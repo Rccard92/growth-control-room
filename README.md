@@ -87,7 +87,7 @@ Copia `.env.example` in `.env` e adatta i valori se necessario.
 | Variabile | Default | Descrizione |
 |-----------|---------|-------------|
 | `VITE_API_URL` | *(vuoto)* | URL base API per il frontend (build-time su Railway) |
-| `DATABASE_URL` | `postgresql+asyncpg://gcr:gcr_dev@localhost:5432/growth_control_room` | Connessione PostgreSQL |
+| `DATABASE_URL` | *(obbligatoria)* | Connessione PostgreSQL; in locale con `APP_ENV=development` usa il default da `.env` |
 | `CORS_ORIGINS` | `*` | Origini CORS consentite (separate da virgola) |
 | `APP_ENV` | `production` | Ambiente applicazione (`development` in locale) |
 
@@ -99,9 +99,11 @@ Due servizi separati: **API** (FastAPI) e **WEB** (Vite preview).
 
 | Variabile | Esempio |
 |-----------|---------|
-| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — se Railway fornisce `postgresql://`, la config lo converte in `postgresql+asyncpg://` |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (**obbligatoria** sul servizio API) |
 | `CORS_ORIGINS` | `https://web-xxx.up.railway.app` |
 | `APP_ENV` | `production` |
+
+`DATABASE_URL` deve essere impostata sul servizio **API**, non solo sul database Postgres. Senza questa variabile il container fallisce all'avvio con un errore esplicito. Railway fornisce spesso `postgresql://` o `postgres://`; la config converte automaticamente per asyncpg (FastAPI) e psycopg (Alembic).
 
 Il container API esegue `alembic upgrade head` all'avvio, poi uvicorn.
 

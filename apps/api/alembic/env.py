@@ -1,4 +1,3 @@
-import uuid
 from logging.config import fileConfig
 
 from alembic import context
@@ -18,6 +17,10 @@ target_metadata = Base.metadata
 
 def get_url() -> str:
     return settings.database_url_sync
+
+
+# Risolve e valida DATABASE_URL prima di qualsiasi connessione.
+config.set_main_option("sqlalchemy.url", get_url())
 
 
 def run_migrations_offline() -> None:
