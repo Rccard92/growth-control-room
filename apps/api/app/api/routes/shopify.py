@@ -9,16 +9,12 @@ from app.models.shopify import ShopifyOrder, ShopifyProduct
 from app.schemas.shopify import (
     ShopifyConnectRequest,
     ShopifyConnectResponse,
-    ShopifyOAuthStartResponse,
     ShopifyDashboardResponse,
-    ShopifyDashboardSummary,
-    ShopifyDashboardProduct,
-    ShopifyDashboardOrder,
-    ShopifyBestSeller,
-    ShopifySeoOpportunity,
-    ShopifyInsight,
+    ShopifyOAuthStartResponse,
     ShopifyOrderRead,
     ShopifyProductRead,
+    ShopifyStatusResponse,
+    ShopifySyncResponse,
 )
 from app.services.projects import get_project_in_default_workspace
 from app.services.shopify.client import ShopifyAPIError, normalize_shop_domain
