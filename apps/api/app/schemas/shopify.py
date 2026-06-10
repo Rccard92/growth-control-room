@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -90,10 +91,15 @@ class ShopifyDashboardSummary(BaseModel):
     products_count: int = Field(serialization_alias="productsCount")
     active_products_count: int = Field(serialization_alias="activeProductsCount")
     draft_products_count: int = Field(serialization_alias="draftProductsCount")
-    out_of_stock_count: int = Field(serialization_alias="outOfStockCount")
-    low_stock_count: int = Field(serialization_alias="lowStockCount")
-    pending_orders_count: int = Field(serialization_alias="pendingOrdersCount")
     paid_orders_count: int = Field(serialization_alias="paidOrdersCount")
+    pending_orders_count: int = Field(serialization_alias="pendingOrdersCount")
+    fulfilled_orders_count: int = Field(serialization_alias="fulfilledOrdersCount")
+    unfulfilled_orders_count: int = Field(serialization_alias="unfulfilledOrdersCount")
+    low_stock_count: int = Field(serialization_alias="lowStockCount")
+    out_of_stock_count: int = Field(serialization_alias="outOfStockCount")
+    products_without_sales_count: int = Field(serialization_alias="productsWithoutSalesCount")
+    seo_issues_count: int = Field(serialization_alias="seoIssuesCount")
+    critical_alerts_count: int = Field(serialization_alias="criticalAlertsCount")
     last_sync_at: datetime | None = Field(default=None, serialization_alias="lastSyncAt")
     shop_domain: str = Field(serialization_alias="shopDomain")
 
@@ -127,12 +133,87 @@ class ShopifyDashboardOrder(BaseModel):
     currency: str | None = None
 
 
-class ShopifyBestSeller(BaseModel):
+class ShopifyDashboardAlert(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    severity: str
+    title: str
+    description: str
+    entity_type: str = Field(serialization_alias="entityType")
+    entity_id: str | None = Field(default=None, serialization_alias="entityId")
+    action_label: str | None = Field(default=None, serialization_alias="actionLabel")
+
+
+class ShopifyBestSellerPerformance(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     product_title: str = Field(serialization_alias="productTitle")
+    sku: str | None = None
     quantity_sold: int = Field(serialization_alias="quantitySold")
     revenue: Decimal
+    current_inventory: int | None = Field(default=None, serialization_alias="currentInventory")
+    status: str | None = None
+
+
+class ShopifyNoSalesProduct(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_title: str = Field(serialization_alias="productTitle")
+    current_inventory: int | None = Field(default=None, serialization_alias="currentInventory")
+    status: str | None = None
+    product_type: str | None = Field(default=None, serialization_alias="productType")
+    seo_issue: bool = Field(default=False, serialization_alias="seoIssue")
+
+
+class ShopifyHighStockLowSales(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_title: str = Field(serialization_alias="productTitle")
+    current_inventory: int | None = Field(default=None, serialization_alias="currentInventory")
+    quantity_sold: int = Field(serialization_alias="quantitySold")
+    issue: str
+
+
+class ShopifyProductPerformanceSection(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    best_sellers: list[ShopifyBestSellerPerformance] = Field(serialization_alias="bestSellers")
+    no_sales_products: list[ShopifyNoSalesProduct] = Field(serialization_alias="noSalesProducts")
+    high_stock_low_sales: list[ShopifyHighStockLowSales] = Field(
+        serialization_alias="highStockLowSales",
+    )
+
+
+class ShopifyInventorySummary(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    total_units: int = Field(serialization_alias="totalUnits")
+    active_products: int = Field(serialization_alias="activeProducts")
+    zero_stock_active_products: int = Field(serialization_alias="zeroStockActiveProducts")
+    low_stock_active_products: int = Field(serialization_alias="lowStockActiveProducts")
+
+
+class ShopifyInventorySection(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    low_stock_products: list[ShopifyDashboardProduct] = Field(
+        serialization_alias="lowStockProducts",
+    )
+    out_of_stock_products: list[ShopifyDashboardProduct] = Field(
+        serialization_alias="outOfStockProducts",
+    )
+    inventory_summary: ShopifyInventorySummary = Field(serialization_alias="inventorySummary")
+
+
+class ShopifyOrdersSection(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    recent_orders: list[ShopifyDashboardOrder] = Field(serialization_alias="recentOrders")
+    pending_orders: list[ShopifyDashboardOrder] = Field(serialization_alias="pendingOrders")
+    unfulfilled_orders: list[ShopifyDashboardOrder] = Field(
+        serialization_alias="unfulfilledOrders",
+    )
 
 
 class ShopifySeoOpportunity(BaseModel):
@@ -143,7 +224,31 @@ class ShopifySeoOpportunity(BaseModel):
     priority: str
 
 
-class ShopifyInsight(BaseModel):
+class ShopifySeoSection(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    products_missing_meta_title: list[ShopifyDashboardProduct] = Field(
+        serialization_alias="productsMissingMetaTitle",
+    )
+    products_missing_meta_description: list[ShopifyDashboardProduct] = Field(
+        serialization_alias="productsMissingMetaDescription",
+    )
+    products_missing_both: list[ShopifyDashboardProduct] = Field(
+        serialization_alias="productsMissingBoth",
+    )
+    seo_opportunities: list[ShopifySeoOpportunity] = Field(serialization_alias="seoOpportunities")
+
+
+class ShopifyAttributionReadiness(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    connected_sources: list[str] = Field(serialization_alias="connectedSources")
+    channel_breakdown: list[dict[str, Any]] = Field(serialization_alias="channelBreakdown")
+    utm_coverage: float | None = Field(default=None, serialization_alias="utmCoverage")
+    message: str
+
+
+class ShopifyDailyDiagnosisItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     message: str
@@ -154,20 +259,15 @@ class ShopifyDashboardResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     summary: ShopifyDashboardSummary
-    recent_orders: list[ShopifyDashboardOrder] = Field(serialization_alias="recentOrders")
-    products: list[ShopifyDashboardProduct]
-    low_stock_products: list[ShopifyDashboardProduct] = Field(
-        serialization_alias="lowStockProducts",
+    alerts: list[ShopifyDashboardAlert]
+    product_performance: ShopifyProductPerformanceSection = Field(
+        serialization_alias="productPerformance",
     )
-    out_of_stock_products: list[ShopifyDashboardProduct] = Field(
-        serialization_alias="outOfStockProducts",
-    )
-    best_sellers: list[ShopifyBestSeller] = Field(serialization_alias="bestSellers")
-    stale_products: list[ShopifyDashboardProduct] = Field(serialization_alias="staleProducts")
-    seo_opportunities: list[ShopifySeoOpportunity] = Field(
-        serialization_alias="seoOpportunities",
-    )
-    insights: list[ShopifyInsight]
+    inventory: ShopifyInventorySection
+    orders: ShopifyOrdersSection
+    seo: ShopifySeoSection
+    attribution: ShopifyAttributionReadiness
+    daily_diagnosis: list[ShopifyDailyDiagnosisItem] = Field(serialization_alias="dailyDiagnosis")
 
 
 class ShopifyProductRead(BaseModel):

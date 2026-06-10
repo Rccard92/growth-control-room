@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
-import { ShopifyInsightCard } from "../components/shopify/ShopifyInsightCard";
-import { ShopifyInventoryWatch } from "../components/shopify/ShopifyInventoryWatch";
-import { ShopifyKpiCard } from "../components/shopify/ShopifyKpiCard";
-import { ShopifyProductPerformance } from "../components/shopify/ShopifyProductPerformance";
-import { ShopifyRecentOrders } from "../components/shopify/ShopifyRecentOrders";
-import { ShopifySeoOpportunities } from "../components/shopify/ShopifySeoOpportunities";
-import { ShopifySyncStatus } from "../components/shopify/ShopifySyncStatus";
+import { AttributionReadinessPanel } from "../components/shopify/AttributionReadinessPanel";
+import { EcommerceDiagnosisPanel } from "../components/shopify/EcommerceDiagnosisPanel";
+import { InventoryRiskPanel } from "../components/shopify/InventoryRiskPanel";
+import { OrdersOperationsPanel } from "../components/shopify/OrdersOperationsPanel";
+import { ProductIntelligencePanel } from "../components/shopify/ProductIntelligencePanel";
+import { SeoOpportunitiesPanel } from "../components/shopify/SeoOpportunitiesPanel";
+import { ShopifyAlertCenter } from "../components/shopify/ShopifyAlertCenter";
+import { ShopifyExecutiveStrip } from "../components/shopify/ShopifyExecutiveStrip";
+import { ShopifyStatusBadge } from "../components/shopify/ShopifyStatusBadge";
 import { useShopifyDashboard, useShopifyStatus, useShopifySync } from "../hooks/useShopify";
 import { queryKeys } from "../lib/queryKeys";
 import { APP_ROUTES } from "../routes/config";
@@ -25,12 +27,12 @@ const SHOPIFY_ERROR_MESSAGES: Record<string, string> = {
   missing_params: "Parametri OAuth mancanti. Riprova la connessione.",
 };
 
-function formatMoney(value: string, currency = "EUR"): string {
+function formatMoney(value: string, currency?: string | null): string {
   const amount = Number(value);
   if (Number.isNaN(amount)) return value;
   return new Intl.NumberFormat("it-IT", {
     style: "currency",
-    currency,
+    currency: currency ?? "EUR",
     maximumFractionDigits: 2,
   }).format(amount);
 }
@@ -79,13 +81,6 @@ export function ShopifyPage() {
       setSearchParams({}, { replace: true });
     }
   }, [id, queryClient, searchParams, setSearchParams]);
-
-  const draftProducts = useMemo(
-    () =>
-      dashboard?.products.filter((product) => (product.status ?? "").toUpperCase() === "DRAFT") ??
-      [],
-    [dashboard?.products],
-  );
 
   if (statusLoading) {
     return (
@@ -161,7 +156,7 @@ export function ShopifyPage() {
           ]}
         />
         <div className="shopify-dashboard__header-actions">
-          <ShopifySyncStatus connected={connected} summary={summary} />
+          <ShopifyStatusBadge connected={connected} summary={summary} />
           <button
             type="button"
             className="gcr-btn gcr-btn--primary"
@@ -209,74 +204,26 @@ export function ShopifyPage() {
 
       {!dashboardLoading && dashboard && summary && (
         <>
-          <div className="shopify-kpi-grid">
-            <ShopifyKpiCard
-              label="Revenue"
-              value={formatMoney(summary.revenue)}
-              meta={`${summary.paidOrdersCount} ordini pagati`}
-              accent="violet"
-            />
-            <ShopifyKpiCard
-              label="Ordini"
-              value={summary.ordersCount}
-              meta={`${summary.pendingOrdersCount} pending`}
-              accent="cyan"
-            />
-            <ShopifyKpiCard
-              label="AOV"
-              value={formatMoney(summary.averageOrderValue)}
-              accent="default"
-            />
-            <ShopifyKpiCard
-              label="Prodotti attivi"
-              value={summary.activeProductsCount}
-              meta={`${summary.productsCount} totali`}
-              accent="emerald"
-            />
-            <ShopifyKpiCard
-              label="Scorte basse"
-              value={summary.lowStockCount}
-              meta={`${summary.outOfStockCount} out of stock`}
-              accent="amber"
-            />
-            <ShopifyKpiCard
-              label="Ordini pending"
-              value={summary.pendingOrdersCount}
-              meta={`${summary.draftProductsCount} prodotti draft`}
-              accent="rose"
-            />
-          </div>
+          <ShopifyExecutiveStrip summary={summary} formatMoney={formatMoney} />
+
+          <EcommerceDiagnosisPanel items={dashboard.dailyDiagnosis} />
 
           <div className="shopify-dashboard__layout">
             <div className="shopify-dashboard__main">
-              <div className="shopify-snapshot">
-                <h3 className="shopify-snapshot__title">Performance snapshot</h3>
-                <p className="shopify-snapshot__copy">
-                  Trend disponibile dopo più sync giornaliere. Stiamo raccoghendo metriche
-                  storiche senza inventare dati.
-                </p>
-              </div>
-
-              <ShopifyInventoryWatch
-                outOfStock={dashboard.outOfStockProducts}
-                lowStock={dashboard.lowStockProducts}
-                stale={dashboard.staleProducts}
+              <ProductIntelligencePanel
+                performance={dashboard.productPerformance}
+                formatMoney={formatMoney}
               />
-
-              <ShopifyProductPerformance
-                products={dashboard.products}
-                bestSellers={dashboard.bestSellers}
-                seoOpportunities={dashboard.seoOpportunities}
-              />
-
-              <ShopifyRecentOrders orders={dashboard.recentOrders} />
+              <InventoryRiskPanel inventory={dashboard.inventory} />
+              <OrdersOperationsPanel orders={dashboard.orders} formatMoney={formatMoney} />
+              <SeoOpportunitiesPanel seo={dashboard.seo} />
             </div>
 
             <div className="shopify-dashboard__side">
-              <ShopifyInsightCard insights={dashboard.insights} />
-              <ShopifySeoOpportunities
-                opportunities={dashboard.seoOpportunities}
-                draftProducts={draftProducts}
+              <ShopifyAlertCenter alerts={dashboard.alerts} />
+              <AttributionReadinessPanel
+                attribution={dashboard.attribution}
+                shopifyConnected={connected}
               />
             </div>
           </div>

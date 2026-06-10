@@ -188,6 +188,7 @@ Implementato:
 - CRUD progetti (`POST/GET /api/projects`, dettaglio)
 - Integrazioni per progetto: merge di 8 provider (anche non collegati → `not_connected`)
 - **Shopify v1**: OAuth connect, sync read-only prodotti/ordini, dashboard KPI
+- **Shopify Dashboard v2**: E-commerce Control Room operativa con product intelligence, inventory risk, order operations, SEO opportunities, alert center, daily diagnosis e attribution readiness (placeholder GA4/Meta/Google Ads/Klaviyo)
 - SEO Content Room e AI Brief: placeholder evoluti con roadmap
 - Struttura connectors e skills (stub OAuth per altri provider)
 

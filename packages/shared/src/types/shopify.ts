@@ -63,10 +63,15 @@ export interface ShopifyDashboardSummary {
   productsCount: number;
   activeProductsCount: number;
   draftProductsCount: number;
-  outOfStockCount: number;
-  lowStockCount: number;
-  pendingOrdersCount: number;
   paidOrdersCount: number;
+  pendingOrdersCount: number;
+  fulfilledOrdersCount: number;
+  unfulfilledOrdersCount: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  productsWithoutSalesCount: number;
+  seoIssuesCount: number;
+  criticalAlertsCount: number;
   lastSyncAt?: string | null;
   shopDomain: string;
 }
@@ -90,10 +95,63 @@ export interface ShopifyDashboardOrder {
   currency?: string | null;
 }
 
-export interface ShopifyBestSeller {
+export interface ShopifyDashboardAlert {
+  id: string;
+  severity: ShopifyInsightSeverity;
+  title: string;
+  description: string;
+  entityType: "product" | "order" | "inventory" | "seo" | "attribution" | "sync";
+  entityId?: string | null;
+  actionLabel?: string | null;
+}
+
+export interface ShopifyBestSellerPerformance {
   productTitle: string;
+  sku?: string | null;
   quantitySold: number;
   revenue: string;
+  currentInventory?: number | null;
+  status?: string | null;
+}
+
+export interface ShopifyNoSalesProduct {
+  productTitle: string;
+  currentInventory?: number | null;
+  status?: string | null;
+  productType?: string | null;
+  seoIssue: boolean;
+}
+
+export interface ShopifyHighStockLowSales {
+  productTitle: string;
+  currentInventory?: number | null;
+  quantitySold: number;
+  issue: string;
+}
+
+export interface ShopifyProductPerformanceSection {
+  bestSellers: ShopifyBestSellerPerformance[];
+  noSalesProducts: ShopifyNoSalesProduct[];
+  highStockLowSales: ShopifyHighStockLowSales[];
+}
+
+export interface ShopifyInventorySummary {
+  totalUnits: number;
+  activeProducts: number;
+  zeroStockActiveProducts: number;
+  lowStockActiveProducts: number;
+}
+
+export interface ShopifyInventorySection {
+  lowStockProducts: ShopifyDashboardProduct[];
+  outOfStockProducts: ShopifyDashboardProduct[];
+  inventorySummary: ShopifyInventorySummary;
+}
+
+export interface ShopifyOrdersSection {
+  recentOrders: ShopifyDashboardOrder[];
+  pendingOrders: ShopifyDashboardOrder[];
+  unfulfilledOrders: ShopifyDashboardOrder[];
 }
 
 export interface ShopifySeoOpportunity {
@@ -102,23 +160,36 @@ export interface ShopifySeoOpportunity {
   priority: string;
 }
 
+export interface ShopifySeoSection {
+  productsMissingMetaTitle: ShopifyDashboardProduct[];
+  productsMissingMetaDescription: ShopifyDashboardProduct[];
+  productsMissingBoth: ShopifyDashboardProduct[];
+  seoOpportunities: ShopifySeoOpportunity[];
+}
+
+export interface ShopifyAttributionReadiness {
+  connectedSources: string[];
+  channelBreakdown: Record<string, unknown>[];
+  utmCoverage: number | null;
+  message: string;
+}
+
 export type ShopifyInsightSeverity = "info" | "warning" | "critical" | "opportunity";
 
-export interface ShopifyInsight {
+export interface ShopifyDailyDiagnosisItem {
   message: string;
   severity: ShopifyInsightSeverity;
 }
 
 export interface ShopifyDashboard {
   summary: ShopifyDashboardSummary;
-  recentOrders: ShopifyDashboardOrder[];
-  products: ShopifyDashboardProduct[];
-  lowStockProducts: ShopifyDashboardProduct[];
-  outOfStockProducts: ShopifyDashboardProduct[];
-  bestSellers: ShopifyBestSeller[];
-  staleProducts: ShopifyDashboardProduct[];
-  seoOpportunities: ShopifySeoOpportunity[];
-  insights: ShopifyInsight[];
+  alerts: ShopifyDashboardAlert[];
+  productPerformance: ShopifyProductPerformanceSection;
+  inventory: ShopifyInventorySection;
+  orders: ShopifyOrdersSection;
+  seo: ShopifySeoSection;
+  attribution: ShopifyAttributionReadiness;
+  dailyDiagnosis: ShopifyDailyDiagnosisItem[];
 }
 
 export interface ShopifyProduct {

@@ -135,6 +135,8 @@ class ShopifyGraphQLClient:
                 totalInventory
                 featuredImage { url }
                 seo { title description }
+                createdAt
+                updatedAt
               }
             }
           }
@@ -164,9 +166,12 @@ class ShopifyGraphQLClient:
                     node {
                       title
                       quantity
-                      product { id title }
+                      sku
+                      variant { id }
+                      product { id title vendor productType }
                       originalUnitPriceSet { shopMoney { amount currencyCode } }
                       discountedTotalSet { shopMoney { amount currencyCode } }
+                      totalDiscountSet { shopMoney { amount currencyCode } }
                     }
                   }
                 }
