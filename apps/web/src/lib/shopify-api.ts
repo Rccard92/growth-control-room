@@ -1,6 +1,7 @@
 import type {
   ShopifyConnectRequest,
   ShopifyConnectResponse,
+  ShopifyOAuthStartResponse,
   ShopifyDashboard,
   ShopifyOrder,
   ShopifyProduct,
@@ -8,6 +9,16 @@ import type {
   ShopifySyncResponse,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
+
+export function startShopifyOAuth(
+  projectId: string,
+  shopDomain: string,
+): Promise<ShopifyOAuthStartResponse> {
+  const params = new URLSearchParams({ shop: shopDomain.trim() });
+  return apiFetch<ShopifyOAuthStartResponse>(
+    `/api/projects/${projectId}/integrations/shopify/oauth/start?${params.toString()}`,
+  );
+}
 
 export function connectShopify(
   projectId: string,

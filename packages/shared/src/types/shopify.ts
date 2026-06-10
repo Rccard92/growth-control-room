@@ -1,3 +1,7 @@
+export interface ShopifyOAuthStartResponse {
+  authorizationUrl: string;
+}
+
 export interface ShopifyConnectRequest {
   shopDomain: string;
   adminAccessToken: string;

@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
@@ -10,7 +12,19 @@ import {
   useShopifyStatus,
   useShopifySync,
 } from "../hooks/useShopify";
+import { queryKeys } from "../lib/queryKeys";
 import { APP_ROUTES } from "../routes/config";
+
+const SHOPIFY_ERROR_MESSAGES: Record<string, string> = {
+  invalid_state: "Sessione OAuth scaduta o non valida. Riprova la connessione.",
+  hmac_invalid: "Verifica di sicurezza Shopify non riuscita. Riprova.",
+  invalid_shop: "Dominio shop non valido. Usa il formato nomesito.myshopify.com.",
+  token_exchange_failed: "Shopify non ha accettato l'autorizzazione. Riprova.",
+  shopify_unavailable: "Shopify non è raggiungibile al momento. Riprova più tardi.",
+  connection_failed: "Impossibile completare la connessione. Riprova.",
+  oauth_not_configured: "OAuth Shopify non configurato sul server. Contatta l'amministratore.",
+  missing_params: "Parametri OAuth mancanti. Riprova la connessione.",
+};
 
 function formatMoney(value: string, currency = "EUR"): string {
   const amount = Number(value);
@@ -29,8 +43,41 @@ function formatDate(value?: string | null): string {
 
 export function ShopifyPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const [oauthBanner, setOauthBanner] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const { data: status, isLoading: statusLoading, error: statusError } = useShopifyStatus(id);
   const connected = status?.connected ?? false;
+
+  useEffect(() => {
+    const connectedParam = searchParams.get("shopify_connected");
+    const errorParam = searchParams.get("shopify_error");
+
+    if (connectedParam === "1") {
+      setOauthBanner({
+        type: "success",
+        message: "Shopify collegato con successo.",
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.shopify.status(id ?? "") });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.integrations(id ?? ""),
+      });
+    } else if (errorParam) {
+      setOauthBanner({
+        type: "error",
+        message:
+          SHOPIFY_ERROR_MESSAGES[errorParam] ??
+          "Errore durante la connessione Shopify. Riprova.",
+      });
+    }
+
+    if (connectedParam || errorParam) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [id, queryClient, searchParams, setSearchParams]);
 
   const { data: dashboard } = useShopifyDashboard(id, connected);
   const { data: products } = useShopifyProducts(id, connected);
@@ -53,13 +100,29 @@ export function ShopifyPage() {
             { label: "Shopify" },
           ]}
         />
+        {oauthBanner && (
+          oauthBanner.type === "success" ? (
+            <div
+              className="gcr-card"
+              style={{ marginBottom: "1rem", maxWidth: 480, borderColor: "rgba(52, 211, 153, 0.3)" }}
+            >
+              <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--gcr-success)" }}>
+                {oauthBanner.message}
+              </p>
+            </div>
+          ) : (
+            <div className="gcr-alert gcr-alert--error" style={{ marginBottom: "1rem", maxWidth: 480 }}>
+              {oauthBanner.message}
+            </div>
+          )
+        )}
         <div className="gcr-card" style={{ maxWidth: 480 }}>
           <StatusBadge variant="not_connected" label="Shopify non collegato" />
           <h3 className="gcr-card__title" style={{ marginTop: "1rem" }}>
             Connetti il tuo store
           </h3>
           <p className="gcr-card__description">
-            Collega Shopify con una Custom App e Admin API access token per sincronizzare ordini e prodotti.
+            Autorizza Growth Control Room su Shopify per sincronizzare ordini e prodotti in modo sicuro.
           </p>
           <Link to={APP_ROUTES.projectShopifyConnect(id!)} className="gcr-btn gcr-btn--primary">
             Connetti Shopify
@@ -94,6 +157,23 @@ export function ShopifyPage() {
           </button>
         }
       />
+
+      {oauthBanner && (
+        oauthBanner.type === "success" ? (
+          <div
+            className="gcr-card"
+            style={{ marginBottom: "1rem", borderColor: "rgba(52, 211, 153, 0.3)" }}
+          >
+            <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--gcr-success)" }}>
+              {oauthBanner.message}
+            </p>
+          </div>
+        ) : (
+          <div className="gcr-alert gcr-alert--error" style={{ marginBottom: "1rem" }}>
+            {oauthBanner.message}
+          </div>
+        )
+      )}
 
       {(statusError || syncMutation.isError) && (
         <div className="gcr-alert gcr-alert--error" style={{ marginBottom: "1rem" }}>

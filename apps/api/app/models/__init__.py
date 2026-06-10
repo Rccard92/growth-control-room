@@ -9,6 +9,7 @@ from app.models.shopify import (
     ShopifyProduct,
     ShopifyStore,
 )
+from app.models.shopify_oauth_state import ShopifyOAuthState
 from app.models.user import User
 from app.models.workspace import Workspace
 
@@ -22,6 +23,7 @@ __all__ = [
     "ShopifyOrder",
     "ShopifyProduct",
     "ShopifyStore",
+    "ShopifyOAuthState",
     "User",
     "Workspace",
 ]

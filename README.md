@@ -125,30 +125,48 @@ Lascia vuoto lo Start Command su entrambi i servizi (usa il CMD del Dockerfile).
 1. Redeploy API (migration 003 + seed demo)
 2. Redeploy WEB con `VITE_API_URL` impostato all'URL pubblico dell'API
 
-## Integrazione Shopify (Custom App)
+## Integrazione Shopify (OAuth)
 
-Connessione manuale read-only via Admin API access token (no OAuth in v1).
+Connessione store tramite OAuth Shopify. L'utente inserisce solo il dominio shop e autorizza l'app su Shopify Admin.
 
-### Creare la Custom App su Shopify
+### Creare l'app Shopify (Partner / Dev Dashboard)
 
-1. Shopify Admin → **Settings** → **Apps and sales channels** → **Develop apps**
-2. **Create an app** → nome a scelta (es. Growth Control Room)
-3. **Configure Admin API scopes**:
+1. Crea un'app su [Shopify Partners](https://partners.shopify.com) o dal Dev Dashboard dello store
+2. **App URL**: `https://web-production-77355.up.railway.app`
+3. **Allowed redirection URL(s)**:
+   `https://api-production-1077.up.railway.app/api/integrations/shopify/oauth/callback`
+4. Configura gli **Admin API scopes**:
    - `read_products`
    - `read_orders`
-   - *(step successivo blog)* `write_content`, `write_online_store_pages`
-4. **Install app** sullo store
-5. Copia **Admin API access token** (`shpat_...`) e il dominio `nomesito.myshopify.com`
+   - `read_content`
+   - `write_content`
+5. Copia **Client ID** e **Client secret** dall'app
 
-### Connettere da Growth Control Room
+### Variabili Railway (servizio API)
+
+| Variabile | Valore esempio |
+|-----------|----------------|
+| `SHOPIFY_CLIENT_ID` | da Shopify App settings |
+| `SHOPIFY_CLIENT_SECRET` | da Shopify App settings |
+| `SHOPIFY_SCOPES` | `read_products,read_orders,read_content,write_content` |
+| `SHOPIFY_REDIRECT_URI` | `https://api-production-1077.up.railway.app/api/integrations/shopify/oauth/callback` |
+| `FRONTEND_URL` | `https://web-production-77355.up.railway.app` |
+
+Assicurati che `CORS_ORIGINS` includa il dominio WEB.
+
+### Flusso utente
 
 1. Apri un progetto → **Integrazioni** → Shopify → **Connetti**
-2. Inserisci dominio shop e Admin API access token
-3. Dopo la connessione, usa **Sincronizza dati Shopify** per importare prodotti e ordini
+2. Inserisci il dominio shop (`nomesito.myshopify.com` o solo `nomesito`)
+3. Clicca **Connetti Shopify** → redirect su Shopify Admin
+4. Autorizza Growth Control Room → ritorno automatico alla piattaforma
+5. Usa **Sincronizza dati** per importare prodotti e ordini
 
-Endpoint API:
+### Endpoint API Shopify
 
-- `POST /api/projects/{id}/integrations/shopify/connect`
+- `GET /api/projects/{id}/integrations/shopify/oauth/start?shop=...`
+- `GET /api/integrations/shopify/oauth/callback` (redirect Shopify)
+- `POST /api/projects/{id}/integrations/shopify/connect` (solo connessione manuale avanzata)
 - `GET /api/projects/{id}/shopify/status`
 - `POST /api/projects/{id}/shopify/sync`
 - `GET /api/projects/{id}/shopify/dashboard`
@@ -169,8 +187,8 @@ Implementato:
 - PostgreSQL con SQLAlchemy async + Alembic (schema foundation + Shopify)
 - CRUD progetti (`POST/GET /api/projects`, dettaglio)
 - Integrazioni per progetto: merge di 8 provider (anche non collegati → `not_connected`)
-- **Shopify v1**: connect manuale (Custom App token), sync read-only prodotti/ordini, dashboard KPI
+- **Shopify v1**: OAuth connect, sync read-only prodotti/ordini, dashboard KPI
 - SEO Content Room e AI Brief: placeholder evoluti con roadmap
 - Struttura connectors e skills (stub OAuth per altri provider)
 
-Non ancora implementato: autenticazione utenti, OAuth integrazioni, sync automatico, creazione articoli blog Shopify, provider oltre Shopify.
+Non ancora implementato: autenticazione utenti, OAuth altri provider, sync automatico, creazione articoli blog Shopify, provider oltre Shopify.

@@ -90,7 +90,7 @@ export function ProjectOverviewPage() {
         <MetricCard
           label="Shopify"
           value={shopifyConnected ? "Connesso" : "Non connesso"}
-          meta={shopifyStatus?.shopDomain ?? "Custom App token"}
+          meta={shopifyStatus?.shopDomain ?? "OAuth Shopify"}
         />
         <MetricCard label="Contenuti SEO" value="0" meta="Bozze e articoli" />
         <MetricCard label="AI Brief" value="—" meta="Prossima generazione" />

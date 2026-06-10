@@ -41,15 +41,18 @@ async def get_shopify_client_for_store(
     )
 
 
-async def connect_shopify(
+async def persist_shopify_connection(
     project_id: UUID,
     shop_domain: str,
-    admin_access_token: str,
+    access_token: str,
     session: AsyncSession,
+    *,
+    shop_info: dict | None = None,
 ) -> ShopifyStore:
     normalized_domain = normalize_shop_domain(shop_domain)
-    client = ShopifyGraphQLClient(normalized_domain, admin_access_token)
-    shop_info = await client.fetch_shop()
+    if shop_info is None:
+        client = ShopifyGraphQLClient(normalized_domain, access_token)
+        shop_info = await client.fetch_shop()
 
     result = await session.execute(
         select(Integration)
@@ -78,7 +81,7 @@ async def connect_shopify(
     credential_payload = json.dumps(
         {
             "shop_domain": normalized_domain,
-            "admin_access_token": admin_access_token.strip(),
+            "admin_access_token": access_token.strip(),
         }
     )
 
@@ -115,3 +118,21 @@ async def connect_shopify(
     await session.flush()
     await session.refresh(store)
     return store
+
+
+async def connect_shopify(
+    project_id: UUID,
+    shop_domain: str,
+    admin_access_token: str,
+    session: AsyncSession,
+) -> ShopifyStore:
+    normalized_domain = normalize_shop_domain(shop_domain)
+    client = ShopifyGraphQLClient(normalized_domain, admin_access_token)
+    shop_info = await client.fetch_shop()
+    return await persist_shopify_connection(
+        project_id,
+        normalized_domain,
+        admin_access_token,
+        session,
+        shop_info=shop_info,
+    )

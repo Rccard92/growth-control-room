@@ -9,6 +9,7 @@ from app.models.shopify import ShopifyOrder, ShopifyProduct
 from app.schemas.shopify import (
     ShopifyConnectRequest,
     ShopifyConnectResponse,
+    ShopifyOAuthStartResponse,
     ShopifyDashboardResponse,
     ShopifyOrderRead,
     ShopifyOrderSummary,
@@ -19,8 +20,13 @@ from app.schemas.shopify import (
     ShopifyTopProduct,
 )
 from app.services.projects import get_project_in_default_workspace
-from app.services.shopify.client import ShopifyAPIError
+from app.services.shopify.client import ShopifyAPIError, normalize_shop_domain
 from app.services.shopify.connect import connect_shopify, get_shopify_client_for_store, get_shopify_store_for_project
+from app.services.shopify.oauth import (
+    build_authorization_url,
+    create_oauth_state,
+    ensure_shopify_oauth_configured,
+)
 from app.services.shopify.dashboard import build_dashboard
 from app.services.shopify.sync import sync_shopify_store
 
@@ -34,6 +40,28 @@ def _map_shopify_error(exc: ShopifyAPIError) -> HTTPException:
     elif code == 403:
         code = status.HTTP_403_FORBIDDEN
     return HTTPException(status_code=code, detail=exc.message)
+
+
+@router.get(
+    "/{project_id}/integrations/shopify/oauth/start",
+    response_model=ShopifyOAuthStartResponse,
+    response_model_by_alias=True,
+)
+async def shopify_oauth_start(
+    project_id: UUID,
+    shop: str,
+    session: AsyncSession = Depends(get_db),
+) -> ShopifyOAuthStartResponse:
+    ensure_shopify_oauth_configured()
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        shop_domain = normalize_shop_domain(shop)
+    except ShopifyAPIError as exc:
+        raise _map_shopify_error(exc) from exc
+
+    oauth_state = await create_oauth_state(session, project_id, shop_domain)
+    authorization_url = build_authorization_url(shop_domain, oauth_state.state)
+    return ShopifyOAuthStartResponse(authorization_url=authorization_url)
 
 
 @router.post(

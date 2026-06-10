@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     database_url: str | None = None
     cors_origins: str = "*"
     app_env: str = "production"
+    shopify_client_id: str | None = None
+    shopify_client_secret: str | None = None
+    shopify_scopes: str = "read_products,read_orders,read_content,write_content"
+    shopify_redirect_uri: str | None = None
+    frontend_url: str | None = None
 
     @model_validator(mode="after")
     def require_database_url(self) -> "Settings":
@@ -31,6 +36,30 @@ class Settings(BaseSettings):
         if url.startswith("postgres://"):
             return url.replace("postgres://", "postgresql://", 1)
         return url
+
+    @property
+    def shopify_oauth_configured(self) -> bool:
+        return all(
+            [
+                self.shopify_client_id,
+                self.shopify_client_secret,
+                self.shopify_redirect_uri,
+                self.frontend_url,
+            ]
+        )
+
+    @property
+    def shopify_oauth_missing_vars(self) -> list[str]:
+        missing: list[str] = []
+        if not self.shopify_client_id:
+            missing.append("SHOPIFY_CLIENT_ID")
+        if not self.shopify_client_secret:
+            missing.append("SHOPIFY_CLIENT_SECRET")
+        if not self.shopify_redirect_uri:
+            missing.append("SHOPIFY_REDIRECT_URI")
+        if not self.frontend_url:
+            missing.append("FRONTEND_URL")
+        return missing
 
     @property
     def cors_origins_list(self) -> list[str]:

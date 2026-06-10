@@ -5,6 +5,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ShopifyOAuthStartResponse(BaseModel):
+    authorization_url: str = Field(serialization_alias="authorizationUrl")
+
+
 class ShopifyConnectRequest(BaseModel):
     shop_domain: str = Field(min_length=1)
     admin_access_token: str = Field(min_length=1)

@@ -6,6 +6,7 @@ export type {
   IntegrationMeta,
 } from "./types/integration";
 export type {
+  ShopifyOAuthStartResponse,
   ShopifyConnectRequest,
   ShopifyConnectResponse,
   ShopifyStatus,

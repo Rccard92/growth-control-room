@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   connectShopify,
+  startShopifyOAuth,
   getShopifyDashboard,
   getShopifyOrders,
   getShopifyProducts,
@@ -39,6 +40,15 @@ export function useShopifyOrders(projectId: string | undefined, connected: boole
     queryKey: queryKeys.shopify.orders(projectId ?? ""),
     queryFn: () => getShopifyOrders(projectId!),
     enabled: Boolean(projectId) && connected,
+  });
+}
+
+export function useShopifyOAuthStart(projectId: string) {
+  return useMutation({
+    mutationFn: async (shopDomain: string) => {
+      const result = await startShopifyOAuth(projectId, shopDomain);
+      window.location.href = result.authorizationUrl;
+    },
   });
 }
 
