@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -81,9 +81,57 @@ class ShopifyProduct(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     featured_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     seo_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     seo_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    created_at_shopify: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    updated_at_shopify: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    variants_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    min_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    max_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     store: Mapped["ShopifyStore"] = relationship(back_populates="products")
+    variants: Mapped[list["ShopifyProductVariant"]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+    )
+
+
+class ShopifyProductVariant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "shopify_product_variants"
+    __table_args__ = (
+        UniqueConstraint(
+            "shopify_store_id",
+            "shopify_variant_gid",
+            name="uq_shopify_product_variants_store_gid",
+        ),
+    )
+
+    shopify_store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_stores.id", ondelete="CASCADE"),
+        index=True,
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_products.id", ondelete="CASCADE"),
+        index=True,
+    )
+    shopify_variant_gid: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(500))
+    sku: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    compare_at_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    inventory_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    selected_options: Mapped[list[dict[str, str]] | None] = mapped_column(JSONB, nullable=True)
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    product: Mapped["ShopifyProduct"] = relationship(back_populates="variants")
 
 
 class ShopifyOrder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -115,11 +163,16 @@ class ShopifyOrder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     fulfillment_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     subtotal_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    current_total_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    total_discounts: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    shipping_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
     customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source_identifier: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    registered_source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     channel_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    channel_handle: Mapped[str | None] = mapped_column(String(100), nullable=True)
     landing_page: Mapped[str | None] = mapped_column(Text, nullable=True)
     referrer_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
     referrer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -128,10 +181,64 @@ class ShopifyOrder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     utm_campaign: Mapped[str | None] = mapped_column(String(255), nullable=True)
     utm_content: Mapped[str | None] = mapped_column(String(255), nullable=True)
     utm_term: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_utm_source: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_utm_medium: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_utm_campaign: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_utm_content: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_utm_term: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_landing_page: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_referral_code: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_source: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_source_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    discount_codes: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    attribution_ready: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    days_to_conversion: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_order_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     customer_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     store: Mapped["ShopifyStore"] = relationship(back_populates="orders")
+    line_items: Mapped[list["ShopifyOrderLineItem"]] = relationship(
+        back_populates="order",
+        cascade="all, delete-orphan",
+    )
+
+
+class ShopifyOrderLineItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "shopify_order_line_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "shopify_store_id",
+            "shopify_line_item_gid",
+            name="uq_shopify_order_line_items_store_gid",
+        ),
+    )
+
+    shopify_store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_stores.id", ondelete="CASCADE"),
+        index=True,
+    )
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_orders.id", ondelete="CASCADE"),
+        index=True,
+    )
+    shopify_line_item_gid: Mapped[str] = mapped_column(String(255))
+    product_gid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    variant_gid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    title: Mapped[str] = mapped_column(String(500))
+    sku: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    vendor: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    product_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, default=0)
+    unit_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    original_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    discounted_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    order: Mapped["ShopifyOrder"] = relationship(back_populates="line_items")
 
 
 class ShopifyDailyMetric(Base, UUIDPrimaryKeyMixin, TimestampMixin):

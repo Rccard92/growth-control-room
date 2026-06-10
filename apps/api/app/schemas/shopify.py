@@ -37,8 +37,11 @@ class ShopifySyncResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     products_synced: int = Field(serialization_alias="productsSynced")
+    variants_synced: int = Field(default=0, serialization_alias="variantsSynced")
     orders_synced: int = Field(serialization_alias="ordersSynced")
+    line_items_synced: int = Field(default=0, serialization_alias="lineItemsSynced")
     metrics_synced: int = Field(serialization_alias="metricsSynced")
+    duration_seconds: float = Field(default=0.0, serialization_alias="durationSeconds")
     last_sync_at: datetime = Field(serialization_alias="lastSyncAt")
 
 
@@ -336,6 +339,19 @@ class ShopifyDashboardResponse(BaseModel):
 
     summary: ShopifyDashboardSummary
     alerts: list[ShopifyDashboardAlert]
+    product_intelligence: ShopifyProductPerformanceSection = Field(
+        serialization_alias="productIntelligence",
+    )
+    attribution_intelligence: ShopifyAttributionIntelligence = Field(
+        serialization_alias="attributionIntelligence",
+    )
+    inventory_risk: ShopifyInventorySection = Field(serialization_alias="inventoryRisk")
+    order_operations: ShopifyOrdersSection = Field(serialization_alias="orderOperations")
+    seo_opportunities: ShopifySeoSection = Field(serialization_alias="seoOpportunities")
+    daily_diagnosis: list[ShopifyDailyDiagnosisItem] = Field(
+        serialization_alias="dailyDiagnosis",
+    )
+    # Backward compatibility
     product_performance: ShopifyProductPerformanceSection = Field(
         serialization_alias="productPerformance",
     )
@@ -343,13 +359,9 @@ class ShopifyDashboardResponse(BaseModel):
     orders: ShopifyOrdersSection
     seo: ShopifySeoSection
     attribution: ShopifyAttributionReadiness
-    attribution_intelligence: ShopifyAttributionIntelligence = Field(
-        serialization_alias="attributionIntelligence",
-    )
     marketing_report_availability: ShopifyMarketingReportAvailability = Field(
         serialization_alias="marketingReportAvailability",
     )
-    daily_diagnosis: list[ShopifyDailyDiagnosisItem] = Field(serialization_alias="dailyDiagnosis")
 
 
 class ShopifyProductRead(BaseModel):

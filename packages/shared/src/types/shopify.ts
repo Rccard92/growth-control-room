@@ -23,8 +23,11 @@ export interface ShopifyStatus {
 
 export interface ShopifySyncResponse {
   productsSynced: number;
+  variantsSynced?: number;
   ordersSynced: number;
+  lineItemsSynced?: number;
   metricsSynced: number;
+  durationSeconds?: number;
   lastSyncAt: string;
 }
 
@@ -229,14 +232,19 @@ export interface ShopifyDailyDiagnosisItem {
 export interface ShopifyDashboard {
   summary: ShopifyDashboardSummary;
   alerts: ShopifyDashboardAlert[];
+  productIntelligence?: ShopifyProductPerformanceSection;
+  attributionIntelligence: ShopifyAttributionIntelligence;
+  inventoryRisk?: ShopifyInventorySection;
+  orderOperations?: ShopifyOrdersSection;
+  seoOpportunities?: ShopifySeoSection;
+  dailyDiagnosis: ShopifyDailyDiagnosisItem[];
+  // Backward compatibility
   productPerformance: ShopifyProductPerformanceSection;
   inventory: ShopifyInventorySection;
   orders: ShopifyOrdersSection;
   seo: ShopifySeoSection;
   attribution: ShopifyAttributionReadiness;
-  attributionIntelligence: ShopifyAttributionIntelligence;
   marketingReportAvailability: ShopifyMarketingReportAvailability;
-  dailyDiagnosis: ShopifyDailyDiagnosisItem[];
 }
 
 export interface ShopifyProduct {

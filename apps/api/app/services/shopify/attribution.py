@@ -25,82 +25,102 @@ def _normalize_source_label(value: str | None) -> str | None:
     return cleaned or None
 
 
-def _visit_data(journey: dict[str, Any] | None, prefer_last: bool = True) -> dict[str, Any]:
+def _visit_from_journey(journey: dict[str, Any] | None, *, first: bool) -> dict[str, Any]:
     if not journey:
         return {}
-    key = "lastVisit" if prefer_last else "firstVisit"
+    key = "firstVisit" if first else "lastVisit"
     visit = journey.get(key) or {}
-    if not visit and prefer_last:
-        visit = journey.get("firstVisit") or {}
     return visit if isinstance(visit, dict) else {}
 
 
-def resolve_customer_type(customer: dict[str, Any] | None) -> str:
-    if not customer:
-        return "unknown"
-    try:
-        count = int(customer.get("numberOfOrders") or 0)
-    except (TypeError, ValueError):
-        return "unknown"
-    if count <= 1:
-        return "new"
-    return "returning"
+def _touch_from_visit(visit: dict[str, Any]) -> dict[str, Any]:
+    utm = visit.get("utmParameters") or {}
+    return {
+        "utm_source": _normalize_source_label(utm.get("source")),
+        "utm_medium": _normalize_source_label(utm.get("medium")),
+        "utm_campaign": _normalize_source_label(utm.get("campaign")),
+        "utm_content": _normalize_source_label(utm.get("content")),
+        "utm_term": _normalize_source_label(utm.get("term")),
+        "landing_page": _normalize_source_label(visit.get("landingPage")),
+        "referral_code": _normalize_source_label(visit.get("referralCode")),
+        "source": _normalize_source_label(visit.get("source")),
+        "source_type": _normalize_source_label(visit.get("sourceType")),
+    }
+
+
+def extract_first_touch(node: dict[str, Any]) -> dict[str, Any]:
+    journey = node.get("customerJourneySummary") or {}
+    return _touch_from_visit(_visit_from_journey(journey, first=True))
+
+
+def extract_last_touch(node: dict[str, Any]) -> dict[str, Any]:
+    journey = node.get("customerJourneySummary") or {}
+    visit = _visit_from_journey(journey, first=False)
+    if not visit:
+        visit = _visit_from_journey(journey, first=True)
+    return _touch_from_visit(visit)
+
+
+def extract_journey_meta(node: dict[str, Any]) -> dict[str, Any]:
+    journey = node.get("customerJourneySummary") or {}
+    ready = journey.get("ready")
+    days = journey.get("daysToConversion")
+    index = journey.get("customerOrderIndex")
+    return {
+        "attribution_ready": bool(ready) if ready is not None else None,
+        "days_to_conversion": int(days) if days is not None else None,
+        "customer_order_index": int(index) if index is not None else None,
+    }
 
 
 def extract_order_attribution(node: dict[str, Any]) -> dict[str, Any]:
-    journey = node.get("customerJourneySummary") or {}
-    visit = _visit_data(journey, prefer_last=True)
-    utm = visit.get("utmParameters") or {}
+    first = extract_first_touch(node)
+    last = extract_last_touch(node)
+    journey_meta = extract_journey_meta(node)
 
     channel_info = node.get("channelInformation") or {}
     channel_def = channel_info.get("channelDefinition") or {}
-    channel_name = _normalize_source_label(channel_def.get("channelName"))
 
-    source_name = _normalize_source_label(node.get("sourceName"))
-    source_identifier = _normalize_source_label(node.get("sourceIdentifier"))
-    registered_source_url = _normalize_source_label(node.get("registeredSourceUrl"))
-
-    utm_source = _normalize_source_label(utm.get("source"))
-    utm_medium = _normalize_source_label(utm.get("medium"))
-    utm_campaign = _normalize_source_label(utm.get("campaign"))
-    utm_content = _normalize_source_label(utm.get("content"))
-    utm_term = _normalize_source_label(utm.get("term"))
-
-    landing_page = _normalize_source_label(visit.get("landingPage"))
-    referrer_source = _normalize_source_label(visit.get("sourceType") or visit.get("source"))
-    referrer_name = _normalize_source_label(visit.get("referralCode"))
-
-    customer = node.get("customer") or {}
-    customer_type = resolve_customer_type(customer)
+    discount_codes = node.get("discountCodes") or []
+    if not isinstance(discount_codes, list):
+        discount_codes = []
 
     return {
-        "source_name": source_name,
-        "source_identifier": source_identifier,
-        "channel_name": channel_name,
-        "landing_page": landing_page,
-        "referrer_source": referrer_source,
-        "referrer_name": referrer_name,
-        "utm_source": utm_source,
-        "utm_medium": utm_medium,
-        "utm_campaign": utm_campaign,
-        "utm_content": utm_content,
-        "utm_term": utm_term,
-        "customer_type": customer_type,
-        "registered_source_url": registered_source_url,
+        "source_name": _normalize_source_label(node.get("sourceName")),
+        "source_identifier": _normalize_source_label(node.get("sourceIdentifier")),
+        "registered_source_url": _normalize_source_label(node.get("registeredSourceUrl")),
+        "channel_name": _normalize_source_label(channel_def.get("channelName")),
+        "channel_handle": _normalize_source_label(channel_def.get("handle")),
+        "landing_page": last.get("landing_page"),
+        "referrer_source": last.get("source_type") or last.get("source"),
+        "referrer_name": last.get("referral_code"),
+        "utm_source": last.get("utm_source"),
+        "utm_medium": last.get("utm_medium"),
+        "utm_campaign": last.get("utm_campaign"),
+        "utm_content": last.get("utm_content"),
+        "utm_term": last.get("utm_term"),
+        "first_utm_source": first.get("utm_source"),
+        "first_utm_medium": first.get("utm_medium"),
+        "first_utm_campaign": first.get("utm_campaign"),
+        "first_utm_content": first.get("utm_content"),
+        "first_utm_term": first.get("utm_term"),
+        "first_landing_page": first.get("landing_page"),
+        "first_referral_code": first.get("referral_code"),
+        "first_source": first.get("source"),
+        "first_source_type": first.get("source_type"),
+        "discount_codes": discount_codes,
+        "customer_type": "unknown",
+        **journey_meta,
     }
 
 
 def order_has_tracking_signal(order: ShopifyOrder) -> bool:
-    payload = order.raw_payload or {}
-    extracted = extract_order_attribution(payload)
     return bool(
         order.utm_source
         or order.source_name
         or order.channel_name
-        or extracted.get("registered_source_url")
-        or extracted.get("utm_source")
-        or extracted.get("source_name")
-        or extracted.get("channel_name")
+        or order.registered_source_url
+        or order.first_utm_source
     )
 
 
@@ -112,35 +132,18 @@ def _is_direct_like(value: str | None) -> bool:
 
 
 def resolve_attribution_source(order: ShopifyOrder) -> str:
-    utm_source = _normalize_source_label(order.utm_source)
-    if utm_source:
-        if _is_direct_like(utm_source):
+    for value in (
+        order.utm_source,
+        order.source_name,
+        order.channel_name,
+        order.registered_source_url,
+    ):
+        label = _normalize_source_label(value)
+        if not label:
+            continue
+        if _is_direct_like(label):
             return DIRECT_SOURCE
-        return utm_source
-
-    source_name = _normalize_source_label(order.source_name)
-    if source_name:
-        if _is_direct_like(source_name):
-            return DIRECT_SOURCE
-        return source_name
-
-    channel_name = _normalize_source_label(order.channel_name)
-    if channel_name:
-        if _is_direct_like(channel_name):
-            return DIRECT_SOURCE
-        return channel_name
-
-    payload = order.raw_payload or {}
-    extracted = extract_order_attribution(payload)
-    registered = extracted.get("registered_source_url")
-    if registered:
-        if _is_direct_like(registered):
-            return DIRECT_SOURCE
-        return registered
-
-    if _is_direct_like(source_name) or _is_direct_like(utm_source):
-        return DIRECT_SOURCE
-
+        return label
     return UNKNOWN_SOURCE
 
 
@@ -182,21 +185,27 @@ def compute_attribution_intelligence(orders: list[ShopifyOrder]) -> dict[str, An
     revenue_by_campaign: defaultdict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     orders_by_campaign: Counter[str] = Counter()
     new_returning: dict[str, dict[str, Any]] = defaultdict(
-        lambda: {"new_count": 0, "returning_count": 0, "unknown_count": 0, "revenue": Decimal("0")}
+        lambda: {
+            "new_count": 0,
+            "returning_count": 0,
+            "unknown_count": 0,
+            "revenue": Decimal("0"),
+        }
     )
     products_by_source: dict[str, set[str]] = defaultdict(set)
-    product_revenue_by_source: dict[tuple[str, str], Decimal] = defaultdict(lambda: Decimal("0"))
+    product_revenue_by_source: dict[tuple[str, str], Decimal] = defaultdict(
+        lambda: Decimal("0")
+    )
 
     tracking_signals = 0
     direct_count = 0
     unknown_count = 0
     unknown_revenue = Decimal("0")
-    direct_revenue = Decimal("0")
     has_utm_campaign = False
 
     for order in orders:
         source = resolve_attribution_source(order)
-        revenue = order.total_price or Decimal("0")
+        revenue = order.current_total_price or order.total_price or Decimal("0")
         channel = _normalize_source_label(order.channel_name) or UNKNOWN_SOURCE
         campaign = _normalize_source_label(order.utm_campaign)
 
@@ -226,7 +235,6 @@ def compute_attribution_intelligence(orders: list[ShopifyOrder]) -> dict[str, An
 
         if source == DIRECT_SOURCE:
             direct_count += 1
-            direct_revenue += revenue
         if source == UNKNOWN_SOURCE:
             unknown_count += 1
             unknown_revenue += revenue
@@ -281,7 +289,9 @@ def compute_attribution_intelligence(orders: list[ShopifyOrder]) -> dict[str, An
             "unknown_count": data["unknown_count"],
             "revenue": data["revenue"],
         }
-        for src, data in sorted(new_returning.items(), key=lambda x: x[1]["revenue"], reverse=True)
+        for src, data in sorted(
+            new_returning.items(), key=lambda x: x[1]["revenue"], reverse=True
+        )
     ][:15]
 
     campaign_items = _breakdown_items(revenue_by_campaign, orders_by_campaign, "campaign")
@@ -289,12 +299,16 @@ def compute_attribution_intelligence(orders: list[ShopifyOrder]) -> dict[str, An
         campaign_items = []
 
     return {
-        "revenue_by_source": _breakdown_items(revenue_by_source, orders_by_source, "source"),
+        "revenue_by_source": _breakdown_items(
+            revenue_by_source, orders_by_source, "source"
+        ),
         "orders_by_source": [
             {"source": k, "orders_count": v, "revenue": revenue_by_source[k]}
             for k, v in orders_by_source.most_common(15)
         ],
-        "revenue_by_channel": _breakdown_items(revenue_by_channel, orders_by_channel, "channel"),
+        "revenue_by_channel": _breakdown_items(
+            revenue_by_channel, orders_by_channel, "channel"
+        ),
         "orders_by_channel": [
             {"channel": k, "orders_count": v, "revenue": revenue_by_channel[k]}
             for k, v in orders_by_channel.most_common(15)
@@ -342,11 +356,12 @@ def build_marketing_report_availability(
 ) -> dict[str, Any]:
     has_signal = any(order_has_tracking_signal(o) for o in orders)
     return {
-        "shopify_order_attribution_available": has_signal and intelligence.get("_total_orders", 0) > 0,
+        "shopify_order_attribution_available": has_signal
+        and intelligence.get("_total_orders", 0) > 0,
         "shopifyql_available": None,
         "message": (
             "Questa vista usa i dati attribution disponibili sugli ordini Shopify. "
-            "I report aggregati ShopifyQL verranno testati nello step successivo."
+            "ShopifyQL non è ancora implementato."
         ),
     }
 

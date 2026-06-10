@@ -6,7 +6,9 @@ from app.models.project import Project
 from app.models.shopify import (
     ShopifyDailyMetric,
     ShopifyOrder,
+    ShopifyOrderLineItem,
     ShopifyProduct,
+    ShopifyProductVariant,
     ShopifyStore,
 )
 from app.models.shopify_oauth_state import ShopifyOAuthState
@@ -21,7 +23,9 @@ __all__ = [
     "Project",
     "ShopifyDailyMetric",
     "ShopifyOrder",
+    "ShopifyOrderLineItem",
     "ShopifyProduct",
+    "ShopifyProductVariant",
     "ShopifyStore",
     "ShopifyOAuthState",
     "User",

@@ -140,8 +140,11 @@ async def shopify_sync(
     await session.refresh(store)
     return ShopifySyncResponse(
         products_synced=counts["products_synced"],
+        variants_synced=counts.get("variants_synced", 0),
         orders_synced=counts["orders_synced"],
+        line_items_synced=counts.get("line_items_synced", 0),
         metrics_synced=counts["metrics_synced"],
+        duration_seconds=counts.get("duration_seconds", 0.0),
         last_sync_at=store.last_sync_at,
     )
 

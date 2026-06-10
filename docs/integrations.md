@@ -45,7 +45,40 @@ L'API userà il registry per istanziare il connector corretto in base al tipo di
 
 ## Stato attuale
 
-Tutti i connector sono **stub**: i metodi sollevano `NotImplementedError`. Nessun OAuth o chiamata API reale è implementato.
+L'integrazione **Shopify OAuth** è operativa in `apps/api` (connessione store, sync, dashboard).
+
+Il package `packages/connectors` contiene ancora uno stub `ShopifyConnector`; la logica reale vive in `apps/api/app/services/shopify/`.
+
+### Shopify Sync v2
+
+Il sync Shopify v2 (`POST /api/projects/{id}/shopify/sync`) esegue:
+
+- **Paginazione cursor-based** (100 record/pagina) su prodotti e ordini
+- **Tutti i prodotti** disponibili nello shop
+- **Ordini** disponibili con lo scope attuale (`read_orders`): di default **ultimi 60 giorni** (senza `read_all_orders`)
+- **Normalizzazione DB** di varianti prodotto (`shopify_product_variants`) e line items ordine (`shopify_order_line_items`)
+- **Attribution first/last touch** su colonne ordine (UTM, landing page, source, channel)
+- **Metriche giornaliere** ricostruite localmente dagli ordini sincronizzati
+
+Limiti attuali:
+
+| Funzionalità | Stato |
+|--------------|-------|
+| ShopifyQL / report Analytics aggregati | Non implementato |
+| `read_customers` (LTV, numberOfOrders) | Non richiesto nello scope attuale |
+| `read_all_orders` (storico > 60 gg) | Non richiesto; serve approvazione Partner |
+| GA4 / Meta / Google Ads / Klaviyo | Non implementato |
+
+Scope OAuth attuali: `read_products`, `read_orders`, `read_content`, `write_content`.
+
+Endpoint principali:
+
+- `GET /api/projects/{id}/integrations/shopify/oauth/start?shop=...`
+- `GET /api/integrations/shopify/oauth/callback`
+- `POST /api/projects/{id}/shopify/sync`
+- `GET /api/projects/{id}/shopify/dashboard`
+
+Gli altri connector (Meta, GA4, ecc.) restano **stub**.
 
 ## Flusso OAuth (design futuro)
 
