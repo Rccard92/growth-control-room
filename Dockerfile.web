@@ -6,21 +6,12 @@ ENV CI=true
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-
-COPY apps/web/package.json ./apps/web/
-COPY apps/api/package.json ./apps/api/
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/ui/package.json ./packages/ui/
+COPY . .
 
 RUN pnpm install --frozen-lockfile
-
-COPY apps/web ./apps/web
-COPY packages/shared ./packages/shared
-COPY packages/ui ./packages/ui
 
 RUN pnpm --filter @gcr/web build
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "pnpm --filter @gcr/web preview --host 0.0.0.0 --port ${PORT:-3000}"]
+CMD ["sh", "-c", "pnpm --filter @gcr/web run preview --host 0.0.0.0 --port ${PORT:-3000}"]
