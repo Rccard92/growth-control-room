@@ -15,6 +15,8 @@ import { ShopifyControlRoomHeader } from "../components/shopify/ShopifyControlRo
 import { ShopifyExecutiveStrip } from "../components/shopify/ShopifyExecutiveStrip";
 import { ShopifySyncSummary } from "../components/shopify/ShopifySyncSummary";
 import { useShopifyDashboard, useShopifyStatus, useShopifySync } from "../hooks/useShopify";
+import { useDateRangeParams } from "../hooks/useDateRangeParams";
+import { getDateRangeDisplayLabel } from "../lib/date-range";
 import { resolveShopifyDashboardBlocks } from "../lib/shopify-dashboard-blocks";
 import { formatShopifyMoney } from "../lib/shopify-format";
 import { queryKeys } from "../lib/queryKeys";
@@ -50,13 +52,14 @@ export function ShopifyControlRoomPage() {
     message: string;
   } | null>(null);
 
+  const { dateRange, setDateRange } = useDateRangeParams();
   const { data: status, isLoading: statusLoading, error: statusError } = useShopifyStatus(id);
   const connected = status?.connected ?? false;
   const {
     data: dashboard,
     isLoading: dashboardLoading,
     error: dashboardError,
-  } = useShopifyDashboard(id, connected);
+  } = useShopifyDashboard(id, connected, dateRange);
   const syncMutation = useShopifySync(projectId);
 
   useEffect(() => {
@@ -82,7 +85,10 @@ export function ShopifyControlRoomPage() {
     }
 
     if (connectedParam || errorParam) {
-      setSearchParams({}, { replace: true });
+      const next = new URLSearchParams(searchParams);
+      next.delete("shopify_connected");
+      next.delete("shopify_error");
+      setSearchParams(next, { replace: true });
     }
   }, [projectId, queryClient, searchParams, setSearchParams]);
 
@@ -132,6 +138,9 @@ export function ShopifyControlRoomPage() {
 
   const blocks = dashboard ? resolveShopifyDashboardBlocks(dashboard) : null;
   const summary = blocks?.summary;
+  const periodLabel = dashboard
+    ? getDateRangeDisplayLabel(dateRange, dashboard.period.label)
+    : getDateRangeDisplayLabel(dateRange);
 
   return (
     <motion.div
@@ -147,6 +156,9 @@ export function ShopifyControlRoomPage() {
         status={status}
         syncing={syncMutation.isPending}
         onSync={() => syncMutation.mutate()}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        periodLabel={periodLabel}
         syncSummary={
           syncMutation.isSuccess && syncMutation.data ? (
             <ShopifySyncSummary data={syncMutation.data} />
@@ -181,6 +193,7 @@ export function ShopifyControlRoomPage() {
             summary={summary}
             trackingQualityScore={blocks.attributionIntelligence.trackingQualityScore}
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
+            periodLabel={periodLabel}
           />
 
           <DailyDiagnosisPanel items={blocks.dailyDiagnosis} />
@@ -191,11 +204,13 @@ export function ShopifyControlRoomPage() {
             intelligence={blocks.attributionIntelligence}
             availability={blocks.marketingReportAvailability}
             formatMoney={formatShopifyMoney}
+            periodLabel={periodLabel}
           />
 
           <ProductIntelligencePanel
             productIntelligence={blocks.productIntelligence}
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
+            periodLabel={periodLabel}
           />
 
           <InventoryRiskPanel inventoryRisk={blocks.inventoryRisk} />
@@ -203,6 +218,7 @@ export function ShopifyControlRoomPage() {
           <OrdersOperationsPanel
             orderOperations={blocks.orderOperations}
             formatMoney={formatShopifyMoney}
+            periodLabel={periodLabel}
           />
 
           <SeoOpportunitiesPanel seoOpportunities={blocks.seoOpportunities} />

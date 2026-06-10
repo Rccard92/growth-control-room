@@ -7,6 +7,7 @@ import { ShowMoreToggle } from "./ShowMoreToggle";
 interface OrdersOperationsPanelProps {
   orderOperations: ShopifyOrdersSection;
   formatMoney: (value: string, currency?: string | null) => string;
+  periodLabel?: string;
 }
 
 type OrderTab = "recent" | "pending" | "unfulfilled";
@@ -53,7 +54,11 @@ function OrderRow({
   );
 }
 
-export function OrdersOperationsPanel({ orderOperations, formatMoney }: OrdersOperationsPanelProps) {
+export function OrdersOperationsPanel({
+  orderOperations,
+  formatMoney,
+  periodLabel,
+}: OrdersOperationsPanelProps) {
   const [tab, setTab] = useState<OrderTab>("recent");
   const [expanded, setExpanded] = useState(false);
 
@@ -68,6 +73,11 @@ export function OrdersOperationsPanel({ orderOperations, formatMoney }: OrdersOp
   return (
     <section className="shopify-orders-ops gcr-card">
       <h3 className="shopify-panel__title">Orders Operations</h3>
+      <p className="shopify-panel__context">
+        {periodLabel
+          ? `Ordini nel periodo selezionato: ${periodLabel}`
+          : "Ordini nel periodo selezionato"}
+      </p>
       <div className="shopify-orders-ops__badges">
         {orderOperations.pendingOrders.length > 0 && (
           <span className="shopify-severity shopify-severity--warning">

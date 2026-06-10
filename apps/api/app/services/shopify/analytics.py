@@ -11,6 +11,7 @@ from app.services.shopify.attribution import (
     order_has_tracking_signal,
     resolve_attribution_source,
 )
+from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
 
 LOW_STOCK_THRESHOLD = 10
 HIGH_STOCK_THRESHOLD = 20
@@ -34,14 +35,26 @@ def _product_to_dict(product: ShopifyProduct) -> dict[str, Any]:
     }
 
 
+def _period_line_item_filters(period: ResolvedPeriod | None) -> list[Any]:
+    if period is None:
+        return []
+    effective_at = order_effective_at_column()
+    return [
+        effective_at.is_not(None),
+        effective_at >= period.start_at,
+        effective_at < period.end_at_exclusive,
+    ]
+
+
 async def compute_best_sellers(
     session: AsyncSession,
     store_id: Any,
     products_by_gid: dict[str, ShopifyProduct],
     *,
+    period: ResolvedPeriod | None = None,
     limit: int = 10,
 ) -> list[dict[str, Any]]:
-    result = await session.execute(
+    query = (
         select(
             ShopifyOrderLineItem.product_gid,
             func.sum(ShopifyOrderLineItem.quantity).label("qty"),
@@ -55,16 +68,19 @@ async def compute_best_sellers(
             func.max(ShopifyOrderLineItem.title).label("title"),
             func.max(ShopifyOrderLineItem.sku).label("sku"),
         )
+        .select_from(ShopifyOrderLineItem)
+        .join(ShopifyOrder, ShopifyOrderLineItem.order_id == ShopifyOrder.id)
         .where(
             ShopifyOrderLineItem.shopify_store_id == store_id,
             ShopifyOrderLineItem.product_gid.is_not(None),
+            *_period_line_item_filters(period),
         )
         .group_by(ShopifyOrderLineItem.product_gid)
         .order_by(func.sum(ShopifyOrderLineItem.quantity).desc())
         .limit(limit)
     )
 
-    rows = result.all()
+    rows = (await session.execute(query)).all()
     items: list[dict[str, Any]] = []
     for row in rows:
         product = products_by_gid.get(row.product_gid or "")
@@ -84,35 +100,46 @@ async def compute_best_sellers(
 async def compute_sold_product_gids(
     session: AsyncSession,
     store_id: Any,
+    *,
+    period: ResolvedPeriod | None = None,
 ) -> set[str]:
-    result = await session.execute(
+    query = (
         select(ShopifyOrderLineItem.product_gid)
+        .select_from(ShopifyOrderLineItem)
+        .join(ShopifyOrder, ShopifyOrderLineItem.order_id == ShopifyOrder.id)
         .where(
             ShopifyOrderLineItem.shopify_store_id == store_id,
             ShopifyOrderLineItem.product_gid.is_not(None),
+            *_period_line_item_filters(period),
         )
         .distinct()
     )
+    result = await session.execute(query)
     return {row[0] for row in result.all() if row[0]}
 
 
 async def compute_qty_by_product_gid(
     session: AsyncSession,
     store_id: Any,
+    *,
+    period: ResolvedPeriod | None = None,
 ) -> Counter[str]:
-    result = await session.execute(
+    query = (
         select(
             ShopifyOrderLineItem.product_gid,
             func.sum(ShopifyOrderLineItem.quantity),
         )
+        .select_from(ShopifyOrderLineItem)
+        .join(ShopifyOrder, ShopifyOrderLineItem.order_id == ShopifyOrder.id)
         .where(
             ShopifyOrderLineItem.shopify_store_id == store_id,
             ShopifyOrderLineItem.product_gid.is_not(None),
+            *_period_line_item_filters(period),
         )
         .group_by(ShopifyOrderLineItem.product_gid)
     )
     counter: Counter[str] = Counter()
-    for gid, qty in result.all():
+    for gid, qty in (await session.execute(query)).all():
         if gid:
             counter[gid] += int(qty or 0)
     return counter
@@ -146,7 +173,10 @@ def compute_products_without_sales(
 def compute_high_stock_low_sales(
     products: list[ShopifyProduct],
     qty_by_gid: Counter[str],
+    *,
+    period_label: str | None = None,
 ) -> list[dict[str, Any]]:
+    period_suffix = period_label or "nel periodo selezionato"
     result: list[dict[str, Any]] = []
     for product in products:
         if not _is_active_status(product.status):
@@ -164,7 +194,7 @@ def compute_high_stock_low_sales(
                 "quantity_sold": sold,
                 "issue": (
                     f"Stock alto ({inv} unità) con vendite basse "
-                    f"({sold} negli ordini sincronizzati)"
+                    f"({sold} {period_suffix})"
                 ),
             }
         )

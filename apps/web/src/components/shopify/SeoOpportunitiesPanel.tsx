@@ -49,6 +49,7 @@ export function SeoOpportunitiesPanel({ seoOpportunities }: SeoOpportunitiesPane
   return (
     <section className="shopify-seo-panel gcr-card">
       <h3 className="shopify-panel__title">SEO Opportunities</h3>
+      <p className="shopify-panel__context">Stato attuale dello store</p>
 
       <div className="shopify-seo-stats">
         <div className="shopify-seo-stats__item">

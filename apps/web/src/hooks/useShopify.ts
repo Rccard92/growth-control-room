@@ -9,7 +9,7 @@ import {
   syncShopify,
 } from "../lib/shopify-api";
 import { queryKeys } from "../lib/queryKeys";
-import type { ShopifyConnectRequest } from "@gcr/shared";
+import type { DateRangeParams, ShopifyConnectRequest } from "@gcr/shared";
 
 export function useShopifyStatus(projectId: string | undefined) {
   return useQuery({
@@ -19,10 +19,14 @@ export function useShopifyStatus(projectId: string | undefined) {
   });
 }
 
-export function useShopifyDashboard(projectId: string | undefined, connected: boolean) {
+export function useShopifyDashboard(
+  projectId: string | undefined,
+  connected: boolean,
+  dateRange?: DateRangeParams,
+) {
   return useQuery({
-    queryKey: queryKeys.shopify.dashboard(projectId ?? ""),
-    queryFn: () => getShopifyDashboard(projectId!),
+    queryKey: queryKeys.shopify.dashboard(projectId ?? "", dateRange),
+    queryFn: () => getShopifyDashboard(projectId!, dateRange),
     enabled: Boolean(projectId) && connected,
   });
 }
@@ -73,7 +77,9 @@ export function useShopifySync(projectId: string) {
     mutationFn: () => syncShopify(projectId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.shopify.status(projectId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.shopify.dashboard(projectId) });
+      void queryClient.invalidateQueries({
+        queryKey: ["shopify", projectId, "dashboard"],
+      });
       void queryClient.invalidateQueries({ queryKey: queryKeys.shopify.products(projectId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.shopify.orders(projectId) });
     },

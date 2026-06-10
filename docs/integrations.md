@@ -78,6 +78,27 @@ Endpoint principali:
 - `POST /api/projects/{id}/shopify/sync`
 - `GET /api/projects/{id}/shopify/dashboard`
 
+Query params opzionali per filtro periodo:
+
+| Parametro | Descrizione |
+|-----------|-------------|
+| `range` | Preset temporale (default: `last_30_days`) |
+| `start_date` | Data inizio ISO (`YYYY-MM-DD`), obbligatoria con `range=custom` |
+| `end_date` | Data fine ISO (`YYYY-MM-DD`), obbligatoria con `range=custom` |
+
+Valori `range` supportati: `today`, `yesterday`, `last_7_days`, `last_30_days`, `month_to_date`, `previous_month`, `custom`.
+
+Le date sono interpretate nel timezone IANA dello store Shopify (`shopify_stores.timezone`), con fallback `UTC`.
+
+La response include `period` (`range`, `startDate`, `endDate`, `timezone`, `label`) e nel `summary` i gruppi `periodMetrics` / `currentStateMetrics`.
+
+**Nota:** La Shopify Control Room supporta filtri temporali per metriche basate sugli ordini. Inventario e SEO rappresentano invece lo stato corrente dello store.
+
+Esempi frontend (persistiti in URL):
+
+- `/projects/:id/shopify?range=last_7_days`
+- `/projects/:id/shopify?range=custom&start_date=2026-06-01&end_date=2026-06-10`
+
 Gli altri connector (Meta, GA4, ecc.) restano **stub**.
 
 ## Flusso OAuth (design futuro)

@@ -16,6 +16,7 @@ export function InventoryRiskPanel({ inventoryRisk }: InventoryRiskPanelProps) {
   return (
     <section className="shopify-inventory-risk gcr-card">
       <h3 className="shopify-panel__title">Inventory Risk</h3>
+      <p className="shopify-panel__context">Stato attuale dello store</p>
 
       <div className="shopify-inventory-summary">
         <div className="shopify-inventory-summary__item">

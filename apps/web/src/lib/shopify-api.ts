@@ -1,13 +1,15 @@
 import type {
+  DateRangeParams,
   ShopifyConnectRequest,
   ShopifyConnectResponse,
-  ShopifyOAuthStartResponse,
   ShopifyDashboard,
+  ShopifyOAuthStartResponse,
   ShopifyOrder,
   ShopifyProduct,
   ShopifyStatus,
   ShopifySyncResponse,
 } from "@gcr/shared";
+import { dateRangeToApiQueryString } from "./date-range";
 import { apiFetch } from "./api";
 
 export function startShopifyOAuth(
@@ -47,8 +49,12 @@ export function syncShopify(projectId: string): Promise<ShopifySyncResponse> {
   });
 }
 
-export function getShopifyDashboard(projectId: string): Promise<ShopifyDashboard> {
-  return apiFetch<ShopifyDashboard>(`/api/projects/${projectId}/shopify/dashboard`);
+export function getShopifyDashboard(
+  projectId: string,
+  dateRange?: DateRangeParams,
+): Promise<ShopifyDashboard> {
+  const query = dateRange ? `?${dateRangeToApiQueryString(dateRange)}` : "";
+  return apiFetch<ShopifyDashboard>(`/api/projects/${projectId}/shopify/dashboard${query}`);
 }
 
 export function getShopifyProducts(projectId: string): Promise<ShopifyProduct[]> {

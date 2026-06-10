@@ -1,6 +1,7 @@
 from uuid import UUID
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,7 @@ from app.services.shopify.oauth import (
     ensure_shopify_oauth_configured,
 )
 from app.services.shopify.dashboard import build_dashboard
+from app.services.shopify.period import resolve_shopify_period
 from app.services.shopify.sync import sync_shopify_store
 
 router = APIRouter(prefix="/projects", tags=["shopify"])
@@ -156,6 +158,9 @@ async def shopify_sync(
 )
 async def shopify_dashboard(
     project_id: UUID,
+    range: str | None = Query(None, alias="range"),
+    start_date: date | None = Query(None, alias="start_date"),
+    end_date: date | None = Query(None, alias="end_date"),
     session: AsyncSession = Depends(get_db),
 ) -> ShopifyDashboardResponse:
     await get_project_in_default_workspace(project_id, session)
@@ -167,7 +172,8 @@ async def shopify_dashboard(
             detail="Shopify non connesso per questo progetto",
         )
 
-    data = await build_dashboard(store, session)
+    period = resolve_shopify_period(store, range, start_date, end_date)
+    data = await build_dashboard(store, session, period=period)
     return ShopifyDashboardResponse.model_validate(data)
 
 

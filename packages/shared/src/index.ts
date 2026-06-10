@@ -1,5 +1,15 @@
 export type { Project, CreateProjectInput, ProjectStatus } from "./types/project";
 export type {
+  DateRangePreset,
+  DateRangeParams,
+  DateRangeOption,
+} from "./types/date-range";
+export {
+  DEFAULT_DATE_RANGE,
+  DATE_RANGE_OPTIONS,
+  getDateRangeLabel,
+} from "./types/date-range";
+export type {
   Integration,
   IntegrationProvider,
   IntegrationStatus,
@@ -15,7 +25,10 @@ export type {
   ShopifyProductSummary,
   ShopifyOrderSummary,
   ShopifyDashboard,
+  ShopifyDashboardPeriod,
   ShopifyDashboardSummary,
+  ShopifyPeriodMetrics,
+  ShopifyCurrentStateMetrics,
   ShopifyDashboardProduct,
   ShopifyDashboardOrder,
   ShopifyDashboardAlert,

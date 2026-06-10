@@ -1,0 +1,113 @@
+.date-range-selector {
+  position: relative;
+}
+
+.date-range-selector__trigger {
+  min-width: 10rem;
+  justify-content: center;
+}
+
+.date-range-selector__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 20;
+  min-width: 240px;
+  padding: 0.75rem;
+  border-radius: var(--gcr-radius);
+  border: 1px solid var(--gcr-border);
+  background: var(--gcr-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.date-range-selector__options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.date-range-selector__option {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: calc(var(--gcr-radius) - 2px);
+  background: transparent;
+  color: var(--gcr-text);
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.date-range-selector__option:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.date-range-selector__option--active {
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--gcr-text);
+}
+
+.date-range-selector__custom {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--gcr-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.date-range-selector__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.date-range-selector__field input {
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--gcr-radius);
+  border: 1px solid var(--gcr-border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--gcr-text);
+  font-size: 0.8125rem;
+}
+
+.date-range-selector__apply {
+  width: 100%;
+}
+
+.shopify-period-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.shopify-period-banner__performance {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gcr-text);
+}
+
+.shopify-period-banner__performance span {
+  color: var(--gcr-accent);
+}
+
+.shopify-period-section-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gcr-text-muted);
+}
+
+.shopify-panel__context {
+  margin: -0.25rem 0 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--gcr-text-muted);
+}

@@ -4,6 +4,7 @@ interface ShopifyExecutiveStripProps {
   summary: ShopifyDashboardSummary;
   trackingQualityScore: number;
   formatMoney: (value: string) => string;
+  periodLabel?: string;
 }
 
 interface KpiItem {
@@ -17,6 +18,7 @@ export function ShopifyExecutiveStrip({
   summary,
   trackingQualityScore,
   formatMoney,
+  periodLabel,
 }: ShopifyExecutiveStripProps) {
   const scoreClass =
     trackingQualityScore >= 70 ? "emerald" : trackingQualityScore >= 40 ? "amber" : "rose";
@@ -60,7 +62,11 @@ export function ShopifyExecutiveStrip({
   ];
 
   return (
-    <div className="shopify-executive-strip">
+    <div className="shopify-executive-strip-wrap">
+      {periodLabel && (
+        <p className="shopify-panel__context">Performance del periodo: {periodLabel}</p>
+      )}
+      <div className="shopify-executive-strip">
       {items.map((item) => (
         <div
           key={item.label}
@@ -71,6 +77,7 @@ export function ShopifyExecutiveStrip({
           {item.meta && <p className="shopify-kpi__meta">{item.meta}</p>}
         </div>
       ))}
+      </div>
     </div>
   );
 }

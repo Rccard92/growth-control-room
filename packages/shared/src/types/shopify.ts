@@ -59,6 +59,34 @@ export interface ShopifyOrderSummary {
   customerEmail?: string | null;
 }
 
+export interface ShopifyDashboardPeriod {
+  range: string;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+  label: string;
+}
+
+export interface ShopifyPeriodMetrics {
+  revenue: string;
+  ordersCount: number;
+  averageOrderValue: string;
+  paidOrdersCount: number;
+  pendingOrdersCount: number;
+  fulfilledOrdersCount: number;
+  unfulfilledOrdersCount: number;
+  productsWithoutSalesCount: number;
+}
+
+export interface ShopifyCurrentStateMetrics {
+  productsCount: number;
+  activeProductsCount: number;
+  draftProductsCount: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  seoIssuesCount: number;
+}
+
 export interface ShopifyDashboardSummary {
   revenue: string;
   ordersCount: number;
@@ -77,6 +105,8 @@ export interface ShopifyDashboardSummary {
   criticalAlertsCount: number;
   lastSyncAt?: string | null;
   shopDomain: string;
+  periodMetrics: ShopifyPeriodMetrics;
+  currentStateMetrics: ShopifyCurrentStateMetrics;
 }
 
 export interface ShopifyDashboardProduct {
@@ -235,6 +265,7 @@ export interface ShopifyDailyDiagnosisItem {
 }
 
 export interface ShopifyDashboard {
+  period: ShopifyDashboardPeriod;
   summary: ShopifyDashboardSummary;
   alerts: ShopifyDashboardAlert[];
   productIntelligence?: ShopifyProductPerformanceSection;

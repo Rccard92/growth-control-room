@@ -10,6 +10,7 @@ interface ShopifyAttributionIntelligencePanelProps {
   intelligence: ShopifyAttributionIntelligence;
   availability: ShopifyMarketingReportAvailability;
   formatMoney: (value: string, currency?: string | null) => string;
+  periodLabel?: string;
 }
 
 function sourceChipClass(source: string): string {
@@ -95,6 +96,7 @@ export function ShopifyAttributionIntelligencePanel({
   intelligence,
   availability,
   formatMoney,
+  periodLabel,
 }: ShopifyAttributionIntelligencePanelProps) {
   const hasData =
     availability.shopifyOrderAttributionAvailable ||
@@ -111,6 +113,9 @@ export function ShopifyAttributionIntelligencePanel({
   return (
     <section className="shopify-attribution-intel gcr-card">
       <h3 className="shopify-panel__title">Shopify Attribution Intelligence</h3>
+      {periodLabel && (
+        <p className="shopify-panel__context">Attribution nel periodo: {periodLabel}</p>
+      )}
       <p className="shopify-attribution__sparse-note">
         Dati attribution disponibili solo dove Shopify ha registrato source, UTM o customer journey.
       </p>

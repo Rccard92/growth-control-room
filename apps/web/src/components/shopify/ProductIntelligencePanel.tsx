@@ -6,6 +6,7 @@ import { ShowMoreToggle } from "./ShowMoreToggle";
 interface ProductIntelligencePanelProps {
   productIntelligence: ShopifyProductPerformanceSection;
   formatMoney: (value: string) => string;
+  periodLabel?: string;
 }
 
 type Tab = "best" | "stale" | "highstock" | "seo";
@@ -20,6 +21,7 @@ const TABS: { id: Tab; label: string }[] = [
 export function ProductIntelligencePanel({
   productIntelligence,
   formatMoney,
+  periodLabel,
 }: ProductIntelligencePanelProps) {
   const [tab, setTab] = useState<Tab>("best");
   const [expanded, setExpanded] = useState(false);
@@ -29,6 +31,9 @@ export function ProductIntelligencePanel({
   return (
     <section className="shopify-product-intel gcr-card">
       <h3 className="shopify-panel__title">Product Intelligence</h3>
+      {periodLabel && (
+        <p className="shopify-panel__context">Vendite e performance nel periodo: {periodLabel}</p>
+      )}
       <div className="shopify-tabs">
         {TABS.map((t) => (
           <button

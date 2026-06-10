@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { DateRangeParams } from "@gcr/shared";
+import { DateRangeSelector } from "../DateRangeSelector";
 import { PageHeader } from "../PageHeader";
 import { ShopifyStatusBadge } from "./ShopifyStatusBadge";
 import type { ShopifyDashboardSummary, ShopifyStatus } from "@gcr/shared";
@@ -13,6 +15,9 @@ interface ShopifyControlRoomHeaderProps {
   syncing: boolean;
   onSync: () => void;
   syncSummary?: ReactNode;
+  dateRange: DateRangeParams;
+  onDateRangeChange: (value: DateRangeParams) => void;
+  periodLabel?: string;
 }
 
 export function ShopifyControlRoomHeader({
@@ -24,6 +29,9 @@ export function ShopifyControlRoomHeader({
   syncing,
   onSync,
   syncSummary,
+  dateRange,
+  onDateRangeChange,
+  periodLabel,
 }: ShopifyControlRoomHeaderProps) {
   const domain = summary?.shopDomain ?? shopDomain ?? status?.shopDomain ?? "E-commerce Control Room";
 
@@ -40,6 +48,16 @@ export function ShopifyControlRoomHeader({
           ]}
         />
         <div className="shopify-control-room-header__actions">
+          {periodLabel && (
+            <p className="shopify-period-banner__performance">
+              Performance: <span>{periodLabel}</span>
+            </p>
+          )}
+          <DateRangeSelector
+            value={dateRange}
+            onChange={onDateRangeChange}
+            disabled={syncing}
+          />
           <ShopifyStatusBadge connected={connected} summary={summary} />
           <button
             type="button"

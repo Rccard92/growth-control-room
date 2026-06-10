@@ -7,6 +7,7 @@ import "./styles/tokens.css";
 import "./index.css";
 import "./styles/foundation.css";
 import "./styles/shopify-dashboard.css";
+import "./styles/date-range-selector.css";
 import { App } from "./App";
 import { queryClient } from "./lib/queryClient";
 

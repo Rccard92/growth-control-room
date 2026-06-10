@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -85,6 +85,42 @@ class ShopifyOrderSummary(BaseModel):
     customer_email: str | None = Field(default=None, serialization_alias="customerEmail")
 
 
+class ShopifyDashboardPeriod(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    range: str
+    start_date: date = Field(serialization_alias="startDate")
+    end_date: date = Field(serialization_alias="endDate")
+    timezone: str
+    label: str
+
+
+class ShopifyPeriodMetrics(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    revenue: Decimal
+    orders_count: int = Field(serialization_alias="ordersCount")
+    average_order_value: Decimal = Field(serialization_alias="averageOrderValue")
+    paid_orders_count: int = Field(serialization_alias="paidOrdersCount")
+    pending_orders_count: int = Field(serialization_alias="pendingOrdersCount")
+    fulfilled_orders_count: int = Field(serialization_alias="fulfilledOrdersCount")
+    unfulfilled_orders_count: int = Field(serialization_alias="unfulfilledOrdersCount")
+    products_without_sales_count: int = Field(
+        serialization_alias="productsWithoutSalesCount",
+    )
+
+
+class ShopifyCurrentStateMetrics(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    products_count: int = Field(serialization_alias="productsCount")
+    active_products_count: int = Field(serialization_alias="activeProductsCount")
+    draft_products_count: int = Field(serialization_alias="draftProductsCount")
+    low_stock_count: int = Field(serialization_alias="lowStockCount")
+    out_of_stock_count: int = Field(serialization_alias="outOfStockCount")
+    seo_issues_count: int = Field(serialization_alias="seoIssuesCount")
+
+
 class ShopifyDashboardSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -105,6 +141,10 @@ class ShopifyDashboardSummary(BaseModel):
     critical_alerts_count: int = Field(serialization_alias="criticalAlertsCount")
     last_sync_at: datetime | None = Field(default=None, serialization_alias="lastSyncAt")
     shop_domain: str = Field(serialization_alias="shopDomain")
+    period_metrics: ShopifyPeriodMetrics = Field(serialization_alias="periodMetrics")
+    current_state_metrics: ShopifyCurrentStateMetrics = Field(
+        serialization_alias="currentStateMetrics",
+    )
 
 
 class ShopifyDashboardProduct(BaseModel):
@@ -337,6 +377,7 @@ class ShopifyDailyDiagnosisItem(BaseModel):
 class ShopifyDashboardResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    period: ShopifyDashboardPeriod
     summary: ShopifyDashboardSummary
     alerts: list[ShopifyDashboardAlert]
     product_intelligence: ShopifyProductPerformanceSection = Field(

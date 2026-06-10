@@ -22,6 +22,7 @@ from app.services.shopify.analytics import (
     product_lookup,
     _product_to_dict,
 )
+from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
 from app.services.shopify.attribution import (
     build_attribution_alerts,
     build_marketing_report_availability,
@@ -117,11 +118,13 @@ def _compute_seo_section(products: list[ShopifyProduct]) -> dict[str, Any]:
 
 def _build_alerts(
     products: list[ShopifyProduct],
-    orders: list[ShopifyOrder],
-    sold_product_gids: set[str],
+    period_orders: list[ShopifyOrder],
+    period_sold_product_gids: set[str],
     has_line_items: bool,
     last_sync_at: datetime | None,
     attribution_alerts: list[dict[str, Any]] | None = None,
+    *,
+    period_label: str = "nel periodo selezionato",
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
 
@@ -154,7 +157,7 @@ def _build_alerts(
                 }
             )
 
-    for order in orders:
+    for order in period_orders:
         fin = (order.financial_status or "").upper()
         if fin in PENDING_STATUSES:
             alerts.append(
@@ -175,14 +178,14 @@ def _build_alerts(
     for product in products:
         if not _is_active_status(product.status):
             continue
-        if product.shopify_gid not in sold_product_gids:
+        if product.shopify_gid not in period_sold_product_gids:
             alerts.append(
                 {
                     "id": f"nosales-{product.shopify_gid}",
                     "severity": "opportunity",
                     "title": "Prodotto senza vendite",
                     "description": (
-                        f"{product.title} non compare negli ordini sincronizzati."
+                        f"{product.title} non ha vendite {period_label}."
                     ),
                     "entity_type": "product",
                     "entity_id": product.shopify_gid,
@@ -244,7 +247,7 @@ def _build_alerts(
             }
         )
 
-    if orders and not has_line_items:
+    if period_orders and not has_line_items:
         alerts.append(
             {
                 "id": "line-items-missing",
@@ -268,12 +271,15 @@ def _build_alerts(
 
 
 def _build_daily_diagnosis(
-    summary: dict[str, Any],
+    period_metrics: dict[str, Any],
+    current_state_metrics: dict[str, Any],
     attribution_intelligence: dict[str, Any] | None = None,
+    *,
+    period_label: str = "nel periodo selezionato",
 ) -> list[dict[str, str]]:
     diagnosis: list[dict[str, str]] = []
 
-    oos = summary.get("out_of_stock_count", 0)
+    oos = current_state_metrics.get("out_of_stock_count", 0)
     if oos > 0:
         diagnosis.append(
             {
@@ -282,28 +288,27 @@ def _build_daily_diagnosis(
             }
         )
 
-    no_sales = summary.get("products_without_sales_count", 0)
+    no_sales = period_metrics.get("products_without_sales_count", 0)
     if no_sales > 0:
         diagnosis.append(
             {
                 "message": (
-                    f"{no_sales} prodotti attivi non compaiono "
-                    "negli ordini sincronizzati."
+                    f"{no_sales} prodotti attivi non hanno vendite {period_label}."
                 ),
                 "severity": "opportunity",
             }
         )
 
-    pending = summary.get("pending_orders_count", 0)
+    pending = period_metrics.get("pending_orders_count", 0)
     if pending > 0:
         diagnosis.append(
             {
-                "message": f"{pending} ordini risultano pending.",
+                "message": f"{pending} ordini risultano pending {period_label}.",
                 "severity": "warning",
             }
         )
 
-    seo = summary.get("seo_issues_count", 0)
+    seo = current_state_metrics.get("seo_issues_count", 0)
     if seo > 0:
         diagnosis.append(
             {
@@ -312,7 +317,7 @@ def _build_daily_diagnosis(
             }
         )
 
-    low = summary.get("low_stock_count", 0)
+    low = current_state_metrics.get("low_stock_count", 0)
     if low > 0 and len(diagnosis) < 5:
         diagnosis.append(
             {
@@ -330,16 +335,16 @@ def _build_daily_diagnosis(
             diagnosis.append(
                 {
                     "message": (
-                        f"Tracking quality Shopify: {score}% degli ordini ha "
-                        "una sorgente utile. Collega GA4 per analisi cross-channel."
+                        f"Tracking quality Shopify {period_label}: {score}% degli ordini ha "
+                        "una sorgente utile."
                     ),
                     "severity": "info" if score >= 70 else "warning",
                 }
             )
-    elif len(diagnosis) < 5:
+    elif len(diagnosis) < 5 and period_metrics.get("orders_count", 0) == 0:
         diagnosis.append(
             {
-                "message": "Collega GA4 per capire la provenienza degli acquisti.",
+                "message": f"Nessun ordine registrato {period_label}.",
                 "severity": "info",
             }
         )
@@ -361,6 +366,7 @@ def _build_attribution_placeholder() -> dict[str, Any]:
 async def build_dashboard(
     store: ShopifyStore,
     session: AsyncSession,
+    period: ResolvedPeriod,
 ) -> dict[str, Any]:
     empty_summary = {
         "revenue": Decimal("0"),
@@ -389,12 +395,18 @@ async def build_dashboard(
     )
     products = list(products_result.scalars().all())
 
+    effective_at = order_effective_at_column()
     orders_result = await session.execute(
         select(ShopifyOrder)
-        .where(ShopifyOrder.shopify_store_id == store.id)
-        .order_by(ShopifyOrder.created_at_shopify.desc().nullslast())
+        .where(
+            ShopifyOrder.shopify_store_id == store.id,
+            effective_at.is_not(None),
+            effective_at >= period.start_at,
+            effective_at < period.end_at_exclusive,
+        )
+        .order_by(effective_at.desc())
     )
-    orders = list(orders_result.scalars().all())
+    period_orders = list(orders_result.scalars().all())
 
     line_items_count_result = await session.execute(
         select(func.count())
@@ -418,20 +430,20 @@ async def build_dashboard(
     ]
 
     pending_orders = [
-        o for o in orders if (o.financial_status or "").upper() in PENDING_STATUSES
+        o for o in period_orders if (o.financial_status or "").upper() in PENDING_STATUSES
     ]
     unfulfilled_orders = [
         o
-        for o in orders
+        for o in period_orders
         if (o.fulfillment_status or "").upper() not in FULFILLED_STATUSES
         and (o.fulfillment_status or "").strip() != ""
     ]
 
     paid_orders_count = sum(
-        1 for o in orders if (o.financial_status or "").upper() in PAID_STATUSES
+        1 for o in period_orders if (o.financial_status or "").upper() in PAID_STATUSES
     )
     fulfilled_orders_count = sum(
-        1 for o in orders if (o.fulfillment_status or "").upper() in FULFILLED_STATUSES
+        1 for o in period_orders if (o.fulfillment_status or "").upper() in FULFILLED_STATUSES
     )
 
     revenue = Decimal("0")
@@ -440,24 +452,28 @@ async def build_dashboard(
         select(
             func.coalesce(func.sum(ShopifyDailyMetric.gross_sales), 0),
             func.coalesce(func.sum(ShopifyDailyMetric.orders_count), 0),
-        ).where(ShopifyDailyMetric.shopify_store_id == store.id)
+        ).where(
+            ShopifyDailyMetric.shopify_store_id == store.id,
+            ShopifyDailyMetric.date >= period.start_date,
+            ShopifyDailyMetric.date <= period.end_date,
+        )
     )
     revenue, orders_count = metrics_result.one()
     revenue = Decimal(str(revenue))
     orders_count = int(orders_count)
 
-    if revenue == 0 and orders_count == 0 and orders:
+    if revenue == 0 and orders_count == 0 and period_orders:
         revenue = sum(
-            (o.current_total_price or o.total_price for o in orders),
+            (o.current_total_price or o.total_price for o in period_orders),
             Decimal("0"),
         )
-        orders_count = len(orders)
+        orders_count = len(period_orders)
 
     average_order_value = revenue / orders_count if orders_count else Decimal("0")
 
     products_by_gid = product_lookup(products)
-    sold_gids = await compute_sold_product_gids(session, store.id)
-    qty_by_gid = await compute_qty_by_product_gid(session, store.id)
+    sold_gids = await compute_sold_product_gids(session, store.id, period=period)
+    qty_by_gid = await compute_qty_by_product_gid(session, store.id, period=period)
     no_sales = compute_products_without_sales(products, sold_gids)
 
     seo_section = _compute_seo_section(products)
@@ -469,10 +485,17 @@ async def build_dashboard(
 
     product_intelligence = {
         "best_sellers": await compute_best_sellers(
-            session, store.id, products_by_gid
+            session,
+            store.id,
+            products_by_gid,
+            period=period,
         ),
         "no_sales_products": no_sales,
-        "high_stock_low_sales": compute_high_stock_low_sales(products, qty_by_gid),
+        "high_stock_low_sales": compute_high_stock_low_sales(
+            products,
+            qty_by_gid,
+            period_label=period.label.lower(),
+        ),
     }
 
     total_units = sum(
@@ -493,9 +516,29 @@ async def build_dashboard(
     }
 
     order_operations = {
-        "recent_orders": [_order_to_dict(o) for o in orders[:10]],
+        "recent_orders": [_order_to_dict(o) for o in period_orders[:10]],
         "pending_orders": [_order_to_dict(o) for o in pending_orders[:10]],
         "unfulfilled_orders": [_order_to_dict(o) for o in unfulfilled_orders[:10]],
+    }
+
+    period_metrics = {
+        "revenue": revenue,
+        "orders_count": orders_count,
+        "average_order_value": average_order_value,
+        "paid_orders_count": paid_orders_count,
+        "pending_orders_count": len(pending_orders),
+        "fulfilled_orders_count": fulfilled_orders_count,
+        "unfulfilled_orders_count": len(unfulfilled_orders),
+        "products_without_sales_count": len(no_sales),
+    }
+
+    current_state_metrics = {
+        "products_count": len(products),
+        "active_products_count": len(active_products),
+        "draft_products_count": len(draft_products),
+        "low_stock_count": len(low_stock),
+        "out_of_stock_count": len(out_of_stock),
+        "seo_issues_count": seo_issues_count,
     }
 
     summary = {
@@ -514,11 +557,13 @@ async def build_dashboard(
         "out_of_stock_count": len(out_of_stock),
         "products_without_sales_count": len(no_sales),
         "seo_issues_count": seo_issues_count,
+        "period_metrics": period_metrics,
+        "current_state_metrics": current_state_metrics,
     }
 
-    raw_attribution_intelligence = compute_attribution_intelligence(orders)
+    raw_attribution_intelligence = compute_attribution_intelligence(period_orders)
     marketing_report_availability = build_marketing_report_availability(
-        orders,
+        period_orders,
         raw_attribution_intelligence,
     )
     attribution_alerts = build_attribution_alerts(raw_attribution_intelligence)
@@ -528,20 +573,27 @@ async def build_dashboard(
 
     alerts = _build_alerts(
         products,
-        orders,
+        period_orders,
         sold_gids,
         line_items_count > 0,
         store.last_sync_at,
         attribution_alerts,
+        period_label=period.label.lower(),
     )
 
     summary["critical_alerts_count"] = sum(
         1 for a in alerts if a["severity"] == "critical"
     )
 
-    daily_diagnosis = _build_daily_diagnosis(summary, raw_attribution_intelligence)
+    daily_diagnosis = _build_daily_diagnosis(
+        period_metrics,
+        current_state_metrics,
+        raw_attribution_intelligence,
+        period_label=period.label.lower(),
+    )
 
     return {
+        "period": period.to_dict(),
         "summary": summary,
         "alerts": alerts,
         "product_intelligence": product_intelligence,
