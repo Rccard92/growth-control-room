@@ -2,6 +2,7 @@ import type { ShopifyDashboardSummary } from "@gcr/shared";
 
 interface ShopifyExecutiveStripProps {
   summary: ShopifyDashboardSummary;
+  trackingQualityScore: number;
   formatMoney: (value: string) => string;
 }
 
@@ -12,7 +13,14 @@ interface KpiItem {
   accent?: string;
 }
 
-export function ShopifyExecutiveStrip({ summary, formatMoney }: ShopifyExecutiveStripProps) {
+export function ShopifyExecutiveStrip({
+  summary,
+  trackingQualityScore,
+  formatMoney,
+}: ShopifyExecutiveStripProps) {
+  const scoreClass =
+    trackingQualityScore >= 70 ? "emerald" : trackingQualityScore >= 40 ? "amber" : "rose";
+
   const items: KpiItem[] = [
     {
       label: "Revenue",
@@ -38,16 +46,16 @@ export function ShopifyExecutiveStrip({ summary, formatMoney }: ShopifyExecutive
       accent: "emerald",
     },
     {
-      label: "Scorte basse",
-      value: summary.lowStockCount,
-      meta: `${summary.outOfStockCount} out of stock`,
-      accent: "amber",
-    },
-    {
       label: "Alert critici",
       value: summary.criticalAlertsCount,
       meta: "Richiedono azione",
       accent: "rose",
+    },
+    {
+      label: "Tracking quality score",
+      value: `${trackingQualityScore}%`,
+      meta: "Attribution Shopify",
+      accent: scoreClass,
     },
   ];
 

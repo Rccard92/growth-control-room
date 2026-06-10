@@ -138,6 +138,11 @@ export interface ShopifyProductPerformanceSection {
   highStockLowSales: ShopifyHighStockLowSales[];
 }
 
+export type ShopifyProductIntelligenceSection = ShopifyProductPerformanceSection;
+export type ShopifyInventoryRiskSection = ShopifyInventorySection;
+export type ShopifyOrderOperationsSection = ShopifyOrdersSection;
+export type ShopifySeoOpportunitiesSection = ShopifySeoSection;
+
 export interface ShopifyInventorySummary {
   totalUnits: number;
   activeProducts: number;

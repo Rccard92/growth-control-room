@@ -1,7 +1,10 @@
+import { useState } from "react";
 import type {
   ShopifyAttributionIntelligence,
   ShopifyMarketingReportAvailability,
 } from "@gcr/shared";
+import { SHOPIFY_TABLE_ROW_LIMIT, sliceWithLimit } from "../../lib/shopify-dashboard-blocks";
+import { ShowMoreToggle } from "./ShowMoreToggle";
 
 interface ShopifyAttributionIntelligencePanelProps {
   intelligence: ShopifyAttributionIntelligence;
@@ -12,7 +15,12 @@ interface ShopifyAttributionIntelligencePanelProps {
 function sourceChipClass(source: string): string {
   const normalized = source.toLowerCase();
   if (normalized.includes("email") || normalized.includes("klaviyo")) return "shopify-source-chip--email";
-  if (normalized.includes("social") || normalized.includes("facebook") || normalized.includes("instagram") || normalized.includes("meta")) {
+  if (
+    normalized.includes("social") ||
+    normalized.includes("facebook") ||
+    normalized.includes("instagram") ||
+    normalized.includes("meta")
+  ) {
     return "shopify-source-chip--social";
   }
   if (normalized.includes("google") || normalized.includes("search")) return "shopify-source-chip--search";
@@ -20,25 +28,97 @@ function sourceChipClass(source: string): string {
   return "";
 }
 
+function AttributionTable({
+  rows,
+  formatMoney,
+  valueKey,
+  labelKey,
+}: {
+  rows: ShopifyAttributionIntelligence["revenueBySource"];
+  formatMoney: (value: string, currency?: string | null) => string;
+  valueKey: "source" | "channel" | "campaign";
+  labelKey: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleRows = sliceWithLimit(rows, SHOPIFY_TABLE_ROW_LIMIT, expanded);
+
+  if (rows.length === 0) {
+    return (
+      <p className="shopify-empty-copy">
+        Dati attribution disponibili solo dove Shopify ha registrato source, UTM o customer journey.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <table className="shopify-table">
+        <thead>
+          <tr>
+            <th>{labelKey}</th>
+            <th>Revenue</th>
+            <th>Ordini</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRows.map((row) => {
+            const keyValue = row[valueKey] ?? "unknown";
+            return (
+              <tr key={`${valueKey}-${keyValue}`}>
+                <td>
+                  {valueKey === "source" ? (
+                    <span className={`shopify-source-chip ${sourceChipClass(String(keyValue))}`}>
+                      {String(keyValue)}
+                    </span>
+                  ) : (
+                    String(keyValue)
+                  )}
+                </td>
+                <td>{formatMoney(row.revenue)}</td>
+                <td>{row.ordersCount}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <ShowMoreToggle
+        total={rows.length}
+        limit={SHOPIFY_TABLE_ROW_LIMIT}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+      />
+    </>
+  );
+}
+
 export function ShopifyAttributionIntelligencePanel({
   intelligence,
   availability,
   formatMoney,
 }: ShopifyAttributionIntelligencePanelProps) {
-  const hasData = availability.shopifyOrderAttributionAvailable;
+  const hasData =
+    availability.shopifyOrderAttributionAvailable ||
+    intelligence.revenueBySource.length > 0 ||
+    intelligence.revenueByChannel.length > 0;
   const score = intelligence.trackingQualityScore;
   const scoreClass =
-    score >= 70 ? "shopify-quality-score--good" : score >= 40 ? "shopify-quality-score--mid" : "shopify-quality-score--low";
+    score >= 70
+      ? "shopify-quality-score--good"
+      : score >= 40
+        ? "shopify-quality-score--mid"
+        : "shopify-quality-score--low";
 
   return (
     <section className="shopify-attribution-intel gcr-card">
       <h3 className="shopify-panel__title">Shopify Attribution Intelligence</h3>
-      <p className="shopify-panel__subtitle">{availability.message}</p>
+      <p className="shopify-attribution__sparse-note">
+        Dati attribution disponibili solo dove Shopify ha registrato source, UTM o customer journey.
+      </p>
 
       {!hasData ? (
         <p className="shopify-empty-copy">
-          Attribution non disponibile dai dati ordine Shopify. Esegui un re-sync dopo il deploy
-          per popolare source, channel e UTM dagli ordini.
+          Attribution non disponibile dai dati ordine Shopify. Esegui un re-sync dopo il deploy per
+          popolare source, channel e UTM dagli ordini.
         </p>
       ) : (
         <>
@@ -64,134 +144,29 @@ export function ShopifyAttributionIntelligencePanel({
             </div>
           </div>
 
-          <h4 className="shopify-panel__subtitle">Revenue by source</h4>
-          {intelligence.revenueBySource.length === 0 ? (
-            <p className="shopify-empty-copy">Non disponibile dai dati ordine Shopify.</p>
-          ) : (
-            <table className="shopify-table">
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Revenue</th>
-                  <th>Ordini</th>
-                </tr>
-              </thead>
-              <tbody>
-                {intelligence.revenueBySource.slice(0, 8).map((row) => (
-                  <tr key={row.source ?? "unknown"}>
-                    <td>
-                      <span className={`shopify-source-chip ${sourceChipClass(row.source ?? "")}`}>
-                        {row.source ?? "Unknown"}
-                      </span>
-                    </td>
-                    <td>{formatMoney(row.revenue)}</td>
-                    <td>{row.ordersCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <h4 className="shopify-panel__subtitle">Revenue by channel</h4>
+          <AttributionTable
+            rows={intelligence.revenueByChannel}
+            formatMoney={formatMoney}
+            valueKey="channel"
+            labelKey="Channel"
+          />
 
-          <h4 className="shopify-panel__subtitle">Orders by source</h4>
-          {intelligence.ordersBySource.length === 0 ? (
-            <p className="shopify-empty-copy">Non disponibile dai dati ordine Shopify.</p>
-          ) : (
-            <table className="shopify-table">
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Ordini</th>
-                  <th>Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {intelligence.ordersBySource.slice(0, 8).map((row) => (
-                  <tr key={`orders-${row.source}`}>
-                    <td>{row.source ?? "Unknown"}</td>
-                    <td>{row.ordersCount}</td>
-                    <td>{formatMoney(row.revenue)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <h4 className="shopify-panel__subtitle">Revenue by source</h4>
+          <AttributionTable
+            rows={intelligence.revenueBySource}
+            formatMoney={formatMoney}
+            valueKey="source"
+            labelKey="Source"
+          />
 
           <h4 className="shopify-panel__subtitle">Top UTM campaigns</h4>
-          {intelligence.revenueByUtmCampaign.length === 0 ? (
-            <p className="shopify-empty-copy">
-              UTM campaign non disponibile dai dati ordine Shopify (customer journey assente o
-              senza UTM).
-            </p>
-          ) : (
-            <table className="shopify-table">
-              <thead>
-                <tr>
-                  <th>Campaign</th>
-                  <th>Revenue</th>
-                  <th>Ordini</th>
-                </tr>
-              </thead>
-              <tbody>
-                {intelligence.revenueByUtmCampaign.slice(0, 8).map((row) => (
-                  <tr key={row.campaign ?? "none"}>
-                    <td>{row.campaign ?? "—"}</td>
-                    <td>{formatMoney(row.revenue)}</td>
-                    <td>{row.ordersCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          <h4 className="shopify-panel__subtitle">New vs returning by source</h4>
-          {intelligence.newVsReturningBySource.length === 0 ? (
-            <p className="shopify-empty-copy">Non disponibile dai dati ordine Shopify.</p>
-          ) : (
-            <table className="shopify-table">
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>New</th>
-                  <th>Returning</th>
-                  <th>Unknown</th>
-                </tr>
-              </thead>
-              <tbody>
-                {intelligence.newVsReturningBySource.slice(0, 8).map((row) => (
-                  <tr key={`nr-${row.source}`}>
-                    <td>{row.source}</td>
-                    <td>{row.newCount}</td>
-                    <td>{row.returningCount}</td>
-                    <td>{row.unknownCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          <h4 className="shopify-panel__subtitle">Top products by source</h4>
-          {intelligence.topProductsBySource.length === 0 ? (
-            <p className="shopify-empty-copy">Non disponibile dai dati ordine Shopify.</p>
-          ) : (
-            <table className="shopify-table">
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Prodotto</th>
-                  <th>Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {intelligence.topProductsBySource.slice(0, 8).map((row) => (
-                  <tr key={`${row.source}-${row.productTitle}`}>
-                    <td>{row.source}</td>
-                    <td>{row.productTitle}</td>
-                    <td>{formatMoney(row.revenue)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <AttributionTable
+            rows={intelligence.revenueByUtmCampaign}
+            formatMoney={formatMoney}
+            valueKey="campaign"
+            labelKey="Campaign"
+          />
         </>
       )}
     </section>
