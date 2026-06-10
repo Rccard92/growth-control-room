@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants.integrations import INTEGRATION_PROVIDERS
 from app.db.session import get_db
-from app.models.enums import IntegrationStatus, ProjectStatus
+from app.models.enums import IntegrationStatus
 from app.models.integration import Integration
 from app.models.project import Project
 from app.schemas.integration import IntegrationRead
@@ -14,6 +15,8 @@ from app.schemas.project import ProjectCreate, ProjectRead
 from app.services.projects import get_project_in_default_workspace
 from app.services.workspace import get_default_workspace
 from app.utils.slug import unique_project_slug
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -35,19 +38,31 @@ async def create_project(
     body: ProjectCreate,
     session: AsyncSession = Depends(get_db),
 ) -> Project:
-    workspace = await get_default_workspace(session)
-    slug = await unique_project_slug(session, workspace.id, body.name)
-    project = Project(
-        workspace_id=workspace.id,
-        name=body.name,
-        slug=slug,
-        description=body.description,
-        status=ProjectStatus.ACTIVE,
-    )
-    session.add(project)
-    await session.flush()
-    await session.refresh(project)
-    return project
+    try:
+        workspace = await get_default_workspace(session)
+        slug = await unique_project_slug(session, workspace.id, body.name)
+        project = Project(
+            workspace_id=workspace.id,
+            name=body.name,
+            slug=slug,
+            description=body.description,
+            status="active",
+        )
+        session.add(project)
+        await session.flush()
+        await session.refresh(project)
+        return project
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Errore creazione progetto")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "create_project_failed",
+                "message": "Impossibile creare il progetto. Riprova più tardi.",
+            },
+        ) from exc
 
 
 @router.get("", response_model=list[ProjectRead], response_model_by_alias=True)
@@ -105,9 +120,7 @@ async def list_project_integrations(
                     id=integration.id,
                     project_id=integration.project_id,
                     provider=integration.provider,
-                    status=integration.status.value
-                    if hasattr(integration.status, "value")
-                    else str(integration.status),
+                    status=integration.status,
                     connected_at=integration.connected_at,
                 )
             )

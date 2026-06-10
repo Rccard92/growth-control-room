@@ -6,8 +6,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import ProjectStatus
-
 if TYPE_CHECKING:
     from app.models.ai_run import AiRun
     from app.models.alert import Alert
@@ -30,7 +28,7 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255))
     slug: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[ProjectStatus] = mapped_column(default=ProjectStatus.ACTIVE)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
 
     workspace: Mapped["Workspace"] = relationship(back_populates="projects")
     integrations: Mapped[list["Integration"]] = relationship(

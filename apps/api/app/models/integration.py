@@ -7,8 +7,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import IntegrationStatus
-
 if TYPE_CHECKING:
     from app.models.integration_credential import IntegrationCredential
     from app.models.project import Project
@@ -30,8 +28,10 @@ class Integration(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     provider: Mapped[str] = mapped_column(String(50))
-    status: Mapped[IntegrationStatus] = mapped_column(
-        default=IntegrationStatus.NOT_CONNECTED,
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="not_connected",
     )
     connected_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

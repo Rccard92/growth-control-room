@@ -6,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.enums import IntegrationStatus
 from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
 from app.models.shopify import ShopifyStore
@@ -67,13 +66,13 @@ async def connect_shopify(
         integration = Integration(
             project_id=project_id,
             provider="shopify",
-            status=IntegrationStatus.CONNECTED,
+            status="connected",
             connected_at=now,
         )
         session.add(integration)
         await session.flush()
     else:
-        integration.status = IntegrationStatus.CONNECTED
+        integration.status = "connected"
         integration.connected_at = now
 
     credential_payload = json.dumps(
