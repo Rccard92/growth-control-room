@@ -56,15 +56,69 @@ export interface ShopifyOrderSummary {
   customerEmail?: string | null;
 }
 
-export interface ShopifyDashboard {
+export interface ShopifyDashboardSummary {
   revenue: string;
   ordersCount: number;
   averageOrderValue: string;
   productsCount: number;
-  lowStockProducts: ShopifyProductSummary[];
-  topProducts: ShopifyTopProduct[];
-  recentOrders: ShopifyOrderSummary[];
+  activeProductsCount: number;
+  draftProductsCount: number;
+  outOfStockCount: number;
+  lowStockCount: number;
+  pendingOrdersCount: number;
+  paidOrdersCount: number;
   lastSyncAt?: string | null;
+  shopDomain: string;
+}
+
+export interface ShopifyDashboardProduct {
+  title: string;
+  status?: string | null;
+  totalInventory?: number | null;
+  featuredImageUrl?: string | null;
+  productType?: string | null;
+  vendor?: string | null;
+  handle?: string | null;
+}
+
+export interface ShopifyDashboardOrder {
+  orderName?: string | null;
+  createdAtShopify?: string | null;
+  financialStatus?: string | null;
+  fulfillmentStatus?: string | null;
+  totalPrice: string;
+  currency?: string | null;
+}
+
+export interface ShopifyBestSeller {
+  productTitle: string;
+  quantitySold: number;
+  revenue: string;
+}
+
+export interface ShopifySeoOpportunity {
+  productTitle: string;
+  issue: string;
+  priority: string;
+}
+
+export type ShopifyInsightSeverity = "info" | "warning" | "critical" | "opportunity";
+
+export interface ShopifyInsight {
+  message: string;
+  severity: ShopifyInsightSeverity;
+}
+
+export interface ShopifyDashboard {
+  summary: ShopifyDashboardSummary;
+  recentOrders: ShopifyDashboardOrder[];
+  products: ShopifyDashboardProduct[];
+  lowStockProducts: ShopifyDashboardProduct[];
+  outOfStockProducts: ShopifyDashboardProduct[];
+  bestSellers: ShopifyBestSeller[];
+  staleProducts: ShopifyDashboardProduct[];
+  seoOpportunities: ShopifySeoOpportunity[];
+  insights: ShopifyInsight[];
 }
 
 export interface ShopifyProduct {

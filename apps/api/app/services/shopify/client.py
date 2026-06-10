@@ -165,6 +165,8 @@ class ShopifyGraphQLClient:
                       title
                       quantity
                       product { id title }
+                      originalUnitPriceSet { shopMoney { amount currencyCode } }
+                      discountedTotalSet { shopMoney { amount currencyCode } }
                     }
                   }
                 }

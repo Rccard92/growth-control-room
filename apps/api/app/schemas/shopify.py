@@ -81,19 +81,93 @@ class ShopifyOrderSummary(BaseModel):
     customer_email: str | None = Field(default=None, serialization_alias="customerEmail")
 
 
-class ShopifyDashboardResponse(BaseModel):
+class ShopifyDashboardSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     revenue: Decimal
     orders_count: int = Field(serialization_alias="ordersCount")
     average_order_value: Decimal = Field(serialization_alias="averageOrderValue")
     products_count: int = Field(serialization_alias="productsCount")
-    low_stock_products: list[ShopifyProductSummary] = Field(
+    active_products_count: int = Field(serialization_alias="activeProductsCount")
+    draft_products_count: int = Field(serialization_alias="draftProductsCount")
+    out_of_stock_count: int = Field(serialization_alias="outOfStockCount")
+    low_stock_count: int = Field(serialization_alias="lowStockCount")
+    pending_orders_count: int = Field(serialization_alias="pendingOrdersCount")
+    paid_orders_count: int = Field(serialization_alias="paidOrdersCount")
+    last_sync_at: datetime | None = Field(default=None, serialization_alias="lastSyncAt")
+    shop_domain: str = Field(serialization_alias="shopDomain")
+
+
+class ShopifyDashboardProduct(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    title: str
+    status: str | None = None
+    total_inventory: int | None = Field(default=None, serialization_alias="totalInventory")
+    featured_image_url: str | None = Field(default=None, serialization_alias="featuredImageUrl")
+    product_type: str | None = Field(default=None, serialization_alias="productType")
+    vendor: str | None = None
+    handle: str | None = None
+
+
+class ShopifyDashboardOrder(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    order_name: str | None = Field(default=None, serialization_alias="orderName")
+    created_at_shopify: datetime | None = Field(
+        default=None,
+        serialization_alias="createdAtShopify",
+    )
+    financial_status: str | None = Field(default=None, serialization_alias="financialStatus")
+    fulfillment_status: str | None = Field(
+        default=None,
+        serialization_alias="fulfillmentStatus",
+    )
+    total_price: Decimal = Field(serialization_alias="totalPrice")
+    currency: str | None = None
+
+
+class ShopifyBestSeller(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_title: str = Field(serialization_alias="productTitle")
+    quantity_sold: int = Field(serialization_alias="quantitySold")
+    revenue: Decimal
+
+
+class ShopifySeoOpportunity(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_title: str = Field(serialization_alias="productTitle")
+    issue: str
+    priority: str
+
+
+class ShopifyInsight(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str
+    severity: str
+
+
+class ShopifyDashboardResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    summary: ShopifyDashboardSummary
+    recent_orders: list[ShopifyDashboardOrder] = Field(serialization_alias="recentOrders")
+    products: list[ShopifyDashboardProduct]
+    low_stock_products: list[ShopifyDashboardProduct] = Field(
         serialization_alias="lowStockProducts",
     )
-    top_products: list[ShopifyTopProduct] = Field(serialization_alias="topProducts")
-    recent_orders: list[ShopifyOrderSummary] = Field(serialization_alias="recentOrders")
-    last_sync_at: datetime | None = Field(default=None, serialization_alias="lastSyncAt")
+    out_of_stock_products: list[ShopifyDashboardProduct] = Field(
+        serialization_alias="outOfStockProducts",
+    )
+    best_sellers: list[ShopifyBestSeller] = Field(serialization_alias="bestSellers")
+    stale_products: list[ShopifyDashboardProduct] = Field(serialization_alias="staleProducts")
+    seo_opportunities: list[ShopifySeoOpportunity] = Field(
+        serialization_alias="seoOpportunities",
+    )
+    insights: list[ShopifyInsight]
 
 
 class ShopifyProductRead(BaseModel):

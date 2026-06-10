@@ -11,13 +11,14 @@ from app.schemas.shopify import (
     ShopifyConnectResponse,
     ShopifyOAuthStartResponse,
     ShopifyDashboardResponse,
+    ShopifyDashboardSummary,
+    ShopifyDashboardProduct,
+    ShopifyDashboardOrder,
+    ShopifyBestSeller,
+    ShopifySeoOpportunity,
+    ShopifyInsight,
     ShopifyOrderRead,
-    ShopifyOrderSummary,
     ShopifyProductRead,
-    ShopifyProductSummary,
-    ShopifyStatusResponse,
-    ShopifySyncResponse,
-    ShopifyTopProduct,
 )
 from app.services.projects import get_project_in_default_workspace
 from app.services.shopify.client import ShopifyAPIError, normalize_shop_domain
@@ -168,20 +169,7 @@ async def shopify_dashboard(
         )
 
     data = await build_dashboard(store, session)
-    return ShopifyDashboardResponse(
-        revenue=data["revenue"],
-        orders_count=data["orders_count"],
-        average_order_value=data["average_order_value"],
-        products_count=data["products_count"],
-        low_stock_products=[
-            ShopifyProductSummary.model_validate(p) for p in data["low_stock_products"]
-        ],
-        top_products=[ShopifyTopProduct(**item) for item in data["top_products"]],
-        recent_orders=[
-            ShopifyOrderSummary.model_validate(o) for o in data["recent_orders"]
-        ],
-        last_sync_at=data["last_sync_at"],
-    )
+    return ShopifyDashboardResponse.model_validate(data)
 
 
 @router.get(

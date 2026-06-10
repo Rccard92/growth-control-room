@@ -15,6 +15,13 @@ export type {
   ShopifyProductSummary,
   ShopifyOrderSummary,
   ShopifyDashboard,
+  ShopifyDashboardSummary,
+  ShopifyDashboardProduct,
+  ShopifyDashboardOrder,
+  ShopifyBestSeller,
+  ShopifySeoOpportunity,
+  ShopifyInsight,
+  ShopifyInsightSeverity,
   ShopifyProduct,
   ShopifyOrder,
 } from "./types/shopify";
