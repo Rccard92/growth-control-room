@@ -5,7 +5,7 @@
   "scripts": {
     "build": "pnpm --filter @gcr/web build",
     "build:web": "pnpm --filter @gcr/web build",
-    "start:web": "pnpm --filter @gcr/web preview --host 0.0.0.0 --port $PORT",
+    "start:web": "pnpm --filter @gcr/web run start -- --port $PORT",
     "dev": "pnpm --parallel --filter @gcr/web --filter @gcr/api dev",
     "dev:web": "pnpm --filter @gcr/web dev",
     "dev:api": "pnpm --filter @gcr/api dev",
