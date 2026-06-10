@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.api.routes import debug, projects
 from app.core.config import settings
 from app.db.session import close_db, init_db
 
@@ -30,6 +31,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(projects.router, prefix="/api")
+app.include_router(debug.router, prefix="/api")
 app.include_router(api_router, prefix="/api")
 
 

@@ -24,6 +24,13 @@ router = APIRouter(prefix="/projects", tags=["projects"])
     response_model_by_alias=True,
     status_code=status.HTTP_201_CREATED,
 )
+@router.post(
+    "/",
+    response_model=ProjectRead,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 async def create_project(
     body: ProjectCreate,
     session: AsyncSession = Depends(get_db),
