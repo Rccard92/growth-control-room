@@ -31,3 +31,8 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api")
+
+
+@app.get("/health")
+async def root_health() -> dict[str, str]:
+    return {"status": "ok", "service": "growth-control-room-api"}

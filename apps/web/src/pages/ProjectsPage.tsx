@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import type { Integration } from "@gcr/shared";
 import { EmptyState } from "../components/EmptyState";
+import { ApiDiagnostics } from "../components/ApiDiagnostics";
 import { PageHeader } from "../components/PageHeader";
 import { ProjectCard } from "../components/ProjectCard";
 import { apiFetch } from "../lib/api";
@@ -82,6 +83,8 @@ export function ProjectsPage() {
           ))}
         </div>
       )}
+
+      <ApiDiagnostics />
     </motion.div>
   );
 }

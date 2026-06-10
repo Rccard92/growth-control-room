@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { isApiBaseConfigured } from "../lib/api";
 import { useCreateProject } from "../hooks/useProjects";
 import { APP_ROUTES } from "../routes/config";
 
@@ -10,6 +11,7 @@ export function NewProjectPage() {
   const createProject = useCreateProject();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const apiConfigured = isApiBaseConfigured();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,6 +32,12 @@ export function NewProjectPage() {
           { label: "Nuovo" },
         ]}
       />
+      {!apiConfigured && (
+        <div className="gcr-alert gcr-alert--error" style={{ marginBottom: "1rem" }}>
+          VITE_API_URL non configurato: imposta l&apos;URL pubblico dell&apos;API su Railway
+          (senza <code>/api</code> finale) e rebuild del servizio WEB.
+        </div>
+      )}
       <div className="gcr-card" style={{ maxWidth: 480 }}>
         <form
           style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
@@ -64,7 +72,7 @@ export function NewProjectPage() {
           <button
             type="submit"
             className="gcr-btn gcr-btn--primary"
-            disabled={createProject.isPending || !name.trim()}
+            disabled={createProject.isPending || !name.trim() || !apiConfigured}
           >
             {createProject.isPending ? "Creazione…" : "Crea progetto"}
           </button>

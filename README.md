@@ -111,10 +111,10 @@ Il container API esegue `alembic upgrade head` all'avvio, poi uvicorn.
 
 | Variabile | Esempio |
 |-----------|---------|
-| `VITE_API_URL` | `https://api-xxx.up.railway.app` |
+| `VITE_API_URL` | `https://api-xxx.up.railway.app` (senza `/api` finale) |
 | `WEB_ALLOWED_HOSTS` | *(opzionale)* Host aggiuntivi per `vite preview`, separati da virgola (es. dominio custom) |
 
-`VITE_API_URL` è una variabile di **build**: impostala prima del deploy o forza un rebuild dopo averla aggiunta.
+`VITE_API_URL` è una variabile di **build**: imposta l'URL base dell'API **senza** suffisso `/api` (es. `https://api-xxx.up.railway.app`, non `.../api`). Il frontend aggiunge automaticamente i path `/api/projects`, ecc. Rebuild obbligatorio dopo ogni modifica.
 
 Se Railway assegna un nuovo dominio o usi un custom domain, aggiungilo in `WEB_ALLOWED_HOSTS` sul servizio WEB (runtime). L'host Railway attuale è già incluso in config.
 
