@@ -11,7 +11,7 @@ COPY . .
 
 WORKDIR /app/apps/api
 
-RUN uv sync --frozen --no-dev
+RUN uv sync --no-dev
 
 EXPOSE 8000
 
