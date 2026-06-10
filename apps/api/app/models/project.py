@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.ai_run import AiRun
     from app.models.alert import Alert
     from app.models.integration import Integration
+    from app.models.shopify import ShopifyStore
     from app.models.workspace import Workspace
 
 
@@ -41,6 +42,10 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     alerts: Mapped[list["Alert"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    shopify_stores: Mapped[list["ShopifyStore"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

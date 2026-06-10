@@ -11,30 +11,11 @@ from app.models.integration import Integration
 from app.models.project import Project
 from app.schemas.integration import IntegrationRead
 from app.schemas.project import ProjectCreate, ProjectRead
+from app.services.projects import get_project_in_default_workspace
 from app.services.workspace import get_default_workspace
 from app.utils.slug import unique_project_slug
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-
-async def _get_project_in_default_workspace(
-    project_id: UUID,
-    session: AsyncSession,
-) -> Project:
-    workspace = await get_default_workspace(session)
-    result = await session.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.workspace_id == workspace.id,
-        )
-    )
-    project = result.scalar_one_or_none()
-    if project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Progetto non trovato",
-        )
-    return project
 
 
 @router.post(
@@ -80,7 +61,7 @@ async def get_project(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
 ) -> Project:
-    return await _get_project_in_default_workspace(project_id, session)
+    return await get_project_in_default_workspace(project_id, session)
 
 
 @router.get(
@@ -92,7 +73,7 @@ async def list_project_integrations(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
 ) -> list[IntegrationRead]:
-    project = await _get_project_in_default_workspace(project_id, session)
+    project = await get_project_in_default_workspace(project_id, session)
     result = await session.execute(
         select(Integration).where(Integration.project_id == project.id)
     )

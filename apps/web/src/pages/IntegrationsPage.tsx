@@ -67,9 +67,15 @@ export function IntegrationsPage() {
                   <span className="integration-card__status">{STATUS_LABELS[status]}</span>
                 </div>
                 {integration.provider === "shopify" ? (
-                  <Link to={`/projects/${id}/shopify`}>
-                    <Button variant="secondary">Configura</Button>
-                  </Link>
+                  status === "connected" ? (
+                    <Link to={`/projects/${id}/shopify`}>
+                      <Button variant="secondary">Gestisci</Button>
+                    </Link>
+                  ) : (
+                    <Link to={`/projects/${id}/shopify/connect`}>
+                      <Button variant="secondary">Connetti</Button>
+                    </Link>
+                  )
                 ) : (
                   <Button variant="secondary" disabled>
                     Connetti (presto)

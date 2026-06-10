@@ -119,8 +119,36 @@ Lascia vuoto lo Start Command su entrambi i servizi (usa il CMD del Dockerfile).
 
 ### Post-deploy
 
-1. Redeploy API (migration 002 + seed demo)
+1. Redeploy API (migration 003 + seed demo)
 2. Redeploy WEB con `VITE_API_URL` impostato all'URL pubblico dell'API
+
+## Integrazione Shopify (Custom App)
+
+Connessione manuale read-only via Admin API access token (no OAuth in v1).
+
+### Creare la Custom App su Shopify
+
+1. Shopify Admin → **Settings** → **Apps and sales channels** → **Develop apps**
+2. **Create an app** → nome a scelta (es. Growth Control Room)
+3. **Configure Admin API scopes**:
+   - `read_products`
+   - `read_orders`
+   - *(step successivo blog)* `write_content`, `write_online_store_pages`
+4. **Install app** sullo store
+5. Copia **Admin API access token** (`shpat_...`) e il dominio `nomesito.myshopify.com`
+
+### Connettere da Growth Control Room
+
+1. Apri un progetto → **Integrazioni** → Shopify → **Connetti**
+2. Inserisci dominio shop e Admin API access token
+3. Dopo la connessione, usa **Sincronizza dati Shopify** per importare prodotti e ordini
+
+Endpoint API:
+
+- `POST /api/projects/{id}/integrations/shopify/connect`
+- `GET /api/projects/{id}/shopify/status`
+- `POST /api/projects/{id}/shopify/sync`
+- `GET /api/projects/{id}/shopify/dashboard`
 
 ## Documentazione
 
@@ -136,6 +164,7 @@ Implementato:
 - PostgreSQL con SQLAlchemy async + Alembic (schema foundation, 7 entità)
 - CRUD progetti (`POST/GET /api/projects`, dettaglio)
 - Integrazioni per progetto: merge di 8 provider (anche non collegati → `not_connected`)
-- Struttura connectors e skills (stub, senza OAuth)
+- **Shopify v1**: connect manuale (Custom App token), sync read-only prodotti/ordini, dashboard KPI
+- Struttura connectors e skills (stub OAuth per altri provider)
 
-Non ancora implementato: autenticazione, OAuth integrazioni, sync dati, Shopify/content layer.
+Non ancora implementato: autenticazione utenti, OAuth integrazioni, sync automatico, creazione articoli blog Shopify.
