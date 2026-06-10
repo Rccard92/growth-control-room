@@ -14,6 +14,7 @@ import { ShopifyAttributionIntelligencePanel } from "../components/shopify/Shopi
 import { ShopifyControlRoomHeader } from "../components/shopify/ShopifyControlRoomHeader";
 import { ShopifyExecutiveStrip } from "../components/shopify/ShopifyExecutiveStrip";
 import { ShopifySyncSummary } from "../components/shopify/ShopifySyncSummary";
+import { TrendIntelligencePanel } from "../components/shopify/TrendIntelligencePanel";
 import { useShopifyDashboard, useShopifyStatus, useShopifySync } from "../hooks/useShopify";
 import { useDateRangeParams } from "../hooks/useDateRangeParams";
 import { getDateRangeDisplayLabel } from "../lib/date-range";
@@ -194,7 +195,10 @@ export function ShopifyControlRoomPage() {
             trackingQualityScore={blocks.attributionIntelligence.trackingQualityScore}
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
             periodLabel={periodLabel}
+            comparison={blocks.comparison}
           />
+
+          <TrendIntelligencePanel comparison={blocks.comparison} />
 
           <DailyDiagnosisPanel items={blocks.dailyDiagnosis} />
 
@@ -205,12 +209,14 @@ export function ShopifyControlRoomPage() {
             availability={blocks.marketingReportAvailability}
             formatMoney={formatShopifyMoney}
             periodLabel={periodLabel}
+            comparison={blocks.comparison}
           />
 
           <ProductIntelligencePanel
             productIntelligence={blocks.productIntelligence}
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
             periodLabel={periodLabel}
+            comparison={blocks.comparison}
           />
 
           <InventoryRiskPanel inventoryRisk={blocks.inventoryRisk} />

@@ -1,12 +1,26 @@
 import { useState } from "react";
-import type { ShopifyProductPerformanceSection } from "@gcr/shared";
+import type { ShopifyDashboardComparison, ShopifyProductPerformanceSection } from "@gcr/shared";
 import { SHOPIFY_TABLE_ROW_LIMIT } from "../../lib/shopify-dashboard-blocks";
+import {
+  getProductTrendBadge,
+  getProductTrendBadgeClass,
+} from "../../lib/shopify-comparison-format";
 import { ShowMoreToggle } from "./ShowMoreToggle";
 
 interface ProductIntelligencePanelProps {
   productIntelligence: ShopifyProductPerformanceSection;
   formatMoney: (value: string) => string;
   periodLabel?: string;
+  comparison?: ShopifyDashboardComparison;
+}
+
+function ProductTrendBadge({ title, comparison }: { title: string; comparison?: ShopifyDashboardComparison }) {
+  if (!comparison) return null;
+  const badge = getProductTrendBadge(title, comparison);
+  if (!badge) return null;
+  return (
+    <span className={`shopify-product-badge ${getProductTrendBadgeClass(badge)}`}>{badge}</span>
+  );
 }
 
 type Tab = "best" | "stale" | "highstock" | "seo";
@@ -22,6 +36,7 @@ export function ProductIntelligencePanel({
   productIntelligence,
   formatMoney,
   periodLabel,
+  comparison,
 }: ProductIntelligencePanelProps) {
   const [tab, setTab] = useState<Tab>("best");
   const [expanded, setExpanded] = useState(false);
@@ -75,12 +90,15 @@ export function ProductIntelligencePanel({
                   .slice(0, expanded ? undefined : SHOPIFY_TABLE_ROW_LIMIT)
                   .map((item) => (
                     <tr key={item.productTitle}>
-                      <td>{item.productTitle}</td>
-                      <td>{item.quantitySold}</td>
-                      <td>{formatMoney(item.revenue)}</td>
-                      <td>{item.currentInventory ?? "—"}</td>
-                      <td>{item.status ?? "—"}</td>
-                      <td>—</td>
+                    <td>
+                      {item.productTitle}
+                      <ProductTrendBadge title={item.productTitle} comparison={comparison} />
+                    </td>
+                    <td>{item.quantitySold}</td>
+                    <td>{formatMoney(item.revenue)}</td>
+                    <td>{item.currentInventory ?? "—"}</td>
+                    <td>{item.status ?? "—"}</td>
+                    <td>—</td>
                     </tr>
                   ))
               )}
@@ -120,7 +138,10 @@ export function ProductIntelligencePanel({
                   .slice(0, expanded ? undefined : SHOPIFY_TABLE_ROW_LIMIT)
                   .map((item) => (
                     <tr key={item.productTitle}>
-                      <td>{item.productTitle}</td>
+                      <td>
+                        {item.productTitle}
+                        <ProductTrendBadge title={item.productTitle} comparison={comparison} />
+                      </td>
                       <td>0</td>
                       <td>{formatMoney("0")}</td>
                       <td>{item.currentInventory ?? "—"}</td>
@@ -165,7 +186,10 @@ export function ProductIntelligencePanel({
                   .slice(0, expanded ? undefined : SHOPIFY_TABLE_ROW_LIMIT)
                   .map((item) => (
                     <tr key={item.productTitle}>
-                      <td>{item.productTitle}</td>
+                      <td>
+                        {item.productTitle}
+                        <ProductTrendBadge title={item.productTitle} comparison={comparison} />
+                      </td>
                       <td>{item.quantitySold}</td>
                       <td>—</td>
                       <td>{item.currentInventory ?? "—"}</td>

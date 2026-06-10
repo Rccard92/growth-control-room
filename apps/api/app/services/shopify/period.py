@@ -172,3 +172,64 @@ def resolve_shopify_period(
         start_at=start_at,
         end_at_exclusive=end_at_exclusive,
     )
+
+
+def period_length_days(start_date: date, end_date: date) -> int:
+    return (end_date - start_date).days + 1
+
+
+def _previous_period_label(prev_start: date, prev_end: date, current: ResolvedPeriod) -> str:
+    if prev_start == prev_end:
+        return f"Periodo precedente: {prev_start.strftime('%d/%m/%Y')}"
+    if current.range in RANGE_LABELS and current.range not in {"custom", "month_to_date"}:
+        base = RANGE_LABELS[current.range]
+        return f"Periodo precedente: {base}"
+    return f"Periodo precedente: {_format_custom_label(prev_start, prev_end)}"
+
+
+def compute_previous_period(current: ResolvedPeriod, tz: ZoneInfo) -> ResolvedPeriod:
+    length = period_length_days(current.start_date, current.end_date)
+
+    if current.range in {"today", "yesterday"}:
+        prev_end = current.start_date - timedelta(days=1)
+        prev_start = prev_end
+    elif current.range in {"last_7_days", "last_30_days", "custom"}:
+        prev_end = current.start_date - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=length - 1)
+    elif current.range == "month_to_date":
+        first_of_current_month = current.start_date
+        last_day_prev_month = first_of_current_month - timedelta(days=1)
+        first_of_prev_month = last_day_prev_month.replace(day=1)
+        prev_start = first_of_prev_month
+        prev_end = prev_start + timedelta(days=length - 1)
+        if prev_end > last_day_prev_month:
+            prev_end = last_day_prev_month
+    elif current.range == "previous_month":
+        prev_end = current.start_date - timedelta(days=1)
+        prev_start = prev_end.replace(day=1)
+    else:
+        prev_end = current.start_date - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=length - 1)
+
+    start_at, end_at_exclusive = _date_bounds_to_utc(prev_start, prev_end, tz)
+    return ResolvedPeriod(
+        range=current.range,
+        start_date=prev_start,
+        end_date=prev_end,
+        timezone=current.timezone,
+        label=_previous_period_label(prev_start, prev_end, current),
+        start_at=start_at,
+        end_at_exclusive=end_at_exclusive,
+    )
+
+
+def resolve_period_pair(
+    store: ShopifyStore,
+    range_key: str | None,
+    start_date: date | None,
+    end_date: date | None,
+) -> tuple[ResolvedPeriod, ResolvedPeriod]:
+    current = resolve_shopify_period(store, range_key, start_date, end_date)
+    tz, _ = _store_timezone(store)
+    previous = compute_previous_period(current, tz)
+    return current, previous

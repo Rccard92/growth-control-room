@@ -374,10 +374,120 @@ class ShopifyDailyDiagnosisItem(BaseModel):
     severity: str
 
 
+class ShopifyMetricComparison(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    current: Decimal
+    previous: Decimal
+    delta: Decimal
+    delta_percent: float | None = Field(default=None, serialization_alias="deltaPercent")
+    direction: str
+
+
+class ShopifySourceComparisonItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: str
+    revenue: Decimal | None = None
+    orders_count: int | None = Field(default=None, serialization_alias="ordersCount")
+    previous: Decimal
+    delta: Decimal
+    delta_percent: float | None = Field(default=None, serialization_alias="deltaPercent")
+    direction: str
+
+
+class ShopifyProductComparisonItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_title: str = Field(serialization_alias="productTitle")
+    current_revenue: Decimal = Field(serialization_alias="currentRevenue")
+    previous_revenue: Decimal = Field(serialization_alias="previousRevenue")
+    current_quantity: int = Field(serialization_alias="currentQuantity")
+    previous_quantity: int = Field(serialization_alias="previousQuantity")
+    delta: Decimal
+    delta_percent: float | None = Field(default=None, serialization_alias="deltaPercent")
+    direction: str
+
+
+class ShopifyProductPeriodItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_title: str = Field(serialization_alias="productTitle")
+    quantity_sold: int = Field(serialization_alias="quantitySold")
+    revenue: Decimal
+
+
+class ShopifyComparisonMetrics(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    revenue: ShopifyMetricComparison
+    orders: ShopifyMetricComparison
+    average_order_value: ShopifyMetricComparison = Field(
+        serialization_alias="averageOrderValue",
+    )
+    paid_orders: ShopifyMetricComparison = Field(serialization_alias="paidOrders")
+    pending_orders: ShopifyMetricComparison = Field(serialization_alias="pendingOrders")
+    unfulfilled_orders: ShopifyMetricComparison = Field(
+        serialization_alias="unfulfilledOrders",
+    )
+
+
+class ShopifyAttributionComparison(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    revenue_by_source_delta: list[ShopifySourceComparisonItem] = Field(
+        serialization_alias="revenueBySourceDelta",
+    )
+    orders_by_source_delta: list[ShopifySourceComparisonItem] = Field(
+        serialization_alias="ordersBySourceDelta",
+    )
+    top_growing_sources: list[ShopifySourceComparisonItem] = Field(
+        serialization_alias="topGrowingSources",
+    )
+    top_declining_sources: list[ShopifySourceComparisonItem] = Field(
+        serialization_alias="topDecliningSources",
+    )
+    unknown_revenue_delta: ShopifyMetricComparison = Field(
+        serialization_alias="unknownRevenueDelta",
+    )
+    tracking_quality_delta: ShopifyMetricComparison = Field(
+        serialization_alias="trackingQualityDelta",
+    )
+
+
+class ShopifyProductComparison(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    top_growing_products: list[ShopifyProductComparisonItem] = Field(
+        serialization_alias="topGrowingProducts",
+    )
+    top_declining_products: list[ShopifyProductComparisonItem] = Field(
+        serialization_alias="topDecliningProducts",
+    )
+    products_new_in_current_period: list[ShopifyProductPeriodItem] = Field(
+        serialization_alias="productsNewInCurrentPeriod",
+    )
+    products_sold_previously_but_not_now: list[ShopifyProductPeriodItem] = Field(
+        serialization_alias="productsSoldPreviouslyButNotNow",
+    )
+
+
+class ShopifyDashboardComparison(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    current_period: ShopifyDashboardPeriod = Field(serialization_alias="currentPeriod")
+    previous_period: ShopifyDashboardPeriod = Field(serialization_alias="previousPeriod")
+    data_quality: str = Field(serialization_alias="dataQuality")
+    metrics: ShopifyComparisonMetrics
+    attribution: ShopifyAttributionComparison
+    products: ShopifyProductComparison
+
+
 class ShopifyDashboardResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     period: ShopifyDashboardPeriod
+    comparison: ShopifyDashboardComparison
     summary: ShopifyDashboardSummary
     alerts: list[ShopifyDashboardAlert]
     product_intelligence: ShopifyProductPerformanceSection = Field(

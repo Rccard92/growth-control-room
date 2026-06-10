@@ -22,6 +22,11 @@ from app.services.shopify.analytics import (
     product_lookup,
     _product_to_dict,
 )
+from app.services.shopify.comparison import (
+    build_period_comparison,
+    build_trend_diagnosis,
+    compute_period_snapshot,
+)
 from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
 from app.services.shopify.attribution import (
     build_attribution_alerts,
@@ -276,11 +281,15 @@ def _build_daily_diagnosis(
     attribution_intelligence: dict[str, Any] | None = None,
     *,
     period_label: str = "nel periodo selezionato",
+    comparison: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     diagnosis: list[dict[str, str]] = []
 
+    if comparison:
+        diagnosis.extend(build_trend_diagnosis(comparison))
+
     oos = current_state_metrics.get("out_of_stock_count", 0)
-    if oos > 0:
+    if oos > 0 and len(diagnosis) < 5:
         diagnosis.append(
             {
                 "message": f"{oos} prodotti attivi sono senza stock.",
@@ -289,7 +298,7 @@ def _build_daily_diagnosis(
         )
 
     no_sales = period_metrics.get("products_without_sales_count", 0)
-    if no_sales > 0:
+    if no_sales > 0 and len(diagnosis) < 5:
         diagnosis.append(
             {
                 "message": (
@@ -300,7 +309,7 @@ def _build_daily_diagnosis(
         )
 
     pending = period_metrics.get("pending_orders_count", 0)
-    if pending > 0:
+    if pending > 0 and len(diagnosis) < 5:
         diagnosis.append(
             {
                 "message": f"{pending} ordini risultano pending {period_label}.",
@@ -309,7 +318,7 @@ def _build_daily_diagnosis(
         )
 
     seo = current_state_metrics.get("seo_issues_count", 0)
-    if seo > 0:
+    if seo > 0 and len(diagnosis) < 5:
         diagnosis.append(
             {
                 "message": f"{seo} prodotti hanno dati SEO incompleti.",
@@ -367,6 +376,7 @@ async def build_dashboard(
     store: ShopifyStore,
     session: AsyncSession,
     period: ResolvedPeriod,
+    previous_period: ResolvedPeriod,
 ) -> dict[str, Any]:
     empty_summary = {
         "revenue": Decimal("0"),
@@ -585,15 +595,26 @@ async def build_dashboard(
         1 for a in alerts if a["severity"] == "critical"
     )
 
+    current_snapshot = await compute_period_snapshot(session, store, period, products)
+    previous_snapshot = await compute_period_snapshot(session, store, previous_period, products)
+    comparison = build_period_comparison(
+        period,
+        previous_period,
+        current_snapshot,
+        previous_snapshot,
+    )
+
     daily_diagnosis = _build_daily_diagnosis(
         period_metrics,
         current_state_metrics,
         raw_attribution_intelligence,
         period_label=period.label.lower(),
+        comparison=comparison,
     )
 
     return {
         "period": period.to_dict(),
+        "comparison": comparison,
         "summary": summary,
         "alerts": alerts,
         "product_intelligence": product_intelligence,

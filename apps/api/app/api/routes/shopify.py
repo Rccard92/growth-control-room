@@ -26,7 +26,7 @@ from app.services.shopify.oauth import (
     ensure_shopify_oauth_configured,
 )
 from app.services.shopify.dashboard import build_dashboard
-from app.services.shopify.period import resolve_shopify_period
+from app.services.shopify.period import resolve_period_pair
 from app.services.shopify.sync import sync_shopify_store
 
 router = APIRouter(prefix="/projects", tags=["shopify"])
@@ -172,8 +172,8 @@ async def shopify_dashboard(
             detail="Shopify non connesso per questo progetto",
         )
 
-    period = resolve_shopify_period(store, range, start_date, end_date)
-    data = await build_dashboard(store, session, period=period)
+    period, previous_period = resolve_period_pair(store, range, start_date, end_date)
+    data = await build_dashboard(store, session, period=period, previous_period=previous_period)
     return ShopifyDashboardResponse.model_validate(data)
 
 

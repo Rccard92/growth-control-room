@@ -1,8 +1,11 @@
 import { useState } from "react";
 import type {
   ShopifyAttributionIntelligence,
+  ShopifyDashboardComparison,
   ShopifyMarketingReportAvailability,
+  ShopifySourceComparisonItem,
 } from "@gcr/shared";
+import { directionClass, formatDeltaArrow, formatDeltaPercent } from "../../lib/shopify-comparison-format";
 import { SHOPIFY_TABLE_ROW_LIMIT, sliceWithLimit } from "../../lib/shopify-dashboard-blocks";
 import { ShowMoreToggle } from "./ShowMoreToggle";
 
@@ -11,6 +14,7 @@ interface ShopifyAttributionIntelligencePanelProps {
   availability: ShopifyMarketingReportAvailability;
   formatMoney: (value: string, currency?: string | null) => string;
   periodLabel?: string;
+  comparison?: ShopifyDashboardComparison;
 }
 
 function sourceChipClass(source: string): string {
@@ -92,11 +96,73 @@ function AttributionTable({
   );
 }
 
+function SourceDeltaTable({
+  rows,
+  formatMoney,
+}: {
+  rows: ShopifySourceComparisonItem[];
+  formatMoney: (value: string, currency?: string | null) => string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleRows = sliceWithLimit(rows, SHOPIFY_TABLE_ROW_LIMIT, expanded);
+
+  if (rows.length === 0) {
+    return <p className="shopify-empty-copy">Nessuna variazione source disponibile.</p>;
+  }
+
+  return (
+    <>
+      <table className="shopify-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Revenue</th>
+            <th>Precedente</th>
+            <th>Delta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRows.map((row) => (
+            <tr key={`delta-${row.source}`}>
+              <td>
+                <span className={`shopify-source-chip ${sourceChipClass(row.source)}`}>
+                  {row.source}
+                </span>
+              </td>
+              <td>{formatMoney(String(row.revenue ?? 0))}</td>
+              <td>{formatMoney(String(row.previous))}</td>
+              <td>
+                <span className={`shopify-metric-delta ${directionClass(row.direction)}`}>
+                  {formatDeltaArrow(row.direction)}{" "}
+                  {formatDeltaPercent({
+                    current: row.revenue ?? 0,
+                    previous: row.previous,
+                    delta: row.delta,
+                    deltaPercent: row.deltaPercent,
+                    direction: row.direction,
+                  })}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ShowMoreToggle
+        total={rows.length}
+        limit={SHOPIFY_TABLE_ROW_LIMIT}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+      />
+    </>
+  );
+}
+
 export function ShopifyAttributionIntelligencePanel({
   intelligence,
   availability,
   formatMoney,
   periodLabel,
+  comparison,
 }: ShopifyAttributionIntelligencePanelProps) {
   const hasData =
     availability.shopifyOrderAttributionAvailable ||
@@ -164,6 +230,16 @@ export function ShopifyAttributionIntelligencePanel({
             valueKey="source"
             labelKey="Source"
           />
+
+          {comparison && (
+            <>
+              <h4 className="shopify-panel__subtitle">Variazione revenue by source</h4>
+              <SourceDeltaTable
+                rows={comparison.attribution.revenueBySourceDelta}
+                formatMoney={formatMoney}
+              />
+            </>
+          )}
 
           <h4 className="shopify-panel__subtitle">Top UTM campaigns</h4>
           <AttributionTable

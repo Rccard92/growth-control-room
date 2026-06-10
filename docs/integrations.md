@@ -90,9 +90,11 @@ Valori `range` supportati: `today`, `yesterday`, `last_7_days`, `last_30_days`, 
 
 Le date sono interpretate nel timezone IANA dello store Shopify (`shopify_stores.timezone`), con fallback `UTC`.
 
-La response include `period` (`range`, `startDate`, `endDate`, `timezone`, `label`) e nel `summary` i gruppi `periodMetrics` / `currentStateMetrics`.
+La response include `period` (`range`, `startDate`, `endDate`, `timezone`, `label`), nel `summary` i gruppi `periodMetrics` / `currentStateMetrics`, e il blocco `comparison` con confronto vs periodo precedente equivalente (`currentPeriod`, `previousPeriod`, `metrics`, `attribution`, `products`, `dataQuality`).
 
 **Nota:** La Shopify Control Room supporta filtri temporali per metriche basate sugli ordini. Inventario e SEO rappresentano invece lo stato corrente dello store.
+
+**Nota:** La Shopify Control Room supporta confronto con periodo precedente per metriche ordine, attribution e performance prodotto.
 
 Esempi frontend (persistiti in URL):
 

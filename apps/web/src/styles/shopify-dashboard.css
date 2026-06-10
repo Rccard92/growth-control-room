@@ -659,6 +659,108 @@
   border-radius: var(--gcr-radius);
 }
 
+.shopify-metric-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.shopify-metric-delta__hint {
+  font-weight: 400;
+  color: var(--gcr-text-muted);
+}
+
+.shopify-metric-delta--up {
+  color: #34d399;
+}
+
+.shopify-metric-delta--down {
+  color: #fb7185;
+}
+
+.shopify-metric-delta--flat {
+  color: var(--gcr-text-muted);
+}
+
+.shopify-trend-intel {
+  border-color: rgba(34, 211, 238, 0.22);
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.06), transparent),
+    var(--gcr-surface);
+}
+
+.shopify-trend-intel__limited {
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--gcr-radius);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  background: rgba(251, 191, 36, 0.08);
+  font-size: 0.8125rem;
+  color: #fcd34d;
+}
+
+.shopify-trend-intel__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.shopify-trend-intel__item {
+  padding: 0.75rem;
+  border-radius: var(--gcr-radius);
+  border: 1px solid var(--gcr-border);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.shopify-trend-intel__label {
+  display: block;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gcr-text-muted);
+}
+
+.shopify-trend-intel__value {
+  display: block;
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gcr-text);
+}
+
+.shopify-product-badge {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.shopify-product-badge--growing {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}
+
+.shopify-product-badge--declining {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+}
+
+.shopify-product-badge--new {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+}
+
+.shopify-product-badge--stalled {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fcd34d;
+}
+
 @media (max-width: 1200px) {
   .shopify-executive-strip,
   .shopify-skeleton-grid {
@@ -678,7 +780,8 @@
 
   .shopify-inventory-summary,
   .shopify-seo-stats,
-  .shopify-sync-summary__grid {
+  .shopify-sync-summary__grid,
+  .shopify-trend-intel__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

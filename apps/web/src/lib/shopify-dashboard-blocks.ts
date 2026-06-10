@@ -4,6 +4,7 @@ export const SHOPIFY_TABLE_ROW_LIMIT = 8;
 export const SHOPIFY_DIAGNOSIS_LIMIT = 5;
 
 export interface ResolvedShopifyDashboardBlocks {
+  comparison: ShopifyDashboard["comparison"];
   productIntelligence: ShopifyDashboard["productPerformance"];
   inventoryRisk: ShopifyDashboard["inventory"];
   orderOperations: ShopifyDashboard["orders"];
@@ -19,6 +20,7 @@ export function resolveShopifyDashboardBlocks(
   dashboard: ShopifyDashboard,
 ): ResolvedShopifyDashboardBlocks {
   return {
+    comparison: dashboard.comparison,
     productIntelligence: dashboard.productIntelligence ?? dashboard.productPerformance,
     inventoryRisk: dashboard.inventoryRisk ?? dashboard.inventory,
     orderOperations: dashboard.orderOperations ?? dashboard.orders,

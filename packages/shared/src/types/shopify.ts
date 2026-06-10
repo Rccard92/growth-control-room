@@ -67,6 +67,77 @@ export interface ShopifyDashboardPeriod {
   label: string;
 }
 
+export type ComparisonDirection = "up" | "down" | "flat";
+
+export interface ShopifyMetricComparison {
+  current: string | number;
+  previous: string | number;
+  delta: string | number;
+  deltaPercent: number | null;
+  direction: ComparisonDirection;
+}
+
+export interface ShopifySourceComparisonItem {
+  source: string;
+  revenue?: string;
+  ordersCount?: number;
+  previous: string | number;
+  delta: string | number;
+  deltaPercent: number | null;
+  direction: ComparisonDirection;
+}
+
+export interface ShopifyProductComparisonItem {
+  productTitle: string;
+  currentRevenue: string;
+  previousRevenue: string;
+  currentQuantity: number;
+  previousQuantity: number;
+  delta: string | number;
+  deltaPercent: number | null;
+  direction: ComparisonDirection;
+}
+
+export interface ShopifyProductPeriodItem {
+  productTitle: string;
+  quantitySold: number;
+  revenue: string;
+}
+
+export interface ShopifyComparisonMetrics {
+  revenue: ShopifyMetricComparison;
+  orders: ShopifyMetricComparison;
+  averageOrderValue: ShopifyMetricComparison;
+  paidOrders: ShopifyMetricComparison;
+  pendingOrders: ShopifyMetricComparison;
+  unfulfilledOrders: ShopifyMetricComparison;
+}
+
+export interface ShopifyAttributionComparison {
+  revenueBySourceDelta: ShopifySourceComparisonItem[];
+  ordersBySourceDelta: ShopifySourceComparisonItem[];
+  topGrowingSources: ShopifySourceComparisonItem[];
+  topDecliningSources: ShopifySourceComparisonItem[];
+  unknownRevenueDelta: ShopifyMetricComparison;
+  trackingQualityDelta: ShopifyMetricComparison;
+}
+
+export interface ShopifyProductComparison {
+  topGrowingProducts: ShopifyProductComparisonItem[];
+  topDecliningProducts: ShopifyProductComparisonItem[];
+  productsNewInCurrentPeriod: ShopifyProductPeriodItem[];
+  productsSoldPreviouslyButNotNow: ShopifyProductPeriodItem[];
+}
+
+export interface ShopifyDashboardComparison {
+  currentPeriod: ShopifyDashboardPeriod;
+  previousPeriod: ShopifyDashboardPeriod;
+  dataQuality: "full" | "limited";
+  metrics: ShopifyComparisonMetrics;
+  attribution: ShopifyAttributionComparison;
+  products: ShopifyProductComparison;
+}
+
 export interface ShopifyPeriodMetrics {
   revenue: string;
   ordersCount: number;
@@ -266,6 +337,7 @@ export interface ShopifyDailyDiagnosisItem {
 
 export interface ShopifyDashboard {
   period: ShopifyDashboardPeriod;
+  comparison: ShopifyDashboardComparison;
   summary: ShopifyDashboardSummary;
   alerts: ShopifyDashboardAlert[];
   productIntelligence?: ShopifyProductPerformanceSection;
