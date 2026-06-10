@@ -1,0 +1,15 @@
+{
+  "name": "growth-control-room",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter @gcr/web --filter @gcr/api dev",
+    "dev:web": "pnpm --filter @gcr/web dev",
+    "dev:api": "pnpm --filter @gcr/api dev",
+    "build:web": "pnpm --filter @gcr/web build",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,18 @@
+[project]
+name = "growth-control-room"
+version = "0.1.0"
+description = "Growth Control Room monorepo"
+requires-python = ">=3.12"
+
+[tool.uv.workspace]
+members = [
+    "apps/api",
+    "packages/connectors",
+    "packages/skills",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
