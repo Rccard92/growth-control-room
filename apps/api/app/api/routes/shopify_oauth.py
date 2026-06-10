@@ -87,18 +87,15 @@ async def shopify_oauth_callback(
             access_token,
             session,
         )
-    except ShopifyAPIError as exc:
+    except ShopifyAPIError:
         logger.exception(
-            "Shopify OAuth callback: errore persistenza connessione per project %s",
+            "Shopify OAuth callback: errore durante scambio token o persistenza per project %s",
             project_id,
         )
-        error_code = "token_exchange_failed"
-        if exc.status_code and exc.status_code >= 500:
-            error_code = "shopify_unavailable"
-        return _redirect_error(project_id, error_code)
+        return _redirect_error(project_id, "connection_failed")
     except Exception:
         logger.exception(
-            "Shopify OAuth callback: errore imprevisto per project %s",
+            "Shopify OAuth callback: errore imprevisto durante persistenza per project %s",
             project_id,
         )
         return _redirect_error(project_id, "connection_failed")

@@ -60,7 +60,6 @@ async def persist_shopify_connection(
             Integration.project_id == project_id,
             Integration.provider == "shopify",
         )
-        .options(selectinload(Integration.credential))
     )
     integration = result.scalar_one_or_none()
     now = datetime.now(UTC)
@@ -84,15 +83,23 @@ async def persist_shopify_connection(
             "admin_access_token": access_token.strip(),
         }
     )
+    encrypted_payload = encrypt_secret(credential_payload)
 
-    if integration.credential is None:
-        integration.credential = IntegrationCredential(
-            integration_id=integration.id,
-            encrypted_payload=encrypt_secret(credential_payload),
+    credential_result = await session.execute(
+        select(IntegrationCredential).where(
+            IntegrationCredential.integration_id == integration.id
         )
-        session.add(integration.credential)
+    )
+    credential = credential_result.scalar_one_or_none()
+
+    if credential is None:
+        credential = IntegrationCredential(
+            integration_id=integration.id,
+            encrypted_payload=encrypted_payload,
+        )
+        session.add(credential)
     else:
-        integration.credential.encrypted_payload = encrypt_secret(credential_payload)
+        credential.encrypted_payload = encrypted_payload
 
     store_result = await session.execute(
         select(ShopifyStore).where(ShopifyStore.project_id == project_id)
