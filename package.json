@@ -1,11 +1,14 @@
 {
   "name": "growth-control-room",
   "private": true,
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
+    "build": "pnpm --filter @gcr/web build",
+    "build:web": "pnpm --filter @gcr/web build",
+    "start:web": "pnpm --filter @gcr/web preview --host 0.0.0.0 --port $PORT",
     "dev": "pnpm --parallel --filter @gcr/web --filter @gcr/api dev",
     "dev:web": "pnpm --filter @gcr/web dev",
     "dev:api": "pnpm --filter @gcr/api dev",
-    "build:web": "pnpm --filter @gcr/web build",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:migrate": "python -m uv run --directory apps/api alembic upgrade head",

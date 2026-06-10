@@ -1,0 +1,6 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile && pnpm --filter @gcr/web build"
+
+[deploy]
+startCommand = "pnpm --filter @gcr/web preview --host 0.0.0.0 --port $PORT"

@@ -20,7 +20,7 @@ export function ProjectLayout() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
+              end={"end" in item ? item.end : undefined}
               className={({ isActive }) => (isActive ? "active" : undefined)}
             >
               {item.label}
