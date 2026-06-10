@@ -1,5 +1,5 @@
-import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+﻿import { motion } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
 import { APP_ROUTES } from "../routes/config";
 
 export function LoginPage() {
@@ -26,6 +26,11 @@ export function LoginPage() {
         >
           Entra nella Control Room
         </button>
+        <p style={{ marginTop: "1.25rem", fontSize: "0.8125rem" }}>
+          <Link className="gcr-legal__link" to={APP_ROUTES.privacy}>
+            Privacy Policy
+          </Link>
+        </p>
       </motion.div>
     </div>
   );

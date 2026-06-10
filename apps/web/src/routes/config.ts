@@ -8,6 +8,7 @@ export const PROJECT_NAV = [
 
 export const APP_ROUTES = {
   login: "/login",
+  privacy: "/privacy",
   projects: "/projects",
   newProject: "/projects/new",
   project: (id: string) => `/projects/${id}`,

@@ -1,4 +1,4 @@
-/* App Shell */
+﻿/* App Shell */
 .gcr-shell {
   display: flex;
   flex-direction: column;
@@ -567,6 +567,83 @@
   margin: 0 0 2rem;
 }
 
+/* Legal pages */
+.gcr-legal {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 0 3rem;
+}
+
+.gcr-legal__header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.gcr-legal__brand {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gcr-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gcr-legal__title {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--gcr-text);
+}
+
+.gcr-legal__updated {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gcr-text-muted);
+}
+
+.gcr-legal__intro {
+  margin: 0 0 2rem;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--gcr-text);
+}
+
+.gcr-legal__section {
+  margin-bottom: 1.75rem;
+}
+
+.gcr-legal__section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--gcr-text);
+}
+
+.gcr-legal__section p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--gcr-text-muted);
+}
+
+.gcr-legal__link {
+  color: var(--gcr-accent-cyan);
+  text-decoration: none;
+}
+
+.gcr-legal__link:hover {
+  text-decoration: underline;
+}
+
+.gcr-legal__footer {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--gcr-border);
+  text-align: center;
+  font-size: 0.875rem;
+}
 /* Command Card */
 .gcr-command-card {
   display: flex;

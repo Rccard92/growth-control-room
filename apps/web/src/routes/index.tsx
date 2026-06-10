@@ -1,9 +1,10 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+﻿import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { AiBriefPage } from "../pages/AiBriefPage";
 import { ContentPage } from "../pages/ContentPage";
 import { IntegrationsPage } from "../pages/IntegrationsPage";
 import { LoginPage } from "../pages/LoginPage";
+import { PrivacyPolicyPage } from "../pages/PrivacyPolicyPage";
 import { NewProjectPage } from "../pages/NewProjectPage";
 import { ProjectOverviewPage } from "../pages/ProjectOverviewPage";
 import { ProjectsPage } from "../pages/ProjectsPage";
@@ -14,6 +15,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
       <Route element={<AppShell showSidebar={false} />}>
         <Route index element={<Navigate to="/projects" replace />} />
