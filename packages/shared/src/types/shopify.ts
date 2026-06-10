@@ -174,6 +174,51 @@ export interface ShopifyAttributionReadiness {
   message: string;
 }
 
+export interface ShopifyAttributionBreakdownItem {
+  source?: string | null;
+  channel?: string | null;
+  campaign?: string | null;
+  revenue: string;
+  ordersCount: number;
+}
+
+export interface ShopifyNewReturningBySource {
+  source: string;
+  newCount: number;
+  returningCount: number;
+  unknownCount: number;
+  revenue: string;
+}
+
+export interface ShopifyTopProductBySource {
+  source: string;
+  productTitle: string;
+  revenue: string;
+  ordersCount: number;
+}
+
+export interface ShopifyAttributionIntelligence {
+  revenueBySource: ShopifyAttributionBreakdownItem[];
+  ordersBySource: ShopifyAttributionBreakdownItem[];
+  revenueByChannel: ShopifyAttributionBreakdownItem[];
+  ordersByChannel: ShopifyAttributionBreakdownItem[];
+  revenueByUtmCampaign: ShopifyAttributionBreakdownItem[];
+  ordersByUtmCampaign: ShopifyAttributionBreakdownItem[];
+  newVsReturningBySource: ShopifyNewReturningBySource[];
+  topProductsBySource: ShopifyTopProductBySource[];
+  unattributedOrdersCount: number;
+  unattributedRevenue: string;
+  directOrdersCount: number;
+  unknownOrdersCount: number;
+  trackingQualityScore: number;
+}
+
+export interface ShopifyMarketingReportAvailability {
+  shopifyOrderAttributionAvailable: boolean;
+  shopifyqlAvailable: boolean | null;
+  message: string;
+}
+
 export type ShopifyInsightSeverity = "info" | "warning" | "critical" | "opportunity";
 
 export interface ShopifyDailyDiagnosisItem {
@@ -189,6 +234,8 @@ export interface ShopifyDashboard {
   orders: ShopifyOrdersSection;
   seo: ShopifySeoSection;
   attribution: ShopifyAttributionReadiness;
+  attributionIntelligence: ShopifyAttributionIntelligence;
+  marketingReportAvailability: ShopifyMarketingReportAvailability;
   dailyDiagnosis: ShopifyDailyDiagnosisItem[];
 }
 

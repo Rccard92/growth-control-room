@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { AttributionReadinessPanel } from "../components/shopify/AttributionReadinessPanel";
+import { ShopifyAttributionIntelligencePanel } from "../components/shopify/ShopifyAttributionIntelligencePanel";
 import { EcommerceDiagnosisPanel } from "../components/shopify/EcommerceDiagnosisPanel";
 import { InventoryRiskPanel } from "../components/shopify/InventoryRiskPanel";
 import { OrdersOperationsPanel } from "../components/shopify/OrdersOperationsPanel";
@@ -207,6 +208,12 @@ export function ShopifyPage() {
           <ShopifyExecutiveStrip summary={summary} formatMoney={formatMoney} />
 
           <EcommerceDiagnosisPanel items={dashboard.dailyDiagnosis} />
+
+          <ShopifyAttributionIntelligencePanel
+            intelligence={dashboard.attributionIntelligence}
+            availability={dashboard.marketingReportAvailability}
+            formatMoney={formatMoney}
+          />
 
           <div className="shopify-dashboard__layout">
             <div className="shopify-dashboard__main">

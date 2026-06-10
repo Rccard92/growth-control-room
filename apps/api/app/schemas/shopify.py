@@ -248,6 +248,82 @@ class ShopifyAttributionReadiness(BaseModel):
     message: str
 
 
+class ShopifyAttributionBreakdownItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: str | None = None
+    channel: str | None = None
+    campaign: str | None = None
+    revenue: Decimal
+    orders_count: int = Field(serialization_alias="ordersCount")
+
+
+class ShopifyNewReturningBySource(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: str
+    new_count: int = Field(serialization_alias="newCount")
+    returning_count: int = Field(serialization_alias="returningCount")
+    unknown_count: int = Field(serialization_alias="unknownCount")
+    revenue: Decimal
+
+
+class ShopifyTopProductBySource(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: str
+    product_title: str = Field(serialization_alias="productTitle")
+    revenue: Decimal
+    orders_count: int = Field(serialization_alias="ordersCount")
+
+
+class ShopifyAttributionIntelligence(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    revenue_by_source: list[ShopifyAttributionBreakdownItem] = Field(
+        serialization_alias="revenueBySource",
+    )
+    orders_by_source: list[ShopifyAttributionBreakdownItem] = Field(
+        serialization_alias="ordersBySource",
+    )
+    revenue_by_channel: list[ShopifyAttributionBreakdownItem] = Field(
+        serialization_alias="revenueByChannel",
+    )
+    orders_by_channel: list[ShopifyAttributionBreakdownItem] = Field(
+        serialization_alias="ordersByChannel",
+    )
+    revenue_by_utm_campaign: list[ShopifyAttributionBreakdownItem] = Field(
+        serialization_alias="revenueByUtmCampaign",
+    )
+    orders_by_utm_campaign: list[ShopifyAttributionBreakdownItem] = Field(
+        serialization_alias="ordersByUtmCampaign",
+    )
+    new_vs_returning_by_source: list[ShopifyNewReturningBySource] = Field(
+        serialization_alias="newVsReturningBySource",
+    )
+    top_products_by_source: list[ShopifyTopProductBySource] = Field(
+        serialization_alias="topProductsBySource",
+    )
+    unattributed_orders_count: int = Field(serialization_alias="unattributedOrdersCount")
+    unattributed_revenue: Decimal = Field(serialization_alias="unattributedRevenue")
+    direct_orders_count: int = Field(serialization_alias="directOrdersCount")
+    unknown_orders_count: int = Field(serialization_alias="unknownOrdersCount")
+    tracking_quality_score: float = Field(serialization_alias="trackingQualityScore")
+
+
+class ShopifyMarketingReportAvailability(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    shopify_order_attribution_available: bool = Field(
+        serialization_alias="shopifyOrderAttributionAvailable",
+    )
+    shopifyql_available: bool | None = Field(
+        default=None,
+        serialization_alias="shopifyqlAvailable",
+    )
+    message: str
+
+
 class ShopifyDailyDiagnosisItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -267,6 +343,12 @@ class ShopifyDashboardResponse(BaseModel):
     orders: ShopifyOrdersSection
     seo: ShopifySeoSection
     attribution: ShopifyAttributionReadiness
+    attribution_intelligence: ShopifyAttributionIntelligence = Field(
+        serialization_alias="attributionIntelligence",
+    )
+    marketing_report_availability: ShopifyMarketingReportAvailability = Field(
+        serialization_alias="marketingReportAvailability",
+    )
     daily_diagnosis: list[ShopifyDailyDiagnosisItem] = Field(serialization_alias="dailyDiagnosis")
 
 

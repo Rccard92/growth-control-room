@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.shopify import ShopifyDailyMetric, ShopifyOrder, ShopifyProduct, ShopifyStore
+from app.services.shopify.attribution import extract_order_attribution
 from app.services.shopify.client import ShopifyGraphQLClient
 
 
@@ -80,8 +81,13 @@ async def _upsert_order(
         )
     )
     order = result.scalar_one_or_none()
-    total_money = (node.get("totalPriceSet") or {}).get("shopMoney") or {}
-    subtotal_money = (node.get("subtotalPriceSet") or {}).get("shopMoney") or {}
+    total_money = (node.get("currentTotalPriceSet") or node.get("totalPriceSet") or {}).get(
+        "shopMoney"
+    ) or {}
+    subtotal_money = (
+        node.get("currentSubtotalPriceSet") or node.get("subtotalPriceSet") or {}
+    ).get("shopMoney") or {}
+    attribution = extract_order_attribution(node)
 
     fields = {
         "order_name": node.get("name"),
@@ -92,7 +98,19 @@ async def _upsert_order(
         "total_price": _parse_decimal(total_money.get("amount")),
         "subtotal_price": _parse_decimal(subtotal_money.get("amount")),
         "currency": total_money.get("currencyCode"),
-        "customer_email": node.get("email"),
+        "customer_email": node.get("email") or (node.get("customer") or {}).get("email"),
+        "source_name": attribution.get("source_name"),
+        "source_identifier": attribution.get("source_identifier"),
+        "channel_name": attribution.get("channel_name"),
+        "landing_page": attribution.get("landing_page"),
+        "referrer_source": attribution.get("referrer_source"),
+        "referrer_name": attribution.get("referrer_name"),
+        "utm_source": attribution.get("utm_source"),
+        "utm_medium": attribution.get("utm_medium"),
+        "utm_campaign": attribution.get("utm_campaign"),
+        "utm_content": attribution.get("utm_content"),
+        "utm_term": attribution.get("utm_term"),
+        "customer_type": attribution.get("customer_type"),
         "raw_payload": node,
     }
 

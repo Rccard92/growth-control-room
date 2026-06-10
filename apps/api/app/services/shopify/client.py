@@ -103,6 +103,46 @@ class ShopifyGraphQLClient:
 
         return data.get("data") or {}
 
+    async def execute_raw(
+        self,
+        query: str,
+        variables: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        headers = {
+            "X-Shopify-Access-Token": self.access_token,
+            "Content-Type": "application/json",
+        }
+        payload: dict[str, Any] = {"query": query}
+        if variables:
+            payload["variables"] = variables
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(self._url, json=payload, headers=headers)
+        except httpx.RequestError as exc:
+            raise ShopifyAPIError(
+                "Impossibile contattare Shopify. Verifica il dominio dello shop."
+            ) from exc
+
+        if response.status_code == 401:
+            raise ShopifyAPIError(
+                "Token non valido o permessi insufficienti. "
+                "Verifica Admin API access token e scope read_products/read_orders.",
+                status_code=401,
+            )
+        if response.status_code == 403:
+            raise ShopifyAPIError(
+                "Accesso negato. Verifica i permessi della Custom App Shopify.",
+                status_code=403,
+            )
+        if response.status_code >= 400:
+            raise ShopifyAPIError(
+                f"Errore Shopify (HTTP {response.status_code}). Riprova più tardi.",
+                status_code=response.status_code,
+            )
+
+        return response.json()
+
     async def fetch_shop(self) -> dict[str, Any]:
         query = """
         query ShopInfo {
@@ -146,8 +186,7 @@ class ShopifyGraphQLClient:
         edges = data.get("products", {}).get("edges", [])
         return [edge["node"] for edge in edges if edge.get("node")]
 
-    async def fetch_orders(self, limit: int = 50) -> list[dict[str, Any]]:
-        query = """
+    _ORDERS_QUERY_FULL = """
         query Orders($first: Int!) {
           orders(first: $first, sortKey: CREATED_AT, reverse: true) {
             edges {
@@ -159,20 +198,61 @@ class ShopifyGraphQLClient:
                 displayFinancialStatus
                 displayFulfillmentStatus
                 email
+                sourceName
+                sourceIdentifier
+                registeredSourceUrl
                 totalPriceSet { shopMoney { amount currencyCode } }
                 subtotalPriceSet { shopMoney { amount currencyCode } }
-                lineItems(first: 10) {
-                  edges {
-                    node {
-                      title
-                      quantity
-                      sku
-                      variant { id }
-                      product { id title vendor productType }
-                      originalUnitPriceSet { shopMoney { amount currencyCode } }
-                      discountedTotalSet { shopMoney { amount currencyCode } }
-                      totalDiscountSet { shopMoney { amount currencyCode } }
-                    }
+                currentTotalPriceSet { shopMoney { amount currencyCode } }
+                currentSubtotalPriceSet { shopMoney { amount currencyCode } }
+                currentTotalDiscountsSet { shopMoney { amount currencyCode } }
+                currentTotalTaxSet { shopMoney { amount currencyCode } }
+                totalShippingPriceSet { shopMoney { amount currencyCode } }
+                customer {
+                  id
+                  email
+                  firstName
+                  lastName
+                  numberOfOrders
+                  amountSpent { amount }
+                }
+                channelInformation {
+                  channelDefinition { channelName }
+                }
+                customerJourneySummary {
+                  firstVisit {
+                    occurredAt
+                    landingPage
+                    referralCode
+                    source
+                    sourceType
+                    utmParameters { campaign content medium source term }
+                  }
+                  lastVisit {
+                    occurredAt
+                    landingPage
+                    referralCode
+                    source
+                    sourceType
+                    utmParameters { campaign content medium source term }
+                  }
+                  momentsCount { count }
+                }
+                discountCodes
+                refunds(first: 5) {
+                  nodes { id createdAt }
+                }
+                lineItems(first: 50) {
+                  nodes {
+                    id
+                    title
+                    quantity
+                    sku
+                    vendor
+                    product { id title handle productType vendor }
+                    variant { id title sku inventoryQuantity }
+                    discountedTotalSet { shopMoney { amount currencyCode } }
+                    originalTotalSet { shopMoney { amount currencyCode } }
                   }
                 }
               }
@@ -180,6 +260,110 @@ class ShopifyGraphQLClient:
           }
         }
         """
-        data = await self.execute(query, {"first": limit})
-        edges = data.get("orders", {}).get("edges", [])
-        return [edge["node"] for edge in edges if edge.get("node")]
+
+    _ORDERS_QUERY_STANDARD = """
+        query Orders($first: Int!) {
+          orders(first: $first, sortKey: CREATED_AT, reverse: true) {
+            edges {
+              node {
+                id
+                name
+                createdAt
+                processedAt
+                displayFinancialStatus
+                displayFulfillmentStatus
+                email
+                sourceName
+                sourceIdentifier
+                registeredSourceUrl
+                totalPriceSet { shopMoney { amount currencyCode } }
+                subtotalPriceSet { shopMoney { amount currencyCode } }
+                customer {
+                  id
+                  email
+                  firstName
+                  lastName
+                  numberOfOrders
+                  amountSpent { amount }
+                }
+                channelInformation {
+                  channelDefinition { channelName }
+                }
+                discountCodes
+                lineItems(first: 50) {
+                  nodes {
+                    id
+                    title
+                    quantity
+                    sku
+                    vendor
+                    product { id title handle productType vendor }
+                    variant { id title sku inventoryQuantity }
+                    discountedTotalSet { shopMoney { amount currencyCode } }
+                    originalTotalSet { shopMoney { amount currencyCode } }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+    _ORDERS_QUERY_MINIMAL = """
+        query Orders($first: Int!) {
+          orders(first: $first, sortKey: CREATED_AT, reverse: true) {
+            edges {
+              node {
+                id
+                name
+                createdAt
+                processedAt
+                displayFinancialStatus
+                displayFulfillmentStatus
+                email
+                sourceName
+                totalPriceSet { shopMoney { amount currencyCode } }
+                subtotalPriceSet { shopMoney { amount currencyCode } }
+                lineItems(first: 50) {
+                  nodes {
+                    id
+                    title
+                    quantity
+                    sku
+                    product { id title vendor productType }
+                    variant { id }
+                    discountedTotalSet { shopMoney { amount currencyCode } }
+                    originalTotalSet { shopMoney { amount currencyCode } }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+    async def fetch_orders(self, limit: int = 50) -> list[dict[str, Any]]:
+        variables = {"first": limit}
+        queries = [
+            self._ORDERS_QUERY_FULL,
+            self._ORDERS_QUERY_STANDARD,
+            self._ORDERS_QUERY_MINIMAL,
+        ]
+
+        last_error: str | None = None
+        for query in queries:
+            raw = await self.execute_raw(query, variables)
+            if raw.get("errors"):
+                messages = [
+                    err.get("message", str(err)) if isinstance(err, dict) else str(err)
+                    for err in raw["errors"]
+                ]
+                last_error = "; ".join(messages[:3])
+                continue
+            data = raw.get("data") or {}
+            edges = data.get("orders", {}).get("edges", [])
+            return [edge["node"] for edge in edges if edge.get("node")]
+
+        if last_error:
+            raise ShopifyAPIError(f"Errore GraphQL Shopify: {last_error}")
+        return []

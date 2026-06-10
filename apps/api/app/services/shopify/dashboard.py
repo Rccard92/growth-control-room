@@ -7,6 +7,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.shopify import ShopifyDailyMetric, ShopifyOrder, ShopifyProduct, ShopifyStore
+from app.services.shopify.attribution import (
+    build_attribution_alerts,
+    build_marketing_report_availability,
+    compute_attribution_intelligence,
+)
 
 LOW_STOCK_THRESHOLD = 10
 HIGH_STOCK_THRESHOLD = 20
@@ -56,13 +61,20 @@ def _order_to_dict(order: ShopifyOrder) -> dict[str, Any]:
     }
 
 
+def _iter_line_item_nodes(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    line_items = payload.get("lineItems") or {}
+    nodes = line_items.get("nodes") or []
+    if nodes:
+        return [n for n in nodes if isinstance(n, dict)]
+    edges = line_items.get("edges") or []
+    return [edge.get("node") for edge in edges if edge.get("node")]
+
+
 def _parse_line_items(orders: list[ShopifyOrder]) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for order in orders:
         payload = order.raw_payload or {}
-        line_items = (payload.get("lineItems") or {}).get("edges") or []
-        for edge in line_items:
-            node = edge.get("node") or {}
+        for node in _iter_line_item_nodes(payload):
             product = node.get("product") or {}
             variant = node.get("variant") or {}
             product_gid = product.get("id")
@@ -70,9 +82,12 @@ def _parse_line_items(orders: list[ShopifyOrder]) -> list[dict[str, Any]]:
                 continue
             qty = int(node.get("quantity") or 0)
             unit = (node.get("originalUnitPriceSet") or {}).get("shopMoney") or {}
+            original_total = (node.get("originalTotalSet") or {}).get("shopMoney") or {}
             discounted = (node.get("discountedTotalSet") or {}).get("shopMoney") or {}
             discount = (node.get("totalDiscountSet") or {}).get("shopMoney") or {}
             line_revenue = _parse_decimal(discounted.get("amount"))
+            if line_revenue == 0:
+                line_revenue = _parse_decimal(original_total.get("amount"))
             if line_revenue == 0 and unit.get("amount"):
                 line_revenue = _parse_decimal(unit.get("amount")) * qty
             items.append(
@@ -80,11 +95,11 @@ def _parse_line_items(orders: list[ShopifyOrder]) -> list[dict[str, Any]]:
                     "product_gid": product_gid,
                     "variant_id": variant.get("id"),
                     "product_title": product.get("title") or node.get("title") or "Unknown",
-                    "sku": node.get("sku"),
+                    "sku": node.get("sku") or variant.get("sku"),
                     "quantity": qty,
-                    "price": _parse_decimal(unit.get("amount")),
+                    "price": _parse_decimal(unit.get("amount") or original_total.get("amount")),
                     "total_discount": _parse_decimal(discount.get("amount")),
-                    "vendor": product.get("vendor"),
+                    "vendor": product.get("vendor") or node.get("vendor"),
                     "product_type": product.get("productType"),
                     "revenue": line_revenue,
                 }
@@ -251,6 +266,7 @@ def _build_alerts(
     sold_product_gids: set[str],
     has_line_items: bool,
     last_sync_at: datetime | None,
+    attribution_alerts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
 
@@ -371,11 +387,17 @@ def _build_alerts(
             }
         )
 
+    if attribution_alerts:
+        alerts.extend(attribution_alerts)
+
     alerts.sort(key=lambda a: SEVERITY_ORDER.get(a["severity"], 99))
     return alerts[:50]
 
 
-def _build_daily_diagnosis(summary: dict[str, Any]) -> list[dict[str, str]]:
+def _build_daily_diagnosis(
+    summary: dict[str, Any],
+    attribution_intelligence: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
     diagnosis: list[dict[str, str]] = []
 
     oos = summary.get("out_of_stock_count", 0)
@@ -423,7 +445,19 @@ def _build_daily_diagnosis(summary: dict[str, Any]) -> list[dict[str, str]]:
             }
         )
 
-    if len(diagnosis) < 5:
+    if attribution_intelligence and attribution_intelligence.get("_total_orders", 0) > 0:
+        score = float(attribution_intelligence.get("tracking_quality_score") or 0)
+        if len(diagnosis) < 5:
+            diagnosis.append(
+                {
+                    "message": (
+                        f"Tracking quality Shopify: {score}% degli ordini ha una sorgente utile. "
+                        "Collega GA4 per analisi cross-channel avanzata."
+                    ),
+                    "severity": "info" if score >= 70 else "warning",
+                }
+            )
+    elif len(diagnosis) < 5:
         diagnosis.append(
             {
                 "message": "Collega GA4 per capire la provenienza degli acquisti.",
@@ -633,6 +667,30 @@ async def build_dashboard(
         "seo_issues_count": seo_issues_count,
     }
 
+    raw_attribution_intelligence: dict[str, Any] = compute_attribution_intelligence([])
+    attribution_intelligence: dict[str, Any] = {}
+    marketing_report_availability: dict[str, Any] = {}
+    attribution_alerts: list[dict[str, Any]] = []
+    try:
+        raw_attribution_intelligence = compute_attribution_intelligence(orders)
+        marketing_report_availability = build_marketing_report_availability(
+            orders,
+            raw_attribution_intelligence,
+        )
+        attribution_alerts = build_attribution_alerts(raw_attribution_intelligence)
+        attribution_intelligence = {
+            k: v
+            for k, v in raw_attribution_intelligence.items()
+            if not k.startswith("_")
+        }
+    except Exception:
+        attribution_intelligence = {
+            k: v
+            for k, v in raw_attribution_intelligence.items()
+            if not k.startswith("_")
+        }
+        marketing_report_availability = build_marketing_report_availability([], {})
+
     alerts: list[dict[str, Any]] = []
     try:
         alerts = _build_alerts(
@@ -641,6 +699,7 @@ async def build_dashboard(
             sold_gids,
             bool(line_items),
             store.last_sync_at,
+            attribution_alerts,
         )
     except Exception:
         alerts = []
@@ -649,7 +708,7 @@ async def build_dashboard(
 
     daily_diagnosis: list[dict[str, str]] = []
     try:
-        daily_diagnosis = _build_daily_diagnosis(summary)
+        daily_diagnosis = _build_daily_diagnosis(summary, raw_attribution_intelligence)
     except Exception:
         daily_diagnosis = []
 
@@ -661,5 +720,7 @@ async def build_dashboard(
         "orders": orders_section,
         "seo": seo_section,
         "attribution": _build_attribution_placeholder(),
+        "attribution_intelligence": attribution_intelligence,
+        "marketing_report_availability": marketing_report_availability,
         "daily_diagnosis": daily_diagnosis,
     }
