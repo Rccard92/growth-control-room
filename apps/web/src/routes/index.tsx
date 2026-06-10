@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AppLayout } from "../layouts/AppLayout";
-import { ProjectLayout } from "../layouts/ProjectLayout";
+import { AppShell } from "../components/AppShell";
 import { AiBriefPage } from "../pages/AiBriefPage";
 import { ContentPage } from "../pages/ContentPage";
 import { IntegrationsPage } from "../pages/IntegrationsPage";
@@ -16,19 +15,19 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
-      <Route element={<AppLayout />}>
+      <Route element={<AppShell showSidebar={false} />}>
         <Route index element={<Navigate to="/projects" replace />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/new" element={<NewProjectPage />} />
+      </Route>
 
-        <Route path="projects/:id" element={<ProjectLayout />}>
-          <Route index element={<ProjectOverviewPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
-          <Route path="shopify" element={<ShopifyPage />} />
-          <Route path="shopify/connect" element={<ShopifyConnectPage />} />
-          <Route path="content" element={<ContentPage />} />
-          <Route path="ai-brief" element={<AiBriefPage />} />
-        </Route>
+      <Route path="projects/:id" element={<AppShell showSidebar />}>
+        <Route index element={<ProjectOverviewPage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="shopify" element={<ShopifyPage />} />
+        <Route path="shopify/connect" element={<ShopifyConnectPage />} />
+        <Route path="content" element={<ContentPage />} />
+        <Route path="ai-brief" element={<AiBriefPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/projects" replace />} />

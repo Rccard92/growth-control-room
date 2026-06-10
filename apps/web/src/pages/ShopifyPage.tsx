@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
-import type { ShopifyDashboard, ShopifyOrder, ShopifyProduct } from "@gcr/shared";
-import { Button, Card, PageHeader } from "@gcr/ui";
+import { motion } from "framer-motion";
+import { Link, useParams } from "react-router-dom";
+import { MetricCard } from "../components/MetricCard";
+import { PageHeader } from "../components/PageHeader";
+import { StatusBadge } from "../components/StatusBadge";
 import {
-  getShopifyDashboard,
-  getShopifyOrders,
-  getShopifyProducts,
-  getShopifyStatus,
-  syncShopify,
-} from "../lib/shopify-api";
+  useShopifyDashboard,
+  useShopifyOrders,
+  useShopifyProducts,
+  useShopifyStatus,
+  useShopifySync,
+} from "../hooks/useShopify";
+import { APP_ROUTES } from "../routes/config";
 
 function formatMoney(value: string, currency = "EUR"): string {
   const amount = Number(value);
@@ -27,215 +29,170 @@ function formatDate(value?: string | null): string {
 
 export function ShopifyPage() {
   const { id } = useParams<{ id: string }>();
-  const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [dashboard, setDashboard] = useState<ShopifyDashboard | null>(null);
-  const [products, setProducts] = useState<ShopifyProduct[]>([]);
-  const [orders, setOrders] = useState<ShopifyOrder[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [shopName, setShopName] = useState<string | null>(null);
-  const [shopDomain, setShopDomain] = useState<string | null>(null);
+  const { data: status, isLoading: statusLoading, error: statusError } = useShopifyStatus(id);
+  const connected = status?.connected ?? false;
 
-  async function loadData(projectId: string) {
-    setLoading(true);
-    setError(null);
+  const { data: dashboard } = useShopifyDashboard(id, connected);
+  const { data: products } = useShopifyProducts(id, connected);
+  const { data: orders } = useShopifyOrders(id, connected);
+  const syncMutation = useShopifySync(id!);
 
-    try {
-      const status = await getShopifyStatus(projectId);
-      if (!status.connected) {
-        setConnected(false);
-        return;
-      }
-
-      setConnected(true);
-      setShopName(status.shopName ?? null);
-      setShopDomain(status.shopDomain ?? null);
-
-      const [dashboardData, productsData, ordersData] = await Promise.all([
-        getShopifyDashboard(projectId),
-        getShopifyProducts(projectId),
-        getShopifyOrders(projectId),
-      ]);
-      setDashboard(dashboardData);
-      setProducts(productsData);
-      setOrders(ordersData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Errore nel caricamento");
-    } finally {
-      setLoading(false);
-    }
+  if (statusLoading) {
+    return <div className="gcr-skeleton" style={{ height: 200 }} />;
   }
 
-  useEffect(() => {
-    if (!id) return;
-    void loadData(id);
-  }, [id]);
-
-  async function handleSync() {
-    if (!id) return;
-    setSyncing(true);
-    setError(null);
-    try {
-      await syncShopify(id);
-      await loadData(id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sincronizzazione fallita");
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  if (!loading && !connected && !error) {
-    return <Navigate to={`/projects/${id}/shopify/connect`} replace />;
+  if (!connected) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <PageHeader
+          title="Shopify Control Room"
+          subtitle="Store, ordini, prodotti e inventario"
+          breadcrumb={[
+            { label: "Progetti", href: APP_ROUTES.projects },
+            { label: id ?? "", href: id ? APP_ROUTES.project(id) : undefined },
+            { label: "Shopify" },
+          ]}
+        />
+        <div className="gcr-card" style={{ maxWidth: 480 }}>
+          <StatusBadge variant="not_connected" label="Shopify non collegato" />
+          <h3 className="gcr-card__title" style={{ marginTop: "1rem" }}>
+            Connetti il tuo store
+          </h3>
+          <p className="gcr-card__description">
+            Collega Shopify con una Custom App e Admin API access token per sincronizzare ordini e prodotti.
+          </p>
+          <Link to={APP_ROUTES.projectShopifyConnect(id!)} className="gcr-btn gcr-btn--primary">
+            Connetti Shopify
+          </Link>
+        </div>
+      </motion.div>
+    );
   }
 
   return (
-    <>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <PageHeader
-        title="Shopify"
+        title="Shopify Control Room"
         subtitle={
-          shopName
-            ? `${shopName} (${shopDomain ?? ""})`
+          status?.shopName
+            ? `${status.shopName} · ${status.shopDomain ?? ""}`
             : "Store, ordini, prodotti e inventario"
         }
         breadcrumb={[
-          { label: "Progetti", href: "/projects" },
-          { label: id ?? "", href: `/projects/${id}` },
+          { label: "Progetti", href: APP_ROUTES.projects },
+          { label: id ?? "", href: id ? APP_ROUTES.project(id) : undefined },
           { label: "Shopify" },
         ]}
         actions={
-          connected ? (
-            <Button onClick={handleSync} disabled={syncing}>
-              {syncing ? "Sincronizzazione…" : "Sincronizza dati Shopify"}
-            </Button>
-          ) : undefined
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--primary"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+          >
+            {syncMutation.isPending ? "Sincronizzazione…" : "Sincronizza dati"}
+          </button>
         }
       />
 
-      {loading && (
-        <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>Caricamento Shopify…</p>
-      )}
-      {error && (
-        <p style={{ color: "#dc2626", fontSize: "0.875rem" }}>{error}</p>
-      )}
-
-      {connected && dashboard && (
-        <>
-          <div className="placeholder-grid" style={{ marginBottom: "1.5rem" }}>
-            <Card title="Fatturato" description="Periodo disponibile">
-              <p style={{ fontSize: "1.5rem", fontWeight: 600, margin: 0 }}>
-                {formatMoney(dashboard.revenue)}
-              </p>
-            </Card>
-            <Card title="Ordini" description="Totale sincronizzati">
-              <p style={{ fontSize: "1.5rem", fontWeight: 600, margin: 0 }}>
-                {dashboard.ordersCount}
-              </p>
-            </Card>
-            <Card title="AOV" description="Valore medio ordine">
-              <p style={{ fontSize: "1.5rem", fontWeight: 600, margin: 0 }}>
-                {formatMoney(dashboard.averageOrderValue)}
-              </p>
-            </Card>
-            <Card title="Prodotti" description="Catalogo sincronizzato">
-              <p style={{ fontSize: "1.5rem", fontWeight: 600, margin: 0 }}>
-                {dashboard.productsCount}
-              </p>
-            </Card>
-            <Card title="Ultimo sync" description="Timestamp">
-              <p style={{ fontSize: "0.875rem", margin: 0 }}>
-                {formatDate(dashboard.lastSyncAt)}
-              </p>
-            </Card>
-          </div>
-
-          <div style={{ display: "grid", gap: "1.5rem" }}>
-            <Card title="Ordini recenti" description="Ultimi ordini sincronizzati">
-              {orders.length === 0 ? (
-                <p style={{ color: "#6b7280", fontSize: "0.875rem", margin: 0 }}>
-                  Nessun ordine. Esegui una sincronizzazione.
-                </p>
-              ) : (
-                <table style={{ width: "100%", fontSize: "0.875rem", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", padding: "0.5rem 0" }}>Ordine</th>
-                      <th style={{ textAlign: "left" }}>Data</th>
-                      <th style={{ textAlign: "left" }}>Stato</th>
-                      <th style={{ textAlign: "right" }}>Totale</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.slice(0, 10).map((order) => (
-                      <tr key={order.id}>
-                        <td style={{ padding: "0.5rem 0" }}>{order.orderName ?? order.shopifyGid}</td>
-                        <td>{formatDate(order.createdAtShopify)}</td>
-                        <td>{order.financialStatus ?? "—"}</td>
-                        <td style={{ textAlign: "right" }}>
-                          {formatMoney(order.totalPrice, order.currency ?? "EUR")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Card>
-
-            <Card title="Prodotti" description="Catalogo sincronizzato">
-              {products.length === 0 ? (
-                <p style={{ color: "#6b7280", fontSize: "0.875rem", margin: 0 }}>
-                  Nessun prodotto. Esegui una sincronizzazione.
-                </p>
-              ) : (
-                <table style={{ width: "100%", fontSize: "0.875rem", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", padding: "0.5rem 0" }}>Titolo</th>
-                      <th style={{ textAlign: "left" }}>Stato</th>
-                      <th style={{ textAlign: "right" }}>Inventario</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products.map((product) => (
-                      <tr key={product.id}>
-                        <td style={{ padding: "0.5rem 0" }}>{product.title}</td>
-                        <td>{product.status ?? "—"}</td>
-                        <td style={{ textAlign: "right" }}>
-                          {product.totalInventory ?? "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Card>
-
-            {dashboard.lowStockProducts.length > 0 && (
-              <Card title="Scorte basse" description="Prodotti con inventario ≤ 5">
-                <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem" }}>
-                  {dashboard.lowStockProducts.map((product) => (
-                    <li key={product.id}>
-                      {product.title} — {product.totalInventory ?? 0} pz
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            )}
-          </div>
-        </>
+      {(statusError || syncMutation.isError) && (
+        <div className="gcr-alert gcr-alert--error" style={{ marginBottom: "1rem" }}>
+          {statusError?.message ?? syncMutation.error?.message}
+        </div>
       )}
 
-      {!connected && !loading && (
-        <Card title="Shopify non connesso">
-          <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "#6b7280" }}>
-            Collega lo store per visualizzare ordini, prodotti e metriche.
+      {syncMutation.isSuccess && (
+        <div className="gcr-card" style={{ marginBottom: "1rem", borderColor: "rgba(52, 211, 153, 0.3)" }}>
+          <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--gcr-success)" }}>
+            Sync completato: {syncMutation.data.productsSynced} prodotti, {syncMutation.data.ordersSynced} ordini
           </p>
-          <Link to={`/projects/${id}/shopify/connect`}>
-            <Button>Connetti Shopify</Button>
-          </Link>
-        </Card>
+        </div>
       )}
-    </>
+
+      {dashboard && (
+        <div className="gcr-grid gcr-grid--auto" style={{ marginBottom: "1.5rem" }}>
+          <MetricCard label="Revenue" value={formatMoney(dashboard.revenue)} />
+          <MetricCard label="Ordini" value={dashboard.ordersCount} />
+          <MetricCard label="AOV" value={formatMoney(dashboard.averageOrderValue)} />
+          <MetricCard label="Prodotti" value={dashboard.productsCount} />
+          <MetricCard label="Ultimo sync" value={formatDate(dashboard.lastSyncAt)} />
+        </div>
+      )}
+
+      <div style={{ display: "grid", gap: "1.5rem" }}>
+        <div className="gcr-card">
+          <h3 className="gcr-card__title">Ordini recenti</h3>
+          {!orders?.length ? (
+            <p style={{ color: "var(--gcr-text-muted)", fontSize: "0.875rem", margin: 0 }}>
+              Nessun ordine. Esegui una sincronizzazione.
+            </p>
+          ) : (
+            <table className="gcr-table">
+              <thead>
+                <tr>
+                  <th>Ordine</th>
+                  <th>Data</th>
+                  <th>Stato</th>
+                  <th style={{ textAlign: "right" }}>Totale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.slice(0, 10).map((order) => (
+                  <tr key={order.id}>
+                    <td>{order.orderName ?? order.shopifyGid}</td>
+                    <td>{formatDate(order.createdAtShopify)}</td>
+                    <td>{order.financialStatus ?? "—"}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {formatMoney(order.totalPrice, order.currency ?? "EUR")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="gcr-card">
+          <h3 className="gcr-card__title">Prodotti</h3>
+          {!products?.length ? (
+            <p style={{ color: "var(--gcr-text-muted)", fontSize: "0.875rem", margin: 0 }}>
+              Nessun prodotto. Esegui una sincronizzazione.
+            </p>
+          ) : (
+            <table className="gcr-table">
+              <thead>
+                <tr>
+                  <th>Titolo</th>
+                  <th>Stato</th>
+                  <th style={{ textAlign: "right" }}>Inventario</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id}>
+                    <td>{product.title}</td>
+                    <td>{product.status ?? "—"}</td>
+                    <td style={{ textAlign: "right" }}>{product.totalInventory ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {dashboard && dashboard.lowStockProducts.length > 0 && (
+          <div className="gcr-card">
+            <h3 className="gcr-card__title">Scorte basse</h3>
+            <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem", color: "var(--gcr-text-muted)" }}>
+              {dashboard.lowStockProducts.map((product) => (
+                <li key={product.id}>
+                  {product.title} — {product.totalInventory ?? 0} pz
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }

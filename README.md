@@ -159,12 +159,15 @@ Endpoint API:
 
 Implementato:
 
+- **Frontend Foundation v1**: UI dark premium "AI Control Room", AppShell, Sidebar, TanStack Query
+- Pagine navigabili end-to-end: login demo → Project Hub → Control Room → Integration Center (React Flow graph)
 - Routing frontend e pagine collegate all'API via `VITE_API_URL`
 - Health check API
-- PostgreSQL con SQLAlchemy async + Alembic (schema foundation, 7 entità)
+- PostgreSQL con SQLAlchemy async + Alembic (schema foundation + Shopify)
 - CRUD progetti (`POST/GET /api/projects`, dettaglio)
 - Integrazioni per progetto: merge di 8 provider (anche non collegati → `not_connected`)
 - **Shopify v1**: connect manuale (Custom App token), sync read-only prodotti/ordini, dashboard KPI
+- SEO Content Room e AI Brief: placeholder evoluti con roadmap
 - Struttura connectors e skills (stub OAuth per altri provider)
 
-Non ancora implementato: autenticazione utenti, OAuth integrazioni, sync automatico, creazione articoli blog Shopify.
+Non ancora implementato: autenticazione utenti, OAuth integrazioni, sync automatico, creazione articoli blog Shopify, provider oltre Shopify.

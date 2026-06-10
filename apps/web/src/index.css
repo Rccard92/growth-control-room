@@ -6,12 +6,12 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+  font-family: var(--gcr-font);
   font-size: 16px;
   line-height: 1.5;
-  color: #111827;
-  background-color: #f3f4f6;
+  color: var(--gcr-text);
+  background-color: var(--gcr-bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {

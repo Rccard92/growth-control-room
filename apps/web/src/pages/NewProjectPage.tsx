@@ -1,82 +1,75 @@
 import { FormEvent, useState } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import type { Project } from "@gcr/shared";
-import { Button, Card, PageHeader } from "@gcr/ui";
-import { apiFetch } from "../lib/api";
+import { PageHeader } from "../components/PageHeader";
+import { useCreateProject } from "../hooks/useProjects";
+import { APP_ROUTES } from "../routes/config";
 
 export function NewProjectPage() {
   const navigate = useNavigate();
+  const createProject = useCreateProject();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const project = await apiFetch<Project>("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-        }),
-      });
-      navigate(`/projects/${project.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Errore durante la creazione");
-    } finally {
-      setSubmitting(false);
-    }
+    const project = await createProject.mutateAsync({
+      name: name.trim(),
+      description: description.trim() || null,
+    });
+    navigate(APP_ROUTES.project(project.id));
   }
 
   return (
-    <>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <PageHeader
         title="Nuovo progetto"
-        subtitle="Crea un nuovo progetto per monitorare un brand"
+        subtitle="Configura una nuova control room per un brand"
         breadcrumb={[
-          { label: "Progetti", href: "/projects" },
+          { label: "Progetti", href: APP_ROUTES.projects },
           { label: "Nuovo" },
         ]}
       />
-      <Card title="Dettagli progetto">
+      <div className="gcr-card" style={{ maxWidth: 480 }}>
         <form
-          style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: "24rem" }}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
           onSubmit={handleSubmit}
         >
-          <div className="login-page__field">
+          <div className="gcr-field">
             <label htmlFor="name">Nome progetto</label>
             <input
               id="name"
               type="text"
               placeholder="Es. Brand XYZ"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
-          <div className="login-page__field">
+          <div className="gcr-field">
             <label htmlFor="description">Descrizione</label>
             <input
               id="description"
               type="text"
               placeholder="Breve descrizione (opzionale)"
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </div>
-          {error && (
-            <p style={{ color: "#dc2626", fontSize: "0.875rem", margin: 0 }}>{error}</p>
+          {createProject.isError && (
+            <div className="gcr-alert gcr-alert--error">
+              {createProject.error.message}
+            </div>
           )}
-          <Button type="submit" disabled={submitting || !name.trim()}>
-            {submitting ? "Creazione…" : "Crea progetto"}
-          </Button>
+          <button
+            type="submit"
+            className="gcr-btn gcr-btn--primary"
+            disabled={createProject.isPending || !name.trim()}
+          >
+            {createProject.isPending ? "Creazione…" : "Crea progetto"}
+          </button>
         </form>
-      </Card>
-    </>
+      </div>
+    </motion.div>
   );
 }

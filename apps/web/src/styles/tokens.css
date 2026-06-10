@@ -1,0 +1,30 @@
+:root {
+  --gcr-bg: #08090d;
+  --gcr-bg-elevated: #0f1117;
+  --gcr-surface: rgba(255, 255, 255, 0.03);
+  --gcr-surface-hover: rgba(255, 255, 255, 0.06);
+  --gcr-border: rgba(255, 255, 255, 0.08);
+  --gcr-border-strong: rgba(255, 255, 255, 0.14);
+  --gcr-text: #f4f4f5;
+  --gcr-text-muted: #a1a1aa;
+  --gcr-text-dim: #71717a;
+  --gcr-accent-violet: #8b5cf6;
+  --gcr-accent-violet-dim: rgba(139, 92, 246, 0.15);
+  --gcr-accent-cyan: #22d3ee;
+  --gcr-accent-cyan-dim: rgba(34, 211, 238, 0.12);
+  --gcr-accent-blue: #6366f1;
+  --gcr-success: #34d399;
+  --gcr-success-dim: rgba(52, 211, 153, 0.12);
+  --gcr-warning: #fbbf24;
+  --gcr-error: #f87171;
+  --gcr-error-dim: rgba(248, 113, 113, 0.12);
+  --gcr-glow-violet: 0 0 40px rgba(139, 92, 246, 0.15);
+  --gcr-glow-cyan: 0 0 32px rgba(34, 211, 238, 0.12);
+  --gcr-radius: 12px;
+  --gcr-radius-sm: 8px;
+  --gcr-radius-lg: 16px;
+  --gcr-sidebar-width: 240px;
+  --gcr-topbar-height: 56px;
+  --gcr-font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --gcr-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}

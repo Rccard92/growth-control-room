@@ -1,91 +1,84 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import {
-  INTEGRATION_BY_PROVIDER,
-  INTEGRATIONS,
-  type Integration,
-  type IntegrationStatus,
-} from "@gcr/shared";
-import { Button, Card, PageHeader } from "@gcr/ui";
-import { apiFetch } from "../lib/api";
-
-const STATUS_LABELS: Record<IntegrationStatus, string> = {
-  not_connected: "Non connessa",
-  connected: "Connessa",
-  error: "Errore",
-};
+import { motion } from "framer-motion";
+import { useParams } from "react-router-dom";
+import { INTEGRATIONS } from "@gcr/shared";
+import { IntegrationCard } from "../components/IntegrationCard";
+import { IntegrationGraph } from "../components/IntegrationGraph";
+import { PageHeader } from "../components/PageHeader";
+import { useProject, useProjectIntegrations } from "../hooks/useProjects";
+import { APP_ROUTES } from "../routes/config";
 
 export function IntegrationsPage() {
   const { id } = useParams<{ id: string }>();
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: project } = useProject(id);
+  const { data: integrations, isLoading, error } = useProjectIntegrations(id);
 
-  useEffect(() => {
-    if (!id) return;
-
-    apiFetch<Integration[]>(`/api/projects/${id}/integrations`)
-      .then(setIntegrations)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  const statusByProvider = useMemo(
-    () => new Map(integrations.map((integration) => [integration.provider, integration.status])),
-    [integrations],
+  const statusMap = new Map(
+    (integrations ?? []).map((i) => [i.provider, i.status]),
   );
 
   return (
-    <>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <PageHeader
-        title="Integrazioni"
-        subtitle="Collega le piattaforme e-commerce e marketing"
+        title="Integration Center"
+        subtitle="Collega le piattaforme e-commerce e marketing al progetto"
         breadcrumb={[
-          { label: "Progetti", href: "/projects" },
-          { label: id ?? "", href: `/projects/${id}` },
+          { label: "Progetti", href: APP_ROUTES.projects },
+          { label: project?.name ?? id ?? "", href: id ? APP_ROUTES.project(id) : undefined },
           { label: "Integrazioni" },
         ]}
       />
-      {loading && (
-        <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>Caricamento integrazioni…</p>
-      )}
+
+      {isLoading && <div className="gcr-skeleton" style={{ height: 120 }} />}
       {error && (
-        <p style={{ color: "#dc2626", fontSize: "0.875rem" }}>
-          Errore nel caricamento: {error}
-        </p>
+        <div className="gcr-alert gcr-alert--error">{error.message}</div>
       )}
-      <div className="placeholder-grid">
-        {INTEGRATIONS.map((integration) => {
-          const status = statusByProvider.get(integration.provider) ?? "not_connected";
-          const meta = INTEGRATION_BY_PROVIDER[integration.provider];
+
+      <div className="gcr-grid gcr-grid--auto" style={{ marginBottom: "2rem" }}>
+        {INTEGRATIONS.map((meta) => {
+          const isShopify = meta.provider === "shopify";
+          const apiStatus = statusMap.get(meta.provider);
+
+          if (isShopify) {
+            const connected = apiStatus === "connected";
+            return (
+              <IntegrationCard
+                key={meta.provider}
+                meta={meta}
+                status={apiStatus ?? "not_connected"}
+                href={
+                  connected
+                    ? APP_ROUTES.projectShopify(id!)
+                    : APP_ROUTES.projectShopifyConnect(id!)
+                }
+                actionLabel={connected ? "Gestisci" : "Connetti"}
+              />
+            );
+          }
 
           return (
-            <Card key={integration.provider} title={meta.label} description={meta.description}>
-              <div className="integration-card">
-                <div className="integration-card__header">
-                  <span className="integration-card__icon">{meta.icon}</span>
-                  <span className="integration-card__status">{STATUS_LABELS[status]}</span>
-                </div>
-                {integration.provider === "shopify" ? (
-                  status === "connected" ? (
-                    <Link to={`/projects/${id}/shopify`}>
-                      <Button variant="secondary">Gestisci</Button>
-                    </Link>
-                  ) : (
-                    <Link to={`/projects/${id}/shopify/connect`}>
-                      <Button variant="secondary">Connetti</Button>
-                    </Link>
-                  )
-                ) : (
-                  <Button variant="secondary" disabled>
-                    Connetti (presto)
-                  </Button>
-                )}
-              </div>
-            </Card>
+            <IntegrationCard
+              key={meta.provider}
+              meta={meta}
+              status="coming_soon"
+              actionLabel="Coming soon"
+              disabled
+            />
           );
         })}
       </div>
-    </>
+
+      <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--gcr-text)", marginBottom: "1rem" }}>
+        Integration Graph
+      </h2>
+      <p style={{ fontSize: "0.8125rem", color: "var(--gcr-text-muted)", marginBottom: "1rem" }}>
+        Vista relazionale del progetto e dei connettori. Shopify è il primo provider attivo.
+      </p>
+      {integrations && (
+        <IntegrationGraph
+          projectName={project?.name ?? "Progetto"}
+          integrations={integrations}
+        />
+      )}
+    </motion.div>
   );
 }
