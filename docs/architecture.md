@@ -73,18 +73,56 @@ flowchart TB
 
 Tutte le route API sono prefissate con `/api`:
 
-- `GET /api/health` — health check con stato connectors/skills
+| Metodo | Path | Descrizione |
+|--------|------|-------------|
+| `GET` | `/api/health` | Health check con stato connectors/skills |
+| `POST` | `/api/projects` | Crea progetto nel workspace default |
+| `GET` | `/api/projects` | Lista progetti |
+| `GET` | `/api/projects/{id}` | Dettaglio progetto |
+| `GET` | `/api/projects/{id}/integrations` | Integrazioni del progetto |
 
 Il proxy Vite in sviluppo inoltra `/api` verso `localhost:8000`.
 
 ## Database
 
-PostgreSQL è avviato via Docker Compose. Lo stub SQLAlchemy in `apps/api/app/core/database.py` è pronto per future migration Alembic, ma non ancora utilizzato.
+PostgreSQL 16 via Docker Compose. ORM SQLAlchemy 2 async in `apps/api/app/models/`, migration Alembic in `apps/api/alembic/`.
+
+```mermaid
+erDiagram
+  User ||--o{ Workspace : owns
+  Workspace ||--o{ Project : contains
+  Project ||--o{ Integration : has
+  Integration ||--o| IntegrationCredential : stores
+  Integration ||--o| ShopifyStore : links
+  ShopifyStore ||--o{ ShopifyProduct : has
+  ShopifyStore ||--o{ ShopifyOrder : has
+  ShopifyStore ||--o{ ShopifyDailyMetric : has
+  Project ||--o{ ContentPlan : has
+  ContentPlan ||--o{ BlogDraft : has
+  Project ||--o{ AiRun : has
+  Project ||--o{ Alert : has
+```
+
+### Workspace default (pre-auth)
+
+Fino all'implementazione dell'autenticazione, la migration `001` crea:
+
+- User: `dev@gcr.local`
+- Workspace: slug `default`
+
+Tutti gli endpoint progetti operano su questo workspace.
+
+Comandi:
+
+```bash
+pnpm db:up        # avvia PostgreSQL
+pnpm db:migrate   # applica migration
+```
 
 ## Prossimi passi
 
-1. Modelli SQLAlchemy (User, Project, Integration, Credential)
-2. Autenticazione JWT o session-based
-3. OAuth flow per ogni integrazione
-4. Implementazione connector Shopify (primo provider)
+1. Autenticazione JWT o session-based
+2. OAuth flow per integrazioni (Shopify per primo)
+3. Sync Shopify → tabelle product/order/metric
+4. Wire frontend `ProjectsPage` all'API
 5. Skill AI Brief collegata alla pagina `/projects/:id/ai-brief`

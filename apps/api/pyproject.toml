@@ -9,6 +9,8 @@ dependencies = [
     "pydantic-settings>=2.0",
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg>=0.30",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
     "gcr-connectors",
     "gcr-skills",
 ]

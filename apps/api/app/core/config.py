@@ -17,5 +17,9 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
 
+    @property
+    def database_url_sync(self) -> str:
+        return self.database_url.replace("+asyncpg", "+psycopg")
+
 
 settings = Settings()

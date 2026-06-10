@@ -7,7 +7,9 @@
     "dev:api": "pnpm --filter @gcr/api dev",
     "build:web": "pnpm --filter @gcr/web build",
     "db:up": "docker compose up -d",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "db:migrate": "python -m uv run --directory apps/api alembic upgrade head",
+    "db:revision": "python -m uv run --directory apps/api alembic revision --autogenerate -m"
   },
   "engines": {
     "node": ">=20"

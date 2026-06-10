@@ -52,7 +52,15 @@ uv sync
 Su Windows, se `uv` non è nel PATH: `python -m pip install uv` poi `python -m uv sync --all-packages`.
 Se compaiono errori TLS: aggiungi `--system-certs`.
 
-### 4. Avvia backend e frontend
+### 4. Esegui le migration
+
+```bash
+pnpm db:migrate
+```
+
+Crea lo schema PostgreSQL e il seed iniziale (User `dev@gcr.local`, Workspace `default`).
+
+### 5. Avvia backend e frontend
 
 ```bash
 pnpm dev
@@ -61,6 +69,7 @@ pnpm dev
 - Frontend: http://localhost:5173
 - API: http://localhost:8000
 - Health check: http://localhost:8000/api/health
+- Progetti: http://localhost:8000/api/projects
 
 ### Avvio singolo
 
@@ -85,11 +94,13 @@ Copia `.env.example` in `.env` e adatta i valori se necessario.
 
 ## Stato attuale
 
-Scaffolding iniziale con:
+Implementato:
 
 - Routing frontend e pagine placeholder
 - Health check API
+- PostgreSQL con SQLAlchemy async + Alembic
+- Modelli dominio (User, Workspace, Project, Integration, Shopify, Content, AI, Alert)
+- CRUD base progetti (`POST/GET /api/projects`, dettaglio, integrazioni)
 - Struttura connectors e skills (stub, senza OAuth)
-- PostgreSQL via Docker Compose
 
-Non ancora implementato: autenticazione, OAuth, logica integrazioni reali, persistenza DB.
+Non ancora implementato: autenticazione, OAuth Shopify, sync dati integrazioni, wire frontend → API.
