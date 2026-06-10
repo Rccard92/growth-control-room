@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card, PageHeader } from "@gcr/ui";
+import { apiFetch } from "../lib/api";
 
 interface HealthResponse {
   status: string;
@@ -15,11 +16,7 @@ export function ProjectOverviewPage() {
   const [healthError, setHealthError] = useState(false);
 
   useEffect(() => {
-    fetch("/api/health")
-      .then((res) => {
-        if (!res.ok) throw new Error("Health check failed");
-        return res.json();
-      })
+    apiFetch<HealthResponse>("/api/health")
       .then(setHealth)
       .catch(() => setHealthError(true));
   }, []);

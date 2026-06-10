@@ -1,58 +1,60 @@
-import type { IntegrationMeta, IntegrationType } from "../types/integration";
+import type { IntegrationMeta, IntegrationProvider } from "../types/integration";
 
 export const INTEGRATIONS: IntegrationMeta[] = [
   {
-    type: "shopify",
+    provider: "shopify",
     label: "Shopify",
     description: "Store e-commerce, ordini, prodotti e inventario",
     icon: "🛍️",
   },
   {
-    type: "meta_ads",
+    provider: "meta_ads",
     label: "Meta Ads",
     description: "Campagne Facebook e Instagram Ads",
     icon: "📱",
   },
   {
-    type: "google_ads",
+    provider: "google_ads",
     label: "Google Ads",
     description: "Campagne search, display e shopping",
     icon: "🔍",
   },
   {
-    type: "klaviyo",
+    provider: "klaviyo",
     label: "Klaviyo",
     description: "Email marketing e automazioni",
     icon: "✉️",
   },
   {
-    type: "gsc",
-    label: "Google Search Console",
-    description: "Prestazioni SEO e indicizzazione",
-    icon: "📊",
-  },
-  {
-    type: "ga4",
+    provider: "ga4",
     label: "Google Analytics 4",
     description: "Traffico web e conversioni",
     icon: "📈",
   },
   {
-    type: "merchant_center",
+    provider: "google_search_console",
+    label: "Google Search Console",
+    description: "Prestazioni SEO e indicizzazione",
+    icon: "📊",
+  },
+  {
+    provider: "merchant_center",
     label: "Merchant Center",
     description: "Feed prodotti Google Shopping",
     icon: "🏪",
   },
   {
-    type: "tiktok",
+    provider: "tiktok_ads",
     label: "TikTok Ads",
     description: "Campagne pubblicitarie TikTok",
     icon: "🎵",
   },
 ];
 
-export const INTEGRATION_BY_TYPE: Record<IntegrationType, IntegrationMeta> =
-  Object.fromEntries(INTEGRATIONS.map((i) => [i.type, i])) as Record<
-    IntegrationType,
-    IntegrationMeta
-  >;
+export const INTEGRATION_BY_PROVIDER: Record<
+  IntegrationProvider,
+  IntegrationMeta
+> = Object.fromEntries(INTEGRATIONS.map((i) => [i.provider, i])) as Record<
+  IntegrationProvider,
+  IntegrationMeta
+>;

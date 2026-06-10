@@ -8,6 +8,9 @@ COPY . .
 
 RUN pnpm install --frozen-lockfile
 
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN pnpm --filter @gcr/web build
 
 CMD ["sh", "-c", "pnpm --filter @gcr/web run start -- --port ${PORT:-3000}"]

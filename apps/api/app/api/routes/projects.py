@@ -4,12 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants.integrations import INTEGRATION_PROVIDERS
 from app.db.session import get_db
+from app.models.enums import IntegrationStatus, ProjectStatus
 from app.models.integration import Integration
 from app.models.project import Project
 from app.schemas.integration import IntegrationRead
 from app.schemas.project import ProjectCreate, ProjectRead
 from app.services.workspace import get_default_workspace
+from app.utils.slug import unique_project_slug
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -45,10 +48,13 @@ async def create_project(
     session: AsyncSession = Depends(get_db),
 ) -> Project:
     workspace = await get_default_workspace(session)
+    slug = await unique_project_slug(session, workspace.id, body.name)
     project = Project(
         workspace_id=workspace.id,
         name=body.name,
-        brand=body.brand,
+        slug=slug,
+        description=body.description,
+        status=ProjectStatus.ACTIVE,
     )
     session.add(project)
     await session.flush()
@@ -85,11 +91,36 @@ async def get_project(
 async def list_project_integrations(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
-) -> list[Integration]:
-    await _get_project_in_default_workspace(project_id, session)
+) -> list[IntegrationRead]:
+    project = await _get_project_in_default_workspace(project_id, session)
     result = await session.execute(
-        select(Integration)
-        .where(Integration.project_id == project_id)
-        .order_by(Integration.type)
+        select(Integration).where(Integration.project_id == project.id)
     )
-    return list(result.scalars().all())
+    stored = {integration.provider: integration for integration in result.scalars().all()}
+
+    integrations: list[IntegrationRead] = []
+    for provider in INTEGRATION_PROVIDERS:
+        integration = stored.get(provider)
+        if integration is None:
+            integrations.append(
+                IntegrationRead(
+                    id=None,
+                    project_id=project.id,
+                    provider=provider,
+                    status=IntegrationStatus.NOT_CONNECTED.value,
+                    connected_at=None,
+                )
+            )
+        else:
+            integrations.append(
+                IntegrationRead(
+                    id=integration.id,
+                    project_id=integration.project_id,
+                    provider=integration.provider,
+                    status=integration.status.value
+                    if hasattr(integration.status, "value")
+                    else str(integration.status),
+                    connected_at=integration.connected_at,
+                )
+            )
+    return integrations

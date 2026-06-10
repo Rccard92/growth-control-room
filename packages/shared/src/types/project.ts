@@ -1,12 +1,16 @@
+export type ProjectStatus = "active" | "archived";
+
 export interface Project {
   id: string;
   name: string;
-  brand: string;
+  slug: string;
+  description?: string | null;
+  status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateProjectInput {
   name: string;
-  brand: string;
+  description?: string | null;
 }

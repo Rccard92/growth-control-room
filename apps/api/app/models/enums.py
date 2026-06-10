@@ -2,21 +2,14 @@ import enum
 
 
 class IntegrationStatus(str, enum.Enum):
-    DISCONNECTED = "disconnected"
+    NOT_CONNECTED = "not_connected"
     CONNECTED = "connected"
     ERROR = "error"
 
 
-class ContentPlanStatus(str, enum.Enum):
-    DRAFT = "draft"
+class ProjectStatus(str, enum.Enum):
     ACTIVE = "active"
-    COMPLETED = "completed"
-
-
-class BlogDraftStatus(str, enum.Enum):
-    DRAFT = "draft"
-    REVIEW = "review"
-    PUBLISHED = "published"
+    ARCHIVED = "archived"
 
 
 class AiRunStatus(str, enum.Enum):
@@ -26,7 +19,12 @@ class AiRunStatus(str, enum.Enum):
     FAILED = "failed"
 
 
-class AlertSeverity(str, enum.Enum):
+class AlertLevel(str, enum.Enum):
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
+
+
+class AlertStatus(str, enum.Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"

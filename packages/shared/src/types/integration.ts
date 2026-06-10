@@ -1,25 +1,25 @@
-export type IntegrationType =
+export type IntegrationProvider =
   | "shopify"
   | "meta_ads"
   | "google_ads"
   | "klaviyo"
-  | "gsc"
   | "ga4"
+  | "google_search_console"
   | "merchant_center"
-  | "tiktok";
+  | "tiktok_ads";
 
-export type IntegrationStatus = "disconnected" | "connected" | "error";
+export type IntegrationStatus = "not_connected" | "connected" | "error";
 
 export interface Integration {
-  id: string;
+  id: string | null;
   projectId: string;
-  type: IntegrationType;
+  provider: IntegrationProvider;
   status: IntegrationStatus;
   connectedAt?: string;
 }
 
 export interface IntegrationMeta {
-  type: IntegrationType;
+  provider: IntegrationProvider;
   label: string;
   description: string;
   icon: string;

@@ -7,9 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class IntegrationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: UUID
+    id: UUID | None = None
     project_id: UUID = Field(serialization_alias="projectId")
-    type: str
+    provider: str
     status: str
     connected_at: datetime | None = Field(
         default=None,

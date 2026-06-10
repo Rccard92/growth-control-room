@@ -2,7 +2,7 @@
 
 Piattaforma multi-brand per monitorare progetti e-commerce e marketing.
 
-Ogni utente può creare più progetti. Ogni progetto può collegare integrazioni diverse: Shopify, Meta Ads, Google Ads, Klaviyo, Google Search Console, GA4, Merchant Center e TikTok.
+Ogni utente può creare più progetti. Ogni progetto può collegare integrazioni diverse: Shopify, Meta Ads, Google Ads, Klaviyo, Google Search Console, GA4, Merchant Center e TikTok Ads.
 
 ## Struttura monorepo
 
@@ -58,9 +58,11 @@ Se compaiono errori TLS: aggiungi `--system-certs`.
 pnpm db:migrate
 ```
 
-Crea lo schema PostgreSQL e il seed iniziale (User `dev@gcr.local`, Workspace `default`).
+Crea lo schema foundation e il seed demo (User `admin@growthcontrolroom.local`, Workspace `Growth Control Room`).
 
 ### 5. Avvia backend e frontend
+
+Copia `.env.example` in `.env` e imposta `VITE_API_URL=http://localhost:8000` per collegare il frontend all'API in locale.
 
 ```bash
 pnpm dev
@@ -84,8 +86,39 @@ Copia `.env.example` in `.env` e adatta i valori se necessario.
 
 | Variabile | Default | Descrizione |
 |-----------|---------|-------------|
+| `VITE_API_URL` | *(vuoto)* | URL base API per il frontend (build-time su Railway) |
 | `DATABASE_URL` | `postgresql+asyncpg://gcr:gcr_dev@localhost:5432/growth_control_room` | Connessione PostgreSQL |
-| `CORS_ORIGINS` | `http://localhost:5173` | Origini CORS consentite |
+| `CORS_ORIGINS` | `*` | Origini CORS consentite (separate da virgola) |
+| `APP_ENV` | `production` | Ambiente applicazione (`development` in locale) |
+
+## Deploy su Railway
+
+Due servizi separati: **API** (FastAPI) e **WEB** (Vite preview).
+
+### Servizio API
+
+| Variabile | Esempio |
+|-----------|---------|
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — se Railway fornisce `postgresql://`, la config lo converte in `postgresql+asyncpg://` |
+| `CORS_ORIGINS` | `https://web-xxx.up.railway.app` |
+| `APP_ENV` | `production` |
+
+Il container API esegue `alembic upgrade head` all'avvio, poi uvicorn.
+
+### Servizio WEB
+
+| Variabile | Esempio |
+|-----------|---------|
+| `VITE_API_URL` | `https://api-xxx.up.railway.app` |
+
+`VITE_API_URL` è una variabile di **build**: impostala prima del deploy o forza un rebuild dopo averla aggiunta.
+
+Lascia vuoto lo Start Command su entrambi i servizi (usa il CMD del Dockerfile).
+
+### Post-deploy
+
+1. Redeploy API (migration 002 + seed demo)
+2. Redeploy WEB con `VITE_API_URL` impostato all'URL pubblico dell'API
 
 ## Documentazione
 
@@ -96,11 +129,11 @@ Copia `.env.example` in `.env` e adatta i valori se necessario.
 
 Implementato:
 
-- Routing frontend e pagine placeholder
+- Routing frontend e pagine collegate all'API via `VITE_API_URL`
 - Health check API
-- PostgreSQL con SQLAlchemy async + Alembic
-- Modelli dominio (User, Workspace, Project, Integration, Shopify, Content, AI, Alert)
-- CRUD base progetti (`POST/GET /api/projects`, dettaglio, integrazioni)
+- PostgreSQL con SQLAlchemy async + Alembic (schema foundation, 7 entità)
+- CRUD progetti (`POST/GET /api/projects`, dettaglio)
+- Integrazioni per progetto: merge di 8 provider (anche non collegati → `not_connected`)
 - Struttura connectors e skills (stub, senza OAuth)
 
-Non ancora implementato: autenticazione, OAuth Shopify, sync dati integrazioni, wire frontend → API.
+Non ancora implementato: autenticazione, OAuth integrazioni, sync dati, Shopify/content layer.

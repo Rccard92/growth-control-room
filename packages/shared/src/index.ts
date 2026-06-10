@@ -1,8 +1,8 @@
-export type { Project, CreateProjectInput } from "./types/project";
+export type { Project, CreateProjectInput, ProjectStatus } from "./types/project";
 export type {
   Integration,
-  IntegrationType,
+  IntegrationProvider,
   IntegrationStatus,
   IntegrationMeta,
 } from "./types/integration";
-export { INTEGRATIONS, INTEGRATION_BY_TYPE } from "./constants/integrations";
+export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";

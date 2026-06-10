@@ -1,8 +1,7 @@
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Text
+from sqlalchemy import ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,10 +19,6 @@ class IntegrationCredential(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("integrations.id", ondelete="CASCADE"),
         unique=True,
     )
-    encrypted_payload: Mapped[str] = mapped_column(Text, default="{}")
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
+    encrypted_payload: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     integration: Mapped["Integration"] = relationship(back_populates="credential")
