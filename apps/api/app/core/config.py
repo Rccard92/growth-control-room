@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     shopify_scopes: str = "read_products,read_orders,read_content,write_content,read_reports"
     shopify_redirect_uri: str | None = None
     frontend_url: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
 
     @model_validator(mode="after")
     def require_database_url(self) -> "Settings":

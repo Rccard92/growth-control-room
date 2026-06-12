@@ -178,6 +178,46 @@ Modulo dedicato alla **Content SEO Room** (`/projects/:id/content`), separato da
 
 **Migration**: `009_content_seo_foundation` — tabelle contenuti Shopify + `seo_audit_issues`, `content_opportunities`, `content_briefs`.
 
+### Product & Collection SEO Optimizer v1
+
+Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — separato da blog/editorial (tab Blog & Ricette = coming soon).
+
+**Sync** (`POST /api/projects/{id}/content/seo/sync-shopify`):
+
+- Prodotti via Shopify Sync v2 (descriptionHtml, media alt)
+- Solo **collections** via content sync (no blog/pages/articles in v1 UI)
+
+**Analisi rule-based** (score 0–100, `seo_entity_analyses`):
+
+- `POST .../content/seo/products/analyze`
+- `POST .../content/seo/collections/analyze`
+
+**Liste**:
+
+- `GET .../content/seo/products` — score, severity, issues, vendite/stock, hasProposal
+- `GET .../content/seo/collections`
+
+**Proposte AI** (richiede `OPENAI_API_KEY`; fallback rules se AI off):
+
+- `POST .../content/seo/proposals/generate` — body `{ entityType, entityId }`
+- `GET .../proposals/{id}`
+- `POST .../proposals/{id}/approve` — non applica su Shopify
+- `POST .../proposals/{id}/apply` — richiede scope **`write_products`** + status `approved`
+- `POST .../proposals/{id}/reject`
+
+**Env API**:
+
+- `OPENAI_API_KEY` (opzionale, proposte AI)
+- `OPENAI_MODEL` (default `gpt-4o-mini`)
+
+**Scope apply**: `write_products` — non incluso negli scope OAuth default; riconnettere Shopify per applicare modifiche prodotto/collection.
+
+**Skill**: `packages/skills/seo/shopify-product-collection/`
+
+**Migration**: `010_product_collection_seo_optimizer` — `seo_entity_analyses`, `seo_optimization_proposals`, `seo_change_logs` + colonne prodotto media/description.
+
+**Legacy**: `GET .../content/seo/dashboard` resta disponibile (fix empty-safe); UI v1 usa endpoint optimizer.
+
 ## Flusso OAuth (design futuro)
 
 ```mermaid

@@ -20,8 +20,37 @@ from app.models.shopify import (
 )
 from app.services.shopify.attribution import extract_order_attribution
 from app.services.shopify.client import ShopifyGraphQLClient
+from app.services.shopify.html_utils import html_to_text
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_media_images(node: dict[str, Any]) -> list[dict[str, Any]] | None:
+    media_nodes = (node.get("media") or {}).get("nodes") or []
+    if not media_nodes:
+        featured = node.get("featuredImage") or {}
+        if featured.get("url"):
+            return [
+                {
+                    "id": featured.get("id"),
+                    "url": featured.get("url"),
+                    "altText": featured.get("altText"),
+                }
+            ]
+        return None
+
+    images: list[dict[str, Any]] = []
+    for media in media_nodes:
+        preview = (media.get("preview") or {}).get("image") or {}
+        images.append(
+            {
+                "id": media.get("id"),
+                "url": preview.get("url"),
+                "altText": media.get("alt") or preview.get("altText"),
+                "mediaContentType": media.get("mediaContentType"),
+            }
+        )
+    return images or None
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -81,6 +110,9 @@ async def _upsert_product(
     if tags is not None and not isinstance(tags, list):
         tags = None
 
+    description_html = node.get("descriptionHtml")
+    media_images = _extract_media_images(node)
+
     fields = {
         "title": node.get("title") or "",
         "handle": node.get("handle"),
@@ -91,6 +123,9 @@ async def _upsert_product(
         "featured_image_url": featured.get("url"),
         "seo_title": seo.get("title"),
         "seo_description": seo.get("description"),
+        "description_html": description_html,
+        "description_text": html_to_text(description_html),
+        "media_images": media_images,
         "tags": tags,
         "created_at_shopify": _parse_datetime(node.get("createdAt")),
         "updated_at_shopify": _parse_datetime(node.get("updatedAt")),

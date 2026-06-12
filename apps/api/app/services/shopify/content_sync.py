@@ -2,7 +2,6 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from html.parser import HTMLParser
 from typing import Any
 from uuid import UUID
 
@@ -17,35 +16,9 @@ from app.models.content_seo import (
 )
 from app.models.shopify import ShopifyStore
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
+from app.services.shopify.html_utils import html_to_text
 
 logger = logging.getLogger(__name__)
-
-
-class _TextExtractor(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self._parts: list[str] = []
-
-    def handle_data(self, data: str) -> None:
-        stripped = data.strip()
-        if stripped:
-            self._parts.append(stripped)
-
-    def get_text(self) -> str:
-        return " ".join(self._parts)
-
-
-def html_to_text(html: str | None) -> str | None:
-    if not html or not html.strip():
-        return None
-    parser = _TextExtractor()
-    try:
-        parser.feed(html)
-        parser.close()
-    except Exception:
-        return None
-    text = parser.get_text().strip()
-    return text or None
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -95,6 +68,7 @@ async def _upsert_collection(
     row.seo_title = seo.get("title")
     row.seo_description = seo.get("description")
     row.image_url = image.get("url")
+    row.image_alt = image.get("altText")
     row.products_count = node.get("productsCount")
     row.raw_payload = node
     return row
@@ -197,6 +171,30 @@ async def _upsert_article(
     row.published_at_shopify = _parse_datetime(node.get("publishedAt"))
     row.raw_payload = node
     return row
+
+
+async def sync_shopify_collections_only(
+    store: ShopifyStore,
+    client: ShopifyGraphQLClient,
+    session: AsyncSession,
+) -> ContentSyncResult:
+    """Sync only collections for Product & Collection SEO Optimizer v1."""
+    started = time.perf_counter()
+    result = ContentSyncResult()
+    try:
+        collection_nodes = await client.fetch_all_collections()
+        for node in collection_nodes:
+            await _upsert_collection(session, store.id, node)
+            result.collections_synced += 1
+    except ShopifyAPIError as exc:
+        logger.warning(
+            "Shopify collections sync failed for store %s: %s",
+            store.shop_domain,
+            exc.message,
+        )
+    await session.commit()
+    result.duration_seconds = round(time.perf_counter() - started, 2)
+    return result
 
 
 async def sync_shopify_content(

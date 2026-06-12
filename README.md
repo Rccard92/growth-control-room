@@ -190,7 +190,10 @@ Implementato:
 - Integrazioni per progetto: merge di 8 provider (anche non collegati → `not_connected`)
 - **Shopify Sync v2**: OAuth connect, sync paginato prodotti/ordini/varianti/line items, attribution first-last touch, dashboard KPI da DB normalizzato
 - **Shopify Dashboard v2**: E-commerce Control Room con product intelligence, inventory risk, order operations, SEO opportunities, alert center, daily diagnosis e attribution intelligence (Shopify-only; GA4/Meta/Google Ads/Klaviyo in roadmap)
-- **Content SEO Engine Foundation**: sync contenuti Shopify (collections, pages, blogs, articles), audit SEO, opportunità editoriali, Content SEO Room — senza publish automatico
+- **Content SEO Engine Foundation**: sync contenuti Shopify, audit legacy
+- **Product & Collection SEO Optimizer v1**: score prodotti/categorie, proposte AI revisionabili, approve/apply controllato (no blog/editorial in v1)
 - Struttura connectors e skills (stub OAuth per altri provider)
 
-Non ancora implementato: autenticazione utenti, OAuth altri provider, sync automatico, generazione/publish articoli blog Shopify, provider oltre Shopify.
+Non ancora implementato: autenticazione utenti, OAuth altri provider, sync automatico, generazione/publish articoli blog Shopify, Editorial SEO (blog/ricette), provider oltre Shopify.
+
+**Env opzionali SEO Optimizer**: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-4o-mini`). Apply su Shopify richiede scope `write_products` (riconnessione OAuth).

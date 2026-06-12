@@ -89,6 +89,20 @@ PRODUCT_FIELDS = """
                 createdAt
                 updatedAt
                 featuredImage { url altText }
+                descriptionHtml
+                media(first: 20) {
+                  nodes {
+                    id
+                    alt
+                    mediaContentType
+                    preview {
+                      image {
+                        url
+                        altText
+                      }
+                    }
+                  }
+                }
                 seo { title description }
                 variants(first: 100) {
                   nodes {

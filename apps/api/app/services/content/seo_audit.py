@@ -39,7 +39,7 @@ def _product_body_text(product: ShopifyProduct) -> str | None:
     for key in ("descriptionHtml", "description", "bodyHtml", "body"):
         raw = payload.get(key)
         if isinstance(raw, str) and raw.strip():
-            from app.services.shopify.content_sync import html_to_text
+            from app.services.shopify.html_utils import html_to_text
 
             return html_to_text(raw) or raw.strip()
     return None

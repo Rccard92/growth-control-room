@@ -102,3 +102,107 @@ export interface ContentSeoAnalyzeResponse {
   criticalIssues: number;
   highPriorityOpportunities: number;
 }
+
+export type SeoOptimizerSeverity = "critical" | "warning" | "opportunity" | "good";
+export type SeoProposalStatus = "draft" | "approved" | "applied" | "rejected";
+export type SeoOptimizerTab = "products" | "collections" | "proposals" | "editorial";
+
+export interface SeoOptimizerSyncResponse {
+  productsSynced: number;
+  collectionsSynced: number;
+  durationSeconds: number;
+}
+
+export interface SeoAnalyzeCountResponse {
+  productsAnalyzed?: number;
+  collectionsAnalyzed?: number;
+  critical: number;
+  warnings: number;
+  opportunities: number;
+}
+
+export interface SeoProductListItem {
+  id: string;
+  shopifyGid: string;
+  title: string;
+  handle?: string | null;
+  score?: number | null;
+  severity?: SeoOptimizerSeverity | null;
+  mainIssues: string[];
+  quantitySold: number;
+  revenue: number;
+  stock?: number | null;
+  hasProposal: boolean;
+  analysisId?: string | null;
+}
+
+export interface SeoCollectionListItem {
+  id: string;
+  shopifyGid: string;
+  title: string;
+  handle?: string | null;
+  score?: number | null;
+  severity?: SeoOptimizerSeverity | null;
+  mainIssues: string[];
+  productsCount?: number | null;
+  hasProposal: boolean;
+  analysisId?: string | null;
+}
+
+export interface SeoProductListResponse {
+  items: SeoProductListItem[];
+  openaiConfigured: boolean;
+  writeProductsAvailable: boolean;
+}
+
+export interface SeoCollectionListResponse {
+  items: SeoCollectionListItem[];
+  openaiConfigured: boolean;
+  writeProductsAvailable: boolean;
+}
+
+export interface SeoEntityAnalysis {
+  id: string;
+  entityType: "product" | "collection";
+  entityId: string;
+  entityTitle: string;
+  scoreTotal: number;
+  scoreTitle: number;
+  scoreSeoTitle: number;
+  scoreMetaDescription: number;
+  scoreDescription: number;
+  scoreImageAlt: number;
+  scoreHandle: number;
+  scoreTags: number;
+  severity: SeoOptimizerSeverity;
+  issues?: Record<string, unknown>[] | null;
+  recommendations?: Record<string, unknown>[] | null;
+  lastAnalyzedAt?: string | null;
+}
+
+export interface SeoOptimizationProposal {
+  id: string;
+  entityType: "product" | "collection";
+  entityId: string;
+  entityGid: string;
+  status: SeoProposalStatus;
+  source: "ai" | "rules";
+  currentValues?: Record<string, unknown> | null;
+  proposedValues?: Record<string, unknown> | null;
+  reasoning?: unknown[] | null;
+  riskLevel: "low" | "medium" | "high";
+  approvedAt?: string | null;
+  appliedAt?: string | null;
+  createdAt?: string | null;
+}
+
+export interface SeoProposalListResponse {
+  items: SeoOptimizationProposal[];
+}
+
+export interface SeoApplyResponse {
+  applied: boolean;
+  requiresScope?: string | null;
+  message?: string | null;
+  proposalId?: string | null;
+}

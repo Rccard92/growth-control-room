@@ -97,6 +97,9 @@ class ShopifyProduct(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     featured_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     seo_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     seo_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_images: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     tags: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     created_at_shopify: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

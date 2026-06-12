@@ -36,6 +36,7 @@ class ShopifyCollection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     seo_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     seo_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_alt: Mapped[str | None] = mapped_column(String(500), nullable=True)
     products_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
