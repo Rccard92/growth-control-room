@@ -3,6 +3,7 @@ import type {
   ShopifyDashboardReconciliation,
   ShopifyDashboardSummary,
   ShopifyMetricComparison,
+  ShopifyOfficialAnalytics,
 } from "@gcr/shared";
 import {
   directionClass,
@@ -13,6 +14,7 @@ import {
 interface ShopifyExecutiveStripProps {
   summary: ShopifyDashboardSummary;
   reconciliation: ShopifyDashboardReconciliation;
+  officialAnalytics: ShopifyOfficialAnalytics;
   trackingQualityScore: number;
   formatMoney: (value: string) => string;
   periodLabel?: string;
@@ -39,6 +41,7 @@ function MetricDelta({ metric }: { metric: ShopifyMetricComparison }) {
 export function ShopifyExecutiveStrip({
   summary,
   reconciliation,
+  officialAnalytics,
   trackingQualityScore,
   formatMoney,
   periodLabel,
@@ -49,25 +52,38 @@ export function ShopifyExecutiveStrip({
   const metrics = comparison?.metrics;
   const trackingDelta = comparison?.attribution.trackingQualityDelta;
   const { salesBreakdown, orders } = reconciliation;
+  const useOfficial =
+    officialAnalytics.available &&
+    officialAnalytics.kpis.totalSales != null &&
+    officialAnalytics.kpis.orders != null;
+
+  const revenueValue = useOfficial
+    ? formatMoney(officialAnalytics.kpis.totalSales!)
+    : formatMoney(salesBreakdown.totalSales);
+  const ordersValue = useOfficial ? officialAnalytics.kpis.orders! : orders.total;
+  const aovValue =
+    useOfficial && officialAnalytics.kpis.averageOrderValue != null
+      ? formatMoney(officialAnalytics.kpis.averageOrderValue)
+      : formatMoney(summary.averageOrderValue);
 
   const items: KpiItem[] = [
     {
       label: "Revenue",
-      value: formatMoney(salesBreakdown.totalSales),
-      meta: "Total sales Shopify-like",
+      value: revenueValue,
+      meta: useOfficial ? "Total sales ShopifyQL" : "Total sales Shopify-like",
       accent: "violet",
       comparisonMetric: metrics?.revenue,
     },
     {
       label: "Ordini",
-      value: orders.total,
+      value: ordersValue,
       meta: `${orders.paid} pagati · ${orders.pending} pending`,
       accent: "cyan",
       comparisonMetric: metrics?.orders,
     },
     {
       label: "AOV",
-      value: formatMoney(summary.averageOrderValue),
+      value: aovValue,
       accent: "default",
       comparisonMetric: metrics?.averageOrderValue,
     },

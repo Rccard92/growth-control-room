@@ -573,12 +573,125 @@ class ShopifyReconciliationDebugResponse(BaseModel):
     )
 
 
+class ShopifyOfficialAnalyticsKpis(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    total_sales: Decimal | None = Field(default=None, serialization_alias="totalSales")
+    orders: int | None = None
+    average_order_value: Decimal | None = Field(
+        default=None,
+        serialization_alias="averageOrderValue",
+    )
+    sessions: int | None = None
+    conversion_rate: float | None = Field(default=None, serialization_alias="conversionRate")
+
+
+class ShopifyOfficialTimeseriesPoint(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    date: str
+    total_sales: Decimal | None = Field(default=None, serialization_alias="totalSales")
+    orders: int | None = None
+    sessions: int | None = None
+    conversion_rate: float | None = Field(default=None, serialization_alias="conversionRate")
+
+
+class ShopifyOfficialChannelRow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    channel: str
+    total_sales: Decimal = Field(serialization_alias="totalSales")
+    orders: int
+
+
+class ShopifyOfficialUtmRow(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    source: str
+    medium: str
+    total_sales: Decimal = Field(serialization_alias="totalSales")
+    orders: int
+
+
+class ShopifyOfficialAnalyticsDataQuality(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    status: str
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ShopifyOfficialAnalytics(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    available: bool
+    source: str = "shopifyql"
+    kpis: ShopifyOfficialAnalyticsKpis
+    timeseries: list[ShopifyOfficialTimeseriesPoint] = Field(default_factory=list)
+    sales_by_referring_channel: list[ShopifyOfficialChannelRow] = Field(
+        default_factory=list,
+        serialization_alias="salesByReferringChannel",
+    )
+    sales_by_utm_campaign: list[ShopifyOfficialUtmRow] = Field(
+        default_factory=list,
+        serialization_alias="salesByUtmCampaign",
+    )
+    data_quality: ShopifyOfficialAnalyticsDataQuality = Field(
+        serialization_alias="dataQuality",
+    )
+
+
+class ShopifyAnalyticsReconciliation(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    official_total_sales: Decimal | None = Field(
+        default=None,
+        serialization_alias="officialTotalSales",
+    )
+    local_total_sales: Decimal = Field(serialization_alias="localTotalSales")
+    delta: Decimal | None = None
+    delta_percent: float | None = Field(default=None, serialization_alias="deltaPercent")
+    message: str
+
+
+class ShopifyShopifyqlProbeSample(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    columns: list[dict[str, Any]] = Field(default_factory=list)
+    rows: list[Any] = Field(default_factory=list)
+
+
+class ShopifyShopifyqlProbeResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    available: bool
+    requires_reconnect: bool = Field(serialization_alias="requiresReconnect")
+    error_code: str | None = Field(default=None, serialization_alias="errorCode")
+    message: str
+    sample: ShopifyShopifyqlProbeSample | None = None
+
+
+class ShopifyOfficialAnalyticsResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    period: ShopifyDashboardPeriod
+    official_analytics: ShopifyOfficialAnalytics = Field(
+        serialization_alias="officialAnalytics",
+    )
+
+
 class ShopifyDashboardResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     period: ShopifyDashboardPeriod
     comparison: ShopifyDashboardComparison
     reconciliation: ShopifyDashboardReconciliation
+    official_analytics: ShopifyOfficialAnalytics = Field(
+        serialization_alias="officialAnalytics",
+    )
+    analytics_reconciliation: ShopifyAnalyticsReconciliation = Field(
+        serialization_alias="analyticsReconciliation",
+    )
     summary: ShopifyDashboardSummary
     alerts: list[ShopifyDashboardAlert]
     product_intelligence: ShopifyProductPerformanceSection = Field(

@@ -174,6 +174,72 @@ export interface ShopifyDashboardReconciliation {
   dataQuality: ShopifyReconciliationDataQuality;
 }
 
+export interface ShopifyOfficialAnalyticsKpis {
+  totalSales: string | null;
+  orders: number | null;
+  averageOrderValue: string | null;
+  sessions: number | null;
+  conversionRate: number | null;
+}
+
+export interface ShopifyOfficialTimeseriesPoint {
+  date: string;
+  totalSales: string | null;
+  orders: number | null;
+  sessions?: number | null;
+  conversionRate?: number | null;
+}
+
+export interface ShopifyOfficialChannelRow {
+  channel: string;
+  totalSales: string;
+  orders: number;
+}
+
+export interface ShopifyOfficialUtmRow {
+  name: string;
+  source: string;
+  medium: string;
+  totalSales: string;
+  orders: number;
+}
+
+export type ShopifyOfficialAnalyticsDataQualityStatus = "ok" | "limited" | "unavailable";
+
+export interface ShopifyOfficialAnalyticsDataQuality {
+  status: ShopifyOfficialAnalyticsDataQualityStatus;
+  warnings: string[];
+}
+
+export interface ShopifyOfficialAnalytics {
+  available: boolean;
+  source: string;
+  kpis: ShopifyOfficialAnalyticsKpis;
+  timeseries: ShopifyOfficialTimeseriesPoint[];
+  salesByReferringChannel: ShopifyOfficialChannelRow[];
+  salesByUtmCampaign: ShopifyOfficialUtmRow[];
+  dataQuality: ShopifyOfficialAnalyticsDataQuality;
+}
+
+export interface ShopifyAnalyticsReconciliation {
+  officialTotalSales: string | null;
+  localTotalSales: string;
+  delta: string | null;
+  deltaPercent: number | null;
+  message: string;
+}
+
+export interface ShopifyShopifyqlProbeResponse {
+  available: boolean;
+  requiresReconnect: boolean;
+  errorCode: string | null;
+  message: string;
+  sample?: {
+    columns: Record<string, unknown>[];
+    rows: unknown[];
+  } | null;
+}
+
 export interface ShopifyPeriodMetrics {
   revenue: string;
   ordersCount: number;
@@ -377,6 +443,8 @@ export interface ShopifyDashboard {
   period: ShopifyDashboardPeriod;
   comparison: ShopifyDashboardComparison;
   reconciliation: ShopifyDashboardReconciliation;
+  officialAnalytics: ShopifyOfficialAnalytics;
+  analyticsReconciliation: ShopifyAnalyticsReconciliation;
   summary: ShopifyDashboardSummary;
   alerts: ShopifyDashboardAlert[];
   productIntelligence?: ShopifyProductPerformanceSection;

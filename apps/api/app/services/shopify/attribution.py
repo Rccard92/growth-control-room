@@ -353,16 +353,30 @@ def _empty_attribution_intelligence() -> dict[str, Any]:
 def build_marketing_report_availability(
     orders: list[ShopifyOrder],
     intelligence: dict[str, Any],
+    *,
+    shopifyql_available: bool | None = None,
 ) -> dict[str, Any]:
     has_signal = any(order_has_tracking_signal(o) for o in orders)
+    if shopifyql_available is True:
+        message = (
+            "Analytics ufficiali Shopify disponibili via ShopifyQL. "
+            "I dati ordine locali restano attivi per operatività e reconciliation."
+        )
+    elif shopifyql_available is False:
+        message = (
+            "ShopifyQL non disponibile. Riconnetti Shopify con scope read_reports "
+            "per allineare i KPI ai report Analytics ufficiali."
+        )
+    else:
+        message = (
+            "Questa vista usa i dati attribution disponibili sugli ordini Shopify. "
+            "ShopifyQL non è ancora verificato per questo store."
+        )
     return {
         "shopify_order_attribution_available": has_signal
         and intelligence.get("_total_orders", 0) > 0,
-        "shopifyql_available": None,
-        "message": (
-            "Questa vista usa i dati attribution disponibili sugli ordini Shopify. "
-            "ShopifyQL non è ancora implementato."
-        ),
+        "shopifyql_available": shopifyql_available,
+        "message": message,
     }
 
 

@@ -206,6 +206,38 @@ class ShopifyGraphQLClient:
 
         return response.json()
 
+    async def execute_shopifyql(self, shopifyql: str) -> dict[str, Any]:
+        query = """
+        query ShopifyQL($query: String!) {
+          shopifyqlQuery(query: $query) {
+            __typename
+            tableData {
+              columns {
+                name
+                dataType
+              }
+              rows
+            }
+            parseErrors {
+              code
+              message
+            }
+          }
+        }
+        """
+        raw = await self.execute_raw(query, {"query": shopifyql})
+        graphql_errors = raw.get("errors") or []
+        data = raw.get("data") or {}
+        result = data.get("shopifyqlQuery") or {}
+        table_data = result.get("tableData") or {}
+        return {
+            "columns": table_data.get("columns") or [],
+            "rows": table_data.get("rows") or [],
+            "parse_errors": result.get("parseErrors") or [],
+            "graphql_errors": graphql_errors,
+            "typename": result.get("__typename"),
+        }
+
     async def fetch_shop(self) -> dict[str, Any]:
         query = """
         query ShopInfo {

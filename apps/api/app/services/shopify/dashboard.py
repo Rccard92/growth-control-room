@@ -28,6 +28,12 @@ from app.services.shopify.comparison import (
 )
 from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
 from app.services.shopify.reconciliation import build_reconciliation_diagnosis, compute_reconciliation
+from app.services.shopify.connect import get_shopify_client_for_store
+from app.services.shopify.shopifyql import (
+    build_analytics_reconciliation,
+    build_unavailable_official_analytics,
+    fetch_official_analytics,
+)
 from app.services.shopify.attribution import (
     build_attribution_alerts,
     build_marketing_report_availability,
@@ -575,9 +581,29 @@ async def build_dashboard(
     }
 
     raw_attribution_intelligence = compute_attribution_intelligence(period_orders)
+
+    official_analytics_raw = build_unavailable_official_analytics(
+        {
+            "message": "ShopifyQL non disponibile.",
+            "error_code": "unavailable",
+        }
+    )
+    try:
+        client = await get_shopify_client_for_store(store, session)
+        official_analytics_raw = await fetch_official_analytics(client, period)
+    except Exception:
+        pass
+    official_analytics_raw.pop("_error", None)
+
+    analytics_reconciliation_raw = build_analytics_reconciliation(
+        official_analytics_raw,
+        reconciliation_raw,
+    )
+
     marketing_report_availability = build_marketing_report_availability(
         period_orders,
         raw_attribution_intelligence,
+        shopifyql_available=official_analytics_raw.get("available"),
     )
     attribution_alerts = build_attribution_alerts(raw_attribution_intelligence)
     attribution_intelligence = {
@@ -621,6 +647,8 @@ async def build_dashboard(
         "period": period.to_dict(),
         "comparison": comparison,
         "reconciliation": reconciliation_raw,
+        "official_analytics": official_analytics_raw,
+        "analytics_reconciliation": analytics_reconciliation_raw,
         "summary": summary,
         "alerts": alerts,
         "product_intelligence": product_intelligence,

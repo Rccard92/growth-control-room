@@ -6,7 +6,10 @@ import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { DailyDiagnosisPanel } from "../components/shopify/EcommerceDiagnosisPanel";
 import { InventoryRiskPanel } from "../components/shopify/InventoryRiskPanel";
+import { AnalyticsReconciliationPanel } from "../components/shopify/AnalyticsReconciliationPanel";
 import { MetricBreakdownPanel } from "../components/shopify/MetricBreakdownPanel";
+import { ShopifyOfficialAnalyticsPanel } from "../components/shopify/ShopifyOfficialAnalyticsPanel";
+import { ShopifyOfficialUnavailablePanel } from "../components/shopify/ShopifyOfficialUnavailablePanel";
 import { OrdersOperationsPanel } from "../components/shopify/OrdersOperationsPanel";
 import { ProductIntelligencePanel } from "../components/shopify/ProductIntelligencePanel";
 import { SeoOpportunitiesPanel } from "../components/shopify/SeoOpportunitiesPanel";
@@ -194,6 +197,7 @@ export function ShopifyControlRoomPage() {
           <ShopifyExecutiveStrip
             summary={summary}
             reconciliation={blocks.reconciliation}
+            officialAnalytics={blocks.officialAnalytics}
             trackingQualityScore={blocks.attributionIntelligence.trackingQualityScore}
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
             periodLabel={periodLabel}
@@ -202,6 +206,23 @@ export function ShopifyControlRoomPage() {
 
           <MetricBreakdownPanel
             reconciliation={blocks.reconciliation}
+            formatMoney={(value) => formatShopifyMoney(value, "EUR")}
+          />
+
+          {blocks.officialAnalytics.available ? (
+            <ShopifyOfficialAnalyticsPanel
+              officialAnalytics={blocks.officialAnalytics}
+              formatMoney={(value) => formatShopifyMoney(value, "EUR")}
+            />
+          ) : (
+            <ShopifyOfficialUnavailablePanel
+              projectId={projectId}
+              officialAnalytics={blocks.officialAnalytics}
+            />
+          )}
+
+          <AnalyticsReconciliationPanel
+            analyticsReconciliation={blocks.analyticsReconciliation}
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
           />
 

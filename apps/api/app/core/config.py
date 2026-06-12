@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     app_env: str = "production"
     shopify_client_id: str | None = None
     shopify_client_secret: str | None = None
-    shopify_scopes: str = "read_products,read_orders,read_content,write_content"
+    shopify_scopes: str = "read_products,read_orders,read_content,write_content,read_reports"
     shopify_redirect_uri: str | None = None
     frontend_url: str | None = None
 

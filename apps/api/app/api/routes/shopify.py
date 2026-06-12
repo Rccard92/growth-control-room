@@ -12,9 +12,11 @@ from app.schemas.shopify import (
     ShopifyConnectResponse,
     ShopifyDashboardResponse,
     ShopifyOAuthStartResponse,
+    ShopifyOfficialAnalyticsResponse,
     ShopifyOrderRead,
     ShopifyProductRead,
     ShopifyReconciliationDebugResponse,
+    ShopifyShopifyqlProbeResponse,
     ShopifyStatusResponse,
     ShopifySyncResponse,
 )
@@ -27,8 +29,9 @@ from app.services.shopify.oauth import (
     ensure_shopify_oauth_configured,
 )
 from app.services.shopify.dashboard import build_dashboard
-from app.services.shopify.period import resolve_period_pair
+from app.services.shopify.period import resolve_period_pair, resolve_shopify_period
 from app.services.shopify.reconciliation import build_reconciliation_debug
+from app.services.shopify.shopifyql import fetch_official_analytics, probe_shopifyql
 from app.services.shopify.sync import sync_shopify_store
 
 router = APIRouter(prefix="/projects", tags=["shopify"])
@@ -203,6 +206,91 @@ async def shopify_reconciliation(
     period, _previous_period = resolve_period_pair(store, range, start_date, end_date)
     data = await build_reconciliation_debug(session, store, period)
     return ShopifyReconciliationDebugResponse.model_validate(data)
+
+
+@router.get(
+    "/{project_id}/shopify/shopifyql/probe",
+    response_model=ShopifyShopifyqlProbeResponse,
+    response_model_by_alias=True,
+)
+async def shopify_shopifyql_probe(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ShopifyShopifyqlProbeResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = await get_shopify_store_for_project(project_id, session)
+
+    if store is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify non connesso per questo progetto",
+        )
+
+    try:
+        client = await get_shopify_client_for_store(store, session)
+        data = await probe_shopifyql(client)
+    except ShopifyAPIError as exc:
+        data = {
+            "available": False,
+            "requires_reconnect": exc.status_code in {401, 403},
+            "error_code": "missing_read_reports" if exc.status_code in {401, 403} else "network_error",
+            "message": exc.message,
+            "sample": None,
+        }
+    except Exception as exc:
+        data = {
+            "available": False,
+            "requires_reconnect": False,
+            "error_code": "network_error",
+            "message": str(exc),
+            "sample": None,
+        }
+
+    return ShopifyShopifyqlProbeResponse.model_validate(data)
+
+
+@router.get(
+    "/{project_id}/shopify/analytics/official",
+    response_model=ShopifyOfficialAnalyticsResponse,
+    response_model_by_alias=True,
+)
+async def shopify_official_analytics(
+    project_id: UUID,
+    range: str | None = Query(None, alias="range"),
+    start_date: date | None = Query(None, alias="start_date"),
+    end_date: date | None = Query(None, alias="end_date"),
+    session: AsyncSession = Depends(get_db),
+) -> ShopifyOfficialAnalyticsResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = await get_shopify_store_for_project(project_id, session)
+
+    if store is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify non connesso per questo progetto",
+        )
+
+    period = resolve_shopify_period(store, range, start_date, end_date)
+    try:
+        client = await get_shopify_client_for_store(store, session)
+        official = await fetch_official_analytics(client, period)
+    except Exception:
+        from app.services.shopify.shopifyql import build_unavailable_official_analytics
+
+        official = build_unavailable_official_analytics(
+            {
+                "message": "Impossibile recuperare analytics ufficiali Shopify.",
+                "error_code": "network_error",
+            }
+        )
+
+    official.pop("_error", None)
+    return ShopifyOfficialAnalyticsResponse.model_validate(
+        {
+            "period": period.to_dict(),
+            "official_analytics": official,
+        }
+    )
 
 
 @router.get(

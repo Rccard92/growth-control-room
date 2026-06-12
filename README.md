@@ -140,6 +140,7 @@ Connessione store tramite OAuth Shopify. L'utente inserisce solo il dominio shop
    - `read_orders`
    - `read_content`
    - `write_content`
+   - `read_reports` (ShopifyQL / Analytics ufficiali)
 5. Copia **Client ID** e **Client secret** dall'app
 
 ### Variabili Railway (servizio API)
@@ -148,7 +149,7 @@ Connessione store tramite OAuth Shopify. L'utente inserisce solo il dominio shop
 |-----------|----------------|
 | `SHOPIFY_CLIENT_ID` | da Shopify App settings |
 | `SHOPIFY_CLIENT_SECRET` | da Shopify App settings |
-| `SHOPIFY_SCOPES` | `read_products,read_orders,read_content,write_content` |
+| `SHOPIFY_SCOPES` | `read_products,read_orders,read_content,write_content,read_reports` |
 | `SHOPIFY_REDIRECT_URI` | `https://api-production-1077.up.railway.app/api/integrations/shopify/oauth/callback` |
 | `FRONTEND_URL` | `https://web-production-77355.up.railway.app` |
 

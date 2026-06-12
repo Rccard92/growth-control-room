@@ -64,12 +64,14 @@ Limiti attuali:
 
 | Funzionalità | Stato |
 |--------------|-------|
-| ShopifyQL / report Analytics aggregati | Non implementato |
+| ShopifyQL / report Analytics aggregati | Implementato via `read_reports` + ShopifyQL (fallback locale se non autorizzato) |
 | `read_customers` (LTV, numberOfOrders) | Non richiesto nello scope attuale |
 | `read_all_orders` (storico > 60 gg) | Non richiesto; serve approvazione Partner |
 | GA4 / Meta / Google Ads / Klaviyo | Non implementato |
 
-Scope OAuth attuali: `read_products`, `read_orders`, `read_content`, `write_content`.
+Scope OAuth attuali: `read_products`, `read_orders`, `read_content`, `write_content`, `read_reports`.
+
+**ShopifyQL:** richiede lo scope `read_reports`. Dopo l'aggiornamento degli scope, **riconnettere Shopify** (OAuth) per emettere un token con i nuovi permessi. I token esistenti non ereditano `read_reports`.
 
 Endpoint principali:
 
@@ -78,6 +80,8 @@ Endpoint principali:
 - `POST /api/projects/{id}/shopify/sync`
 - `GET /api/projects/{id}/shopify/dashboard`
 - `GET /api/projects/{id}/shopify/reconciliation`
+- `GET /api/projects/{id}/shopify/shopifyql/probe`
+- `GET /api/projects/{id}/shopify/analytics/official`
 
 Query params opzionali per filtro periodo:
 
@@ -91,7 +95,7 @@ Valori `range` supportati: `today`, `yesterday`, `last_7_days`, `last_30_days`, 
 
 Le date sono interpretate nel timezone IANA dello store Shopify (`shopify_stores.timezone`), con fallback `UTC`.
 
-La response include `period` (`range`, `startDate`, `endDate`, `timezone`, `label`), nel `summary` i gruppi `periodMetrics` / `currentStateMetrics`, il blocco `comparison` con confronto vs periodo precedente equivalente (`currentPeriod`, `previousPeriod`, `metrics`, `attribution`, `products`, `dataQuality`), e il blocco `reconciliation` con breakdown metriche Shopify-like.
+La response include `period`, `comparison`, `reconciliation`, `officialAnalytics`, `analyticsReconciliation` e `summary` (con `periodMetrics` / `currentStateMetrics`).
 
 **Nota:** La Shopify Control Room supporta filtri temporali per metriche basate sugli ordini. Inventario e SEO rappresentano invece lo stato corrente dello store.
 
@@ -102,15 +106,32 @@ La response include `period` (`range`, `startDate`, `endDate`, `timezone`, `labe
 | Metrica | Descrizione |
 |---------|-------------|
 | `currentTotalSum` | Somma dei totali ordine correnti (`currentTotalPriceSet`). Comportamento precedente di GCR, utile come diagnostica. |
-| `totalSales` (Shopify-like) | `grossSales − discounts − salesReversals + taxes + shipping`. I reversal sono attribuiti al giorno in cui il refund viene processato, anche se l'ordine originale è fuori periodo. |
-| ShopifyQL (futuro) | Parità esatta con la dashboard Analytics Shopify via `read_reports` / ShopifyQL. |
+| `totalSales` (Shopify-like) | Calcolo locale: `grossSales − discounts − salesReversals + taxes + shipping`. Fallback attivo se ShopifyQL non è disponibile. |
+| `officialAnalytics.kpis.totalSales` | Total sales ufficiale da ShopifyQL (`read_reports`), allineato alla dashboard Analytics Shopify. |
 
-Il blocco `reconciliation` espone:
+Il blocco `reconciliation` espone breakdown locale (`metricMode: shopify_like_local`).
 
-- `metricMode`: `shopify_like_local`
-- `orders`: conteggi `total`, `paid`, `pending`, `cancelled`, `unpaid` (ordini piazzati nel periodo per `createdAt`)
-- `salesBreakdown`: componenti della formula sopra + `currentTotalSum`
-- `dataQuality`: `ok` \| `limited` \| `warning` con messaggi esplicativi (tax/duties assenti, reversal fuori storico sync, ecc.)
+Il blocco `officialAnalytics` espone (quando `available: true`):
+
+- `kpis`: `totalSales`, `orders`, `averageOrderValue`, `sessions`, `conversionRate`
+- `timeseries`: vendite/ordini (e sessioni se disponibili) per giorno
+- `salesByReferringChannel`, `salesByUtmCampaign`
+- `dataQuality`: `ok` \| `limited` \| `unavailable`
+
+Il blocco `analyticsReconciliation` confronta `officialTotalSales` vs `localTotalSales` con delta e messaggio esplicativo.
+
+**ShopifyQL non fornisce ROAS/ad spend** (Meta, Google Ads, Klaviyo restano non implementati). Il fallback locale resta sempre attivo: sync, product intelligence, inventory, orders e SEO non dipendono da ShopifyQL.
+
+Probe ShopifyQL:
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "https://<api-host>/api/projects/<project_id>/shopify/shopifyql/probe"
+```
+
+Risposta attesa con permessi OK: `{ "available": true, "requiresReconnect": false, "sample": { ... } }`
+
+Senza `read_reports`: `{ "available": false, "requiresReconnect": true, "errorCode": "missing_read_reports" }`
 
 L'endpoint debug `GET /api/projects/{id}/shopify/reconciliation` accetta gli stessi query params del dashboard e restituisce breakdown esteso, refund nel periodo e un campione di ordini (senza email o token).
 
