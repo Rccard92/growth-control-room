@@ -7,7 +7,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoEntityAnalysis, SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyStore
+from app.schemas.seo_optimizer import SeoEntityAnalysisRead
+from app.services.content.seo_scoring_engine import rebuild_score_breakdown_from_analysis
 from app.services.shopify.analytics import compute_best_sellers, product_lookup
+
+
+def analysis_to_read(analysis: SeoEntityAnalysis) -> SeoEntityAnalysisRead:
+    breakdown = rebuild_score_breakdown_from_analysis(analysis)
+    return SeoEntityAnalysisRead(
+        id=analysis.id,
+        entity_type=analysis.entity_type,
+        entity_id=analysis.entity_id,
+        entity_title=analysis.entity_title,
+        score_total=analysis.score_total,
+        score_title=analysis.score_title,
+        score_seo_title=analysis.score_seo_title,
+        score_meta_description=analysis.score_meta_description,
+        score_description=analysis.score_description,
+        score_image_alt=analysis.score_image_alt,
+        score_handle=analysis.score_handle,
+        score_tags=analysis.score_tags,
+        severity=analysis.severity,
+        issues=analysis.issues,
+        recommendations=analysis.recommendations,
+        score_breakdown=breakdown,
+        last_analyzed_at=analysis.last_analyzed_at,
+    )
 
 
 def _main_issues(issues: list[dict[str, Any]] | None, limit: int = 3) -> list[str]:

@@ -2,17 +2,14 @@ import { useState } from "react";
 import type { SeoOptimizationProposal, SeoOptimizerTab } from "@gcr/shared";
 import { StatusBadge } from "../../StatusBadge";
 import { EntitySeoTable, type EntityFilter } from "./EntitySeoTable";
-import { SeoDetailDrawer } from "./SeoDetailDrawer";
+import { SeoEntityEditDrawer } from "./SeoEntityEditDrawer";
 import {
   useAnalyzeCollectionsSeo,
   useAnalyzeProductsSeo,
-  useCollectionAnalysis,
+  useCollectionSeoDetail,
   useCollectionsSeo,
-  useGenerateProposal,
-  useProductAnalysis,
+  useProductSeoDetail,
   useProductsSeo,
-  useProposalActions,
-  useProposalDetail,
   useProposalsSeo,
   useSeoOptimizerSync,
 } from "../../../hooks/useContentSeo";
@@ -33,11 +30,10 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
   const [tab, setTab] = useState<SeoOptimizerTab>("products");
   const [productFilter, setProductFilter] = useState<EntityFilter>("all");
   const [collectionFilter, setCollectionFilter] = useState<EntityFilter>("all");
-  const [detailEntity, setDetailEntity] = useState<{
+  const [editEntity, setEditEntity] = useState<{
     type: "product" | "collection";
     id: string;
     title: string;
-    proposalId?: string;
   } | null>(null);
 
   const { data: productsData, isLoading: productsLoading } = useProductsSeo(projectId, connected);
@@ -50,44 +46,38 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
   const syncMutation = useSeoOptimizerSync(projectId);
   const analyzeProductsMutation = useAnalyzeProductsSeo(projectId);
   const analyzeCollectionsMutation = useAnalyzeCollectionsSeo(projectId);
-  const generateMutation = useGenerateProposal(projectId);
-  const proposalActions = useProposalActions(projectId);
 
-  const productAnalysis = useProductAnalysis(
+  const productDetail = useProductSeoDetail(
     projectId,
-    detailEntity?.type === "product" ? detailEntity.id : null,
+    editEntity?.type === "product" ? editEntity.id : null,
   );
-  const collectionAnalysis = useCollectionAnalysis(
+  const collectionDetail = useCollectionSeoDetail(
     projectId,
-    detailEntity?.type === "collection" ? detailEntity.id : null,
+    editEntity?.type === "collection" ? editEntity.id : null,
   );
-  const proposalDetail = useProposalDetail(projectId, detailEntity?.proposalId ?? null);
 
   const openaiConfigured = productsData?.openaiConfigured ?? collectionsData?.openaiConfigured ?? false;
   const writeProductsAvailable =
     productsData?.writeProductsAvailable ?? collectionsData?.writeProductsAvailable ?? false;
 
-  const analysis =
-    detailEntity?.type === "product" ? productAnalysis.data : collectionAnalysis.data;
+  const handleOpenEdit = (entityType: "product" | "collection", entityId: string) => {
+    const title =
+      entityType === "product"
+        ? productsData?.items.find((p) => p.id === entityId)?.title
+        : collectionsData?.items.find((c) => c.id === entityId)?.title;
+    setEditEntity({
+      type: entityType,
+      id: entityId,
+      title: title ?? "Modifica SEO",
+    });
+  };
 
-  const handleGenerate = (entityType: "product" | "collection", entityId: string) => {
-    generateMutation.mutate(
-      { entityType, entityId, useAi: true },
-      {
-        onSuccess: (proposal) => {
-          const title =
-            entityType === "product"
-              ? productsData?.items.find((p) => p.id === entityId)?.title
-              : collectionsData?.items.find((c) => c.id === entityId)?.title;
-          setDetailEntity({
-            type: entityType,
-            id: entityId,
-            title: title ?? "Dettaglio",
-            proposalId: proposal.id,
-          });
-        },
-      },
-    );
+  const refreshDetail = () => {
+    if (editEntity?.type === "product") {
+      void productDetail.refetch();
+    } else if (editEntity?.type === "collection") {
+      void collectionDetail.refetch();
+    }
   };
 
   return (
@@ -131,8 +121,8 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
 
       {!openaiConfigured && (
         <div className="content-seo-banner content-seo-banner--warn">
-          AI non configurata. Aggiungi OPENAI_API_KEY per generare proposte automatiche. L&apos;analisi
-          rule-based funziona comunque.
+          AI non configurata. Aggiungi OPENAI_API_KEY per generare proposte automatiche. La
+          modifica manuale funziona comunque.
         </div>
       )}
 
@@ -142,7 +132,9 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         </div>
       )}
 
-      {(syncMutation.isSuccess || analyzeProductsMutation.isSuccess || analyzeCollectionsMutation.isSuccess) && (
+      {(syncMutation.isSuccess ||
+        analyzeProductsMutation.isSuccess ||
+        analyzeCollectionsMutation.isSuccess) && (
         <div className="content-seo-banner content-seo-banner--success">
           {syncMutation.isSuccess &&
             `Sync: ${syncMutation.data.productsSynced} prodotti, ${syncMutation.data.collectionsSynced} categorie.`}
@@ -178,15 +170,7 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
               mode="product"
               filter={productFilter}
               onFilterChange={setProductFilter}
-              openaiConfigured={openaiConfigured}
-              generateLoadingId={
-                generateMutation.isPending ? generateMutation.variables?.entityId ?? null : null
-              }
-              onGenerate={(id) => handleGenerate("product", id)}
-              onDetails={(id) => {
-                const item = productsData?.items.find((p) => p.id === id);
-                setDetailEntity({ type: "product", id, title: item?.title ?? "Prodotto" });
-              }}
+              onEdit={(id) => handleOpenEdit("product", id)}
             />
           )}
         </div>
@@ -202,15 +186,7 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
               mode="collection"
               filter={collectionFilter}
               onFilterChange={setCollectionFilter}
-              openaiConfigured={openaiConfigured}
-              generateLoadingId={
-                generateMutation.isPending ? generateMutation.variables?.entityId ?? null : null
-              }
-              onGenerate={(id) => handleGenerate("collection", id)}
-              onDetails={(id) => {
-                const item = collectionsData?.items.find((c) => c.id === id);
-                setDetailEntity({ type: "collection", id, title: item?.title ?? "Categoria" });
-              }}
+              onEdit={(id) => handleOpenEdit("collection", id)}
             />
           )}
         </div>
@@ -221,11 +197,10 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
           <ProposalList
             proposals={proposalsData?.items ?? []}
             onOpen={(p) =>
-              setDetailEntity({
+              setEditEntity({
                 type: p.entityType,
                 id: p.entityId,
                 title: p.entityGid,
-                proposalId: p.id,
               })
             }
           />
@@ -240,39 +215,19 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         </div>
       )}
 
-      <SeoDetailDrawer
-        open={Boolean(detailEntity)}
-        onClose={() => setDetailEntity(null)}
-        title={detailEntity?.title ?? ""}
-        analysis={analysis}
-        proposal={proposalDetail.data}
+      <SeoEntityEditDrawer
+        open={Boolean(editEntity)}
+        onClose={() => setEditEntity(null)}
+        projectId={projectId}
+        entityType={editEntity?.type ?? "product"}
+        entityId={editEntity?.id ?? ""}
+        title={editEntity?.title ?? ""}
+        productDetail={productDetail.data}
+        collectionDetail={collectionDetail.data}
+        detailLoading={productDetail.isLoading || collectionDetail.isLoading}
+        openaiConfigured={openaiConfigured}
         writeProductsAvailable={writeProductsAvailable}
-        actionLoading={
-          proposalActions.approve.isPending ||
-          proposalActions.reject.isPending ||
-          proposalActions.apply.isPending
-        }
-        onApprove={() => {
-          if (detailEntity?.proposalId) {
-            proposalActions.approve.mutate(detailEntity.proposalId);
-          }
-        }}
-        onReject={() => {
-          if (detailEntity?.proposalId) {
-            proposalActions.reject.mutate(detailEntity.proposalId);
-          }
-        }}
-        onApply={() => {
-          if (detailEntity?.proposalId) {
-            proposalActions.apply.mutate(detailEntity.proposalId, {
-              onSuccess: (res) => {
-                if (res.message && !res.applied) {
-                  alert(res.message);
-                }
-              },
-            });
-          }
-        }}
+        onDetailRefresh={refreshDetail}
       />
     </>
   );
@@ -286,14 +241,24 @@ function ProposalList({
   onOpen: (p: SeoOptimizationProposal) => void;
 }) {
   if (proposals.length === 0) {
-    return <p className="shopify-empty-copy">Nessuna proposta. Genera da tab Prodotti o Categorie.</p>;
+    return (
+      <p className="shopify-empty-copy">
+        Nessuna proposta. Apri Modifica da tab Prodotti o Categorie.
+      </p>
+    );
   }
   return (
     <ul className="shopify-seo-list">
       {proposals.slice(0, 10).map((p) => (
         <li key={p.id} className="shopify-seo-list__item">
-          <span>{p.entityType} · {p.status} · {p.riskLevel}</span>
-          <button type="button" className="gcr-btn gcr-btn--secondary gcr-btn--sm" onClick={() => onOpen(p)}>
+          <span>
+            {p.entityType} · {p.status} · {p.riskLevel}
+          </span>
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+            onClick={() => onOpen(p)}
+          >
             Apri
           </button>
         </li>

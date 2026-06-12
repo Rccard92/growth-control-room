@@ -29,8 +29,14 @@ export const queryKeys = {
       ["contentSeo", projectId, "productAnalysis", entityId] as const,
     collectionAnalysis: (projectId: string, entityId: string) =>
       ["contentSeo", projectId, "collectionAnalysis", entityId] as const,
+    productDetail: (projectId: string, entityId: string) =>
+      ["contentSeo", projectId, "productDetail", entityId] as const,
+    collectionDetail: (projectId: string, entityId: string) =>
+      ["contentSeo", projectId, "collectionDetail", entityId] as const,
     proposalDetail: (projectId: string, proposalId: string) =>
       ["contentSeo", projectId, "proposal", proposalId] as const,
+    proposalPreview: (projectId: string, proposalId: string) =>
+      ["contentSeo", projectId, "proposalPreview", proposalId] as const,
   },
   health: ["health"] as const,
 };

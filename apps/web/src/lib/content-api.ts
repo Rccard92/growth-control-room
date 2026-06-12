@@ -1,12 +1,15 @@
 import type {
   SeoAnalyzeCountResponse,
   SeoApplyResponse,
+  SeoCollectionDetailResponse,
   SeoCollectionListResponse,
   SeoEntityAnalysis,
   SeoOptimizationProposal,
   SeoOptimizerSyncResponse,
+  SeoProductDetailResponse,
   SeoProductListResponse,
   SeoProposalListResponse,
+  SeoProposalPreviewResponse,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
 
@@ -38,6 +41,24 @@ export function getProductsSeo(projectId: string): Promise<SeoProductListRespons
 export function getCollectionsSeo(projectId: string): Promise<SeoCollectionListResponse> {
   return apiFetch<SeoCollectionListResponse>(
     `/api/projects/${projectId}/content/seo/collections`,
+  );
+}
+
+export function getProductSeoDetail(
+  projectId: string,
+  productId: string,
+): Promise<SeoProductDetailResponse> {
+  return apiFetch<SeoProductDetailResponse>(
+    `/api/projects/${projectId}/content/seo/products/${productId}`,
+  );
+}
+
+export function getCollectionSeoDetail(
+  projectId: string,
+  collectionId: string,
+): Promise<SeoCollectionDetailResponse> {
+  return apiFetch<SeoCollectionDetailResponse>(
+    `/api/projects/${projectId}/content/seo/collections/${collectionId}`,
   );
 }
 
@@ -73,15 +94,46 @@ export function generateProposal(
   projectId: string,
   entityType: "product" | "collection",
   entityId: string,
-  useAi = true,
+  options?: { useAi?: boolean; mode?: string },
 ): Promise<SeoOptimizationProposal> {
   return apiFetch<SeoOptimizationProposal>(
     `/api/projects/${projectId}/content/seo/proposals/generate`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entityType, entityId, useAi }),
+      body: JSON.stringify({
+        entityType,
+        entityId,
+        useAi: options?.useAi ?? true,
+        mode: options?.mode ?? "fill_missing_and_improve",
+      }),
     },
+  );
+}
+
+export function saveManualProposal(
+  projectId: string,
+  entityType: "product" | "collection",
+  entityId: string,
+  proposedValues: Record<string, unknown>,
+): Promise<SeoOptimizationProposal> {
+  return apiFetch<SeoOptimizationProposal>(
+    `/api/projects/${projectId}/content/seo/proposals/manual`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entityType, entityId, proposedValues }),
+    },
+  );
+}
+
+export function previewProposal(
+  projectId: string,
+  proposalId: string,
+): Promise<SeoProposalPreviewResponse> {
+  return apiFetch<SeoProposalPreviewResponse>(
+    `/api/projects/${projectId}/content/seo/proposals/${proposalId}/preview`,
+    { method: "POST" },
   );
 }
 

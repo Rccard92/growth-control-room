@@ -21,10 +21,16 @@ def write_products_required_response() -> dict[str, Any]:
         "applied": False,
         "requires_scope": "write_products",
         "message": (
-            "Per applicare modifiche prodotto o collection serve riconnettere Shopify "
-            "con write_products."
+            "Per applicare modifiche su Shopify serve riconnettere l'app con write_products."
         ),
     }
+
+
+def _get_proposed(proposed: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in proposed and proposed[key] is not None:
+            return proposed[key]
+    return None
 
 
 async def approve_proposal(
@@ -79,21 +85,31 @@ async def apply_proposal(
             }
             """
             input_data: dict[str, Any] = {"id": proposal.entity_gid}
-            if proposed.get("proposed_product_title"):
-                input_data["title"] = proposed["proposed_product_title"]
-            if proposed.get("proposed_handle"):
-                input_data["handle"] = proposed["proposed_handle"]
-            if proposed.get("proposed_tags") is not None:
-                input_data["tags"] = proposed["proposed_tags"]
+            title = _get_proposed(
+                proposed, "product_title", "proposed_product_title"
+            )
+            if title:
+                input_data["title"] = title
+            handle = _get_proposed(proposed, "handle", "proposed_handle")
+            if handle:
+                input_data["handle"] = handle
+            tags = _get_proposed(proposed, "tags", "proposed_tags")
+            if tags is not None:
+                input_data["tags"] = tags
             seo_block: dict[str, str] = {}
-            if proposed.get("proposed_seo_title"):
-                seo_block["title"] = proposed["proposed_seo_title"]
-            if proposed.get("proposed_meta_description"):
-                seo_block["description"] = proposed["proposed_meta_description"]
+            seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
+            if seo_title:
+                seo_block["title"] = seo_title
+            meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
+            if meta:
+                seo_block["description"] = meta
             if seo_block:
                 input_data["seo"] = seo_block
-            if proposed.get("proposed_description_html"):
-                input_data["descriptionHtml"] = proposed["proposed_description_html"]
+            desc_html = _get_proposed(
+                proposed, "description_html", "proposed_description_html"
+            )
+            if desc_html:
+                input_data["descriptionHtml"] = desc_html
 
             data = await client.execute(mutation, {"input": input_data})
             shopify_response = data
@@ -113,17 +129,28 @@ async def apply_proposal(
             }
             """
             input_data = {"id": proposal.entity_gid}
-            if proposed.get("proposed_collection_title"):
-                input_data["title"] = proposed["proposed_collection_title"]
-            if proposed.get("proposed_handle"):
-                input_data["handle"] = proposed["proposed_handle"]
-            if proposed.get("proposed_description"):
-                input_data["descriptionHtml"] = proposed["proposed_description"]
+            title = _get_proposed(
+                proposed, "collection_title", "proposed_collection_title"
+            )
+            if title:
+                input_data["title"] = title
+            handle = _get_proposed(proposed, "handle", "proposed_handle")
+            if handle:
+                input_data["handle"] = handle
+            desc_html = _get_proposed(
+                proposed,
+                "description_html",
+                "proposed_description",
+            )
+            if desc_html:
+                input_data["descriptionHtml"] = desc_html
             seo_block = {}
-            if proposed.get("proposed_seo_title"):
-                seo_block["title"] = proposed["proposed_seo_title"]
-            if proposed.get("proposed_meta_description"):
-                seo_block["description"] = proposed["proposed_meta_description"]
+            seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
+            if seo_title:
+                seo_block["title"] = seo_title
+            meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
+            if meta:
+                seo_block["description"] = meta
             if seo_block:
                 input_data["seo"] = seo_block
 

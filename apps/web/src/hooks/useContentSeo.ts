@@ -6,12 +6,16 @@ import {
   approveProposal,
   generateProposal,
   getCollectionAnalysis,
+  getCollectionSeoDetail,
   getCollectionsSeo,
   getProductAnalysis,
+  getProductSeoDetail,
   getProductsSeo,
   getProposal,
   listProposals,
+  previewProposal,
   rejectProposal,
+  saveManualProposal,
   syncSeoOptimizer,
 } from "../lib/content-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -37,6 +41,22 @@ export function useProposalsSeo(projectId: string | undefined, enabled = true) {
     queryKey: queryKeys.contentSeo.proposals(projectId ?? ""),
     queryFn: () => listProposals(projectId!),
     enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useProductSeoDetail(projectId: string, productId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.contentSeo.productDetail(projectId, productId ?? ""),
+    queryFn: () => getProductSeoDetail(projectId, productId!),
+    enabled: Boolean(productId),
+  });
+}
+
+export function useCollectionSeoDetail(projectId: string, collectionId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.contentSeo.collectionDetail(projectId, collectionId ?? ""),
+    queryFn: () => getCollectionSeoDetail(projectId, collectionId!),
+    enabled: Boolean(collectionId),
   });
 }
 
@@ -73,21 +93,68 @@ export function useAnalyzeCollectionsSeo(projectId: string) {
 
 export function useGenerateProposal(projectId: string) {
   const qc = useQueryClient();
+  const invalidate = (entityId: string, entityType: "product" | "collection") => {
+    void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.proposals(projectId) });
+    void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
+    void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.collections(projectId) });
+    if (entityType === "product") {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.contentSeo.productDetail(projectId, entityId),
+      });
+    } else {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.contentSeo.collectionDetail(projectId, entityId),
+      });
+    }
+  };
   return useMutation({
     mutationFn: ({
       entityType,
       entityId,
       useAi,
+      mode,
     }: {
       entityType: "product" | "collection";
       entityId: string;
       useAi?: boolean;
-    }) => generateProposal(projectId, entityType, entityId, useAi),
-    onSuccess: () => {
+      mode?: string;
+    }) => generateProposal(projectId, entityType, entityId, { useAi, mode }),
+    onSuccess: (_data, vars) => invalidate(vars.entityId, vars.entityType),
+  });
+}
+
+export function useSaveManualProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entityType,
+      entityId,
+      proposedValues,
+    }: {
+      entityType: "product" | "collection";
+      entityId: string;
+      proposedValues: Record<string, unknown>;
+    }) => saveManualProposal(projectId, entityType, entityId, proposedValues),
+    onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.proposals(projectId) });
-      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
-      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.collections(projectId) });
+      if (vars.entityType === "product") {
+        void qc.invalidateQueries({
+          queryKey: queryKeys.contentSeo.productDetail(projectId, vars.entityId),
+        });
+      } else {
+        void qc.invalidateQueries({
+          queryKey: queryKeys.contentSeo.collectionDetail(projectId, vars.entityId),
+        });
+      }
     },
+  });
+}
+
+export function usePreviewProposal(projectId: string, proposalId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.contentSeo.proposalPreview(projectId, proposalId ?? ""),
+    queryFn: () => previewProposal(projectId, proposalId!),
+    enabled: Boolean(proposalId),
   });
 }
 

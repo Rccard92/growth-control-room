@@ -17,10 +17,8 @@ interface EntitySeoTableProps {
   mode: "product" | "collection";
   filter: EntityFilter;
   onFilterChange: (f: EntityFilter) => void;
-  onGenerate: (id: string) => void;
-  onDetails: (id: string) => void;
-  generateLoadingId?: string | null;
-  openaiConfigured: boolean;
+  onEdit: (id: string) => void;
+  editLoadingId?: string | null;
 }
 
 function matchesFilter(
@@ -47,10 +45,8 @@ export function EntitySeoTable({
   mode,
   filter,
   onFilterChange,
-  onGenerate,
-  onDetails,
-  generateLoadingId,
-  openaiConfigured,
+  onEdit,
+  editLoadingId,
 }: EntitySeoTableProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -122,23 +118,11 @@ export function EntitySeoTable({
               <div className="seo-entity-table__actions">
                 <button
                   type="button"
-                  className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-                  onClick={() => onDetails(item.id)}
-                >
-                  Dettagli
-                </button>
-                <button
-                  type="button"
                   className="gcr-btn gcr-btn--primary gcr-btn--sm"
-                  disabled={!openaiConfigured || generateLoadingId === item.id}
-                  title={
-                    openaiConfigured
-                      ? undefined
-                      : "AI non configurata. Aggiungi OPENAI_API_KEY per generare proposte automatiche."
-                  }
-                  onClick={() => onGenerate(item.id)}
+                  disabled={editLoadingId === item.id}
+                  onClick={() => onEdit(item.id)}
                 >
-                  {generateLoadingId === item.id ? "…" : "Genera proposta"}
+                  {editLoadingId === item.id ? "…" : "Modifica"}
                 </button>
               </div>
             </div>

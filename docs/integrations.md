@@ -178,45 +178,53 @@ Modulo dedicato alla **Content SEO Room** (`/projects/:id/content`), separato da
 
 **Migration**: `009_content_seo_foundation` — tabelle contenuti Shopify + `seo_audit_issues`, `content_opportunities`, `content_briefs`.
 
-### Product & Collection SEO Optimizer v1
+### Product & Collection SEO Optimizer
 
 Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — separato da blog/editorial (tab Blog & Ricette = coming soon).
+
+**Score rule-based trasparente** (0–100, breakdown pesato per componente in `scoreBreakdown`):
+
+- Prodotti: title, seoTitle, metaDescription, description, handle, tags, imageAlt
+- Collections: title, seoTitle, metaDescription, description, handle, imageAlt
+- Formula: ogni componente ha score 0–100; punti = `round(score × peso / 100)`; totale = somma punti (pesi sommano a 100)
+- Skill di riferimento: `packages/skills/seo/shopify-product-collection/` (7 file markdown), caricata da `seo_skill_loader.py` con fallback e log warning
 
 **Sync** (`POST /api/projects/{id}/content/seo/sync-shopify`):
 
 - Prodotti via Shopify Sync v2 (descriptionHtml, media alt)
 - Solo **collections** via content sync (no blog/pages/articles in v1 UI)
 
-**Analisi rule-based** (score 0–100, `seo_entity_analyses`):
+**Analisi**:
 
 - `POST .../content/seo/products/analyze`
 - `POST .../content/seo/collections/analyze`
 
-**Liste**:
+**Liste e dettaglio**:
 
 - `GET .../content/seo/products` — score, severity, issues, vendite/stock, hasProposal
 - `GET .../content/seo/collections`
+- `GET .../content/seo/products/{product_id}` — prodotto, analysis, scoreBreakdown, currentValues, images, latestProposal, storico
+- `GET .../content/seo/collections/{collection_id}` — analogo
 
-**Proposte AI** (richiede `OPENAI_API_KEY`; fallback rules se AI off):
+**Flusso Modifica → Proposta → Approvazione** (nessuna modifica live senza conferma):
 
-- `POST .../content/seo/proposals/generate` — body `{ entityType, entityId }`
-- `GET .../proposals/{id}`
-- `POST .../proposals/{id}/approve` — non applica su Shopify
-- `POST .../proposals/{id}/apply` — richiede scope **`write_products`** + status `approved`
-- `POST .../proposals/{id}/reject`
+1. UI: bottone **Modifica** apre drawer con tab Campi SEO, Score, Immagini, Proposta, Storico
+2. **Proposta manuale**: `POST .../content/seo/proposals/manual` — `source=manual`, `status=draft`, non tocca Shopify
+3. **Proposta AI** (solo nel drawer): `POST .../content/seo/proposals/generate` — body `{ entityType, entityId, mode: "fill_missing_and_improve" }`
+4. **Preview**: `POST .../proposals/{id}/preview` — confronto current vs proposed, motivazione, rischio
+5. **Approve**: `POST .../proposals/{id}/approve` — non applica su Shopify
+6. **Apply**: `POST .../proposals/{id}/apply` — solo se `approved` + scope `write_products` + conferma utente
 
 **Env API**:
 
-- `OPENAI_API_KEY` (opzionale, proposte AI)
+- `OPENAI_API_KEY` (opzionale; se assente, modifica manuale OK, AI disabilitata in UI)
 - `OPENAI_MODEL` (default `gpt-4o-mini`)
 
-**Scope apply**: `write_products` — non incluso negli scope OAuth default; riconnettere Shopify per applicare modifiche prodotto/collection.
+**Scope apply**: `write_products` — non incluso negli scope OAuth default. Messaggio apply senza scope: *"Per applicare modifiche su Shopify serve riconnettere l'app con write_products."*
 
-**Skill**: `packages/skills/seo/shopify-product-collection/`
+**Migrations**: `010_product_collection_seo_optimizer`, `011_seo_score_breakdown` (colonna `score_breakdown` JSONB)
 
-**Migration**: `010_product_collection_seo_optimizer` — `seo_entity_analyses`, `seo_optimization_proposals`, `seo_change_logs` + colonne prodotto media/description.
-
-**Legacy**: `GET .../content/seo/dashboard` resta disponibile (fix empty-safe); UI v1 usa endpoint optimizer.
+**Legacy**: `GET .../content/seo/dashboard` resta disponibile (fix empty-safe); UI usa endpoint optimizer.
 
 ## Flusso OAuth (design futuro)
 

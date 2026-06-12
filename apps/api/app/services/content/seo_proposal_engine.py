@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -15,24 +14,10 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-
-SKILL_DIR = Path(__file__).resolve().parents[5] / "packages" / "skills" / "seo" / "shopify-product-collection"
-
-
-def _load_skill_excerpt() -> str:
-    parts: list[str] = []
-    for name in (
-        "SKILL.md",
-        "seo-proposal-rules.md",
-        "brand-guardrails.md",
-    ):
-        path = SKILL_DIR / name
-        if path.exists():
-            parts.append(path.read_text(encoding="utf-8")[:3000])
-    return "\n\n".join(parts)
+from app.services.content.seo_skill_loader import load_seo_skill_context
 
 
-def _product_current_values(product: ShopifyProduct) -> dict[str, Any]:
+def product_current_values(product: ShopifyProduct) -> dict[str, Any]:
     return {
         "product_title": product.title,
         "seo_title": product.seo_title,
@@ -40,33 +25,48 @@ def _product_current_values(product: ShopifyProduct) -> dict[str, Any]:
         "handle": product.handle,
         "tags": product.tags or [],
         "description_html": product.description_html,
+        "description_text": product.description_text,
         "media_images": product.media_images or [],
     }
 
 
-def _collection_current_values(collection: ShopifyCollection) -> dict[str, Any]:
+def collection_current_values(collection: ShopifyCollection) -> dict[str, Any]:
     return {
         "collection_title": collection.title,
         "seo_title": collection.seo_title,
         "meta_description": collection.seo_description,
         "description_html": collection.description_html,
+        "description_text": collection.description_text,
         "handle": collection.handle,
         "image_alt": collection.image_alt,
     }
 
 
+def _weak_issue_fields(issues: list[dict[str, Any]] | None) -> set[str]:
+    weak: set[str] = set()
+    for issue in issues or []:
+        sev = str(issue.get("severity", ""))
+        if sev in ("critical", "warning", "opportunity", "info"):
+            field = issue.get("field")
+            if field:
+                weak.add(str(field))
+    return weak
+
+
 def _rules_product_proposal(product: ShopifyProduct, analysis: SeoEntityAnalysis) -> dict[str, Any]:
+    weak = _weak_issue_fields(analysis.issues)
     proposed = {
-        "proposed_product_title": product.title,
-        "proposed_seo_title": product.seo_title or product.title[:60],
-        "proposed_meta_description": product.seo_description or "",
-        "proposed_handle": product.handle or "",
-        "proposed_tags": product.tags or [],
-        "proposed_image_alts": [],
-        "reasoning": ["Proposta rule-based: solo campi mancanti compilati con dati esistenti"],
+        "product_title": product.title,
+        "seo_title": product.seo_title or (product.title[:60] if "seo_title" in weak else product.seo_title),
+        "meta_description": product.seo_description or "",
+        "handle": product.handle or "",
+        "tags": product.tags or [],
+        "description_html": product.description_html,
+        "media_images": product.media_images or [],
+        "reasoning": ["Proposta rule-based: solo campi mancanti o deboli compilati con dati esistenti"],
         "risk_level": "low",
     }
-    if not product.seo_title:
+    if not product.seo_title and "seo_title" in weak:
         proposed["reasoning"].append("SEO title derivato dal titolo prodotto")
     return proposed
 
@@ -76,15 +76,48 @@ def _rules_collection_proposal(
     analysis: SeoEntityAnalysis,
 ) -> dict[str, Any]:
     return {
-        "proposed_collection_title": collection.title,
-        "proposed_seo_title": collection.seo_title or collection.title[:60],
-        "proposed_meta_description": collection.seo_description or "",
-        "proposed_description": collection.description_html or "",
-        "proposed_handle": collection.handle or "",
-        "proposed_image_alt": collection.image_alt or collection.title,
+        "collection_title": collection.title,
+        "seo_title": collection.seo_title or collection.title[:60],
+        "meta_description": collection.seo_description or "",
+        "description_html": collection.description_html or "",
+        "handle": collection.handle or "",
+        "image_alt": collection.image_alt or collection.title,
         "reasoning": ["Proposta rule-based conservativa"],
         "risk_level": "low",
     }
+
+
+def _ai_system_prompt(skill_context: str) -> str:
+    return (
+        "Sei un SEO specialist ecommerce Shopify. "
+        "Rispondi SOLO con JSON valido strutturato. "
+        "Non inventare claim non presenti nei dati forniti. "
+        "Non modificare il significato del prodotto/collection. "
+        "Evita keyword stuffing. "
+        "Rispetta brand guardrails, regole SEO title, meta description, alt image. "
+        "Modalità fill_missing_and_improve: compila campi mancanti e migliora solo quelli deboli; "
+        "non sovrascrivere campi già ottimali.\n\n"
+        f"{skill_context}"
+    )
+
+
+def _ai_user_prompt(
+    *,
+    entity_type: str,
+    current: dict[str, Any],
+    analysis: SeoEntityAnalysis,
+    mode: str,
+) -> str:
+    return (
+        f"mode={mode}\n"
+        f"entity_type={entity_type}\n"
+        f"current_values={current}\n"
+        f"issues={analysis.issues}\n"
+        f"recommendations={analysis.recommendations}\n"
+        f"score_breakdown={analysis.score_breakdown}\n"
+        "Genera proposta JSON con chiavi allineate a current_values (stessi nomi), "
+        "più reasoning (array stringhe) e risk_level (low|medium|high)."
+    )
 
 
 async def generate_seo_proposal(
@@ -94,6 +127,7 @@ async def generate_seo_proposal(
     entity_type: str,
     entity_id: UUID,
     use_ai: bool = True,
+    mode: str = "fill_missing_and_improve",
 ) -> SeoOptimizationProposal:
     analysis = (
         await session.execute(
@@ -119,7 +153,7 @@ async def generate_seo_proposal(
         ).scalar_one_or_none()
         if entity is None:
             raise ValueError("Prodotto non trovato")
-        current = _product_current_values(entity)
+        current = product_current_values(entity)
         entity_gid = entity.shopify_gid
     elif entity_type == "collection":
         entity = (
@@ -132,7 +166,7 @@ async def generate_seo_proposal(
         ).scalar_one_or_none()
         if entity is None:
             raise ValueError("Collection non trovata")
-        current = _collection_current_values(entity)
+        current = collection_current_values(entity)
         entity_gid = entity.shopify_gid
     else:
         raise ValueError("entity_type non supportato")
@@ -141,19 +175,15 @@ async def generate_seo_proposal(
     proposed: dict[str, Any]
     reasoning: list[Any]
 
+    skill_ctx = load_seo_skill_context()
+
     if use_ai and is_openai_configured():
-        skill = _load_skill_excerpt()
-        system_prompt = (
-            "Sei un SEO specialist ecommerce Shopify. "
-            "Rispondi SOLO con JSON valido. Non inventare claim non presenti nei dati. "
-            f"Regole skill:\n{skill}"
-        )
-        user_prompt = (
-            f"entity_type={entity_type}\n"
-            f"current_values={current}\n"
-            f"issues={analysis.issues}\n"
-            f"recommendations={analysis.recommendations}\n"
-            "Genera proposta JSON secondo seo-proposal-rules."
+        system_prompt = _ai_system_prompt(skill_ctx.as_prompt_context())
+        user_prompt = _ai_user_prompt(
+            entity_type=entity_type,
+            current=current,
+            analysis=analysis,
+            mode=mode,
         )
         try:
             proposed = await generate_structured_json(
@@ -161,21 +191,23 @@ async def generate_seo_proposal(
                 user_prompt=user_prompt,
             )
             source = "ai"
-            reasoning = proposed.get("reasoning") or []
+            reasoning = proposed.pop("reasoning", []) or []
+            risk_from_ai = proposed.pop("risk_level", "low")
+            proposed["risk_level"] = risk_from_ai
         except (OpenAINotConfiguredError, OpenAIRequestError):
             if entity_type == "product":
                 proposed = _rules_product_proposal(entity, analysis)
             else:
                 proposed = _rules_collection_proposal(entity, analysis)
-            reasoning = proposed.get("reasoning") or []
+            reasoning = proposed.pop("reasoning", []) or []
     else:
         if entity_type == "product":
             proposed = _rules_product_proposal(entity, analysis)
         else:
             proposed = _rules_collection_proposal(entity, analysis)
-        reasoning = proposed.get("reasoning") or []
+        reasoning = proposed.pop("reasoning", []) or []
 
-    risk_level = str(proposed.get("risk_level") or "low")
+    risk_level = str(proposed.pop("risk_level", "low"))
     proposal = SeoOptimizationProposal(
         project_id=store.project_id,
         shopify_store_id=store.id,

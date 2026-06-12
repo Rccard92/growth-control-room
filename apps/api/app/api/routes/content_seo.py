@@ -12,12 +12,16 @@ from app.schemas.content_seo import (
 from app.schemas.seo_optimizer import (
     SeoAnalyzeCountResponse,
     SeoApplyResponse,
+    SeoCollectionDetailResponse,
     SeoCollectionListResponse,
     SeoEntityAnalysisRead,
     SeoOptimizerSyncResponse,
+    SeoProductDetailResponse,
     SeoProductListResponse,
     SeoProposalGenerateRequest,
     SeoProposalListResponse,
+    SeoProposalManualRequest,
+    SeoProposalPreviewResponse,
     SeoProposalRead,
 )
 from app.services.ai.openai_client import is_openai_configured
@@ -32,12 +36,19 @@ from app.services.content.seo_apply_service import (
     has_write_products_scope,
     reject_proposal,
 )
+from app.services.content.seo_entity_detail_service import (
+    get_collection_seo_detail,
+    get_product_seo_detail,
+)
 from app.services.content.seo_optimizer_list import (
+    analysis_to_read,
     get_analysis_detail,
     list_collection_seo_items,
     list_product_seo_items,
     list_proposals,
 )
+from app.services.content.seo_proposal_manual_service import create_manual_proposal
+from app.services.content.seo_proposal_preview_service import build_proposal_preview
 from app.services.content.seo_proposal_engine import generate_seo_proposal
 from app.services.projects import get_project_in_default_workspace
 from app.services.shopify.client import ShopifyAPIError
@@ -221,6 +232,95 @@ async def list_collections_seo(
     )
 
 
+def _proposal_from_dict(data: dict | None) -> SeoProposalRead | None:
+    if not data:
+        return None
+    return SeoProposalRead.model_validate(
+        {
+            "id": data["id"],
+            "entity_type": data.get("entityType") or data.get("entity_type"),
+            "entity_id": data.get("entityId") or data.get("entity_id"),
+            "entity_gid": data.get("entityGid") or data.get("entity_gid"),
+            "status": data["status"],
+            "source": data["source"],
+            "current_values": data.get("currentValues") or data.get("current_values"),
+            "proposed_values": data.get("proposedValues") or data.get("proposed_values"),
+            "reasoning": data.get("reasoning"),
+            "risk_level": data.get("riskLevel") or data.get("risk_level"),
+            "approved_at": data.get("approvedAt") or data.get("approved_at"),
+            "applied_at": data.get("appliedAt") or data.get("applied_at"),
+            "created_at": data.get("createdAt") or data.get("created_at"),
+        }
+    )
+
+
+def _build_product_detail(data: dict) -> SeoProductDetailResponse:
+    history = data.get("proposal_history") or []
+    return SeoProductDetailResponse(
+        product=data["product"],
+        analysis=data.get("analysis"),
+        score_breakdown=data.get("score_breakdown"),
+        current_values=data["current_values"],
+        images=data.get("images") or [],
+        quantity_sold=data.get("quantity_sold", 0),
+        revenue=data.get("revenue", 0),
+        stock=data.get("stock"),
+        latest_proposal=_proposal_from_dict(data.get("latest_proposal")),
+        proposal_history=[_proposal_from_dict(p) for p in history if p],
+        change_logs=data.get("change_logs") or [],
+    )
+
+
+def _build_collection_detail(data: dict) -> SeoCollectionDetailResponse:
+    history = data.get("proposal_history") or []
+    return SeoCollectionDetailResponse(
+        collection=data["collection"],
+        analysis=data.get("analysis"),
+        score_breakdown=data.get("score_breakdown"),
+        current_values=data["current_values"],
+        image=data.get("image"),
+        latest_proposal=_proposal_from_dict(data.get("latest_proposal")),
+        proposal_history=[_proposal_from_dict(p) for p in history if p],
+        change_logs=data.get("change_logs") or [],
+    )
+
+
+@router.get(
+    "/{project_id}/content/seo/products/{product_id}",
+    response_model=SeoProductDetailResponse,
+    response_model_by_alias=True,
+)
+async def get_product_seo_detail_route(
+    project_id: UUID,
+    product_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SeoProductDetailResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    data = await get_product_seo_detail(store, session, product_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Prodotto non trovato")
+    return _build_product_detail(data)
+
+
+@router.get(
+    "/{project_id}/content/seo/collections/{collection_id}",
+    response_model=SeoCollectionDetailResponse,
+    response_model_by_alias=True,
+)
+async def get_collection_seo_detail_route(
+    project_id: UUID,
+    collection_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SeoCollectionDetailResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    data = await get_collection_seo_detail(store, session, collection_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Collection non trovata")
+    return _build_collection_detail(data)
+
+
 @router.get(
     "/{project_id}/content/seo/products/{entity_id}/analysis",
     response_model=SeoEntityAnalysisRead,
@@ -236,7 +336,7 @@ async def get_product_analysis(
     analysis = await get_analysis_detail(store, session, "product", entity_id)
     if analysis is None:
         raise HTTPException(status_code=404, detail="Analisi non trovata")
-    return SeoEntityAnalysisRead.model_validate(analysis)
+    return analysis_to_read(analysis)
 
 
 @router.get(
@@ -254,7 +354,7 @@ async def get_collection_analysis(
     analysis = await get_analysis_detail(store, session, "collection", entity_id)
     if analysis is None:
         raise HTTPException(status_code=404, detail="Analisi non trovata")
-    return SeoEntityAnalysisRead.model_validate(analysis)
+    return analysis_to_read(analysis)
 
 
 @router.get(
@@ -301,11 +401,56 @@ async def generate_proposal(
             entity_type=body.entity_type,
             entity_id=body.entity_id,
             use_ai=body.use_ai,
+            mode=body.mode,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return SeoProposalRead.model_validate(proposal)
+
+
+@router.post(
+    "/{project_id}/content/seo/proposals/manual",
+    response_model=SeoProposalRead,
+    response_model_by_alias=True,
+)
+async def create_manual_seo_proposal(
+    project_id: UUID,
+    body: SeoProposalManualRequest,
+    session: AsyncSession = Depends(get_db),
+) -> SeoProposalRead:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    try:
+        proposal = await create_manual_proposal(
+            store,
+            session,
+            entity_type=body.entity_type,
+            entity_id=body.entity_id,
+            proposed_values=body.proposed_values,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SeoProposalRead.model_validate(proposal)
+
+
+@router.post(
+    "/{project_id}/content/seo/proposals/{proposal_id}/preview",
+    response_model=SeoProposalPreviewResponse,
+    response_model_by_alias=True,
+)
+async def preview_seo_proposal(
+    project_id: UUID,
+    proposal_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SeoProposalPreviewResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    proposal = await get_proposal_for_store(store, session, proposal_id)
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="Proposta non trovata")
+    preview = build_proposal_preview(proposal)
+    return SeoProposalPreviewResponse.model_validate(preview)
 
 
 @router.get(

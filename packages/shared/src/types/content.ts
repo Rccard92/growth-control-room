@@ -161,6 +161,14 @@ export interface SeoCollectionListResponse {
   writeProductsAvailable: boolean;
 }
 
+export interface SeoScoreBreakdownItem {
+  score: number;
+  max: number;
+  issues: Record<string, unknown>[];
+}
+
+export type SeoScoreBreakdown = Record<string, SeoScoreBreakdownItem>;
+
 export interface SeoEntityAnalysis {
   id: string;
   entityType: "product" | "collection";
@@ -177,8 +185,11 @@ export interface SeoEntityAnalysis {
   severity: SeoOptimizerSeverity;
   issues?: Record<string, unknown>[] | null;
   recommendations?: Record<string, unknown>[] | null;
+  scoreBreakdown?: SeoScoreBreakdown | null;
   lastAnalyzedAt?: string | null;
 }
+
+export type SeoProposalSource = "ai" | "rules" | "manual";
 
 export interface SeoOptimizationProposal {
   id: string;
@@ -186,7 +197,7 @@ export interface SeoOptimizationProposal {
   entityId: string;
   entityGid: string;
   status: SeoProposalStatus;
-  source: "ai" | "rules";
+  source: SeoProposalSource;
   currentValues?: Record<string, unknown> | null;
   proposedValues?: Record<string, unknown> | null;
   reasoning?: unknown[] | null;
@@ -194,6 +205,63 @@ export interface SeoOptimizationProposal {
   approvedAt?: string | null;
   appliedAt?: string | null;
   createdAt?: string | null;
+}
+
+export interface SeoProposalPreviewField {
+  field: string;
+  current?: unknown;
+  proposed?: unknown;
+  changed: boolean;
+  reasoning?: string | null;
+  risk?: string | null;
+}
+
+export interface SeoProposalPreviewResponse {
+  proposalId: string;
+  entityType: "product" | "collection";
+  entityId: string;
+  status: SeoProposalStatus;
+  source: SeoProposalSource;
+  riskLevel: "low" | "medium" | "high";
+  reasoning?: unknown[] | null;
+  fields: SeoProposalPreviewField[];
+  changedFields: string[];
+  currentValues?: Record<string, unknown> | null;
+  proposedValues?: Record<string, unknown> | null;
+}
+
+export interface SeoChangeLogEntry {
+  id: string;
+  status: string;
+  appliedValues?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+  createdAt?: string | null;
+  proposalId: string;
+}
+
+export interface SeoProductDetailResponse {
+  product: Record<string, unknown>;
+  analysis?: Record<string, unknown> | null;
+  scoreBreakdown?: SeoScoreBreakdown | null;
+  currentValues: Record<string, unknown>;
+  images: Record<string, unknown>[];
+  quantitySold: number;
+  revenue: number;
+  stock?: number | null;
+  latestProposal?: SeoOptimizationProposal | null;
+  proposalHistory: SeoOptimizationProposal[];
+  changeLogs: SeoChangeLogEntry[];
+}
+
+export interface SeoCollectionDetailResponse {
+  collection: Record<string, unknown>;
+  analysis?: Record<string, unknown> | null;
+  scoreBreakdown?: SeoScoreBreakdown | null;
+  currentValues: Record<string, unknown>;
+  image?: Record<string, unknown> | null;
+  latestProposal?: SeoOptimizationProposal | null;
+  proposalHistory: SeoOptimizationProposal[];
+  changeLogs: SeoChangeLogEntry[];
 }
 
 export interface SeoProposalListResponse {

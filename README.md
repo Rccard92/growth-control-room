@@ -191,7 +191,7 @@ Implementato:
 - **Shopify Sync v2**: OAuth connect, sync paginato prodotti/ordini/varianti/line items, attribution first-last touch, dashboard KPI da DB normalizzato
 - **Shopify Dashboard v2**: E-commerce Control Room con product intelligence, inventory risk, order operations, SEO opportunities, alert center, daily diagnosis e attribution intelligence (Shopify-only; GA4/Meta/Google Ads/Klaviyo in roadmap)
 - **Content SEO Engine Foundation**: sync contenuti Shopify, audit legacy
-- **Product & Collection SEO Optimizer v1**: score prodotti/categorie, proposte AI revisionabili, approve/apply controllato (no blog/editorial in v1)
+- **Product & Collection SEO Optimizer**: score trasparente con breakdown, skill SEO da markdown, drawer Modifica con proposta manuale/AI, preview, approve/apply controllato (no blog/editorial in v1)
 - Struttura connectors e skills (stub OAuth per altri provider)
 
 Non ancora implementato: autenticazione utenti, OAuth altri provider, sync automatico, generazione/publish articoli blog Shopify, Editorial SEO (blog/ricette), provider oltre Shopify.

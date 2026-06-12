@@ -50,6 +50,7 @@ class SeoEntityAnalysis(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     severity: Mapped[str] = mapped_column(String(20), default="warning")
     issues: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     recommendations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    score_breakdown: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     last_analyzed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

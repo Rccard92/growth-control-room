@@ -71,6 +71,23 @@ class SeoProposalGenerateRequest(BaseModel):
     entity_type: str = Field(validation_alias="entityType")
     entity_id: UUID = Field(validation_alias="entityId")
     use_ai: bool = Field(default=True, validation_alias="useAi")
+    mode: str = Field(default="fill_missing_and_improve")
+
+
+class SeoProposalManualRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    entity_type: str = Field(validation_alias="entityType")
+    entity_id: UUID = Field(validation_alias="entityId")
+    proposed_values: dict[str, Any] = Field(validation_alias="proposedValues")
+
+
+class SeoScoreBreakdownItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    score: int
+    max: int
+    issues: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SeoProposalRead(BaseModel):
@@ -93,6 +110,82 @@ class SeoProposalRead(BaseModel):
     approved_at: datetime | None = Field(default=None, serialization_alias="approvedAt")
     applied_at: datetime | None = Field(default=None, serialization_alias="appliedAt")
     created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
+
+
+class SeoProposalPreviewField(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    field: str
+    current: Any = None
+    proposed: Any = None
+    changed: bool = False
+    reasoning: str | None = None
+    risk: str | None = None
+
+
+class SeoProposalPreviewResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    proposal_id: str = Field(serialization_alias="proposalId")
+    entity_type: str = Field(serialization_alias="entityType")
+    entity_id: str = Field(serialization_alias="entityId")
+    status: str
+    source: str
+    risk_level: str = Field(serialization_alias="riskLevel")
+    reasoning: list[Any] | None = None
+    fields: list[SeoProposalPreviewField]
+    changed_fields: list[str] = Field(serialization_alias="changedFields")
+    current_values: dict[str, Any] | None = Field(
+        default=None, serialization_alias="currentValues"
+    )
+    proposed_values: dict[str, Any] | None = Field(
+        default=None, serialization_alias="proposedValues"
+    )
+
+
+class SeoProductDetailResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product: dict[str, Any]
+    analysis: dict[str, Any] | None = None
+    score_breakdown: dict[str, SeoScoreBreakdownItem] | None = Field(
+        default=None, serialization_alias="scoreBreakdown"
+    )
+    current_values: dict[str, Any] = Field(serialization_alias="currentValues")
+    images: list[dict[str, Any]] = Field(default_factory=list)
+    quantity_sold: int = Field(default=0, serialization_alias="quantitySold")
+    revenue: float = 0
+    stock: int | None = None
+    latest_proposal: SeoProposalRead | None = Field(
+        default=None, serialization_alias="latestProposal"
+    )
+    proposal_history: list[SeoProposalRead] = Field(
+        default_factory=list, serialization_alias="proposalHistory"
+    )
+    change_logs: list[dict[str, Any]] = Field(
+        default_factory=list, serialization_alias="changeLogs"
+    )
+
+
+class SeoCollectionDetailResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    collection: dict[str, Any]
+    analysis: dict[str, Any] | None = None
+    score_breakdown: dict[str, SeoScoreBreakdownItem] | None = Field(
+        default=None, serialization_alias="scoreBreakdown"
+    )
+    current_values: dict[str, Any] = Field(serialization_alias="currentValues")
+    image: dict[str, Any] | None = None
+    latest_proposal: SeoProposalRead | None = Field(
+        default=None, serialization_alias="latestProposal"
+    )
+    proposal_history: list[SeoProposalRead] = Field(
+        default_factory=list, serialization_alias="proposalHistory"
+    )
+    change_logs: list[dict[str, Any]] = Field(
+        default_factory=list, serialization_alias="changeLogs"
+    )
 
 
 class SeoProposalListResponse(BaseModel):
@@ -128,6 +221,9 @@ class SeoEntityAnalysisRead(BaseModel):
     severity: str
     issues: list[dict[str, Any]] | None = None
     recommendations: list[dict[str, Any]] | None = None
+    score_breakdown: dict[str, SeoScoreBreakdownItem] | None = Field(
+        default=None, serialization_alias="scoreBreakdown"
+    )
     last_analyzed_at: datetime | None = Field(default=None, serialization_alias="lastAnalyzedAt")
 
 
