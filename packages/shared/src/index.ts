@@ -75,4 +75,22 @@ export type {
   ShopifyProduct,
   ShopifyOrder,
 } from "./types/shopify";
+export type {
+  SeoAuditIssue,
+  ContentOpportunity,
+  ContentBrief,
+  ContentSeoDashboard,
+  ContentSeoDashboardSummary,
+  ContentSeoSyncResponse,
+  ContentSeoAnalyzeResponse,
+  ContentEntityRef,
+  SeoIssueSeverity,
+  SeoIssueStatus,
+  SeoEntityType,
+  ContentOpportunityType,
+  ContentOpportunityPriority,
+  ContentOpportunityStatus,
+  ContentBriefStatus,
+  SearchIntent,
+} from "./types/content";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";

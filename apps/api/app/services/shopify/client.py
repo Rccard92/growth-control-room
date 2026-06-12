@@ -103,6 +103,40 @@ PRODUCT_FIELDS = """
                 }"""
 
 
+COLLECTION_FIELDS = """
+                id
+                title
+                handle
+                descriptionHtml
+                seo { title description }
+                image { url altText }
+                productsCount"""
+
+PAGE_FIELDS = """
+                id
+                title
+                handle
+                body
+                seo { title description }
+                publishedAt"""
+
+BLOG_FIELDS = """
+                id
+                title
+                handle"""
+
+ARTICLE_FIELDS = """
+                id
+                title
+                handle
+                body
+                summary
+                seo { title description }
+                tags
+                publishedAt
+                author { name }"""
+
+
 class ShopifyAPIError(Exception):
     def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
@@ -317,6 +351,107 @@ class ShopifyGraphQLClient:
             PRODUCT_FIELDS,
             page_size=page_size,
         )
+
+    async def fetch_all_collections(
+        self,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        return await self._paginate_connection(
+            "collections",
+            COLLECTION_FIELDS,
+            page_size=page_size,
+        )
+
+    async def fetch_all_pages(
+        self,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        return await self._paginate_connection(
+            "pages",
+            PAGE_FIELDS,
+            page_size=page_size,
+        )
+
+    async def fetch_all_blogs(
+        self,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        return await self._paginate_connection(
+            "blogs",
+            BLOG_FIELDS,
+            page_size=page_size,
+        )
+
+    async def fetch_all_articles(
+        self,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        blogs = await self.fetch_all_blogs(page_size=page_size)
+        all_articles: list[dict[str, Any]] = []
+        for blog in blogs:
+            blog_gid = blog.get("id")
+            if not blog_gid:
+                continue
+            articles = await self._paginate_blog_articles(blog_gid, page_size=page_size)
+            for article in articles:
+                article["_blog"] = {
+                    "id": blog_gid,
+                    "title": blog.get("title"),
+                    "handle": blog.get("handle"),
+                }
+            all_articles.extend(articles)
+        return all_articles
+
+    async def _paginate_blog_articles(
+        self,
+        blog_gid: str,
+        *,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        query_template = f"""
+        query BlogArticles($blogId: ID!, $first: Int!, $after: String) {{
+          blog(id: $blogId) {{
+            articles(first: $first, after: $after) {{
+              pageInfo {{
+                hasNextPage
+                endCursor
+              }}
+              edges {{
+                node {{
+                  {ARTICLE_FIELDS}
+                }}
+              }}
+            }}
+          }}
+        }}
+        """
+
+        all_nodes: list[dict[str, Any]] = []
+        cursor: str | None = None
+
+        while True:
+            variables: dict[str, Any] = {
+                "blogId": blog_gid,
+                "first": page_size,
+                "after": cursor,
+            }
+            data = await self.execute(query_template, variables)
+            blog = data.get("blog") or {}
+            connection = blog.get("articles") or {}
+            edges = connection.get("edges") or []
+            for edge in edges:
+                node = edge.get("node")
+                if node:
+                    all_nodes.append(node)
+
+            page_info = connection.get("pageInfo") or {}
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info.get("endCursor")
+            if not cursor:
+                break
+
+        return all_nodes
 
     def _build_orders_query(self, optional_blocks: dict[str, str]) -> str:
         extra = "\n".join(optional_blocks.values())

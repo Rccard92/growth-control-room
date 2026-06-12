@@ -3,6 +3,15 @@ from app.models.alert import Alert
 from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
 from app.models.project import Project
+from app.models.content_seo import (
+    ContentBrief,
+    ContentOpportunity,
+    SeoAuditIssue,
+    ShopifyArticle,
+    ShopifyBlog,
+    ShopifyCollection,
+    ShopifyPage,
+)
 from app.models.shopify import (
     ShopifyDailyMetric,
     ShopifyOrder,
@@ -21,6 +30,13 @@ __all__ = [
     "Integration",
     "IntegrationCredential",
     "Project",
+    "ContentBrief",
+    "ContentOpportunity",
+    "SeoAuditIssue",
+    "ShopifyArticle",
+    "ShopifyBlog",
+    "ShopifyCollection",
+    "ShopifyPage",
     "ShopifyDailyMetric",
     "ShopifyOrder",
     "ShopifyOrderLineItem",

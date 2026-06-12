@@ -190,7 +190,7 @@ Implementato:
 - Integrazioni per progetto: merge di 8 provider (anche non collegati → `not_connected`)
 - **Shopify Sync v2**: OAuth connect, sync paginato prodotti/ordini/varianti/line items, attribution first-last touch, dashboard KPI da DB normalizzato
 - **Shopify Dashboard v2**: E-commerce Control Room con product intelligence, inventory risk, order operations, SEO opportunities, alert center, daily diagnosis e attribution intelligence (Shopify-only; GA4/Meta/Google Ads/Klaviyo in roadmap)
-- SEO Content Room e AI Brief: placeholder evoluti con roadmap
+- **Content SEO Engine Foundation**: sync contenuti Shopify (collections, pages, blogs, articles), audit SEO, opportunità editoriali, Content SEO Room — senza publish automatico
 - Struttura connectors e skills (stub OAuth per altri provider)
 
-Non ancora implementato: autenticazione utenti, OAuth altri provider, sync automatico, creazione articoli blog Shopify, provider oltre Shopify.
+Non ancora implementato: autenticazione utenti, OAuth altri provider, sync automatico, generazione/publish articoli blog Shopify, provider oltre Shopify.

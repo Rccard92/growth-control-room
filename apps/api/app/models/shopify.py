@@ -54,6 +54,22 @@ class ShopifyStore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="store",
         cascade="all, delete-orphan",
     )
+    collections: Mapped[list["ShopifyCollection"]] = relationship(
+        back_populates="store",
+        cascade="all, delete-orphan",
+    )
+    pages: Mapped[list["ShopifyPage"]] = relationship(
+        back_populates="store",
+        cascade="all, delete-orphan",
+    )
+    blogs: Mapped[list["ShopifyBlog"]] = relationship(
+        back_populates="store",
+        cascade="all, delete-orphan",
+    )
+    articles: Mapped[list["ShopifyArticle"]] = relationship(
+        back_populates="store",
+        cascade="all, delete-orphan",
+    )
 
 
 class ShopifyProduct(Base, UUIDPrimaryKeyMixin, TimestampMixin):

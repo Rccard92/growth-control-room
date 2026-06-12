@@ -144,6 +144,40 @@ Esempi frontend (persistiti in URL):
 
 Gli altri connector (Meta, GA4, ecc.) restano **stub**.
 
+### Content SEO Engine Foundation
+
+Modulo dedicato alla **Content SEO Room** (`/projects/:id/content`), separato da Shopify Sync v2.
+
+**Cosa sincronizza** (`POST /api/projects/{id}/content/seo/sync-shopify`):
+
+- Collections Shopify (description, SEO, image, products count)
+- Pages (body, SEO, publishedAt)
+- Blogs
+- Articles (body, SEO, tags, author) — paginazione per blog via Admin GraphQL
+
+**Cosa analizza** (`POST /api/projects/{id}/content/seo/analyze`):
+
+- Audit SEO su prodotti (da DB Sync v2), collections, pages, articles
+- Issue persistite in `seo_audit_issues` (status `open`, rigenerate ad ogni analyze)
+- Opportunità editoriali in `content_opportunities` (status `new`, rigenerate ad ogni analyze)
+- Best seller, prodotti fermi con stock, internal linking, FAQ, miglioramenti collection/prodotto
+
+**Dashboard** (`GET /api/projects/{id}/content/seo/dashboard`):
+
+- Summary KPI, issue, opportunità, slice prodotto/collection/internal linking
+
+**Cosa non fa ancora**:
+
+- Generazione automatica articoli o brief AI
+- Pubblicazione su Shopify (nessun uso di `write_content` in questo step)
+- GA4, Search Console, Meta Ads, Google Ads, Klaviyo
+
+**Publishing**: non automatico. Lo scope `write_content` sarà usato solo in step successivo per draft/publish controllato con conferma manuale.
+
+**Skill interna**: `packages/skills/seo/shopify-content/` (regole audit, opportunità, internal linking, brief, publishing).
+
+**Migration**: `009_content_seo_foundation` — tabelle contenuti Shopify + `seo_audit_issues`, `content_opportunities`, `content_briefs`.
+
 ## Flusso OAuth (design futuro)
 
 ```mermaid

@@ -20,5 +20,8 @@ export const queryKeys = {
     products: (projectId: string) => ["shopify", projectId, "products"] as const,
     orders: (projectId: string) => ["shopify", projectId, "orders"] as const,
   },
+  contentSeo: {
+    dashboard: (projectId: string) => ["contentSeo", projectId, "dashboard"] as const,
+  },
   health: ["health"] as const,
 };
