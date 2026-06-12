@@ -761,6 +761,97 @@
   color: #fcd34d;
 }
 
+.shopify-metric-breakdown {
+  border-color: rgba(139, 92, 246, 0.22);
+  background:
+    linear-gradient(135deg, rgba(139, 92, 246, 0.05), transparent),
+    var(--gcr-surface);
+}
+
+.shopify-metric-breakdown__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.shopify-metric-breakdown__banner {
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--gcr-radius);
+  font-size: 0.8125rem;
+}
+
+.shopify-metric-breakdown__banner--limited {
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fcd34d;
+}
+
+.shopify-metric-breakdown__banner--warning {
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  background: rgba(244, 63, 94, 0.08);
+  color: #fda4af;
+}
+
+.shopify-metric-breakdown__banner p {
+  margin: 0;
+}
+
+.shopify-metric-breakdown__banner p + p {
+  margin-top: 0.35rem;
+}
+
+.shopify-metric-breakdown__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.shopify-metric-breakdown__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--gcr-radius);
+  border: 1px solid var(--gcr-border);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.shopify-metric-breakdown__row--emphasis {
+  grid-column: 1 / -1;
+  border-color: rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.shopify-metric-breakdown__row--negative .shopify-metric-breakdown__value {
+  color: #fb7185;
+}
+
+.shopify-metric-breakdown__row--positive .shopify-metric-breakdown__value {
+  color: #34d399;
+}
+
+.shopify-metric-breakdown__label {
+  font-size: 0.8125rem;
+  color: var(--gcr-text-muted);
+}
+
+.shopify-metric-breakdown__value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gcr-text);
+}
+
+.shopify-metric-breakdown__footnote {
+  margin: 0.875rem 0 0;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.45;
+}
+
 @media (max-width: 1200px) {
   .shopify-executive-strip,
   .shopify-skeleton-grid {
@@ -781,7 +872,8 @@
   .shopify-inventory-summary,
   .shopify-seo-stats,
   .shopify-sync-summary__grid,
-  .shopify-trend-intel__grid {
+  .shopify-trend-intel__grid,
+  .shopify-metric-breakdown__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

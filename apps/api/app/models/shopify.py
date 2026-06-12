@@ -166,6 +166,9 @@ class ShopifyOrder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     current_total_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total_discounts: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     shipping_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    total_tax: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    refund_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    refund_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
     customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -202,6 +205,43 @@ class ShopifyOrder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="order",
         cascade="all, delete-orphan",
     )
+    refunds: Mapped[list["ShopifyOrderRefund"]] = relationship(
+        back_populates="order",
+        cascade="all, delete-orphan",
+    )
+
+
+class ShopifyOrderRefund(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "shopify_order_refunds"
+    __table_args__ = (
+        UniqueConstraint(
+            "shopify_store_id",
+            "shopify_refund_gid",
+            name="uq_shopify_order_refunds_store_gid",
+        ),
+    )
+
+    shopify_store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_stores.id", ondelete="CASCADE"),
+        index=True,
+    )
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_orders.id", ondelete="CASCADE"),
+        index=True,
+    )
+    shopify_refund_gid: Mapped[str] = mapped_column(String(255))
+    refund_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    order: Mapped["ShopifyOrder"] = relationship(back_populates="refunds")
 
 
 class ShopifyOrderLineItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):

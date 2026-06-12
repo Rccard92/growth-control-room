@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.shopify import ShopifyDailyMetric, ShopifyOrder, ShopifyOrderLineItem, ShopifyProduct, ShopifyStore
+from app.models.shopify import ShopifyOrder, ShopifyProduct, ShopifyStore
 from app.services.shopify.analytics import compute_best_sellers, product_lookup
 from app.services.shopify.attribution import UNKNOWN_SOURCE, compute_attribution_intelligence
-from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
+from app.services.shopify.period import ResolvedPeriod
+from app.services.shopify.reconciliation import compute_reconciliation
 
 PENDING_STATUSES = {"PENDING", "AUTHORIZED", "PARTIALLY_PAID"}
 PAID_STATUSES = {"PAID", "PARTIALLY_REFUNDED", "REFUNDED"}
@@ -70,73 +70,34 @@ def compare_scalar(current: Decimal | int | float, previous: Decimal | int | flo
     }
 
 
-async def _fetch_period_orders(
-    session: AsyncSession,
-    store_id: Any,
-    period: ResolvedPeriod,
-) -> list[ShopifyOrder]:
-    effective_at = order_effective_at_column()
-    result = await session.execute(
-        select(ShopifyOrder)
-        .where(
-            ShopifyOrder.shopify_store_id == store_id,
-            effective_at.is_not(None),
-            effective_at >= period.start_at,
-            effective_at < period.end_at_exclusive,
-        )
-        .order_by(effective_at.desc())
-    )
-    return list(result.scalars().all())
-
-
 async def compute_period_snapshot(
     session: AsyncSession,
     store: ShopifyStore,
     period: ResolvedPeriod,
     products: list[ShopifyProduct],
 ) -> PeriodSnapshot:
-    period_orders = await _fetch_period_orders(session, store.id, period)
+    reconciliation = await compute_reconciliation(session, store, period)
+    placed_orders: list[ShopifyOrder] = reconciliation.pop("_placed_orders")
+    reconciliation.pop("_refunds_in_period", None)
 
-    pending_orders = [
-        o for o in period_orders if (o.financial_status or "").upper() in PENDING_STATUSES
-    ]
+    order_buckets = reconciliation["orders"]
+    sales_breakdown = reconciliation["sales_breakdown"]
+
+    revenue = Decimal(str(sales_breakdown["total_sales"]))
+    orders_count = int(order_buckets["total"])
+    average_order_value = revenue / orders_count if orders_count else Decimal("0")
+    paid_orders_count = int(order_buckets["paid"])
+    pending_orders_count = int(order_buckets["pending"])
+
     unfulfilled_orders = [
         o
-        for o in period_orders
+        for o in placed_orders
         if (o.fulfillment_status or "").upper() not in FULFILLED_STATUSES
         and (o.fulfillment_status or "").strip() != ""
     ]
-    paid_orders_count = sum(
-        1 for o in period_orders if (o.financial_status or "").upper() in PAID_STATUSES
-    )
     fulfilled_orders_count = sum(
-        1 for o in period_orders if (o.fulfillment_status or "").upper() in FULFILLED_STATUSES
+        1 for o in placed_orders if (o.fulfillment_status or "").upper() in FULFILLED_STATUSES
     )
-
-    revenue = Decimal("0")
-    orders_count = 0
-    metrics_result = await session.execute(
-        select(
-            func.coalesce(func.sum(ShopifyDailyMetric.gross_sales), 0),
-            func.coalesce(func.sum(ShopifyDailyMetric.orders_count), 0),
-        ).where(
-            ShopifyDailyMetric.shopify_store_id == store.id,
-            ShopifyDailyMetric.date >= period.start_date,
-            ShopifyDailyMetric.date <= period.end_date,
-        )
-    )
-    revenue, orders_count = metrics_result.one()
-    revenue = Decimal(str(revenue))
-    orders_count = int(orders_count)
-
-    if revenue == 0 and orders_count == 0 and period_orders:
-        revenue = sum(
-            (o.current_total_price or o.total_price for o in period_orders),
-            Decimal("0"),
-        )
-        orders_count = len(period_orders)
-
-    average_order_value = revenue / orders_count if orders_count else Decimal("0")
 
     products_by_gid = product_lookup(products)
     best_sellers = await compute_best_sellers(
@@ -156,14 +117,14 @@ async def compute_period_snapshot(
             "revenue": Decimal(str(item["revenue"])),
         }
 
-    raw_attribution = compute_attribution_intelligence(period_orders)
+    raw_attribution = compute_attribution_intelligence(placed_orders)
 
     return PeriodSnapshot(
         revenue=revenue,
         orders_count=orders_count,
         average_order_value=average_order_value,
         paid_orders_count=paid_orders_count,
-        pending_orders_count=len(pending_orders),
+        pending_orders_count=pending_orders_count,
         fulfilled_orders_count=fulfilled_orders_count,
         unfulfilled_orders_count=len(unfulfilled_orders),
         attribution_intelligence=raw_attribution,

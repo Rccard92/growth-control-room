@@ -103,6 +103,8 @@ class ShopifyPeriodMetrics(BaseModel):
     average_order_value: Decimal = Field(serialization_alias="averageOrderValue")
     paid_orders_count: int = Field(serialization_alias="paidOrdersCount")
     pending_orders_count: int = Field(serialization_alias="pendingOrdersCount")
+    cancelled_orders_count: int = Field(default=0, serialization_alias="cancelledOrdersCount")
+    unpaid_orders_count: int = Field(default=0, serialization_alias="unpaidOrdersCount")
     fulfilled_orders_count: int = Field(serialization_alias="fulfilledOrdersCount")
     unfulfilled_orders_count: int = Field(serialization_alias="unfulfilledOrdersCount")
     products_without_sales_count: int = Field(
@@ -483,11 +485,100 @@ class ShopifyDashboardComparison(BaseModel):
     products: ShopifyProductComparison
 
 
+class ShopifyReconciliationOrders(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    total: int
+    paid: int
+    pending: int
+    cancelled: int
+    unpaid: int
+
+
+class ShopifySalesBreakdown(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    gross_sales: Decimal = Field(serialization_alias="grossSales")
+    discounts: Decimal
+    sales_reversals: Decimal = Field(serialization_alias="salesReversals")
+    returns: Decimal
+    shipping: Decimal
+    taxes: Decimal
+    duties: Decimal
+    fees: Decimal
+    total_sales: Decimal = Field(serialization_alias="totalSales")
+    current_total_sum: Decimal = Field(serialization_alias="currentTotalSum")
+
+
+class ShopifyReconciliationDataQuality(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    status: str
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ShopifyDashboardReconciliation(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    metric_mode: str = Field(serialization_alias="metricMode")
+    period: ShopifyDashboardPeriod
+    orders: ShopifyReconciliationOrders
+    sales_breakdown: ShopifySalesBreakdown = Field(serialization_alias="salesBreakdown")
+    data_quality: ShopifyReconciliationDataQuality = Field(serialization_alias="dataQuality")
+
+
+class ShopifyReconciliationRefundItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    refund_created_at: datetime | None = Field(
+        default=None,
+        serialization_alias="refundCreatedAt",
+    )
+    amount: Decimal
+    currency: str | None = None
+    order_name: str | None = Field(default=None, serialization_alias="orderName")
+
+
+class ShopifyReconciliationSampleOrder(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    order_name: str | None = Field(default=None, serialization_alias="orderName")
+    created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
+    processed_at: datetime | None = Field(default=None, serialization_alias="processedAt")
+    financial_status: str | None = Field(default=None, serialization_alias="financialStatus")
+    total_price: Decimal = Field(serialization_alias="totalPrice")
+    current_total_price: Decimal = Field(serialization_alias="currentTotalPrice")
+    refund_total: Decimal | None = Field(default=None, serialization_alias="refundTotal")
+
+
+class ShopifyReconciliationDebugResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    period: ShopifyDashboardPeriod
+    last_sync_at: datetime | None = Field(default=None, serialization_alias="lastSyncAt")
+    metric_mode: str = Field(serialization_alias="metricMode")
+    order_count_by_financial_status: dict[str, int] = Field(
+        serialization_alias="orderCountByFinancialStatus",
+    )
+    order_count_by_fulfillment_status: dict[str, int] = Field(
+        serialization_alias="orderCountByFulfillmentStatus",
+    )
+    reconciliation: ShopifyDashboardReconciliation
+    sales_breakdown: ShopifySalesBreakdown = Field(serialization_alias="salesBreakdown")
+    refunds_in_period: list[ShopifyReconciliationRefundItem] = Field(
+        serialization_alias="refundsInPeriod",
+    )
+    sample_orders: list[ShopifyReconciliationSampleOrder] = Field(
+        serialization_alias="sampleOrders",
+    )
+
+
 class ShopifyDashboardResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     period: ShopifyDashboardPeriod
     comparison: ShopifyDashboardComparison
+    reconciliation: ShopifyDashboardReconciliation
     summary: ShopifyDashboardSummary
     alerts: list[ShopifyDashboardAlert]
     product_intelligence: ShopifyProductPerformanceSection = Field(

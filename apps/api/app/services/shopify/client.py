@@ -38,9 +38,14 @@ ORDER_OPTIONAL_BLOCKS: dict[str, str] = {
                   }
                 }""",
     "refunds": """
-                refunds(first: 10) {
-                  nodes { id createdAt }
+                refunds(first: 50) {
+                  nodes {
+                    id
+                    createdAt
+                    totalRefundedSet { shopMoney { amount currencyCode } }
+                  }
                 }""",
+    "tax": "currentTotalTaxSet { shopMoney { amount currencyCode } }",
 }
 
 ORDER_CORE_FIELDS = """

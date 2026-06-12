@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { DailyDiagnosisPanel } from "../components/shopify/EcommerceDiagnosisPanel";
 import { InventoryRiskPanel } from "../components/shopify/InventoryRiskPanel";
+import { MetricBreakdownPanel } from "../components/shopify/MetricBreakdownPanel";
 import { OrdersOperationsPanel } from "../components/shopify/OrdersOperationsPanel";
 import { ProductIntelligencePanel } from "../components/shopify/ProductIntelligencePanel";
 import { SeoOpportunitiesPanel } from "../components/shopify/SeoOpportunitiesPanel";
@@ -192,10 +193,16 @@ export function ShopifyControlRoomPage() {
         <div className="shopify-control-room__sections">
           <ShopifyExecutiveStrip
             summary={summary}
+            reconciliation={blocks.reconciliation}
             trackingQualityScore={blocks.attributionIntelligence.trackingQualityScore}
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
             periodLabel={periodLabel}
             comparison={blocks.comparison}
+          />
+
+          <MetricBreakdownPanel
+            reconciliation={blocks.reconciliation}
+            formatMoney={(value) => formatShopifyMoney(value, "EUR")}
           />
 
           <TrendIntelligencePanel comparison={blocks.comparison} />

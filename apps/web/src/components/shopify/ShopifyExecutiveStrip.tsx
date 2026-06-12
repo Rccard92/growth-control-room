@@ -1,4 +1,9 @@
-import type { ShopifyDashboardComparison, ShopifyDashboardSummary, ShopifyMetricComparison } from "@gcr/shared";
+import type {
+  ShopifyDashboardComparison,
+  ShopifyDashboardReconciliation,
+  ShopifyDashboardSummary,
+  ShopifyMetricComparison,
+} from "@gcr/shared";
 import {
   directionClass,
   formatDeltaArrow,
@@ -7,6 +12,7 @@ import {
 
 interface ShopifyExecutiveStripProps {
   summary: ShopifyDashboardSummary;
+  reconciliation: ShopifyDashboardReconciliation;
   trackingQualityScore: number;
   formatMoney: (value: string) => string;
   periodLabel?: string;
@@ -32,6 +38,7 @@ function MetricDelta({ metric }: { metric: ShopifyMetricComparison }) {
 
 export function ShopifyExecutiveStrip({
   summary,
+  reconciliation,
   trackingQualityScore,
   formatMoney,
   periodLabel,
@@ -41,19 +48,20 @@ export function ShopifyExecutiveStrip({
     trackingQualityScore >= 70 ? "emerald" : trackingQualityScore >= 40 ? "amber" : "rose";
   const metrics = comparison?.metrics;
   const trackingDelta = comparison?.attribution.trackingQualityDelta;
+  const { salesBreakdown, orders } = reconciliation;
 
   const items: KpiItem[] = [
     {
       label: "Revenue",
-      value: formatMoney(summary.revenue),
-      meta: `${summary.paidOrdersCount} pagati`,
+      value: formatMoney(salesBreakdown.totalSales),
+      meta: "Total sales Shopify-like",
       accent: "violet",
       comparisonMetric: metrics?.revenue,
     },
     {
       label: "Ordini",
-      value: summary.ordersCount,
-      meta: `${summary.pendingOrdersCount} pending`,
+      value: orders.total,
+      meta: `${orders.paid} pagati · ${orders.pending} pending`,
       accent: "cyan",
       comparisonMetric: metrics?.orders,
     },

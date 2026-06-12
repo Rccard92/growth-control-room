@@ -14,6 +14,7 @@ from app.schemas.shopify import (
     ShopifyOAuthStartResponse,
     ShopifyOrderRead,
     ShopifyProductRead,
+    ShopifyReconciliationDebugResponse,
     ShopifyStatusResponse,
     ShopifySyncResponse,
 )
@@ -27,6 +28,7 @@ from app.services.shopify.oauth import (
 )
 from app.services.shopify.dashboard import build_dashboard
 from app.services.shopify.period import resolve_period_pair
+from app.services.shopify.reconciliation import build_reconciliation_debug
 from app.services.shopify.sync import sync_shopify_store
 
 router = APIRouter(prefix="/projects", tags=["shopify"])
@@ -175,6 +177,32 @@ async def shopify_dashboard(
     period, previous_period = resolve_period_pair(store, range, start_date, end_date)
     data = await build_dashboard(store, session, period=period, previous_period=previous_period)
     return ShopifyDashboardResponse.model_validate(data)
+
+
+@router.get(
+    "/{project_id}/shopify/reconciliation",
+    response_model=ShopifyReconciliationDebugResponse,
+    response_model_by_alias=True,
+)
+async def shopify_reconciliation(
+    project_id: UUID,
+    range: str | None = Query(None, alias="range"),
+    start_date: date | None = Query(None, alias="start_date"),
+    end_date: date | None = Query(None, alias="end_date"),
+    session: AsyncSession = Depends(get_db),
+) -> ShopifyReconciliationDebugResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = await get_shopify_store_for_project(project_id, session)
+
+    if store is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify non connesso per questo progetto",
+        )
+
+    period, _previous_period = resolve_period_pair(store, range, start_date, end_date)
+    data = await build_reconciliation_debug(session, store, period)
+    return ShopifyReconciliationDebugResponse.model_validate(data)
 
 
 @router.get(

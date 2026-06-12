@@ -6,7 +6,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.shopify import (
-    ShopifyDailyMetric,
     ShopifyOrder,
     ShopifyOrderLineItem,
     ShopifyProduct,
@@ -28,6 +27,7 @@ from app.services.shopify.comparison import (
     compute_period_snapshot,
 )
 from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
+from app.services.shopify.reconciliation import build_reconciliation_diagnosis, compute_reconciliation
 from app.services.shopify.attribution import (
     build_attribution_alerts,
     build_marketing_report_availability,
@@ -282,11 +282,22 @@ def _build_daily_diagnosis(
     *,
     period_label: str = "nel periodo selezionato",
     comparison: dict[str, Any] | None = None,
+    reconciliation: dict[str, Any] | None = None,
+    last_sync_at: datetime | None = None,
 ) -> list[dict[str, str]]:
     diagnosis: list[dict[str, str]] = []
 
+    if reconciliation:
+        diagnosis.extend(
+            build_reconciliation_diagnosis(reconciliation, last_sync_at=last_sync_at)
+        )
+
     if comparison:
-        diagnosis.extend(build_trend_diagnosis(comparison))
+        for item in build_trend_diagnosis(comparison):
+            if len(diagnosis) >= 5:
+                break
+            if item not in diagnosis:
+                diagnosis.append(item)
 
     oos = current_state_metrics.get("out_of_stock_count", 0)
     if oos > 0 and len(diagnosis) < 5:
@@ -405,6 +416,18 @@ async def build_dashboard(
     )
     products = list(products_result.scalars().all())
 
+    reconciliation_raw = await compute_reconciliation(session, store, period)
+    placed_orders: list[ShopifyOrder] = reconciliation_raw.pop("_placed_orders")
+    reconciliation_raw.pop("_refunds_in_period", None)
+    order_buckets = reconciliation_raw["orders"]
+    sales_breakdown = reconciliation_raw["sales_breakdown"]
+
+    revenue = Decimal(str(sales_breakdown["total_sales"]))
+    orders_count = int(order_buckets["total"])
+    paid_orders_count = int(order_buckets["paid"])
+    pending_orders_count = int(order_buckets["pending"])
+    average_order_value = revenue / orders_count if orders_count else Decimal("0")
+
     effective_at = order_effective_at_column()
     orders_result = await session.execute(
         select(ShopifyOrder)
@@ -449,37 +472,15 @@ async def build_dashboard(
         and (o.fulfillment_status or "").strip() != ""
     ]
 
-    paid_orders_count = sum(
-        1 for o in period_orders if (o.financial_status or "").upper() in PAID_STATUSES
-    )
     fulfilled_orders_count = sum(
-        1 for o in period_orders if (o.fulfillment_status or "").upper() in FULFILLED_STATUSES
+        1 for o in placed_orders if (o.fulfillment_status or "").upper() in FULFILLED_STATUSES
     )
-
-    revenue = Decimal("0")
-    orders_count = 0
-    metrics_result = await session.execute(
-        select(
-            func.coalesce(func.sum(ShopifyDailyMetric.gross_sales), 0),
-            func.coalesce(func.sum(ShopifyDailyMetric.orders_count), 0),
-        ).where(
-            ShopifyDailyMetric.shopify_store_id == store.id,
-            ShopifyDailyMetric.date >= period.start_date,
-            ShopifyDailyMetric.date <= period.end_date,
-        )
+    unfulfilled_placed_count = sum(
+        1
+        for o in placed_orders
+        if (o.fulfillment_status or "").upper() not in FULFILLED_STATUSES
+        and (o.fulfillment_status or "").strip() != ""
     )
-    revenue, orders_count = metrics_result.one()
-    revenue = Decimal(str(revenue))
-    orders_count = int(orders_count)
-
-    if revenue == 0 and orders_count == 0 and period_orders:
-        revenue = sum(
-            (o.current_total_price or o.total_price for o in period_orders),
-            Decimal("0"),
-        )
-        orders_count = len(period_orders)
-
-    average_order_value = revenue / orders_count if orders_count else Decimal("0")
 
     products_by_gid = product_lookup(products)
     sold_gids = await compute_sold_product_gids(session, store.id, period=period)
@@ -536,9 +537,11 @@ async def build_dashboard(
         "orders_count": orders_count,
         "average_order_value": average_order_value,
         "paid_orders_count": paid_orders_count,
-        "pending_orders_count": len(pending_orders),
+        "pending_orders_count": pending_orders_count,
+        "cancelled_orders_count": int(order_buckets["cancelled"]),
+        "unpaid_orders_count": int(order_buckets["unpaid"]),
         "fulfilled_orders_count": fulfilled_orders_count,
-        "unfulfilled_orders_count": len(unfulfilled_orders),
+        "unfulfilled_orders_count": unfulfilled_placed_count,
         "products_without_sales_count": len(no_sales),
     }
 
@@ -560,9 +563,9 @@ async def build_dashboard(
         "active_products_count": len(active_products),
         "draft_products_count": len(draft_products),
         "paid_orders_count": paid_orders_count,
-        "pending_orders_count": len(pending_orders),
+        "pending_orders_count": pending_orders_count,
         "fulfilled_orders_count": fulfilled_orders_count,
-        "unfulfilled_orders_count": len(unfulfilled_orders),
+        "unfulfilled_orders_count": unfulfilled_placed_count,
         "low_stock_count": len(low_stock),
         "out_of_stock_count": len(out_of_stock),
         "products_without_sales_count": len(no_sales),
@@ -610,11 +613,14 @@ async def build_dashboard(
         raw_attribution_intelligence,
         period_label=period.label.lower(),
         comparison=comparison,
+        reconciliation=reconciliation_raw,
+        last_sync_at=store.last_sync_at,
     )
 
     return {
         "period": period.to_dict(),
         "comparison": comparison,
+        "reconciliation": reconciliation_raw,
         "summary": summary,
         "alerts": alerts,
         "product_intelligence": product_intelligence,

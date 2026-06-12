@@ -5,6 +5,7 @@ export const SHOPIFY_DIAGNOSIS_LIMIT = 5;
 
 export interface ResolvedShopifyDashboardBlocks {
   comparison: ShopifyDashboard["comparison"];
+  reconciliation: ShopifyDashboard["reconciliation"];
   productIntelligence: ShopifyDashboard["productPerformance"];
   inventoryRisk: ShopifyDashboard["inventory"];
   orderOperations: ShopifyDashboard["orders"];
@@ -21,6 +22,7 @@ export function resolveShopifyDashboardBlocks(
 ): ResolvedShopifyDashboardBlocks {
   return {
     comparison: dashboard.comparison,
+    reconciliation: dashboard.reconciliation,
     productIntelligence: dashboard.productIntelligence ?? dashboard.productPerformance,
     inventoryRisk: dashboard.inventoryRisk ?? dashboard.inventory,
     orderOperations: dashboard.orderOperations ?? dashboard.orders,

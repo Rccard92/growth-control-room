@@ -77,6 +77,7 @@ Endpoint principali:
 - `GET /api/integrations/shopify/oauth/callback`
 - `POST /api/projects/{id}/shopify/sync`
 - `GET /api/projects/{id}/shopify/dashboard`
+- `GET /api/projects/{id}/shopify/reconciliation`
 
 Query params opzionali per filtro periodo:
 
@@ -90,11 +91,30 @@ Valori `range` supportati: `today`, `yesterday`, `last_7_days`, `last_30_days`, 
 
 Le date sono interpretate nel timezone IANA dello store Shopify (`shopify_stores.timezone`), con fallback `UTC`.
 
-La response include `period` (`range`, `startDate`, `endDate`, `timezone`, `label`), nel `summary` i gruppi `periodMetrics` / `currentStateMetrics`, e il blocco `comparison` con confronto vs periodo precedente equivalente (`currentPeriod`, `previousPeriod`, `metrics`, `attribution`, `products`, `dataQuality`).
+La response include `period` (`range`, `startDate`, `endDate`, `timezone`, `label`), nel `summary` i gruppi `periodMetrics` / `currentStateMetrics`, il blocco `comparison` con confronto vs periodo precedente equivalente (`currentPeriod`, `previousPeriod`, `metrics`, `attribution`, `products`, `dataQuality`), e il blocco `reconciliation` con breakdown metriche Shopify-like.
 
 **Nota:** La Shopify Control Room supporta filtri temporali per metriche basate sugli ordini. Inventario e SEO rappresentano invece lo stato corrente dello store.
 
 **Nota:** La Shopify Control Room supporta confronto con periodo precedente per metriche ordine, attribution e performance prodotto.
+
+### Metriche revenue Shopify
+
+| Metrica | Descrizione |
+|---------|-------------|
+| `currentTotalSum` | Somma dei totali ordine correnti (`currentTotalPriceSet`). Comportamento precedente di GCR, utile come diagnostica. |
+| `totalSales` (Shopify-like) | `grossSales − discounts − salesReversals + taxes + shipping`. I reversal sono attribuiti al giorno in cui il refund viene processato, anche se l'ordine originale è fuori periodo. |
+| ShopifyQL (futuro) | Parità esatta con la dashboard Analytics Shopify via `read_reports` / ShopifyQL. |
+
+Il blocco `reconciliation` espone:
+
+- `metricMode`: `shopify_like_local`
+- `orders`: conteggi `total`, `paid`, `pending`, `cancelled`, `unpaid` (ordini piazzati nel periodo per `createdAt`)
+- `salesBreakdown`: componenti della formula sopra + `currentTotalSum`
+- `dataQuality`: `ok` \| `limited` \| `warning` con messaggi esplicativi (tax/duties assenti, reversal fuori storico sync, ecc.)
+
+L'endpoint debug `GET /api/projects/{id}/shopify/reconciliation` accetta gli stessi query params del dashboard e restituisce breakdown esteso, refund nel periodo e un campione di ordini (senza email o token).
+
+**Importante:** dopo l'aggiornamento sync refund/tax, eseguire un nuovo `POST .../shopify/sync` per popolare importi refund e tax nel database locale.
 
 Esempi frontend (persistiti in URL):
 

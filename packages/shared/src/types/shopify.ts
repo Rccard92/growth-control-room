@@ -138,12 +138,50 @@ export interface ShopifyDashboardComparison {
   products: ShopifyProductComparison;
 }
 
+export interface ShopifyReconciliationOrders {
+  total: number;
+  paid: number;
+  pending: number;
+  cancelled: number;
+  unpaid: number;
+}
+
+export interface ShopifySalesBreakdown {
+  grossSales: string;
+  discounts: string;
+  salesReversals: string;
+  returns: string;
+  shipping: string;
+  taxes: string;
+  duties: string;
+  fees: string;
+  totalSales: string;
+  currentTotalSum: string;
+}
+
+export type ShopifyReconciliationDataQualityStatus = "ok" | "limited" | "warning";
+
+export interface ShopifyReconciliationDataQuality {
+  status: ShopifyReconciliationDataQualityStatus;
+  warnings: string[];
+}
+
+export interface ShopifyDashboardReconciliation {
+  metricMode: string;
+  period: ShopifyDashboardPeriod;
+  orders: ShopifyReconciliationOrders;
+  salesBreakdown: ShopifySalesBreakdown;
+  dataQuality: ShopifyReconciliationDataQuality;
+}
+
 export interface ShopifyPeriodMetrics {
   revenue: string;
   ordersCount: number;
   averageOrderValue: string;
   paidOrdersCount: number;
   pendingOrdersCount: number;
+  cancelledOrdersCount?: number;
+  unpaidOrdersCount?: number;
   fulfilledOrdersCount: number;
   unfulfilledOrdersCount: number;
   productsWithoutSalesCount: number;
@@ -338,6 +376,7 @@ export interface ShopifyDailyDiagnosisItem {
 export interface ShopifyDashboard {
   period: ShopifyDashboardPeriod;
   comparison: ShopifyDashboardComparison;
+  reconciliation: ShopifyDashboardReconciliation;
   summary: ShopifyDashboardSummary;
   alerts: ShopifyDashboardAlert[];
   productIntelligence?: ShopifyProductPerformanceSection;

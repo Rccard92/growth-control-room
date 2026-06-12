@@ -13,6 +13,7 @@ from app.models.shopify import (
     ShopifyDailyMetric,
     ShopifyOrder,
     ShopifyOrderLineItem,
+    ShopifyOrderRefund,
     ShopifyProduct,
     ShopifyProductVariant,
     ShopifyStore,
@@ -207,6 +208,14 @@ async def _upsert_order(
         subtotal, _ = _money_amount(node, "subtotalPriceSet")
     total_discounts, _ = _money_amount(node, "currentTotalDiscountsSet")
     shipping_price, _ = _money_amount(node, "totalShippingPriceSet")
+    total_tax, _ = _money_amount(node, "currentTotalTaxSet")
+
+    refund_nodes = (node.get("refunds") or {}).get("nodes") or []
+    refund_total = Decimal("0")
+    for refund_node in refund_nodes:
+        amount, _ = _money_amount(refund_node, "totalRefundedSet")
+        refund_total += amount
+    refund_count = len(refund_nodes) if refund_nodes else None
 
     attribution = extract_order_attribution(node)
 
@@ -221,6 +230,9 @@ async def _upsert_order(
         "subtotal_price": subtotal,
         "total_discounts": total_discounts if total_discounts else None,
         "shipping_price": shipping_price if shipping_price else None,
+        "total_tax": total_tax if total_tax else None,
+        "refund_total": refund_total if refund_total else None,
+        "refund_count": refund_count,
         "currency": currency,
         "customer_email": node.get("email"),
         "discount_codes": attribution.get("discount_codes"),
@@ -322,6 +334,42 @@ async def _replace_line_items(
     return count
 
 
+async def _replace_refunds(
+    session: AsyncSession,
+    store_id: UUID,
+    order: ShopifyOrder,
+    node: dict[str, Any],
+) -> int:
+    await session.execute(
+        delete(ShopifyOrderRefund).where(ShopifyOrderRefund.order_id == order.id)
+    )
+
+    refund_nodes = (node.get("refunds") or {}).get("nodes") or []
+    count = 0
+
+    for refund_node in refund_nodes:
+        gid = refund_node.get("id")
+        if not gid:
+            continue
+
+        amount, currency = _money_amount(refund_node, "totalRefundedSet")
+        session.add(
+            ShopifyOrderRefund(
+                shopify_store_id=store_id,
+                order_id=order.id,
+                shopify_refund_gid=gid,
+                refund_created_at=_parse_datetime(refund_node.get("createdAt")),
+                amount=amount,
+                currency=currency,
+                raw_payload=refund_node,
+            )
+        )
+        count += 1
+
+    await session.flush()
+    return count
+
+
 async def _rebuild_daily_metrics(
     session: AsyncSession,
     store: ShopifyStore,
@@ -389,9 +437,11 @@ async def sync_shopify_store(
 
     orders = await client.fetch_all_orders()
     line_items_synced = 0
+    refunds_synced = 0
     for node in orders:
         order = await _upsert_order(session, store.id, node)
         line_items_synced += await _replace_line_items(session, store.id, order, node)
+        refunds_synced += await _replace_refunds(session, store.id, order, node)
 
     metrics_count = await _rebuild_daily_metrics(session, store)
 
@@ -403,12 +453,13 @@ async def sync_shopify_store(
 
     logger.info(
         "Shopify sync v2 completed store_id=%s products=%d variants=%d orders=%d "
-        "line_items=%d metrics_days=%d duration_s=%s degraded_blocks=%s",
+        "line_items=%d refunds=%d metrics_days=%d duration_s=%s degraded_blocks=%s",
         store.id,
         len(products),
         variants_synced,
         len(orders),
         line_items_synced,
+        refunds_synced,
         metrics_count,
         duration_seconds,
         ",".join(client.degraded_order_blocks) or "none",
@@ -419,6 +470,7 @@ async def sync_shopify_store(
         "variants_synced": variants_synced,
         "orders_synced": len(orders),
         "line_items_synced": line_items_synced,
+        "refunds_synced": refunds_synced,
         "metrics_synced": metrics_count,
         "duration_seconds": duration_seconds,
     }
