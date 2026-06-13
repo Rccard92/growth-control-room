@@ -19,6 +19,9 @@ import type {
   BrandProductKnowledgeGeneralApplyProposalResponse,
   BrandProductKnowledgeGeneralImportResponse,
   BrandProductKnowledgeItem,
+  BrandProductKnowledgeItemsApplyImportRequest,
+  BrandProductKnowledgeItemsApplyImportResponse,
+  BrandProductKnowledgeItemsImportResponse,
   BrandProductKnowledgeItemFromShopifyRequest,
   BrandProductKnowledgeShopifyProductsResponse,
   BrandVisualIdentity,
@@ -283,6 +286,32 @@ export function getProductKnowledgeItems(
 ): Promise<BrandProductKnowledgeItem[]> {
   return apiFetch<BrandProductKnowledgeItem[]>(
     `/api/projects/${projectId}/brand-intelligence/product-knowledge/items`,
+  );
+}
+
+export function importProductKnowledgeItemsFromFile(
+  projectId: string,
+  file: File,
+): Promise<BrandProductKnowledgeItemsImportResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiUploadForm<BrandProductKnowledgeItemsImportResponse>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/items/import-file`,
+    formData,
+  );
+}
+
+export function applyProductKnowledgeItemsImportProposal(
+  projectId: string,
+  data: BrandProductKnowledgeItemsApplyImportRequest,
+): Promise<BrandProductKnowledgeItemsApplyImportResponse> {
+  return apiFetch<BrandProductKnowledgeItemsApplyImportResponse>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/items/apply-import-proposal`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
   );
 }
 

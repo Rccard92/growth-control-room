@@ -284,3 +284,125 @@ class BrandProductKnowledgeContext(BaseModel):
     specific_products: list[BrandProductKnowledgeSpecificProductContext] = Field(
         default_factory=list, serialization_alias="specificProducts"
     )
+
+
+class BrandProductKnowledgeItemProposal(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_name: str = Field(validation_alias="productName", serialization_alias="productName")
+    product_line: str | None = Field(default=None, validation_alias="productLine", serialization_alias="productLine")
+    priority: str | None = None
+    strategic_description: str | None = Field(
+        default=None, validation_alias="strategicDescription", serialization_alias="strategicDescription"
+    )
+    origin: str | None = None
+    ingredients: str | None = None
+    production_process: str | None = Field(
+        default=None, validation_alias="productionProcess", serialization_alias="productionProcess"
+    )
+    taste_notes: str | None = Field(default=None, validation_alias="tasteNotes", serialization_alias="tasteNotes")
+    color_notes: str | None = Field(default=None, validation_alias="colorNotes", serialization_alias="colorNotes")
+    texture_notes: str | None = Field(
+        default=None, validation_alias="textureNotes", serialization_alias="textureNotes"
+    )
+    usage_suggestions: str | None = Field(
+        default=None, validation_alias="usageSuggestions", serialization_alias="usageSuggestions"
+    )
+    conservation: str | None = None
+    target_audience: str | None = Field(
+        default=None, validation_alias="targetAudience", serialization_alias="targetAudience"
+    )
+    objections: list[str] | None = None
+    faq: list[dict[str, Any]] | None = None
+    allowed_claims: list[str] | None = Field(
+        default=None, validation_alias="allowedClaims", serialization_alias="allowedClaims"
+    )
+    forbidden_claims: list[str] | None = Field(
+        default=None, validation_alias="forbiddenClaims", serialization_alias="forbiddenClaims"
+    )
+    seo_notes: str | None = Field(default=None, validation_alias="seoNotes", serialization_alias="seoNotes")
+    ads_social_notes: str | None = Field(
+        default=None, validation_alias="adsSocialNotes", serialization_alias="adsSocialNotes"
+    )
+    related_products: list[str] | None = Field(
+        default=None, validation_alias="relatedProducts", serialization_alias="relatedProducts"
+    )
+    missing_fields: list[str] = Field(
+        default_factory=list, validation_alias="missingFields", serialization_alias="missingFields"
+    )
+    confidence: float = 0.0
+    warnings: list[str] = Field(default_factory=list)
+    suggested_shopify_product_id: UUID | None = Field(
+        default=None,
+        validation_alias="suggestedShopifyProductId",
+        serialization_alias="suggestedShopifyProductId",
+    )
+    suggested_shopify_title: str | None = Field(
+        default=None,
+        validation_alias="suggestedShopifyTitle",
+        serialization_alias="suggestedShopifyTitle",
+    )
+    suggested_shopify_handle: str | None = Field(
+        default=None,
+        validation_alias="suggestedShopifyHandle",
+        serialization_alias="suggestedShopifyHandle",
+    )
+    shopify_match_confidence: float | None = Field(
+        default=None,
+        validation_alias="shopifyMatchConfidence",
+        serialization_alias="shopifyMatchConfidence",
+    )
+    shopify_product_id: UUID | None = Field(
+        default=None, validation_alias="shopifyProductId", serialization_alias="shopifyProductId"
+    )
+    client_key: str | None = Field(default=None, validation_alias="clientKey", serialization_alias="clientKey")
+
+
+class BrandProductKnowledgeItemsProposal(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[BrandProductKnowledgeItemProposal] = Field(default_factory=list)
+
+
+class BrandProductKnowledgeItemsImportResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    proposal: BrandProductKnowledgeItemsProposal
+    source_summary: str = Field(default="", serialization_alias="sourceSummary")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class BrandProductKnowledgeItemsApplyImportRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[BrandProductKnowledgeItemProposal]
+
+
+class BrandProductKnowledgeDuplicateCandidate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    existing_item_id: UUID = Field(serialization_alias="existingItemId")
+    product_name: str = Field(serialization_alias="productName")
+    shopify_handle: str | None = Field(default=None, serialization_alias="shopifyHandle")
+    reason: str
+    completion_status: ModuleCompletionStatus | None = Field(
+        default=None, serialization_alias="completionStatus"
+    )
+
+
+class BrandProductKnowledgeSkippedItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    product_name: str = Field(serialization_alias="productName")
+    reason: str
+    duplicate_candidates: list[BrandProductKnowledgeDuplicateCandidate] = Field(
+        default_factory=list, serialization_alias="duplicateCandidates"
+    )
+
+
+class BrandProductKnowledgeItemsApplyImportResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    saved: list[BrandProductKnowledgeItemRead] = Field(default_factory=list)
+    skipped: list[BrandProductKnowledgeSkippedItem] = Field(default_factory=list)
+    message: str = "Schede prodotto salvate."

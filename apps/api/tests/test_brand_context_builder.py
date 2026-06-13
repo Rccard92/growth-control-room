@@ -243,3 +243,23 @@ def test_build_prompt_context_includes_product_knowledge() -> None:
     assert prompt_ctx.product_knowledge is not None
     assert "PRODUCT KNOWLEDGE" in prompt_ctx.product_knowledge
     assert "Artigianale" in prompt_ctx.product_knowledge
+
+
+def test_format_item_for_prompt_ai_import() -> None:
+    from app.schemas.brand_product_knowledge import BrandProductKnowledgeItemRead
+    from app.services.brand_intelligence.product_knowledge_context import format_item_for_prompt
+
+    item = BrandProductKnowledgeItemRead(
+        id=uuid4(),
+        project_id=_PID,
+        product_name="Miele di Limone",
+        origin="Sicilia",
+        taste_notes="Agrumato",
+        source_type="ai_import",
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+    text = format_item_for_prompt(item)
+    assert "Prodotto: Miele di Limone" in text
+    assert "Origine: Sicilia" in text
+    assert "Gusto/Profumo: Agrumato" in text

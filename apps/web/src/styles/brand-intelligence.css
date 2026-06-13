@@ -1237,6 +1237,29 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.bi-pk-proposal-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bi-pk-proposal-summary {
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.bi-pk-proposal-summary p {
+  margin: 0.35rem 0;
+}
+
+.bi-pk-proposal-warnings {
+  color: #e8b86d;
+}
+
+.bi-pk-items-import {
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .bi-shopify-picker-list {
   list-style: none;
   margin: 0;

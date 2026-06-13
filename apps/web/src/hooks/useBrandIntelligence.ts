@@ -5,6 +5,7 @@ import {
   applyBrandProfileProposal,
   applyBrandSafeClaimsProposal,
   applyProductKnowledgeGeneralProposal,
+  applyProductKnowledgeItemsImportProposal,
   applyVisualProposal,
   createProductKnowledgeItemFromShopify,
   deleteProductKnowledgeItem,
@@ -22,6 +23,7 @@ import {
   importBrandIdentityFromFile,
   importBrandSafeClaimsFromFile,
   importProductKnowledgeGeneralFromFile,
+  importProductKnowledgeItemsFromFile,
   updateBrandIdentity,
   updateBrandProfile,
   updateBrandSafeClaims,
@@ -273,6 +275,21 @@ export function useCreateProductKnowledgeItemFromShopify(projectId: string) {
   return useMutation({
     mutationFn: (data: Parameters<typeof createProductKnowledgeItemFromShopify>[1]) =>
       createProductKnowledgeItemFromShopify(projectId, data),
+    onSuccess: () => invalidateBrand(projectId, qc),
+  });
+}
+
+export function useImportProductKnowledgeItemsFromFile(projectId: string) {
+  return useMutation({
+    mutationFn: (file: File) => importProductKnowledgeItemsFromFile(projectId, file),
+  });
+}
+
+export function useApplyProductKnowledgeItemsImportProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof applyProductKnowledgeItemsImportProposal>[1]) =>
+      applyProductKnowledgeItemsImportProposal(projectId, data),
     onSuccess: () => invalidateBrand(projectId, qc),
   });
 }

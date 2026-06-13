@@ -118,6 +118,12 @@ def format_item_for_prompt(item: BrandProductKnowledgeItemRead) -> str:
         parts.append(f"- Ingredienti: {item.ingredients[:300]}")
     if item.production_process:
         parts.append(f"- Processo: {item.production_process[:300]}")
+    if item.taste_notes:
+        parts.append(f"- Gusto/Profumo: {item.taste_notes[:300]}")
+    if item.color_notes:
+        parts.append(f"- Colore: {item.color_notes[:300]}")
+    if item.texture_notes:
+        parts.append(f"- Consistenza: {item.texture_notes[:300]}")
     if item.usage_suggestions:
         parts.append(f"- Uso consigliato: {item.usage_suggestions[:300]}")
     if item.allowed_claims:

@@ -4,15 +4,19 @@ import type {
   BrandProductKnowledgeGeneralImportResponse,
   BrandProductKnowledgeGeneralProposal,
   BrandProductKnowledgeItem,
+  BrandProductKnowledgeItemProposal,
+  BrandProductKnowledgeItemsImportResponse,
   BrandProductKnowledgeShopifyProductOption,
   ModuleCompletionStatus,
 } from "@gcr/shared";
 import { SeoEditModal } from "../content/optimizer/SeoEditModal";
 import {
   useApplyProductKnowledgeGeneralProposal,
+  useApplyProductKnowledgeItemsImportProposal,
   useCreateProductKnowledgeItemFromShopify,
   useDeleteProductKnowledgeItem,
   useImportProductKnowledgeGeneralFromFile,
+  useImportProductKnowledgeItemsFromFile,
   useProductKnowledgeGeneral,
   useProductKnowledgeItems,
   useProductKnowledgeShopifyProducts,
@@ -44,6 +48,122 @@ const STATUS_LABELS: Record<ModuleCompletionStatus, string> = {
   partial: "Parziale",
   empty: "Da completare",
 };
+
+const MISSING_FIELD_LABELS: Record<string, string> = {
+  productLine: "Categoria / linea",
+  strategicDescription: "Descrizione strategica",
+  origin: "Origine",
+  ingredients: "Ingredienti",
+  productionProcess: "Processo / lavorazione",
+  tasteNotes: "Gusto / profumo",
+  colorNotes: "Colore",
+  textureNotes: "Consistenza",
+  usageSuggestions: "Uso consigliato",
+  conservation: "Conservazione",
+  targetAudience: "Target ideale",
+  objections: "Obiezioni",
+  faq: "FAQ",
+  allowedClaims: "Claim consentiti",
+  forbiddenClaims: "Claim da evitare",
+  seoNotes: "Note SEO",
+  adsSocialNotes: "Note Ads/Social",
+  relatedProducts: "Prodotti correlati",
+  priority: "Priorità",
+};
+
+type ItemFormValues = Partial<BrandProductKnowledgeItem> | Partial<BrandProductKnowledgeItemProposal>;
+
+function renderItemFields(
+  form: ItemFormValues,
+  setForm: (next: ItemFormValues) => void,
+  idPrefix: string,
+) {
+  return (
+    <>
+      <div className="gcr-field">
+        <label htmlFor={`${idPrefix}-productName`}>Nome prodotto</label>
+        <input
+          id={`${idPrefix}-productName`}
+          value={form.productName ?? ""}
+          onChange={(e) => setForm({ ...form, productName: e.target.value })}
+        />
+      </div>
+      <div className="gcr-field">
+        <label htmlFor={`${idPrefix}-productLine`}>Linea prodotto</label>
+        <input
+          id={`${idPrefix}-productLine`}
+          value={form.productLine ?? ""}
+          onChange={(e) => setForm({ ...form, productLine: e.target.value })}
+        />
+      </div>
+      <div className="gcr-field">
+        <label htmlFor={`${idPrefix}-priority`}>Priorità commerciale</label>
+        <select
+          id={`${idPrefix}-priority`}
+          value={form.priority ?? "medium"}
+          onChange={(e) => setForm({ ...form, priority: e.target.value })}
+        >
+          <option value="high">Alta</option>
+          <option value="medium">Media</option>
+          <option value="low">Bassa</option>
+        </select>
+      </div>
+      {(
+        [
+          ["strategicDescription", "Descrizione strategica", 4],
+          ["origin", "Origine", 2],
+          ["ingredients", "Ingredienti", 3],
+          ["productionProcess", "Processo / lavorazione", 3],
+          ["tasteNotes", "Gusto / profumo", 2],
+          ["colorNotes", "Colore", 2],
+          ["textureNotes", "Consistenza", 2],
+          ["usageSuggestions", "Uso consigliato", 3],
+          ["conservation", "Conservazione", 2],
+          ["targetAudience", "Target ideale", 2],
+          ["seoNotes", "Note SEO", 3],
+          ["adsSocialNotes", "Note Ads/Social", 3],
+        ] as const
+      ).map(([key, label, rows]) => (
+        <div className="gcr-field bi-form-grid--full" key={key}>
+          <label htmlFor={`${idPrefix}-${key}`}>{label}</label>
+          <textarea
+            id={`${idPrefix}-${key}`}
+            rows={rows}
+            value={(form[key] as string) ?? ""}
+            onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+          />
+        </div>
+      ))}
+      {(
+        [
+          ["objections", "Obiezioni (uno per riga)"],
+          ["allowedClaims", "Claim consentiti (uno per riga)"],
+          ["forbiddenClaims", "Claim da evitare (uno per riga)"],
+          ["relatedProducts", "Prodotti correlati (uno per riga)"],
+        ] as const
+      ).map(([key, label]) => (
+        <div className="gcr-field bi-form-grid--full" key={key}>
+          <label htmlFor={`${idPrefix}-${key}`}>{label}</label>
+          <textarea
+            id={`${idPrefix}-${key}`}
+            rows={3}
+            value={listToLines(form[key] as string[] | undefined)}
+            onChange={(e) => setForm({ ...form, [key]: linesToList(e.target.value) })}
+          />
+        </div>
+      ))}
+      <div className="gcr-field bi-form-grid--full">
+        <label htmlFor={`${idPrefix}-faq`}>FAQ (Domanda | Risposta, una per riga)</label>
+        <textarea
+          id={`${idPrefix}-faq`}
+          rows={4}
+          value={faqToLines(form.faq as Array<{ question: string; answer: string }> | undefined)}
+          onChange={(e) => setForm({ ...form, faq: linesToFaq(e.target.value) })}
+        />
+      </div>
+    </>
+  );
+}
 
 function linesToList(text: string): string[] {
   return text.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -224,81 +344,7 @@ function ProductItemAccordion({
           {err && <div className="gcr-alert gcr-alert--error">{err}</div>}
           {msg && <div className="gcr-alert gcr-alert--success">{msg}</div>}
           <form onSubmit={handleSave} className="bi-form-grid">
-            <div className="gcr-field">
-              <label>Nome prodotto</label>
-              <input
-                value={form.productName ?? ""}
-                onChange={(e) => setForm({ ...form, productName: e.target.value })}
-              />
-            </div>
-            <div className="gcr-field">
-              <label>Linea prodotto</label>
-              <input
-                value={form.productLine ?? ""}
-                onChange={(e) => setForm({ ...form, productLine: e.target.value })}
-              />
-            </div>
-            <div className="gcr-field">
-              <label>Priorità commerciale</label>
-              <select
-                value={form.priority ?? "medium"}
-                onChange={(e) => setForm({ ...form, priority: e.target.value })}
-              >
-                <option value="high">Alta</option>
-                <option value="medium">Media</option>
-                <option value="low">Bassa</option>
-              </select>
-            </div>
-            {(
-              [
-                ["strategicDescription", "Descrizione strategica", 4],
-                ["origin", "Origine", 2],
-                ["ingredients", "Ingredienti", 3],
-                ["productionProcess", "Processo / lavorazione", 3],
-                ["tasteNotes", "Gusto", 2],
-                ["colorNotes", "Colore", 2],
-                ["textureNotes", "Texture", 2],
-                ["usageSuggestions", "Uso consigliato", 3],
-                ["conservation", "Conservazione", 2],
-                ["targetAudience", "Target", 2],
-                ["seoNotes", "Note SEO", 3],
-                ["adsSocialNotes", "Note ads/social", 3],
-              ] as const
-            ).map(([key, label, rows]) => (
-              <div className="gcr-field bi-form-grid--full" key={key}>
-                <label>{label}</label>
-                <textarea
-                  rows={rows}
-                  value={(form[key] as string) ?? ""}
-                  onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                />
-              </div>
-            ))}
-            {(
-              [
-                ["objections", "Obiezioni (uno per riga)"],
-                ["allowedClaims", "Claim consentiti (uno per riga)"],
-                ["forbiddenClaims", "Claim vietati (uno per riga)"],
-                ["relatedProducts", "Prodotti correlati (uno per riga)"],
-              ] as const
-            ).map(([key, label]) => (
-              <div className="gcr-field bi-form-grid--full" key={key}>
-                <label>{label}</label>
-                <textarea
-                  rows={3}
-                  value={listToLines(form[key] as string[] | undefined)}
-                  onChange={(e) => setForm({ ...form, [key]: linesToList(e.target.value) })}
-                />
-              </div>
-            ))}
-            <div className="gcr-field bi-form-grid--full">
-              <label>FAQ (Domanda | Risposta, una per riga)</label>
-              <textarea
-                rows={4}
-                value={faqToLines(form.faq as Array<{ question: string; answer: string }> | undefined)}
-                onChange={(e) => setForm({ ...form, faq: linesToFaq(e.target.value) })}
-              />
-            </div>
+            {renderItemFields(form, setForm, `item-${item.id}`)}
             <div className="bi-profile-block__actions">
               <button type="submit" className="gcr-btn gcr-btn--primary" disabled={update.isPending}>
                 {update.isPending ? "Salvataggio…" : "Salva scheda"}
@@ -311,12 +357,158 @@ function ProductItemAccordion({
   );
 }
 
+type ProposalWithKey = BrandProductKnowledgeItemProposal & { clientKey: string };
+
+function ItemProposalAccordion({
+  proposal,
+  expanded,
+  onToggle,
+  onChange,
+  onSave,
+  onDiscard,
+  saving,
+  shopifyProducts,
+  shopifyConnected,
+}: {
+  proposal: ProposalWithKey;
+  expanded: boolean;
+  onToggle: () => void;
+  onChange: (next: ProposalWithKey) => void;
+  onSave: () => void;
+  onDiscard: () => void;
+  saving: boolean;
+  shopifyProducts: BrandProductKnowledgeShopifyProductOption[];
+  shopifyConnected: boolean;
+}) {
+  const linked = Boolean(proposal.shopifyProductId ?? proposal.suggestedShopifyProductId);
+  const filledFields = Object.keys(MISSING_FIELD_LABELS).filter(
+    (k) => !(proposal.missingFields ?? []).includes(k),
+  );
+
+  function handleShopifyChange(productId: string) {
+    if (!productId) {
+      onChange({
+        ...proposal,
+        shopifyProductId: null,
+        suggestedShopifyProductId: null,
+        suggestedShopifyTitle: null,
+        suggestedShopifyHandle: null,
+        shopifyMatchConfidence: null,
+      });
+      return;
+    }
+    const product = shopifyProducts.find((p) => p.id === productId);
+    onChange({
+      ...proposal,
+      shopifyProductId: productId,
+      suggestedShopifyProductId: productId,
+      suggestedShopifyTitle: product?.title ?? null,
+      suggestedShopifyHandle: product?.handle ?? null,
+      shopifyMatchConfidence: product ? 1 : null,
+    });
+  }
+
+  const selectedShopifyId =
+    proposal.shopifyProductId ?? proposal.suggestedShopifyProductId ?? "";
+
+  return (
+    <article className="bi-accordion gcr-card bi-pk-proposal-card">
+      <header className="bi-accordion__header">
+        <button type="button" className="bi-accordion__toggle" onClick={onToggle}>
+          <span className="bi-accordion__title">{proposal.productName}</span>
+          <span className="bi-accordion__meta">
+            {proposal.productLine && <span>{proposal.productLine}</span>}
+            {proposal.confidence != null && (
+              <span> · Confidenza {(proposal.confidence * 100).toFixed(0)}%</span>
+            )}
+          </span>
+          <span
+            className={`bi-module-badge ${linked ? "bi-module-badge--complete" : "bi-module-badge--partial"}`}
+          >
+            {linked ? "Collegato a Shopify" : "Non collegato"}
+          </span>
+        </button>
+        <div className="bi-accordion__actions">
+          <button type="button" className="gcr-btn gcr-btn--sm" onClick={onToggle}>
+            Modifica
+          </button>
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--sm gcr-btn--primary"
+            disabled={saving || !proposal.productName?.trim()}
+            onClick={onSave}
+          >
+            {saving ? "Salvataggio…" : "Salva scheda"}
+          </button>
+          <button type="button" className="gcr-btn gcr-btn--sm gcr-btn--ghost" onClick={onDiscard}>
+            Scarta
+          </button>
+        </div>
+      </header>
+      {expanded && (
+        <div className="bi-accordion__body">
+          <div className="bi-pk-proposal-summary">
+            {filledFields.length > 0 && (
+              <p>
+                <strong>Campi compilati:</strong>{" "}
+                {filledFields.map((k) => MISSING_FIELD_LABELS[k] ?? k).join(", ")}
+              </p>
+            )}
+            {(proposal.missingFields ?? []).length > 0 && (
+              <p>
+                <strong>Campi mancanti:</strong>{" "}
+                {(proposal.missingFields ?? [])
+                  .map((k) => MISSING_FIELD_LABELS[k] ?? k)
+                  .join(", ")}
+              </p>
+            )}
+            {(proposal.warnings ?? []).length > 0 && (
+              <p className="bi-pk-proposal-warnings">
+                <strong>Avvisi:</strong> {(proposal.warnings ?? []).join(" ")}
+              </p>
+            )}
+          </div>
+          {shopifyConnected && (
+            <div className="gcr-field bi-form-grid--full">
+              <label htmlFor={`proposal-shopify-${proposal.clientKey}`}>Prodotto Shopify</label>
+              <select
+                id={`proposal-shopify-${proposal.clientKey}`}
+                value={selectedShopifyId}
+                onChange={(e) => handleShopifyChange(e.target.value)}
+              >
+                <option value="">Nessun collegamento</option>
+                {shopifyProducts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title} (@{p.handle})
+                  </option>
+                ))}
+              </select>
+              {proposal.suggestedShopifyTitle && !proposal.shopifyProductId && (
+                <p className="bi-panel__subtitle">
+                  Match suggerito: {proposal.suggestedShopifyTitle}
+                  {proposal.shopifyMatchConfidence != null
+                    && ` (${(proposal.shopifyMatchConfidence * 100).toFixed(0)}%)`}
+                </p>
+              )}
+            </div>
+          )}
+          <div className="bi-form-grid">
+            {renderItemFields(proposal, (next) => onChange({ ...proposal, ...next }), `prop-${proposal.clientKey}`)}
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
 export function BrandProductKnowledgePanel({ projectId }: BrandProductKnowledgePanelProps) {
   const { data: general, isLoading: generalLoading } = useProductKnowledgeGeneral(projectId);
   const { data: items = [], isLoading: itemsLoading } = useProductKnowledgeItems(projectId);
   const updateGeneral = useUpdateProductKnowledgeGeneral(projectId);
   const importFile = useImportProductKnowledgeGeneralFromFile(projectId);
   const applyProposal = useApplyProductKnowledgeGeneralProposal(projectId);
+  const importItemsFile = useImportProductKnowledgeItemsFromFile(projectId);
+  const applyItemsProposal = useApplyProductKnowledgeItemsImportProposal(projectId);
   const createFromShopify = useCreateProductKnowledgeItemFromShopify(projectId);
 
   const [generalForm, setGeneralForm] = useState<Partial<BrandProductKnowledgeGeneral>>({});
@@ -324,17 +516,25 @@ export function BrandProductKnowledgePanel({ projectId }: BrandProductKnowledgeP
   const [importResult, setImportResult] = useState<BrandProductKnowledgeGeneralImportResponse | null>(
     null,
   );
+  const [itemProposals, setItemProposals] = useState<ProposalWithKey[]>([]);
+  const [itemsImportResult, setItemsImportResult] = useState<BrandProductKnowledgeItemsImportResponse | null>(
+    null,
+  );
+  const [expandedProposalKey, setExpandedProposalKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [shopifyModalOpen, setShopifyModalOpen] = useState(false);
   const [shopifySearch, setShopifySearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const itemsFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [itemsSelectedFile, setItemsSelectedFile] = useState<File | null>(null);
 
+  const hasItemProposals = itemProposals.length > 0;
   const { data: shopifyData, isLoading: shopifyLoading } = useProductKnowledgeShopifyProducts(
     projectId,
-    shopifyModalOpen,
+    shopifyModalOpen || hasItemProposals,
   );
 
   useEffect(() => {
@@ -426,6 +626,99 @@ export function BrandProductKnowledgePanel({ projectId }: BrandProductKnowledgeP
         onError: (err: Error) => setError(err.message),
       },
     );
+  }
+
+  function resetItemsProposalState() {
+    setItemProposals([]);
+    setItemsImportResult(null);
+    setItemsSelectedFile(null);
+    setExpandedProposalKey(null);
+    if (itemsFileInputRef.current) itemsFileInputRef.current.value = "";
+  }
+
+  function handleGenerateItemsProposal() {
+    if (!itemsSelectedFile) {
+      setError("Seleziona un file prima di generare le schede prodotto.");
+      return;
+    }
+    setError(null);
+    importItemsFile.mutate(itemsSelectedFile, {
+      onSuccess: (res) => {
+        setItemsImportResult(res);
+        setItemProposals(
+          res.proposal.items.map((item, index) => ({
+            ...item,
+            clientKey: `proposal-${index}-${item.productName}`,
+          })),
+        );
+        if (res.proposal.items.length > 0) {
+          setExpandedProposalKey(`proposal-0-${res.proposal.items[0].productName}`);
+        }
+      },
+      onError: (err: Error) => setError(err.message),
+    });
+  }
+
+  function handleSaveItemProposal(proposalToSave: ProposalWithKey) {
+    setError(null);
+    applyItemsProposal.mutate(
+      { items: [proposalToSave] },
+      {
+        onSuccess: (data) => {
+          if (data.saved.length > 0) {
+            setSuccessMessage(data.message);
+            setItemProposals((prev) => {
+              const next = prev.filter((p) => p.clientKey !== proposalToSave.clientKey);
+              if (next.length === 0) {
+                setItemsImportResult(null);
+                setItemsSelectedFile(null);
+                setExpandedProposalKey(null);
+                if (itemsFileInputRef.current) itemsFileInputRef.current.value = "";
+              }
+              return next;
+            });
+            if (data.saved[0]) setExpandedId(data.saved[0].id);
+          }
+          if (data.skipped.length > 0) {
+            const skip = data.skipped[0];
+            const dupMsg = skip.duplicateCandidates
+              .map((d) => `${d.productName} (${d.reason})`)
+              .join("; ");
+            setError(`"${skip.productName}" non salvata: ${skip.reason}${dupMsg ? ` — ${dupMsg}` : ""}`);
+          }
+        },
+        onError: (err: Error) => setError(err.message),
+      },
+    );
+  }
+
+  function handleSaveAllItemProposals() {
+    const valid = itemProposals.filter((p) => p.productName?.trim());
+    if (valid.length === 0) {
+      setError("Nessuna scheda valida da salvare.");
+      return;
+    }
+    setError(null);
+    applyItemsProposal.mutate(
+      { items: valid },
+      {
+        onSuccess: (data) => {
+          setSuccessMessage(data.message);
+          if (data.skipped.length > 0) {
+            const names = data.skipped.map((s) => s.productName).join(", ");
+            setError(`Alcune schede saltate: ${names}. Verifica i duplicati.`);
+          }
+          resetItemsProposalState();
+        },
+        onError: (err: Error) => setError(err.message),
+      },
+    );
+  }
+
+  function handleDiscardItemProposal(clientKey: string) {
+    const next = itemProposals.filter((p) => p.clientKey !== clientKey);
+    setItemProposals(next);
+    if (next.length === 0) resetItemsProposalState();
   }
 
   const filteredShopify = (shopifyData?.products ?? []).filter((p) => {
@@ -553,10 +846,115 @@ export function BrandProductKnowledgePanel({ projectId }: BrandProductKnowledgeP
           </button>
         </div>
 
+        <div className="bi-pk-items-import" style={{ marginTop: "1.5rem" }}>
+          <h4 className="bi-panel__title">Importa schede prodotto da file</h4>
+          <p className="bi-panel__subtitle">
+            Carica un file con informazioni sui prodotti. L&apos;AI creerà una proposta di schede
+            prodotto specifiche compilando solo i dati presenti o chiaramente deducibili dal file.
+            Potrai modificare tutto prima di salvare.
+          </p>
+          <div
+            className="bi-dropzone"
+            onClick={() => itemsFileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && itemsFileInputRef.current?.click()}
+          >
+            <p className="bi-dropzone__title">Carica file</p>
+            <p className="bi-dropzone__hint">PDF, DOCX, TXT o MD — max 15 MB</p>
+            {itemsSelectedFile && (
+              <p>
+                Selezionato: <strong>{itemsSelectedFile.name}</strong>
+              </p>
+            )}
+            <input
+              ref={itemsFileInputRef}
+              type="file"
+              accept={ACCEPTED_EXTENSIONS}
+              style={{ display: "none" }}
+              onChange={(e) => {
+                setItemsSelectedFile(e.target.files?.[0] ?? null);
+                setError(null);
+              }}
+            />
+          </div>
+          <div className="bi-profile-block__actions">
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              disabled={importItemsFile.isPending || !itemsSelectedFile}
+              onClick={handleGenerateItemsProposal}
+            >
+              {importItemsFile.isPending ? "Generazione…" : "Genera schede prodotto"}
+            </button>
+          </div>
+        </div>
+
+        {itemProposals.length > 0 && (
+          <section className="bi-pk-proposals-section" style={{ marginTop: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+              <div>
+                <h4 className="bi-panel__title">Proposta schede prodotto</h4>
+                {itemsImportResult && (
+                  <p className="bi-panel__subtitle">
+                    {itemsImportResult.sourceSummary && (
+                      <>Anteprima: {itemsImportResult.sourceSummary.slice(0, 120)}… </>
+                    )}
+                    {itemsImportResult.warnings.length > 0 && itemsImportResult.warnings.join(" ")}
+                  </p>
+                )}
+              </div>
+              <div className="bi-profile-block__actions" style={{ margin: 0 }}>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--primary"
+                  disabled={applyItemsProposal.isPending}
+                  onClick={handleSaveAllItemProposals}
+                >
+                  {applyItemsProposal.isPending ? "Salvataggio…" : "Salva tutte le schede valide"}
+                </button>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--ghost"
+                  onClick={resetItemsProposalState}
+                >
+                  Scarta proposta
+                </button>
+              </div>
+            </div>
+            <div className="bi-accordion-list" style={{ marginTop: "1rem" }}>
+              {itemProposals.map((itemProposal) => (
+                <ItemProposalAccordion
+                  key={itemProposal.clientKey}
+                  proposal={itemProposal}
+                  expanded={expandedProposalKey === itemProposal.clientKey}
+                  onToggle={() =>
+                    setExpandedProposalKey(
+                      expandedProposalKey === itemProposal.clientKey
+                        ? null
+                        : itemProposal.clientKey,
+                    )
+                  }
+                  onChange={(next) =>
+                    setItemProposals((prev) =>
+                      prev.map((p) => (p.clientKey === next.clientKey ? next : p)),
+                    )
+                  }
+                  onSave={() => handleSaveItemProposal(itemProposal)}
+                  onDiscard={() => handleDiscardItemProposal(itemProposal.clientKey)}
+                  saving={applyItemsProposal.isPending}
+                  shopifyProducts={shopifyData?.products ?? []}
+                  shopifyConnected={shopifyData?.shopifyConnected ?? false}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {itemsLoading && <p className="bi-panel__subtitle">Caricamento schede…</p>}
-        {!itemsLoading && items.length === 0 && (
+        {!itemsLoading && items.length === 0 && !hasItemProposals && (
           <p className="bi-panel__subtitle" style={{ marginTop: "1rem" }}>
-            Nessuna scheda prodotto. Aggiungi un prodotto da Shopify per iniziare.
+            Nessuna scheda prodotto. Aggiungi un prodotto da Shopify o importa schede da file.
           </p>
         )}
         <div className="bi-accordion-list" style={{ marginTop: "1rem" }}>

@@ -417,6 +417,72 @@ export interface BrandProductKnowledgeShopifyProductsResponse {
   products: BrandProductKnowledgeShopifyProductOption[];
 }
 
+export interface BrandProductKnowledgeItemProposal {
+  productName: string;
+  productLine?: string | null;
+  priority?: string | null;
+  strategicDescription?: string | null;
+  origin?: string | null;
+  ingredients?: string | null;
+  productionProcess?: string | null;
+  tasteNotes?: string | null;
+  colorNotes?: string | null;
+  textureNotes?: string | null;
+  usageSuggestions?: string | null;
+  conservation?: string | null;
+  targetAudience?: string | null;
+  objections?: string[] | null;
+  faq?: Array<{ question: string; answer: string }> | null;
+  allowedClaims?: string[] | null;
+  forbiddenClaims?: string[] | null;
+  seoNotes?: string | null;
+  adsSocialNotes?: string | null;
+  relatedProducts?: string[] | null;
+  missingFields?: string[];
+  confidence?: number;
+  warnings?: string[];
+  suggestedShopifyProductId?: string | null;
+  suggestedShopifyTitle?: string | null;
+  suggestedShopifyHandle?: string | null;
+  shopifyMatchConfidence?: number | null;
+  shopifyProductId?: string | null;
+  clientKey?: string | null;
+}
+
+export interface BrandProductKnowledgeItemsProposal {
+  items: BrandProductKnowledgeItemProposal[];
+}
+
+export interface BrandProductKnowledgeItemsImportResponse {
+  proposal: BrandProductKnowledgeItemsProposal;
+  sourceSummary: string;
+  warnings: string[];
+}
+
+export interface BrandProductKnowledgeItemsApplyImportRequest {
+  items: BrandProductKnowledgeItemProposal[];
+}
+
+export interface BrandProductKnowledgeDuplicateCandidate {
+  existingItemId: string;
+  productName: string;
+  shopifyHandle?: string | null;
+  reason: string;
+  completionStatus?: ModuleCompletionStatus | null;
+}
+
+export interface BrandProductKnowledgeSkippedItem {
+  productName: string;
+  reason: string;
+  duplicateCandidates: BrandProductKnowledgeDuplicateCandidate[];
+}
+
+export interface BrandProductKnowledgeItemsApplyImportResponse {
+  saved: BrandProductKnowledgeItem[];
+  skipped: BrandProductKnowledgeSkippedItem[];
+  message: string;
+}
+
 export interface BrandProductKnowledgeGeneralRulesContext {
   generalPrinciples: string[];
   commonStrengths: string[];

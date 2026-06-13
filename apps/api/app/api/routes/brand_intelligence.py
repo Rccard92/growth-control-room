@@ -32,6 +32,9 @@ from app.schemas.brand_product_knowledge import (
     BrandProductKnowledgeItemFromShopifyRequest,
     BrandProductKnowledgeItemRead,
     BrandProductKnowledgeItemUpdate,
+    BrandProductKnowledgeItemsApplyImportRequest,
+    BrandProductKnowledgeItemsApplyImportResponse,
+    BrandProductKnowledgeItemsImportResponse,
     BrandProductKnowledgeShopifyProductOption,
     BrandProductKnowledgeShopifyProductsResponse,
 )
@@ -155,7 +158,9 @@ from app.services.brand_intelligence.product_knowledge_general_service import (
     get_general,
     upsert_general,
 )
+from app.services.brand_intelligence.product_knowledge_items_import import import_items_from_file
 from app.services.brand_intelligence.product_knowledge_item_service import (
+    apply_items_import_proposal,
     create_item_from_shopify,
     delete_item,
     get_item,
@@ -597,6 +602,41 @@ async def list_product_knowledge_items(
         read.completion_status = item_completion(row)
         result.append(read)
     return result
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/product-knowledge/items/import-file",
+    response_model=BrandProductKnowledgeItemsImportResponse,
+    response_model_by_alias=True,
+)
+async def import_product_knowledge_items_file(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeItemsImportResponse:
+    await get_project_in_default_workspace(project_id, session)
+    data = await file.read()
+    return await import_items_from_file(
+        session,
+        project_id,
+        filename=file.filename or "document",
+        content_type=file.content_type,
+        data=data,
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/product-knowledge/items/apply-import-proposal",
+    response_model=BrandProductKnowledgeItemsApplyImportResponse,
+    response_model_by_alias=True,
+)
+async def apply_product_knowledge_items_import_proposal(
+    project_id: UUID,
+    payload: BrandProductKnowledgeItemsApplyImportRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeItemsApplyImportResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await apply_items_import_proposal(session, project_id, payload.items)
 
 
 @router.post(

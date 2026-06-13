@@ -27,12 +27,26 @@ La UI espone sei tab:
 3. Applica proposta → `brand_product_knowledge_general`
 4. Nessun auto-save
 
+### Import file schede prodotto specifiche
+
+1. Nella sezione **Schede prodotto specifiche**, carica un file (catalogo master, schede tecniche)
+2. L'AI estrae **solo** schede prodotto identificate nel file — una per prodotto
+3. Compila **solo** i campi presenti o chiaramente deducibili; i restanti restano vuoti
+4. Match automatico con prodotti Shopify sincronizzati (titolo/handle); override manuale in UI
+5. Proposta modificabile per ogni scheda → **Salva scheda** o **Salva tutte le schede valide**
+6. Duplicati (stesso nome o stesso `shopify_product_id`): **non sovrascritti** — warning + salvataggio manuale
+7. Nessun auto-save; nessun field-level AI in questo step
+
+| Metodo | Path |
+|--------|------|
+| POST | `/brand-intelligence/product-knowledge/items/import-file` |
+| POST | `/brand-intelligence/product-knowledge/items/apply-import-proposal` |
+
 ### Schede prodotto da Shopify
 
 1. CTA "Aggiungi prodotto da Shopify" → lista prodotti sincronizzati
 2. `POST .../items/from-shopify` crea scheda precompilata (nome, handle, GID, product line)
 3. Compilazione manuale accordion; salvataggio per item
-4. Import file per singolo prodotto: **non in v1**
 
 **Completion modulo:** generale presente **e** ≥1 item = completo; generale **oppure** ≥1 item = parziale.
 
@@ -47,6 +61,8 @@ La UI espone sei tab:
 | POST | `/brand-intelligence/product-knowledge/general/apply-proposal` |
 | GET | `/brand-intelligence/product-knowledge/shopify-products` |
 | GET/POST | `/brand-intelligence/product-knowledge/items` |
+| POST | `/brand-intelligence/product-knowledge/items/import-file` |
+| POST | `/brand-intelligence/product-knowledge/items/apply-import-proposal` |
 | POST | `/brand-intelligence/product-knowledge/items/from-shopify` |
 | GET/PUT/DELETE | `/brand-intelligence/product-knowledge/items/{item_id}` |
 
