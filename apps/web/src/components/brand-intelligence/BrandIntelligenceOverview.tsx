@@ -52,15 +52,55 @@ export function BrandIntelligenceOverviewPanel({
             <div className="bi-onboarding-card">
               <h4 className="bi-onboarding-card__title">Importa da file con AI</h4>
               <p className="bi-onboarding-card__desc">
-                Carica PDF, Word, cataloghi o schede prodotto. L&apos;AI estrarrà le informazioni e le
-                organizzerà nelle sezioni Brand Intelligence — dovrai approvarle prima del salvataggio.
+                Carica PDF, Word, cataloghi o fonti pubbliche. L&apos;AI genera un Brand Intelligence
+                Brief flessibile da revisionare e approvare — nessun salvataggio automatico.
               </p>
               <button type="button" className="gcr-btn gcr-btn--ghost gcr-btn--sm" onClick={onStartImport}>
-                Carica documenti
+                Genera Brand Intelligence Brief
               </button>
             </div>
           </div>
         </section>
+      )}
+
+      {(overview.pendingBriefCount ?? 0) > 0 && (
+        <div className="gcr-alert gcr-alert--info" style={{ marginBottom: "1rem" }}>
+          Brief in bozza da revisionare: {overview.pendingBriefCount}.{" "}
+          <button type="button" className="gcr-btn gcr-btn--primary gcr-btn--sm" onClick={onStartImport}>
+            Apri e approva brief
+          </button>
+        </div>
+      )}
+
+      {overview.hasApprovedBrief && (
+        <section className="bi-brief-overview gcr-card" style={{ marginBottom: "1rem" }}>
+          <div className="bi-brief-overview__header">
+            <h3 className="bi-panel__title">Brief ufficiale attivo</h3>
+            <span className="bi-brief-badge bi-brief-badge--active">v{overview.briefVersion ?? 1}</span>
+          </div>
+          <p className="bi-panel__subtitle">
+            {overview.briefApprovedAt
+              ? `Approvato il ${new Date(overview.briefApprovedAt).toLocaleDateString("it-IT")}`
+              : "Brief approvato — fonte primaria per tutti i moduli AI."}
+          </p>
+          <div className="bi-wizard__actions">
+            <button type="button" className="gcr-btn gcr-btn--primary gcr-btn--sm" onClick={onStartImport}>
+              Apri brief ufficiale
+            </button>
+            <button type="button" className="gcr-btn gcr-btn--ghost gcr-btn--sm" onClick={onStartImport}>
+              Aggiorna con nuovi file/fonti
+            </button>
+          </div>
+        </section>
+      )}
+
+      {!overview.hasApprovedBrief && !showOnboarding && (
+        <div className="gcr-alert" style={{ marginBottom: "1rem" }}>
+          Nessun Brand Intelligence Brief approvato.{" "}
+          <button type="button" className="gcr-btn gcr-btn--primary gcr-btn--sm" onClick={onStartImport}>
+            Genera Brand Intelligence Brief da file/fonti
+          </button>
+        </div>
       )}
 
       {(overview.pendingSectionDraftsCount ?? 0) > 0 && (

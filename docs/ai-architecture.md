@@ -9,7 +9,16 @@ from app.services.brand_intelligence.context import BrandIntelligenceContextBuil
 
 bundle = await BrandIntelligenceContextBuilder.build_brand_context(session, project_id)
 prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
+# bundle.primary_source == "brand_intelligence_brief" se esiste brief approvato
 ```
+
+**Priorità context (0.2.6 Brief Mode):**
+
+1. `BrandIntelligenceBrief` con `status=approved` → `primarySource=brand_intelligence_brief`, `brandBrief` nel bundle
+2. Tabelle CRUD strutturate → `primarySource=structured_tables` (dati secondari nel prompt)
+3. Nessun dato → `primarySource=minimal`, fallback modulo
+
+Moduli futuri (PED, Ads, Email) devono leggere preferibilmente `brandBrief` dal bundle. SEO v1 usa `get_prompt_context` senza modifiche dirette — beneficia automaticamente del brief approvato.
 
 Se `prompt_block` è `None`, il modulo decide se bloccare (futuro) o procedere con fallback (SEO v1).
 
@@ -17,20 +26,19 @@ Se `prompt_block` è `None`, il modulo decide se bloccare (futuro) o procedere c
 
 ## Popolamento Brand Intelligence
 
-Due percorsi equivalenti per i dati ufficiali:
-
 | Percorso | Salvataggio |
 |----------|-------------|
-| Wizard / tab CRUD | Diretto su tabelle ufficiali |
-| AI File Import (facts) | Facts `suggested` → review → `approved` → `apply` |
-| AI Section Synthesis (0.2.3) | Bozze `draft` → review → `approved` → `apply` (enrich non distruttivo) |
-| Source Enrichment (0.2.4) | URL sito/social/recensioni → fetch leggero → facts/bozze (proposta) |
+| **Brand Intelligence Brief (0.2.6)** | Brief `draft` → review → `approved` → fonte primaria AI |
+| Wizard / tab CRUD | Diretto su tabelle ufficiali (secondario nel context) |
+| AI File Import (facts) | Evidenze tecniche; apply opzionale su tabelle |
+| AI Section Synthesis (0.2.3) | Dettagli tecnici; apply opzionale (non flusso principale) |
+| Source Enrichment (0.2.4) | Input al brief e ai facts |
 
-Il ContextBuilder legge **solo** tabelle ufficiali. Sono esclusi dal contesto AI:
+Il ContextBuilder legge il **brief approvato** come primario e le **tabelle ufficiali** come secondario. Esclusi dal contesto AI primario:
 
-- Facts in `brand_extracted_facts` non approvati
-- Bozze in `brand_section_drafts` non applicate (`draft`, `needs_review`, `approved`, `rejected`)
-- Contenuti fetchati da `brand_external_sources` (solo input alla proposta AI)
+- Facts non approvati
+- Bozze section draft non applicate
+- Brief in stato `draft` (fino ad approve)
 
 ```mermaid
 sequenceDiagram

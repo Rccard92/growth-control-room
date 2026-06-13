@@ -10,6 +10,9 @@ import type {
   BrandExtractedFact,
   BrandExternalSource,
   BrandExternalSourceInput,
+  BrandIntelligenceBrief,
+  BrandIntelligenceBriefListItem,
+  GenerateBriefResponse,
   BrandImportBatchListItem,
   BrandImportBatchStartResponse,
   BrandImportBatchStatusResponse,
@@ -541,5 +544,68 @@ export function regenerateSectionDraft(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data ?? {}),
     },
+  );
+}
+
+export function generateBrandBrief(
+  projectId: string,
+  batchId: string,
+): Promise<GenerateBriefResponse> {
+  return apiFetch<GenerateBriefResponse>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/generate-brief`,
+    { method: "POST" },
+  );
+}
+
+export function listBrandBriefs(projectId: string): Promise<BrandIntelligenceBriefListItem[]> {
+  return apiFetch<BrandIntelligenceBriefListItem[]>(
+    `/api/projects/${projectId}/brand-intelligence/briefs`,
+  );
+}
+
+export function getBrandBrief(projectId: string, briefId: string): Promise<BrandIntelligenceBrief> {
+  return apiFetch<BrandIntelligenceBrief>(
+    `/api/projects/${projectId}/brand-intelligence/briefs/${briefId}`,
+  );
+}
+
+export function patchBrandBrief(
+  projectId: string,
+  briefId: string,
+  data: Partial<{
+    title: string;
+    briefPayload: unknown;
+    markdownSummary: string;
+    warnings: unknown;
+    status: string;
+  }>,
+): Promise<BrandIntelligenceBrief> {
+  return apiFetch<BrandIntelligenceBrief>(
+    `/api/projects/${projectId}/brand-intelligence/briefs/${briefId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function approveBrandBrief(
+  projectId: string,
+  briefId: string,
+): Promise<BrandIntelligenceBrief> {
+  return apiFetch<BrandIntelligenceBrief>(
+    `/api/projects/${projectId}/brand-intelligence/briefs/${briefId}/approve`,
+    { method: "POST" },
+  );
+}
+
+export function archiveBrandBrief(
+  projectId: string,
+  briefId: string,
+): Promise<BrandIntelligenceBrief> {
+  return apiFetch<BrandIntelligenceBrief>(
+    `/api/projects/${projectId}/brand-intelligence/briefs/${briefId}/archive`,
+    { method: "POST" },
   );
 }

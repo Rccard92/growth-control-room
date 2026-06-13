@@ -336,6 +336,11 @@ class BrandIntelligenceOverviewResponse(BaseModel):
         default=0, serialization_alias="pendingSectionDraftsCount"
     )
     latest_batch_id: UUID | None = Field(default=None, serialization_alias="latestBatchId")
+    has_approved_brief: bool = Field(default=False, serialization_alias="hasApprovedBrief")
+    approved_brief_id: UUID | None = Field(default=None, serialization_alias="approvedBriefId")
+    brief_version: int | None = Field(default=None, serialization_alias="briefVersion")
+    brief_approved_at: datetime | None = Field(default=None, serialization_alias="briefApprovedAt")
+    pending_brief_count: int = Field(default=0, serialization_alias="pendingBriefCount")
 
 
 class BrandSectionDraftRead(BaseModel):
@@ -584,7 +589,7 @@ class BrandImportBatchRefreshContextRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     refetch_external_sources: bool = Field(default=True, validation_alias="refetchExternalSources")
-    regenerate_section_drafts: bool = Field(default=True, validation_alias="regenerateSectionDrafts")
+    regenerate_section_drafts: bool = Field(default=False, validation_alias="regenerateSectionDrafts")
     archive_previous_drafts: bool = Field(default=True, validation_alias="archivePreviousDrafts")
 
 
@@ -744,6 +749,10 @@ class BrandApplyFactsResponse(BaseModel):
 class BrandContextBundleResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    primary_source: str = Field(default="minimal", serialization_alias="primarySource")
+    approved_brief_id: UUID | None = Field(default=None, serialization_alias="approvedBriefId")
+    brief_version: int | None = Field(default=None, serialization_alias="briefVersion")
+    brand_brief: Any | None = Field(default=None, serialization_alias="brandBrief")
     profile: BrandProfileRead | None = None
     voice: BrandVoiceRead | None = None
     products: list[BrandProductKnowledgeRead] = []

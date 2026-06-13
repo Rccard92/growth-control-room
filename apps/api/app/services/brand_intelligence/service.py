@@ -436,6 +436,10 @@ async def build_overview(
         ).scalar_one()
     )
 
+    from app.services.brand_intelligence.brief_service import (
+        count_pending_briefs,
+        get_approved_brief,
+    )
     from app.services.brand_intelligence.section_drafts_service import (
         count_pending_section_drafts,
         get_latest_batch_id,
@@ -443,6 +447,8 @@ async def build_overview(
 
     pending_drafts = await count_pending_section_drafts(session, project_id)
     latest_batch = await get_latest_batch_id(session, project_id)
+    approved_brief = await get_approved_brief(session, project_id)
+    pending_briefs = await count_pending_briefs(session, project_id)
 
     sections = [
         BrandSectionStatus(
@@ -469,6 +475,11 @@ async def build_overview(
         pending_facts_count=pending_facts,
         pending_section_drafts_count=pending_drafts,
         latest_batch_id=latest_batch,
+        has_approved_brief=approved_brief is not None,
+        approved_brief_id=approved_brief.id if approved_brief else None,
+        brief_version=approved_brief.version if approved_brief else None,
+        brief_approved_at=approved_brief.approved_at if approved_brief else None,
+        pending_brief_count=pending_briefs,
     )
 
 

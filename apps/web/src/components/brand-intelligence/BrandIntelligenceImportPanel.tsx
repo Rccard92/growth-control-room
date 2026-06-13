@@ -7,8 +7,10 @@ import { BrandFileDropzone } from "./BrandFileDropzone";
 import { BrandImportDocumentsList } from "./BrandImportDocumentsList";
 import { BrandImportHistoryPanel } from "./BrandImportHistoryPanel";
 import { BrandImportProgressBar } from "./BrandImportProgressBar";
+import { BrandIntelligenceBriefPanel } from "./BrandIntelligenceBriefPanel";
 import { BrandSectionDraftsGrid } from "./BrandSectionDraftsGrid";
 import {
+  useBrandBrief,
   useBrandExtractedFacts,
   useBrandProfile,
   useBrandSourceDocuments,
@@ -25,7 +27,7 @@ import {
 const STEPS = [
   { id: 1, label: "Fonti e documenti" },
   { id: 2, label: "Elaborazione" },
-  { id: 3, label: "Revisiona bozze" },
+  { id: 3, label: "Brand Brief" },
 ] as const;
 
 const READY_STATUSES = new Set(["review_ready", "partially_failed", "completed"]);
@@ -40,7 +42,8 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [showDetailedFacts, setShowDetailedFacts] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [briefId, setBriefId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [brandName, setBrandName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -55,6 +58,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
   });
   const { data: sectionDrafts = [] } = useSectionDrafts(projectId, batchId ? { batchId } : undefined);
   const { data: facts = [] } = useBrandExtractedFacts(projectId, batchId ? { batchId } : undefined);
+  const { data: brief } = useBrandBrief(projectId, briefId ?? undefined);
 
   const upload = useUploadBrandSources(projectId);
   const startBatch = useStartImportBatch(projectId);
@@ -188,6 +192,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
 
   function openReviewForBatch(id: string) {
     setBatchId(id);
+    setBriefId(null);
     setStep(3);
   }
 
@@ -291,8 +296,8 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
         <div className="bi-panel">
           <h3 className="bi-panel__title">Elaborazione import</h3>
           <p className="bi-panel__subtitle">
-            Estrazione testo, recupero fonti esterne, facts, sintesi per sezione e rilevamento
-            conflitti. Il progresso si aggiorna automaticamente ogni 2 secondi.
+            Estrazione testo, recupero fonti esterne e facts. Al termine genera il Brand Intelligence
+            Brief. Il progresso si aggiorna automaticamente ogni 2 secondi.
           </p>
 
           {batchStatus ? (
@@ -330,7 +335,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
                     className="gcr-btn gcr-btn--primary"
                     onClick={() => setStep(3)}
                   >
-                    Revisiona bozze Brand Intelligence ({sectionDrafts.length || "…"} sezioni)
+                    Genera Brand Intelligence Brief
                   </button>
                 </div>
               )}
@@ -354,43 +359,49 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
 
       {step === 3 && (
         <div className="bi-panel">
-          <h3 className="bi-panel__title">Bozze Brand Intelligence generate</h3>
-          <p className="bi-panel__subtitle">
-            Revisiona ogni sezione come bozza completa. Approva e applica solo ciò che vuoi salvare
-            nella Brand Intelligence ufficiale. I facts e le fonti esterne restano come evidenze.
-          </p>
-
-          {analyzedSources.length > 0 && (
-            <BrandAnalyzedSourcesPanel sources={analyzedSources} warnings={batchStatus?.warnings} />
-          )}
-
-          <BrandSectionDraftsGrid
+          <BrandIntelligenceBriefPanel
             projectId={projectId}
             batchId={batchId}
-            drafts={sectionDrafts}
-            externalSources={analyzedSources}
+            brief={brief}
+            onBriefGenerated={setBriefId}
           />
 
           <div style={{ marginTop: "1.5rem" }}>
             <button
               type="button"
               className="gcr-btn gcr-btn--ghost gcr-btn--sm"
-              onClick={() => setShowDetailedFacts((v) => !v)}
+              onClick={() => setShowTechnicalDetails((v) => !v)}
             >
-              {showDetailedFacts ? "Nascondi review dettagliata facts" : "Review dettagliata facts"}
+              {showTechnicalDetails
+                ? "Nascondi dettagli tecnici"
+                : "Dettagli tecnici — fonti e facts"}
             </button>
           </div>
 
-          {showDetailedFacts && (
+          {showTechnicalDetails && (
             <div style={{ marginTop: "1rem" }}>
-              <BrandExtractedFactsReview
-                facts={facts.filter((f) => f.status !== "rejected")}
-                onApprove={() => {}}
-                onReject={() => {}}
-                onMoveSection={() => {}}
-                onEditValue={() => {}}
-                onApply={() => {}}
+              {analyzedSources.length > 0 && (
+                <BrandAnalyzedSourcesPanel
+                  sources={analyzedSources}
+                  warnings={batchStatus?.warnings}
+                />
+              )}
+              <BrandSectionDraftsGrid
+                projectId={projectId}
+                batchId={batchId}
+                drafts={sectionDrafts}
+                externalSources={analyzedSources}
               />
+              <div style={{ marginTop: "1rem" }}>
+                <BrandExtractedFactsReview
+                  facts={facts.filter((f) => f.status !== "rejected")}
+                  onApprove={() => {}}
+                  onReject={() => {}}
+                  onMoveSection={() => {}}
+                  onEditValue={() => {}}
+                  onApply={() => {}}
+                />
+              </div>
             </div>
           )}
 

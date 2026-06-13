@@ -237,6 +237,43 @@ class BrandImportBatch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="batch",
         cascade="all, delete-orphan",
     )
+    intelligence_briefs: Mapped[list["BrandIntelligenceBrief"]] = relationship(
+        back_populates="source_batch",
+        cascade="all, delete-orphan",
+    )
+
+
+class BrandIntelligenceBrief(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_intelligence_briefs"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    source_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("brand_import_batches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(50), default="draft", index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    brief_payload: Mapped[Any] = mapped_column(JSONB, nullable=False, default=dict)
+    markdown_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warnings: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
+    source_document_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    source_external_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    source_fact_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_intelligence_briefs")
+    source_batch: Mapped["BrandImportBatch | None"] = relationship(
+        back_populates="intelligence_briefs",
+    )
 
 
 class BrandExternalSource(Base, UUIDPrimaryKeyMixin, TimestampMixin):

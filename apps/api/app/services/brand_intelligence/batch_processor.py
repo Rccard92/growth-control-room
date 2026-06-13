@@ -380,32 +380,7 @@ async def process_batch(batch_id: UUID) -> None:
             await update_batch_progress(
                 session,
                 batch,
-                progress_percent=75,
-                current_step="Sintesi sezioni Brand Intelligence",
-                status="ai_processing",
-                commit=True,
-            )
-
-            try:
-                from app.services.brand_intelligence.synthesis import synthesize_batch
-
-                await synthesize_batch(session, project_id, batch_id, update_progress=True)
-            except Exception as exc:
-                logger.warning("Batch synthesis skipped or failed for %s: %s", batch_id, exc)
-                batch = (
-                    await session.execute(
-                        select(BrandImportBatch).where(BrandImportBatch.id == batch_id)
-                    )
-                ).scalar_one()
-                warnings_list = list(batch.warnings or [])
-                warnings_list.append(f"Sintesi sezioni non completata: {exc}")
-                batch.warnings = warnings_list
-                await session.commit()
-
-            await update_batch_progress(
-                session,
-                batch,
-                progress_percent=95,
+                progress_percent=90,
                 current_step="Preparazione review",
                 commit=True,
             )
@@ -433,7 +408,7 @@ async def process_batch(batch_id: UUID) -> None:
                 batch,
                 status=final_status,
                 progress_percent=100,
-                current_step="Bozze pronte per revisione" if final_status != "failed" else "Elaborazione fallita",
+                current_step="Pronto per generare Brand Brief" if final_status != "failed" else "Elaborazione fallita",
                 commit=True,
             )
 

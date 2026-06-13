@@ -64,6 +64,9 @@ export const queryKeys = {
       ["brandIntelligence", projectId, "sectionDrafts", filters ?? {}] as const,
     sectionDraft: (projectId: string, draftId: string) =>
       ["brandIntelligence", projectId, "sectionDraft", draftId] as const,
+    briefs: (projectId: string) => ["brandIntelligence", projectId, "briefs"] as const,
+    brief: (projectId: string, briefId: string) =>
+      ["brandIntelligence", projectId, "brief", briefId] as const,
   },
   health: ["health"] as const,
 };

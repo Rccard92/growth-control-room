@@ -5,6 +5,9 @@ Any AI module that generates brand-facing content must call
 BrandIntelligenceContextBuilder before generating output.
 """
 
+from __future__ import annotations
+
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -34,19 +37,32 @@ from app.schemas.brand_intelligence import (
     BrandSeoStrategyRead,
     BrandVoiceRead,
 )
-from app.services.brand_intelligence.score import (
-    BrandKnowledgeScore,
-    compute_brand_knowledge_score,
-    score_to_response,
-)
+from app.services.brand_intelligence.brief_service import get_approved_brief
+from app.services.brand_intelligence.score import compute_brand_knowledge_score, score_to_response
+
+
+def _as_str_list(items: list[Any], limit: int = 8) -> str:
+    out: list[str] = []
+    for item in items[:limit]:
+        if isinstance(item, str):
+            out.append(item)
+        elif isinstance(item, dict):
+            for key in ("name", "title", "label", "text", "segment"):
+                if item.get(key):
+                    out.append(str(item[key]))
+                    break
+            else:
+                out.append(str(item))
+        else:
+            out.append(str(item))
+    return ", ".join(out)
 
 
 class BrandIntelligenceContextBuilder:
     """
     Central source of truth for brand context used by all AI modules.
 
-    Any AI module that generates brand-facing content must call
-    BrandIntelligenceContextBuilder before generating output.
+    Priority: approved Brand Intelligence Brief > structured CRUD tables > minimal.
     """
 
     @staticmethod
@@ -54,6 +70,8 @@ class BrandIntelligenceContextBuilder:
         session: AsyncSession,
         project_id: UUID,
     ) -> BrandContextBundleResponse:
+        approved_brief = await get_approved_brief(session, project_id)
+
         profile = (
             await session.execute(select(BrandProfile).where(BrandProfile.project_id == project_id))
         ).scalar_one_or_none()
@@ -120,7 +138,29 @@ class BrandIntelligenceContextBuilder:
         products = [p for p in products_raw if p.entity_type == "product"]
         categories = [p for p in products_raw if p.entity_type == "category"]
 
+        has_structured = bool(
+            profile
+            or voice
+            or products
+            or audience
+            or claims
+            or seo
+            or pillars
+            or guardrails
+        )
+
+        if approved_brief:
+            primary_source = "brand_intelligence_brief"
+        elif has_structured:
+            primary_source = "structured_tables"
+        else:
+            primary_source = "minimal"
+
         return BrandContextBundleResponse(
+            primary_source=primary_source,
+            approved_brief_id=approved_brief.id if approved_brief else None,
+            brief_version=approved_brief.version if approved_brief else None,
+            brand_brief=approved_brief.brief_payload if approved_brief else None,
             profile=BrandProfileRead.model_validate(profile) if profile else None,
             voice=BrandVoiceRead.model_validate(voice) if voice else None,
             products=[BrandProductKnowledgeRead.model_validate(p) for p in products],
@@ -135,8 +175,58 @@ class BrandIntelligenceContextBuilder:
         )
 
     @staticmethod
-    def format_for_prompt(bundle: BrandContextBundleResponse) -> str | None:
-        """Compact text block for AI system prompts. Returns None if no meaningful data."""
+    def format_brief_for_prompt(brief_payload: dict[str, Any]) -> str:
+        parts: list[str] = ["# Brand Intelligence Brief"]
+
+        identity = brief_payload.get("brand_identity") or {}
+        if identity.get("brand_name"):
+            parts.append(f"- Brand: {identity['brand_name']}")
+        if identity.get("short_description"):
+            parts.append(f"- Description: {identity['short_description']}")
+        if identity.get("mission"):
+            parts.append(f"- Mission: {identity['mission']}")
+        values = identity.get("values") or []
+        if values:
+            parts.append(f"- Values: {_as_str_list(values)}")
+
+        voice = brief_payload.get("voice_and_tone") or {}
+        if voice.get("tone"):
+            parts.append(f"- Tone: {voice['tone']}")
+        if voice.get("words_to_use"):
+            parts.append(f"- Words to use: {_as_str_list(voice['words_to_use'], 10)}")
+        if voice.get("words_to_avoid"):
+            parts.append(f"- Words to avoid: {_as_str_list(voice['words_to_avoid'], 10)}")
+
+        products = brief_payload.get("products_and_categories") or []
+        if products:
+            parts.append(f"- Products: {_as_str_list(products, 5)}")
+
+        claims = brief_payload.get("claims_compliance") or {}
+        forbidden = claims.get("forbidden_claims") or []
+        caution = claims.get("caution_claims") or []
+        if forbidden or caution:
+            parts.append(
+                f"- Claims caution/forbidden: {_as_str_list(list(forbidden) + list(caution), 6)}"
+            )
+
+        guardrails = brief_payload.get("ai_guardrails") or {}
+        must_not = guardrails.get("must_not") or []
+        if must_not:
+            parts.append(f"- AI must NOT: {_as_str_list(must_not, 5)}")
+
+        seo = brief_payload.get("seo_guidelines") or {}
+        keywords = seo.get("primary_keywords") or []
+        if keywords:
+            parts.append(f"- Primary keywords: {_as_str_list(keywords, 8)}")
+
+        missing = brief_payload.get("missing_information") or []
+        if missing:
+            parts.append(f"- Missing information (verify): {_as_str_list(missing, 5)}")
+
+        return "\n".join(parts)
+
+    @staticmethod
+    def format_structured_for_prompt(bundle: BrandContextBundleResponse) -> str | None:
         parts: list[str] = []
 
         if bundle.profile:
@@ -188,15 +278,29 @@ class BrandIntelligenceContextBuilder:
         if not parts:
             return None
 
-        return "# Brand Intelligence\n" + "\n".join(f"- {line}" for line in parts)
+        return "## Structured data (secondary)\n" + "\n".join(f"- {line}" for line in parts)
+
+    @staticmethod
+    def format_for_prompt(bundle: BrandContextBundleResponse) -> str | None:
+        """Compact text block for AI system prompts."""
+        if bundle.primary_source == "brand_intelligence_brief" and bundle.brand_brief:
+            main = BrandIntelligenceContextBuilder.format_brief_for_prompt(bundle.brand_brief)
+            secondary = BrandIntelligenceContextBuilder.format_structured_for_prompt(bundle)
+            if secondary:
+                return main + "\n\n" + secondary
+            return main
+
+        structured = BrandIntelligenceContextBuilder.format_structured_for_prompt(bundle)
+        if structured:
+            return "# Brand Intelligence\n" + structured.replace("## Structured data (secondary)\n", "")
+        return None
 
     @staticmethod
     async def get_prompt_context(
         session: AsyncSession,
         project_id: UUID,
     ) -> str | None:
-        """Load bundle and return prompt-ready text, or None for fallback."""
         bundle = await BrandIntelligenceContextBuilder.build_brand_context(session, project_id)
-        if bundle.knowledge_score.overall_score < 10:
+        if bundle.primary_source == "minimal" and bundle.knowledge_score.overall_score < 10:
             return None
         return BrandIntelligenceContextBuilder.format_for_prompt(bundle)

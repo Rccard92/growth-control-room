@@ -74,7 +74,45 @@ Dopo conflict detection nel batch job, `synthesis.py` genera fino a 9 bozze (`br
 - Liste (prodotti, audience, claims, …): match per nome/titolo, create se nuovo, enrich se esiste con campi vuoti
 - Dopo apply: `status=applied`, `applied_at` impostato; score riflette solo dati ufficiali
 
-Senza `OPENAI_API_KEY`: batch completa facts, synthesis fallisce con warning su batch; endpoint `POST .../synthesize` risponde 503.
+Senza `OPENAI_API_KEY`: batch completa facts; `POST .../generate-brief` e `POST .../synthesize` rispondono 503.
+
+## Brand Intelligence Brief Mode (0.2.6)
+
+Il **Brand Intelligence Brief** è la fonte primaria approvata per tutti i moduli AI. Sostituisce il flusso principale basato su 9 section drafts Pydantic-rigidi.
+
+### Flusso principale
+
+1. Upload file e/o fonti esterne → estrazione facts (batch async)
+2. **Genera Brand Intelligence Brief** — `POST .../import-batches/{batchId}/generate-brief`
+3. Revisione/modifica del brief (editor a macro-sezioni)
+4. **Approva brief** — `POST .../briefs/{briefId}/approve` (archivia brief approved precedente)
+5. `BrandContextBuilder` usa `primarySource=brand_intelligence_brief`
+
+### Macro-sezioni `brief_payload`
+
+Identità brand, voice & tone, prodotti/categorie, audience, domande/obiezioni, claims & compliance, SEO guidelines, content pillars, ads/social guidelines, AI guardrails, `missing_information`, `source_warnings`.
+
+Validazione **flessibile** (`sanitize_brief_payload`): sezioni parziali salvate con warning; oggetti in `priority_pages` accettati; nessun errore Pydantic bloccante.
+
+### Livelli secondari (invariati)
+
+| Livello | Ruolo |
+|---------|-------|
+| Facts estratti | Evidenze tecniche, review opzionale |
+| Section drafts | Dettagli tecnici / compatibilità apply su tabelle CRUD |
+| Tabelle CRUD | Dati strutturati secondari nel context; wizard manuale |
+
+Nessun dato AI diventa ufficiale senza approvazione esplicita del brief (o apply manuale su tabelle).
+
+### API Brief
+
+- `POST .../import-batches/{batchId}/generate-brief`
+- `GET /briefs`, `GET /briefs/{briefId}`, `PATCH /briefs/{briefId}`
+- `POST /briefs/{briefId}/approve`, `POST /briefs/{briefId}/archive`
+
+Overview: `hasApprovedBrief`, `approvedBriefId`, `briefVersion`, `briefApprovedAt`, `pendingBriefCount`.
+
+Context: `primarySource`, `brandBrief`, tabelle CRUD come `structuredData` implicito nei campi esistenti.
 
 ## Salvataggio fonti e rigenerazione bozze (0.2.5)
 
@@ -233,7 +271,7 @@ Sidebar progetto → **Brand Intelligence** (dopo Control Room).
 
 - **Overview**: onboarding dual-path, score ring, sezioni
 - **Wizard**: minimo obbligatorio
-- **Import AI**: upload → elaborazione async con progress bar → **bozze per sezione** (step 3); pulsanti **Salva fonti** / **Aggiorna e rigenera**; hydration form da batch salvato; review facts opzionale; storico batch
+- **Import AI**: upload → elaborazione → **Brand Intelligence Brief** (step 3); genera/revisiona/approva brief; dettagli tecnici facts/drafts; fonti 0.2.5; storico batch
 - **Documenti**: elenco file caricati + link allo storico import
 - **Tab per sezione**: CRUD manuale
 

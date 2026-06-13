@@ -4,6 +4,12 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.schemas.brand_brief import (
+    BrandIntelligenceBriefListItem,
+    BrandIntelligenceBriefRead,
+    BrandIntelligenceBriefUpdate,
+    GenerateBriefResponse,
+)
 from app.schemas.brand_intelligence import (
     BrandAiGuardrailCreate,
     BrandAiGuardrailRead,
@@ -61,6 +67,14 @@ from app.schemas.brand_intelligence import (
 )
 from app.services.brand_intelligence import service as bi_service
 from app.services.brand_intelligence import sources_service
+from app.services.brand_intelligence.brief_service import (
+    approve_brief,
+    archive_brief,
+    get_brief,
+    list_briefs,
+    patch_brief,
+)
+from app.services.brand_intelligence.brief_synthesis import generate_brief_from_batch
 from app.services.brand_intelligence.batch_processor import schedule_batch_processing
 from app.services.brand_intelligence.batch_service import (
     create_import_batch_with_sources,
@@ -992,4 +1006,99 @@ async def regenerate_brand_section_draft(
         include_fact_ids=body.include_fact_ids,
     )
     return BrandSectionDraftRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/generate-brief",
+    response_model=GenerateBriefResponse,
+    response_model_by_alias=True,
+)
+async def generate_brand_intelligence_brief(
+    project_id: UUID,
+    batch_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> GenerateBriefResponse:
+    await get_project_in_default_workspace(project_id, session)
+    brief = await generate_brief_from_batch(session, project_id, batch_id)
+    return GenerateBriefResponse(
+        brief_id=brief.id,
+        status=brief.status,
+        confidence=brief.confidence,
+        message="Brand Intelligence Brief generato.",
+    )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/briefs",
+    response_model=list[BrandIntelligenceBriefListItem],
+    response_model_by_alias=True,
+)
+async def list_brand_intelligence_briefs(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> list[BrandIntelligenceBriefListItem]:
+    await get_project_in_default_workspace(project_id, session)
+    rows = await list_briefs(session, project_id)
+    return [BrandIntelligenceBriefListItem.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/briefs/{brief_id}",
+    response_model=BrandIntelligenceBriefRead,
+    response_model_by_alias=True,
+)
+async def get_brand_intelligence_brief(
+    project_id: UUID,
+    brief_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandIntelligenceBriefRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_brief(session, project_id, brief_id)
+    return BrandIntelligenceBriefRead.model_validate(row)
+
+
+@router.patch(
+    "/{project_id}/brand-intelligence/briefs/{brief_id}",
+    response_model=BrandIntelligenceBriefRead,
+    response_model_by_alias=True,
+)
+async def patch_brand_intelligence_brief(
+    project_id: UUID,
+    brief_id: UUID,
+    body: BrandIntelligenceBriefUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandIntelligenceBriefRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await patch_brief(session, project_id, brief_id, body)
+    return BrandIntelligenceBriefRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/briefs/{brief_id}/approve",
+    response_model=BrandIntelligenceBriefRead,
+    response_model_by_alias=True,
+)
+async def approve_brand_intelligence_brief(
+    project_id: UUID,
+    brief_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandIntelligenceBriefRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await approve_brief(session, project_id, brief_id)
+    return BrandIntelligenceBriefRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/briefs/{brief_id}/archive",
+    response_model=BrandIntelligenceBriefRead,
+    response_model_by_alias=True,
+)
+async def archive_brand_intelligence_brief(
+    project_id: UUID,
+    brief_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandIntelligenceBriefRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await archive_brief(session, project_id, brief_id)
+    return BrandIntelligenceBriefRead.model_validate(row)
 

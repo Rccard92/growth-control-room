@@ -28,7 +28,13 @@ import {
   patchBrandExtractedFact,
   patchSectionDraft,
   applySectionDraft,
+  approveBrandBrief,
+  archiveBrandBrief,
   createImportBatch,
+  generateBrandBrief,
+  getBrandBrief,
+  listBrandBriefs,
+  patchBrandBrief,
   regenerateSectionDraft,
   refreshImportBatchContext,
   getSectionDraft,
@@ -521,6 +527,76 @@ export function useSynthesizeImportBatch(projectId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDrafts"] });
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
+    },
+  });
+}
+
+export function useBrandBriefs(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.briefs(projectId ?? ""),
+    queryFn: () => listBrandBriefs(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useBrandBrief(projectId: string | undefined, briefId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.brief(projectId ?? "", briefId ?? ""),
+    queryFn: () => getBrandBrief(projectId!, briefId!),
+    enabled: Boolean(projectId && briefId),
+  });
+}
+
+export function useGenerateBrandBrief(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) => generateBrandBrief(projectId, batchId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.briefs(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.overview(projectId) });
+    },
+  });
+}
+
+export function usePatchBrandBrief(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      briefId,
+      data,
+    }: {
+      briefId: string;
+      data: Parameters<typeof patchBrandBrief>[2];
+    }) => patchBrandBrief(projectId, briefId, data),
+    onSuccess: (_data, { briefId }) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.briefs(projectId) });
+      void qc.invalidateQueries({
+        queryKey: queryKeys.brandIntelligence.brief(projectId, briefId),
+      });
+    },
+  });
+}
+
+export function useApproveBrandBrief(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (briefId: string) => approveBrandBrief(projectId, briefId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.briefs(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.overview(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.context(projectId) });
+      invalidateBrand(projectId, qc);
+    },
+  });
+}
+
+export function useArchiveBrandBrief(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (briefId: string) => archiveBrandBrief(projectId, briefId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.briefs(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.overview(projectId) });
     },
   });
 }

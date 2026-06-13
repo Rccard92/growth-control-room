@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.2.6-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Brand Intelligence Brief Mode: brief flessibile a macro-sezioni come fonte primaria AI
+- `brand_intelligence_briefs` (migration 020), synthesis `brief_synthesis.py` senza validazione Pydantic bloccante
+- API: generate-brief, CRUD briefs, approve/archive con un solo brief approved per progetto
+- `BrandContextBuilder` priorità `primarySource=brand_intelligence_brief`
+- Import AI: step 3 centrato sul brief; facts/section drafts in dettagli tecnici
+- Batch processor: nessuna auto-synthesis section drafts a fine import
+
 ## [0.2.5-alpha] - 2026-06-13
 
 Tipo: Alpha patch

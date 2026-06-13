@@ -161,6 +161,53 @@ export interface BrandIntelligenceOverview {
   pendingFactsCount?: number;
   pendingSectionDraftsCount?: number;
   latestBatchId?: string | null;
+  hasApprovedBrief?: boolean;
+  approvedBriefId?: string | null;
+  briefVersion?: number | null;
+  briefApprovedAt?: string | null;
+  pendingBriefCount?: number;
+}
+
+export type BrandBriefStatus = "draft" | "approved" | "archived" | "rejected";
+
+export type BrandBriefPayload = Record<string, unknown>;
+
+export interface BrandIntelligenceBriefListItem {
+  id: string;
+  version: number;
+  status: BrandBriefStatus;
+  title: string;
+  confidence?: number | null;
+  sourceBatchId?: string | null;
+  createdAt: string;
+  approvedAt?: string | null;
+}
+
+export interface BrandIntelligenceBrief {
+  id: string;
+  projectId: string;
+  sourceBatchId?: string | null;
+  version: number;
+  status: BrandBriefStatus;
+  title: string;
+  briefPayload: BrandBriefPayload;
+  markdownSummary?: string | null;
+  confidence?: number | null;
+  warnings?: { messages?: string[] } | null;
+  sourceDocumentIds: string[];
+  sourceExternalIds: string[];
+  sourceFactIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  approvedAt?: string | null;
+  archivedAt?: string | null;
+}
+
+export interface GenerateBriefResponse {
+  briefId: string;
+  status: string;
+  confidence?: number | null;
+  message: string;
 }
 
 export type SectionDraftKey =
@@ -467,6 +514,10 @@ export interface BrandApplyFactsResponse {
 }
 
 export interface BrandContextBundle {
+  primarySource?: "brand_intelligence_brief" | "structured_tables" | "minimal";
+  approvedBriefId?: string | null;
+  briefVersion?: number | null;
+  brandBrief?: BrandBriefPayload | null;
   profile?: BrandProfile | null;
   voice?: BrandVoice | null;
   products: BrandProductKnowledge[];
