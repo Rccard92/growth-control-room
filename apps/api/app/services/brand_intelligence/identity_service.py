@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import BrandIdentity
-from app.schemas.brand_identity_visual import BrandIdentityUpdate
+from app.schemas.brand_identity_visual import BrandIdentityProposal, BrandIdentityUpdate
 
 CompletionStatus = Literal["complete", "partial", "empty"]
 
@@ -52,9 +52,22 @@ def identity_completion(identity: BrandIdentity | None) -> CompletionStatus:
     core = {"positioning", "brand_values", "differentiators", "what_brand_is", "what_brand_is_not"}
     if not any(m in missing for m in core):
         return "complete"
+    values_count = len(identity.brand_values or []) + len(identity.differentiators or [])
+    if _has_text(identity.positioning) and values_count >= 2:
+        return "partial"
     if identity_has_minimum(identity):
         return "partial"
     return "empty"
+
+
+def _apply_string_field(row: BrandIdentity, attr: str, value: str | None) -> None:
+    if _has_text(value):
+        setattr(row, attr, value.strip())
+
+
+def _apply_list_field(row: BrandIdentity, attr: str, value: list | None) -> None:
+    if _has_list(value):
+        setattr(row, attr, value)
 
 
 async def _get_or_create_identity(session: AsyncSession, project_id: UUID) -> BrandIdentity:
@@ -81,6 +94,29 @@ async def upsert_identity(
     row = await _get_or_create_identity(session, project_id)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(row, key, value)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+async def apply_identity_proposal(
+    session: AsyncSession,
+    project_id: UUID,
+    proposal: BrandIdentityProposal,
+) -> BrandIdentity:
+    row = await _get_or_create_identity(session, project_id)
+
+    _apply_string_field(row, "positioning", proposal.positioning)
+    _apply_string_field(row, "what_brand_is", proposal.what_brand_is)
+    _apply_string_field(row, "what_brand_is_not", proposal.what_brand_is_not)
+    _apply_string_field(row, "storytelling_notes", proposal.storytelling_notes)
+
+    _apply_list_field(row, "brand_values", proposal.brand_values)
+    _apply_list_field(row, "differentiators", proposal.differentiators)
+    _apply_list_field(row, "production_principles", proposal.production_principles)
+    _apply_list_field(row, "quality_principles", proposal.quality_principles)
+    _apply_list_field(row, "trust_elements", proposal.trust_elements)
+
     await session.commit()
     await session.refresh(row)
     return row

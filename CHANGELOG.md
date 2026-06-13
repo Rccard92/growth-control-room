@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.2-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added single-file Brand Identity import (PDF/DOCX/TXT/MD) with scoped AI proposal
+- Added Brand Identity apply-proposal flow (preview → confirm → official save)
+- Improved machine-ready BrandContextBuilder: `brandContextVersion`, `promptContext`, clean prompt blocks
+- Brand Identity UI: upload block + editable AI proposal + official form
+
 ## [0.3.1-alpha] - 2026-06-13
 
 Tipo: Alpha minor

@@ -809,11 +809,24 @@ class BrandApplyFactsResponse(BaseModel):
     counts: BrandApplyFactsCounts
 
 
+class BrandPromptContext(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    brand_profile: str | None = Field(default=None, serialization_alias="brandProfile")
+    brand_identity: str | None = Field(default=None, serialization_alias="brandIdentity")
+    visual_identity: str | None = Field(default=None, serialization_alias="visualIdentity")
+    full_text: str | None = Field(default=None, serialization_alias="fullText")
+
+
 class BrandContextBundleResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    brand_context_version: str = Field(default="v1", serialization_alias="brandContextVersion")
     primary_source: str = Field(default="minimal", serialization_alias="primarySource")
     missing_context: list[str] = Field(default_factory=list, serialization_alias="missingContext")
+    prompt_context: BrandPromptContext | None = Field(
+        default=None, serialization_alias="promptContext"
+    )
     approved_brief_id: UUID | None = Field(default=None, serialization_alias="approvedBriefId")
     brief_version: int | None = Field(default=None, serialization_alias="briefVersion")
     brand_brief: Any | None = Field(default=None, serialization_alias="brandBrief")

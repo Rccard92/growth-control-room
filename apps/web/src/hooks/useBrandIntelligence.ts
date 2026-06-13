@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BrandProfileEnrichRequest, VisualExtractRequest } from "@gcr/shared";
 import {
+  applyBrandIdentityProposal,
   applyBrandProfileProposal,
   applyVisualProposal,
   enrichBrandProfile,
@@ -10,6 +11,7 @@ import {
   getBrandIntelligenceOverview,
   getBrandProfile,
   getBrandVisualIdentity,
+  importBrandIdentityFromFile,
   updateBrandIdentity,
   updateBrandProfile,
   updateBrandVisualIdentity,
@@ -93,6 +95,24 @@ export function useUpdateBrandIdentity(projectId: string) {
     mutationFn: (data: Parameters<typeof updateBrandIdentity>[1]) =>
       updateBrandIdentity(projectId, data),
     onSuccess: () => invalidateBrand(projectId, qc),
+  });
+}
+
+export function useImportBrandIdentityFromFile(projectId: string) {
+  return useMutation({
+    mutationFn: (file: File) => importBrandIdentityFromFile(projectId, file),
+  });
+}
+
+export function useApplyBrandIdentityProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof applyBrandIdentityProposal>[1]) =>
+      applyBrandIdentityProposal(projectId, data),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.brandIntelligence.identity(projectId), data.brandIdentity);
+      invalidateBrand(projectId, qc);
+    },
   });
 }
 

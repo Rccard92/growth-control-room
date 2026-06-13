@@ -7,9 +7,20 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.3.1-alpha";
+export const GCR_VERSION = "0.3.2-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.2-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Import Brand Identity da singolo file (PDF, DOCX, TXT, MD)",
+      "Proposta AI scoped + apply-proposal per Brand Identity",
+      "BrandContextBuilder machine-ready con promptContext",
+      "Form ufficiale aggiornato dopo apply proposta",
+    ],
+  },
   {
     version: "0.3.1-alpha",
     date: "2026-06-13",

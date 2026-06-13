@@ -234,3 +234,53 @@ class BrandModuleStatus(BaseModel):
     status: ModuleCompletionStatus
     missing_fields: list[str] = Field(default_factory=list, serialization_alias="missingFields")
     updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+
+
+class BrandIdentityProposal(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    positioning: str | None = None
+    brand_values: list[str] | None = Field(
+        default=None, validation_alias="brandValues", serialization_alias="brandValues"
+    )
+    differentiators: list[str] | None = None
+    production_principles: list[str] | None = Field(
+        default=None, validation_alias="productionPrinciples", serialization_alias="productionPrinciples"
+    )
+    quality_principles: list[str] | None = Field(
+        default=None, validation_alias="qualityPrinciples", serialization_alias="qualityPrinciples"
+    )
+    trust_elements: list[str] | None = Field(
+        default=None, validation_alias="trustElements", serialization_alias="trustElements"
+    )
+    what_brand_is: str | None = Field(
+        default=None, validation_alias="whatBrandIs", serialization_alias="whatBrandIs"
+    )
+    what_brand_is_not: str | None = Field(
+        default=None, validation_alias="whatBrandIsNot", serialization_alias="whatBrandIsNot"
+    )
+    storytelling_notes: str | None = Field(
+        default=None, validation_alias="storytellingNotes", serialization_alias="storytellingNotes"
+    )
+
+
+class BrandIdentityImportResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    proposal: BrandIdentityProposal
+    confidence: float = 0.0
+    warnings: list[str] = Field(default_factory=list)
+    source_summary: str = Field(default="", serialization_alias="sourceSummary")
+
+
+class BrandIdentityApplyProposalRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    proposal: BrandIdentityProposal
+
+
+class BrandIdentityApplyProposalResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    brand_identity: BrandIdentityRead = Field(serialization_alias="brandIdentity")
+    message: str = "Brand Identity aggiornata."

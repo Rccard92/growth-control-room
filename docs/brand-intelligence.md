@@ -1,78 +1,60 @@
 # Brand Intelligence
 
-Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.1** estende il flusso modulare v0.3.0 con **Brand Identity** e **Visual Identity**.
+Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.2** estende Brand Identity con import scoped da singolo file e contesto machine-ready per i moduli AI.
 
-## Strategia v0.3.1 — moduli Profile + Identity + Visual
+## Strategia v0.3.2 — Identity import + context machine-ready
 
 La UI espone quattro tab:
 
 1. **Overview** — tre card di stato (Profile, Identity, Visual Identity)
 2. **Brand Profile** — fonti URL, proposta AI, profilo ufficiale
-3. **Brand Identity** — posizionamento, valori, principi (salvataggio manuale)
-4. **Visual Identity** — logo, palette, font, stile visuale + estrazione da sito
+3. **Brand Identity** — form manuale + **import da 1 file** (PDF/DOCX/TXT/MD) con proposta AI
+4. **Visual Identity** — logo, palette, font + estrazione da sito
 
-### Flusso operativo
+### Flusso Brand Identity da file
 
 ```mermaid
 flowchart LR
-  Fonti[URL fonti] --> Enrich[POST profile/enrich]
-  Enrich --> Preview[Proposta AI in memoria]
+  File[1 file PDF/DOCX/TXT/MD] --> Import[POST identity/import-file]
+  Import --> Preview[Proposta AI in memoria]
   Preview --> Review[Utente revisiona]
-  Review --> Apply[POST profile/apply-proposal]
-  Apply --> Official[(brand_profiles ufficiale)]
-  Sito[Sito web] --> VExtract[POST visual-identity/extract-from-website]
-  VExtract --> VPreview[Proposta visuale in memoria]
-  VPreview --> VApply[POST visual-identity/apply-proposal]
-  VApply --> VisualDB[(brand_visual_identities)]
+  Review --> Apply[POST identity/apply-proposal]
+  Apply --> Official[(brand_identities ufficiale)]
   Official --> CTX[BrandContextBuilder]
-  IdentityDB[(brand_identities)] --> CTX
-  VisualDB --> CTX
-  CTX --> SEO[Content SEO / Product SEO]
 ```
 
-1. L'utente compila **Brand Profile** (enrich + apply-proposal come in v0.3.0)
-2. Compila **Brand Identity** manualmente (nessun enrich AI in questo step)
-3. Compila **Visual Identity** manualmente oppure **Recupera da sito** → revisiona → **Applica proposta**
-4. I moduli AI leggono Profile + Identity + Visual dal contesto ufficiale
+1. L'utente carica **un solo file** dedicato all'identità del brand
+2. L'AI estrae **solo** campi Brand Identity (posizionamento, valori, principi, storytelling)
+3. L'utente modifica la proposta in UI
+4. **Applica proposta** → scrittura ufficiale su `brand_identities`
+5. Il form manuale si aggiorna e resta editabile
 
-### Endpoint attivi (v0.3.1)
+**Non include:** batch import, extracted facts, section drafts, brief, Product Knowledge, FAQ, Claims, PED.
+
+### Endpoint attivi (v0.3.2)
 
 | Metodo | Path | Ruolo |
 |--------|------|-------|
-| GET | `/brand-intelligence` | Overview con 3 moduli |
-| GET | `/brand-intelligence/context` | Bundle Profile + Identity + Visual |
+| GET/PUT | `/brand-intelligence/identity` | Brand Identity manuale |
+| POST | `/brand-intelligence/identity/import-file` | Estrazione testo + proposta AI (preview) |
+| POST | `/brand-intelligence/identity/apply-proposal` | Applica proposta dopo conferma |
 | GET/PUT | `/brand-intelligence/profile` | Brand Profile |
-| POST | `/brand-intelligence/profile/enrich` | Fetch fonti + proposta AI (non salva contenuto) |
-| POST | `/brand-intelligence/profile/apply-proposal` | Applica proposta profilo |
-| GET/PUT | `/brand-intelligence/identity` | Brand Identity |
 | GET/PUT | `/brand-intelligence/visual-identity` | Visual Identity |
-| POST | `/brand-intelligence/visual-identity/extract-from-website` | Estrazione visuale (preview) |
+| POST | `/brand-intelligence/visual-identity/extract-from-website` | Estrazione visuale |
 | POST | `/brand-intelligence/visual-identity/apply-proposal` | Applica proposta visuale |
+| GET | `/brand-intelligence/context` | Bundle machine-ready + `promptContext` |
 
-### Modelli DB
+### Context machine-ready vs UI human-friendly
 
-**`brand_profiles`** (migration 021) — invariato rispetto a v0.3.0.
+- **UI**: form editabili, proposte AI, liste multilinea — pensati per revisione umana
+- **Context API** (`GET /context`): JSON strutturato con `brandContextVersion: v1`, `brandProfile`, `brandIdentity`, `visualIdentity`, `missingContext`
+- **promptContext**: testo pulito per moduli AI (`brandProfile`, `brandIdentity`, `visualIdentity`, `fullText`)
 
-**`brand_identities`** (migration 022, 1:1 `project_id`):
-
-`positioning`, `brand_values`, `differentiators`, `production_principles`, `quality_principles`, `trust_elements`, `what_brand_is`, `what_brand_is_not`, `storytelling_notes`.
-
-**`brand_visual_identities`** (migration 022, 1:1 `project_id`):
-
-Logo/favicon URL, 5 colori base, `color_palette`, `fonts`, note stile, `do_show`/`do_not_show`, `website_extracted_palette` (snapshot ultima estrazione).
-
-### Source fetcher e visual extraction
-
-- **Profile enrich**: fetch leggero fonti pubbliche + proposta AI
-- **Visual extract**: parse HTML per `og:image`, favicon, immagini header, colori da CSS inline, font da `font-family`
-- Nessuno scraping aggressivo, nessun bypass anti-bot
-- Sito irrecuperabile → warning leggibile, proposal vuota o parziale
+I moduli AI (Content SEO, Product SEO, futuri PED/Ads/Email) devono usare `BrandContextBuilder.get_prompt_context()` — non i campi UI raw.
 
 ### Regola fondamentale
 
-**Nessun salvataggio automatico dati AI o estrazione.** Le proposte (profile enrich, visual extract) sono preview; solo `PUT` o `apply-proposal` scrivono i dati ufficiali.
-
-`BrandContextBuilder` include **Brand Profile** (obbligatorio minimo), **Brand Identity** e **Visual Identity** (opzionali se compilati). `primarySource=brand_profile` se il profilo ha minimo; altrimenti `minimal`.
+**Nessun salvataggio automatico dati AI.** Import-file e enrich generano solo preview; solo `PUT` o `apply-proposal` scrivono i dati ufficiali.
 
 ---
 
@@ -80,19 +62,12 @@ Logo/favicon URL, 5 colori base, `color_palette`, `fonts`, note stile, `do_show`
 
 Restano nel backend per compatibilità DB/migration, marcati `deprecated` in OpenAPI:
 
-- Import AI (batch, upload, start, status, refresh-context)
-- Extracted facts, section drafts, brief mode
-- CRUD sezioni avanzate (voice, products, audience, claims, SEO, pillars, guardrails, assets, documenti)
-
-Le tabelle e migration 015–020 **non sono state rimosse**.
+- Import AI batch, extracted facts, section drafts, brief mode
+- CRUD sezioni avanzate legacy
 
 ### Test manuali
 
-1. Aprire Brand Intelligence → 4 tab visibili
-2. Compilare e salvare Brand Identity → persistenza
-3. Visual Identity manuale + Recupera da sito → proposta → Applica
-4. Overview mostra 3 card aggiornate
-5. `GET .../brand-intelligence/context` include `brandIdentity` e `visualIdentity`
-6. Content SEO continua a funzionare con contesto brand
-7. Fonte bloccata (es. Instagram 429): warning visibile, enrich non fallisce
-8. Sito irrecuperabile: errore leggibile, nessun profilo inventato
+1. Brand Identity → carica PDF → Genera proposta → Applica → refresh → dati persistiti
+2. `GET .../context` → `brandIdentity` + `promptContext.fullText` pulito
+3. File non supportato / vuoto → errore leggibile
+4. OPENAI_API_KEY assente → errore 503 leggibile

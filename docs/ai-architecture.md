@@ -12,30 +12,56 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 # bundle.primary_source == "brand_profile" se profilo ufficiale sufficiente
 ```
 
-**Priorità context (0.3.1 modulare):**
+**Priorità context (0.3.2 machine-ready):**
 
 1. `brand_profiles` ufficiale → `primarySource=brand_profile` se profilo minimo presente
 2. Profilo incompleto → `primarySource=minimal`, `missingContext` unificato (profile + identity + visual)
-3. `brand_identities` e `brand_visual_identities` aggiunti al bundle e al prompt se compilati
+3. Bundle include `brandContextVersion: v1` e `promptContext` con blocchi testuali separati
+4. `brand_identities` e `brand_visual_identities` aggiunti al bundle e al prompt se compilati
 
 Moduli futuri (PED, Ads, Email) partono dal **Brand Profile** come contesto minimo; Identity e Visual arricchiscono il prompt.
 
 Content SEO e Product SEO usano `get_prompt_context()` — beneficiano automaticamente dei tre moduli ufficiali.
 
-Se `prompt_block` è `None`, il modulo decide se bloccare (futuro) o procedere con fallback (SEO v1).
+### promptContext (v0.3.2)
 
-**Nessun modulo AI brand-facing deve generare contenuti ignorando Brand Profile ufficiale.**
+`GET /brand-intelligence/context` restituisce sempre `promptContext` quando il profilo è sufficiente:
 
-## Popolamento Brand Intelligence (v0.3.1)
+```json
+{
+  "brandContextVersion": "v1",
+  "promptContext": {
+    "brandProfile": "BRAND PROFILE\n- Nome: ...",
+    "brandIdentity": "BRAND IDENTITY\n- Posizionamento: ...",
+    "visualIdentity": "VISUAL IDENTITY\n- Colori: ...",
+    "fullText": "..."
+  }
+}
+```
+
+**Regola:** i moduli AI non devono usare campi UI raw nei prompt — solo `BrandContextBuilder` / `get_prompt_context()`.
+
+Esempi di blocchi richiesti per modulo (futuro):
+
+| Modulo | Blocchi consigliati |
+|--------|---------------------|
+| Product SEO | profile + identity + product knowledge + safe claims |
+| PED | profile + identity + visual + social guidelines + pillars |
+| Ads | profile + identity + safe claims + ads guidelines |
+| Email | profile + identity + product knowledge + audience |
+
+## Popolamento Brand Intelligence (v0.3.2)
 
 | Percorso | Salvataggio |
 |----------|-------------|
 | **Brand Profile enrich** | Proposta in memoria; metadata fonti su profilo |
 | **Apply proposal (profile)** | Campi contenuto ufficiali su `brand_profiles` |
-| **PUT identity** | Scrittura ufficiale su `brand_identities` |
+| **Identity import-file** | Proposta AI da 1 file in memoria (no save) |
+| **Apply proposal (identity)** | Scrittura ufficiale su `brand_identities` |
+| **PUT identity** | Scrittura manuale su `brand_identities` |
 | **Visual extract** | Proposta palette/logo/font in memoria |
 | **Apply proposal (visual)** | Scrittura ufficiale su `brand_visual_identities` |
-| **Salvataggio manuale** | URL fonti e/o contenuto via `PUT` su ciascun modulo |
+| **Salvataggio manuale** | Via `PUT` su ciascun modulo |
 
 ### Flussi deprecati (non in UI)
 

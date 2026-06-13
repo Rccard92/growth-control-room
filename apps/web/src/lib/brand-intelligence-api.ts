@@ -1,6 +1,9 @@
 import type {
   BrandContextBundle,
   BrandIdentity,
+  BrandIdentityApplyProposalRequest,
+  BrandIdentityApplyProposalResponse,
+  BrandIdentityImportResponse,
   BrandIntelligenceOverview,
   BrandKnowledgeScore,
   BrandProfile,
@@ -13,7 +16,7 @@ import type {
   VisualExtractRequest,
   VisualExtractResponse,
 } from "@gcr/shared";
-import { apiFetch } from "./api";
+import { apiFetch, apiUploadForm } from "./api";
 
 export function getBrandIntelligenceOverview(
   projectId: string,
@@ -91,6 +94,32 @@ export function updateBrandIdentity(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+}
+
+export function importBrandIdentityFromFile(
+  projectId: string,
+  file: File,
+): Promise<BrandIdentityImportResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiUploadForm<BrandIdentityImportResponse>(
+    `/api/projects/${projectId}/brand-intelligence/identity/import-file`,
+    formData,
+  );
+}
+
+export function applyBrandIdentityProposal(
+  projectId: string,
+  data: BrandIdentityApplyProposalRequest,
+): Promise<BrandIdentityApplyProposalResponse> {
+  return apiFetch<BrandIdentityApplyProposalResponse>(
+    `/api/projects/${projectId}/brand-intelligence/identity/apply-proposal`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
 }
 
 export function getBrandVisualIdentity(projectId: string): Promise<BrandVisualIdentity> {

@@ -11,6 +11,9 @@ from app.schemas.brand_brief import (
     GenerateBriefResponse,
 )
 from app.schemas.brand_identity_visual import (
+    BrandIdentityApplyProposalRequest,
+    BrandIdentityApplyProposalResponse,
+    BrandIdentityImportResponse,
     BrandIdentityRead,
     BrandIdentityUpdate,
     BrandVisualIdentityRead,
@@ -117,7 +120,12 @@ from app.services.brand_intelligence.section_drafts_service import (
     patch_section_draft,
     regenerate_section_draft,
 )
-from app.services.brand_intelligence.identity_service import get_identity, upsert_identity
+from app.services.brand_intelligence.identity_import import import_identity_from_file
+from app.services.brand_intelligence.identity_service import (
+    apply_identity_proposal,
+    get_identity,
+    upsert_identity,
+)
 from app.services.brand_intelligence.profile_enrichment import (
     apply_brand_profile_proposal,
     enrich_brand_profile,
@@ -258,6 +266,45 @@ async def update_brand_identity(
     await get_project_in_default_workspace(project_id, session)
     row = await upsert_identity(session, project_id, payload)
     return BrandIdentityRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/identity/import-file",
+    response_model=BrandIdentityImportResponse,
+    response_model_by_alias=True,
+)
+async def import_brand_identity_file(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> BrandIdentityImportResponse:
+    await get_project_in_default_workspace(project_id, session)
+    data = await file.read()
+    return await import_identity_from_file(
+        session,
+        project_id,
+        filename=file.filename or "document",
+        content_type=file.content_type,
+        data=data,
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/identity/apply-proposal",
+    response_model=BrandIdentityApplyProposalResponse,
+    response_model_by_alias=True,
+)
+async def apply_brand_identity_proposal(
+    project_id: UUID,
+    payload: BrandIdentityApplyProposalRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandIdentityApplyProposalResponse:
+    await get_project_in_default_workspace(project_id, session)
+    row = await apply_identity_proposal(session, project_id, payload.proposal)
+    return BrandIdentityApplyProposalResponse(
+        brand_identity=BrandIdentityRead.model_validate(row),
+        message="Brand Identity aggiornata.",
+    )
 
 
 @router.get(

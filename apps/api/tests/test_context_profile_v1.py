@@ -40,7 +40,7 @@ def test_format_for_prompt_uses_brand_profile_primary() -> None:
     )
     text = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
     assert text is not None
-    assert "# Brand Profile" in text
+    assert "BRAND PROFILE" in text
     assert "Acme" in text
     assert "Test brand" in text
 

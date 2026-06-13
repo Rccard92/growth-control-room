@@ -237,6 +237,34 @@ export interface BrandIdentity {
   updatedAt: string;
 }
 
+export interface BrandIdentityProposal {
+  positioning?: string | null;
+  brandValues?: string[] | null;
+  differentiators?: string[] | null;
+  productionPrinciples?: string[] | null;
+  qualityPrinciples?: string[] | null;
+  trustElements?: string[] | null;
+  whatBrandIs?: string | null;
+  whatBrandIsNot?: string | null;
+  storytellingNotes?: string | null;
+}
+
+export interface BrandIdentityImportResponse {
+  proposal: BrandIdentityProposal;
+  confidence: number;
+  warnings: string[];
+  sourceSummary: string;
+}
+
+export interface BrandIdentityApplyProposalRequest {
+  proposal: BrandIdentityProposal;
+}
+
+export interface BrandIdentityApplyProposalResponse {
+  brandIdentity: BrandIdentity;
+  message: string;
+}
+
 export interface VisualColorSwatch {
   hex: string;
   role?: string | null;
@@ -681,9 +709,18 @@ export interface BrandApplyFactsResponse {
   };
 }
 
+export interface BrandPromptContext {
+  brandProfile?: string | null;
+  brandIdentity?: string | null;
+  visualIdentity?: string | null;
+  fullText?: string | null;
+}
+
 export interface BrandContextBundle {
+  brandContextVersion?: string;
   primarySource?: "brand_profile" | "brand_intelligence_brief" | "structured_tables" | "minimal";
   missingContext?: string[];
+  promptContext?: BrandPromptContext | null;
   approvedBriefId?: string | null;
   briefVersion?: number | null;
   brandBrief?: BrandBriefPayload | null;

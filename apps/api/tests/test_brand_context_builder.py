@@ -66,7 +66,7 @@ def test_format_for_prompt_uses_profile_v1() -> None:
 
     text = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
     assert text is not None
-    assert text.startswith("# Brand Profile")
+    assert text.startswith("BRAND PROFILE")
     assert "Test Brand" in text
     assert "Premium artisan products" in text
     assert "Qualità artigianale" in text
@@ -111,8 +111,51 @@ def test_format_for_prompt_includes_identity_and_visual() -> None:
 
     text = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
     assert text is not None
-    assert "# Brand Profile" in text
-    assert "# Brand Identity" in text
+    assert "BRAND PROFILE" in text
+    assert "BRAND IDENTITY" in text
     assert "Premium niche" in text
-    assert "# Visual Identity" in text
+    assert "VISUAL IDENTITY" in text
     assert "#112233" in text
+
+
+def test_build_prompt_context_machine_ready() -> None:
+    from app.schemas.brand_intelligence import BrandPromptContext
+
+    bundle = BrandContextBundleResponse(
+        brand_context_version="v1",
+        primary_source="brand_profile",
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Artisan brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        brand_identity=BrandIdentityRead(
+            id=uuid4(),
+            project_id=_PID,
+            positioning="Premium niche",
+            brand_values=["quality"],
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        products=[],
+        categories=[],
+        audience=[],
+        claims=[],
+        content_pillars=[],
+        guardrails=[],
+        assets=[],
+        knowledge_score=_score(80),
+    )
+    prompt_ctx = BrandIntelligenceContextBuilder.build_prompt_context(bundle)
+    assert prompt_ctx is not None
+    assert isinstance(prompt_ctx, BrandPromptContext)
+    assert prompt_ctx.brand_profile is not None
+    assert "Acme" in prompt_ctx.brand_profile
+    assert prompt_ctx.brand_identity is not None
+    assert "Premium niche" in prompt_ctx.brand_identity
+    assert prompt_ctx.full_text is not None
+    assert "BRAND PROFILE" in prompt_ctx.full_text
+    assert "BRAND IDENTITY" in prompt_ctx.full_text
