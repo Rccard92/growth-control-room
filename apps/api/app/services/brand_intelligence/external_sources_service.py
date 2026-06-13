@@ -12,7 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import BrandExternalSource, BrandImportBatch
-from app.schemas.brand_intelligence import BrandExternalSourceInput, BrandExternalSourceRead
+from app.schemas.brand_intelligence import (
+    BrandExternalSourceInput,
+    BrandExternalSourceRead,
+    BrandImportBatchSourcesUpdateResponse,
+)
 from app.services.brand_intelligence.source_fetcher import (
     INACCESSIBLE_MESSAGE,
     fetch_url_content,
@@ -33,6 +37,21 @@ VALID_SOURCE_TYPES = frozenset(
 )
 
 TERMINAL_BATCH_FOR_ADD = frozenset({"review_ready", "partially_failed", "completed", "pending", "uploading", "extracting", "ai_processing"})
+
+SINGLE_INSTANCE_TYPES = frozenset(
+    {
+        "website",
+        "instagram",
+        "facebook",
+        "tiktok",
+        "youtube",
+        "linkedin",
+        "trustpilot",
+        "google_business",
+    }
+)
+
+REMOVED_BY_USER_MSG = "Rimossa dall'utente"
 
 
 def normalize_url(url: str) -> str:
@@ -83,6 +102,119 @@ def build_sources_from_form(
         add(BrandExternalSourceInput(source_type=st, url=src.url.strip(), label=src.label))
 
     return out
+
+
+def _reset_source_for_refetch(source: BrandExternalSource) -> None:
+    source.status = "pending"
+    source.fetched_title = None
+    source.fetched_text = None
+    source.fetched_summary = None
+    source.fetch_error = None
+    source.last_fetched_at = None
+
+
+def _mark_source_skipped(source: BrandExternalSource) -> None:
+    source.status = "skipped"
+    source.fetch_error = REMOVED_BY_USER_MSG
+
+
+async def upsert_batch_sources(
+    session: AsyncSession,
+    project_id: UUID,
+    batch_id: UUID,
+    *,
+    brand_name: str | None,
+    website_url: str | None,
+    sources: list[BrandExternalSourceInput],
+) -> BrandImportBatchSourcesUpdateResponse:
+    batch = await _get_batch(session, project_id, batch_id)
+    batch.declared_brand_name = brand_name.strip() if brand_name and brand_name.strip() else None
+    batch.declared_website_url = (
+        website_url.strip() if website_url and website_url.strip() else None
+    )
+
+    merged = build_sources_from_form(website_url=website_url, sources=sources)
+    desired_keys = {_dedupe_key(s.source_type, s.url) for s in merged}
+    desired_by_type: dict[str, BrandExternalSourceInput] = {}
+    for item in merged:
+        if item.source_type in SINGLE_INSTANCE_TYPES:
+            desired_by_type[item.source_type] = item
+
+    existing = list(
+        (
+            await session.execute(
+                select(BrandExternalSource).where(
+                    BrandExternalSource.batch_id == batch_id,
+                    BrandExternalSource.project_id == project_id,
+                )
+            )
+        ).scalars().all()
+    )
+
+    saved = 0
+    touched_ids: set[UUID] = set()
+
+    for item in merged:
+        key = _dedupe_key(item.source_type, item.url)
+        match = next(
+            (
+                row
+                for row in existing
+                if _dedupe_key(row.source_type, row.url) == key and row.id not in touched_ids
+            ),
+            None,
+        )
+        if not match and item.source_type in SINGLE_INSTANCE_TYPES:
+            match = next(
+                (
+                    row
+                    for row in existing
+                    if row.source_type == item.source_type
+                    and row.status != "skipped"
+                    and row.id not in touched_ids
+                ),
+                None,
+            )
+
+        if match:
+            touched_ids.add(match.id)
+            url_changed = normalize_url(match.url) != normalize_url(item.url)
+            match.url = normalize_url(item.url)
+            match.label = item.label
+            if url_changed:
+                _reset_source_for_refetch(match)
+            saved += 1
+            continue
+
+        row = BrandExternalSource(
+            project_id=project_id,
+            batch_id=batch_id,
+            source_type=item.source_type,
+            label=item.label,
+            url=normalize_url(item.url),
+            status="pending",
+        )
+        session.add(row)
+        saved += 1
+
+    for row in existing:
+        if row.id in touched_ids:
+            continue
+        key = _dedupe_key(row.source_type, row.url)
+        if key in desired_keys:
+            continue
+        if row.source_type in SINGLE_INSTANCE_TYPES:
+            if row.source_type not in desired_by_type:
+                _mark_source_skipped(row)
+        elif row.source_type == "other":
+            _mark_source_skipped(row)
+
+    await session.commit()
+    return BrandImportBatchSourcesUpdateResponse(
+        batch_id=batch_id,
+        sources_saved=saved,
+        message="Fonti brand salvate.",
+    )
 
 
 async def create_external_sources_for_batch(

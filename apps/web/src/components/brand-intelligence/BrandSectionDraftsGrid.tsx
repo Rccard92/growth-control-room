@@ -70,6 +70,11 @@ export function BrandSectionDraftsGrid({
                 {draft.title || targetSectionLabel(draft.sectionKey)}
               </h4>
               <span className="bi-section-draft-card__status">{statusLabel(draft.status)}</span>
+              {(draft.sourceExternalIds ?? []).length > 0 && (
+                <span className="bi-section-draft-card__badge bi-section-draft-card__badge--external">
+                  Aggiornata con fonti esterne
+                </span>
+              )}
               {draft.confidence != null && (
                 <span className="bi-section-draft-card__confidence">
                   {Math.round(draft.confidence * 100)}% confidence

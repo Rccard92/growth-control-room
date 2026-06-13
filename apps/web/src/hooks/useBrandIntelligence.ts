@@ -28,10 +28,13 @@ import {
   patchBrandExtractedFact,
   patchSectionDraft,
   applySectionDraft,
+  createImportBatch,
   regenerateSectionDraft,
+  refreshImportBatchContext,
   getSectionDraft,
   synthesizeImportBatch,
   startImportBatch,
+  updateImportBatchSources,
   updateBrandProfile,
   updateBrandSeoStrategy,
   updateBrandVoice,
@@ -331,6 +334,54 @@ export function useStartImportBatch(projectId: string) {
         queryKey: queryKeys.brandIntelligence.importBatch(projectId, batchId),
       });
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
+    },
+  });
+}
+
+export function useCreateImportBatch(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof createImportBatch>[1]) =>
+      createImportBatch(projectId, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
+    },
+  });
+}
+
+export function useSaveBatchSources(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      batchId,
+      body,
+    }: {
+      batchId: string;
+      body: Parameters<typeof updateImportBatchSources>[2];
+    }) => updateImportBatchSources(projectId, batchId, body),
+    onSuccess: (_data, { batchId }) => {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.brandIntelligence.importBatch(projectId, batchId),
+      });
+    },
+  });
+}
+
+export function useRefreshBatchContext(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      batchId,
+      body,
+    }: {
+      batchId: string;
+      body?: Parameters<typeof refreshImportBatchContext>[2];
+    }) => refreshImportBatchContext(projectId, batchId, body),
+    onSuccess: (_data, { batchId }) => {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.brandIntelligence.importBatch(projectId, batchId),
+      });
+      void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDrafts"] });
     },
   });
 }

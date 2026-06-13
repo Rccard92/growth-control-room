@@ -564,6 +564,38 @@ class BrandExternalSourcesFetchResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class BrandImportBatchSourcesUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    brand_name: str | None = Field(default=None, validation_alias="brandName")
+    website_url: str | None = Field(default=None, validation_alias="websiteUrl")
+    sources: list[BrandExternalSourceInput] = Field(default_factory=list)
+
+
+class BrandImportBatchSourcesUpdateResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    batch_id: UUID = Field(serialization_alias="batchId")
+    sources_saved: int = Field(serialization_alias="sourcesSaved")
+    message: str
+
+
+class BrandImportBatchRefreshContextRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    refetch_external_sources: bool = Field(default=True, validation_alias="refetchExternalSources")
+    regenerate_section_drafts: bool = Field(default=True, validation_alias="regenerateSectionDrafts")
+    archive_previous_drafts: bool = Field(default=True, validation_alias="archivePreviousDrafts")
+
+
+class BrandImportBatchRefreshContextResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    batch_id: UUID = Field(serialization_alias="batchId")
+    status: str
+    message: str
+
+
 class BrandImportBatchDocumentStatus(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

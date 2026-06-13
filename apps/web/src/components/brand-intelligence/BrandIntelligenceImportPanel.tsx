@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { BrandExternalSourceInput } from "@gcr/shared";
 import { BrandAnalyzedSourcesPanel } from "./BrandAnalyzedSourcesPanel";
 import { BrandExtractedFactsReview } from "./BrandExtractedFactsReview";
@@ -12,10 +12,12 @@ import {
   useBrandExtractedFacts,
   useBrandProfile,
   useBrandSourceDocuments,
+  useCreateImportBatch,
   useImportBatchStatus,
   useImportBatches,
+  useRefreshBatchContext,
+  useSaveBatchSources,
   useSectionDrafts,
-  useSynthesizeImportBatch,
   useStartImportBatch,
   useUploadBrandSources,
 } from "../../hooks/useBrandIntelligence";
@@ -36,7 +38,10 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
   const [step, setStep] = useState(1);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [showDetailedFacts, setShowDetailedFacts] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [brandName, setBrandName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [externalSources, setExternalSources] = useState<BrandExternalSourceInput[]>([]);
@@ -46,19 +51,29 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
   const { data: batches = [] } = useImportBatches(projectId);
   const { data: batchStatus } = useImportBatchStatus(projectId, batchId ?? undefined, {
     enabled: Boolean(batchId),
-    polling: step === 2,
+    polling: step === 2 || isRefreshing,
   });
   const { data: sectionDrafts = [] } = useSectionDrafts(projectId, batchId ? { batchId } : undefined);
   const { data: facts = [] } = useBrandExtractedFacts(projectId, batchId ? { batchId } : undefined);
 
   const upload = useUploadBrandSources(projectId);
   const startBatch = useStartImportBatch(projectId);
-  const synthesize = useSynthesizeImportBatch(projectId);
+  const createBatch = useCreateImportBatch(projectId);
+  const saveSources = useSaveBatchSources(projectId);
+  const refreshContext = useRefreshBatchContext(projectId);
 
   const isProcessing = Boolean(
     batchStatus &&
       !READY_STATUSES.has(batchStatus.status) &&
       batchStatus.status !== "failed",
+  );
+
+  const batchFileCount = batchStatus?.documents?.length ?? 0;
+  const canRegenerate = Boolean(
+    brandName.trim() ||
+      websiteUrl.trim() ||
+      externalSources.length > 0 ||
+      batchFileCount > 0,
   );
 
   const handleFormChange = useCallback(
@@ -69,9 +84,79 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
       setBrandName(values.brandName);
       setWebsiteUrl(values.websiteUrl);
       setExternalSources(sources);
+      setSaveSuccess(null);
     },
     [],
   );
+
+  useEffect(() => {
+    if (!isRefreshing || !batchStatus) return;
+    if (READY_STATUSES.has(batchStatus.status)) {
+      setIsRefreshing(false);
+      setStep(3);
+    }
+  }, [batchStatus, isRefreshing]);
+
+  async function ensureBatch(): Promise<string> {
+    if (batchId) return batchId;
+    const result = await createBatch.mutateAsync({
+      brandName: brandName.trim() || undefined,
+      websiteUrl: websiteUrl.trim() || undefined,
+      sources: externalSources.length ? externalSources : undefined,
+      batchName: brandName.trim() || undefined,
+    });
+    setBatchId(result.batchId);
+    return result.batchId;
+  }
+
+  async function handleSaveSources() {
+    setSourcesError(null);
+    setSaveSuccess(null);
+    try {
+      const id = await ensureBatch();
+      const result = await saveSources.mutateAsync({
+        batchId: id,
+        body: {
+          brandName: brandName.trim() || undefined,
+          websiteUrl: websiteUrl.trim() || undefined,
+          sources: externalSources,
+        },
+      });
+      setSaveSuccess(result.message || "Fonti brand salvate.");
+    } catch (e) {
+      setSourcesError(e instanceof Error ? e.message : "Salvataggio fonti non riuscito.");
+    }
+  }
+
+  async function handleRefreshAndRegenerate() {
+    setSourcesError(null);
+    setSaveSuccess(null);
+
+    if (!canRegenerate) {
+      setSourcesError(
+        "Inserisci almeno il nome brand, il sito web, una fonte esterna o carica file nel batch.",
+      );
+      return;
+    }
+
+    try {
+      const id = await ensureBatch();
+      await saveSources.mutateAsync({
+        batchId: id,
+        body: {
+          brandName: brandName.trim() || undefined,
+          websiteUrl: websiteUrl.trim() || undefined,
+          sources: externalSources,
+        },
+      });
+      setIsRefreshing(true);
+      setStep(2);
+      await refreshContext.mutateAsync({ batchId: id });
+    } catch (e) {
+      setIsRefreshing(false);
+      setSourcesError(e instanceof Error ? e.message : "Rigenerazione non riuscita.");
+    }
+  }
 
   async function startImport(files: File[]) {
     setUploadError(null);
@@ -91,6 +176,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
         websiteUrl: websiteUrl.trim() || undefined,
         sources: externalSources.length ? externalSources : undefined,
         batchName: brandName.trim() || undefined,
+        batchId: batchId ?? undefined,
       });
       setBatchId(result.batchId);
       setStep(2);
@@ -106,6 +192,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
   }
 
   const analyzedSources = batchStatus?.externalSources ?? [];
+  const sourcesBusy = saveSources.isPending || refreshContext.isPending || createBatch.isPending;
 
   return (
     <div className="bi-import">
@@ -126,8 +213,56 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
           <BrandExternalSourcesForm
             initialBrandName={profile?.brandName ?? ""}
             initialWebsiteUrl={profile?.websiteUrl ?? ""}
+            hydrateFromBatch={
+              batchId && batchStatus
+                ? {
+                    brandName: batchStatus.declaredBrandName,
+                    websiteUrl: batchStatus.declaredWebsiteUrl,
+                    sources: analyzedSources,
+                  }
+                : undefined
+            }
             onChange={handleFormChange}
-          />
+          >
+            <div className="bi-sources-actions">
+              <button
+                type="button"
+                className="gcr-btn gcr-btn--ghost"
+                disabled={sourcesBusy}
+                onClick={() => void handleSaveSources()}
+              >
+                {saveSources.isPending ? "Salvataggio…" : "Salva fonti brand"}
+              </button>
+              <button
+                type="button"
+                className="gcr-btn gcr-btn--primary bi-sources-actions__primary"
+                disabled={sourcesBusy || !canRegenerate}
+                onClick={() => void handleRefreshAndRegenerate()}
+              >
+                {refreshContext.isPending || isRefreshing
+                  ? "Rigenerazione in corso…"
+                  : "Aggiorna fonti e rigenera Brand Intelligence"}
+              </button>
+            </div>
+            {saveSuccess && <p className="bi-sources-save-success">{saveSuccess}</p>}
+            <p className="bi-sources-actions__hint">
+              Le fonti verranno usate per rigenerare bozze più complete a partire da sito, social e
+              recensioni pubbliche.
+            </p>
+            <p className="bi-sources-actions__hint">
+              Verranno generate nuove bozze da revisionare. I dati ufficiali già approvati non
+              saranno sovrascritti automaticamente.
+            </p>
+            <p className="bi-sources-actions__hint">
+              Puoi generare una prima Brand Intelligence anche solo da sito e fonti pubbliche, senza
+              caricare file.
+            </p>
+            {sourcesError && (
+              <div className="gcr-alert gcr-alert--error" style={{ marginTop: "0.75rem" }}>
+                {sourcesError}
+              </div>
+            )}
+          </BrandExternalSourcesForm>
 
           <h3 className="bi-panel__title" style={{ marginTop: "1.5rem" }}>
             Carica documenti
@@ -140,16 +275,6 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
             onFilesSelected={startImport}
             disabled={upload.isPending || startBatch.isPending}
           />
-          <div className="bi-wizard__actions" style={{ marginTop: "0.75rem" }}>
-            <button
-              type="button"
-              className="gcr-btn gcr-btn--ghost gcr-btn--sm"
-              disabled={upload.isPending || startBatch.isPending}
-              onClick={() => startImport([])}
-            >
-              Avvia solo con fonti brand (senza file)
-            </button>
-          </div>
           {(upload.isPending || startBatch.isPending) && (
             <p className="bi-panel__subtitle">Caricamento e avvio elaborazione…</p>
           )}
@@ -221,7 +346,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
 
           <div className="bi-wizard__actions">
             <button type="button" className="gcr-btn gcr-btn--ghost" onClick={() => setStep(1)}>
-              Nuovo upload
+              Modifica fonti
             </button>
           </div>
         </div>
@@ -237,21 +362,6 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
 
           {analyzedSources.length > 0 && (
             <BrandAnalyzedSourcesPanel sources={analyzedSources} warnings={batchStatus?.warnings} />
-          )}
-
-          {batchId && (
-            <div className="bi-wizard__actions" style={{ marginBottom: "1rem" }}>
-              <button
-                type="button"
-                className="gcr-btn gcr-btn--primary gcr-btn--sm"
-                disabled={synthesize.isPending}
-                onClick={() => synthesize.mutate(batchId)}
-              >
-                {synthesize.isPending
-                  ? "Rigenerazione in corso…"
-                  : "Rigenera bozze usando file + fonti esterne"}
-              </button>
-            </div>
           )}
 
           <BrandSectionDraftsGrid
@@ -285,8 +395,8 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
           )}
 
           <div className="bi-wizard__actions" style={{ marginTop: "1rem" }}>
-            <button type="button" className="gcr-btn gcr-btn--ghost" onClick={() => setStep(2)}>
-              Indietro
+            <button type="button" className="gcr-btn gcr-btn--ghost" onClick={() => setStep(1)}>
+              Aggiorna fonti e rigenera
             </button>
           </div>
         </div>

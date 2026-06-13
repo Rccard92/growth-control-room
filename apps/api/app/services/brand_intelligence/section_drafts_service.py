@@ -24,6 +24,7 @@ async def list_section_drafts(
     batch_id: UUID | None = None,
     status_filter: str | None = None,
     section_key: str | None = None,
+    latest_only: bool = True,
 ) -> list[BrandSectionDraft]:
     query = select(BrandSectionDraft).where(BrandSectionDraft.project_id == project_id)
     if batch_id:
@@ -33,7 +34,20 @@ async def list_section_drafts(
     if section_key:
         query = query.where(BrandSectionDraft.section_key == section_key)
     query = query.order_by(BrandSectionDraft.created_at.desc())
-    return list((await session.execute(query)).scalars().all())
+    rows = list((await session.execute(query)).scalars().all())
+
+    if not latest_only or status_filter:
+        return rows
+
+    latest: dict[str, BrandSectionDraft] = {}
+    for row in rows:
+        if row.status in ("rejected", "applied"):
+            continue
+        if row.status not in PENDING_DRAFT_STATUSES:
+            continue
+        if row.section_key not in latest:
+            latest[row.section_key] = row
+    return list(latest.values())
 
 
 async def get_section_draft(

@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.2.5-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Salvataggio esplicito fonti brand su batch esistente (`PUT .../sources`)
+- Refresh context async: re-fetch fonti, archivia bozze non applicate, rigenera synthesis
+- UI: pulsanti Salva fonti / Aggiorna e rigenera, polling progress, auto step 3
+- `GET /section-drafts?latestOnly=true` — ultima versione attiva per sezione
+- Bozze `applied` e BI ufficiale mai modificati da save/refresh
+
 ## [0.2.4-alpha] - 2026-06-13
 
 Tipo: Alpha minor

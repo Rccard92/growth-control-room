@@ -32,6 +32,10 @@ from app.schemas.brand_intelligence import (
     BrandImportBatchCreateRequest,
     BrandImportBatchCreateResponse,
     BrandImportBatchListItem,
+    BrandImportBatchRefreshContextRequest,
+    BrandImportBatchRefreshContextResponse,
+    BrandImportBatchSourcesUpdateRequest,
+    BrandImportBatchSourcesUpdateResponse,
     BrandImportBatchStartResponse,
     BrandImportBatchStatusResponse,
     BrandIntelligenceOverviewResponse,
@@ -69,7 +73,9 @@ from app.services.brand_intelligence.external_sources_service import (
     fetch_batch_external_sources,
     list_external_sources_for_batch,
     parse_sources_json,
+    upsert_batch_sources,
 )
+from app.services.brand_intelligence.refresh_context_service import schedule_refresh_context
 from app.services.brand_intelligence.document_extraction import run_ai_extraction
 from app.services.brand_intelligence.draft_apply import (
     apply_section_draft,
@@ -719,6 +725,55 @@ async def fetch_batch_external_sources_route(
     )
 
 
+@router.put(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/sources",
+    response_model=BrandImportBatchSourcesUpdateResponse,
+    response_model_by_alias=True,
+)
+async def update_import_batch_sources(
+    project_id: UUID,
+    batch_id: UUID,
+    body: BrandImportBatchSourcesUpdateRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandImportBatchSourcesUpdateResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await upsert_batch_sources(
+        session,
+        project_id,
+        batch_id,
+        brand_name=body.brand_name,
+        website_url=body.website_url,
+        sources=body.sources,
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/refresh-context",
+    response_model=BrandImportBatchRefreshContextResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def refresh_import_batch_context(
+    project_id: UUID,
+    batch_id: UUID,
+    body: BrandImportBatchRefreshContextRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandImportBatchRefreshContextResponse:
+    await get_project_in_default_workspace(project_id, session)
+    await get_batch_status(session, project_id, batch_id)
+    schedule_refresh_context(
+        batch_id,
+        refetch_external_sources=body.refetch_external_sources,
+        regenerate_section_drafts=body.regenerate_section_drafts,
+        archive_previous_drafts=body.archive_previous_drafts,
+    )
+    return BrandImportBatchRefreshContextResponse(
+        batch_id=batch_id,
+        status="ai_processing",
+        message="Aggiornamento contesto avviato.",
+    )
+
+
 @router.get(
     "/{project_id}/brand-intelligence/sources",
     response_model=list[BrandSourceDocumentRead],
@@ -843,6 +898,7 @@ async def list_brand_section_drafts(
     batch_id: UUID | None = Query(default=None, alias="batchId"),
     status: str | None = Query(default=None),
     section_key: str | None = Query(default=None, alias="sectionKey"),
+    latest_only: bool = Query(default=True, alias="latestOnly"),
 ) -> list[BrandSectionDraftListItem]:
     await get_project_in_default_workspace(project_id, session)
     rows = await list_section_drafts(
@@ -851,6 +907,7 @@ async def list_brand_section_drafts(
         batch_id=batch_id,
         status_filter=status,
         section_key=section_key,
+        latest_only=latest_only,
     )
     return [BrandSectionDraftListItem.model_validate(r) for r in rows]
 

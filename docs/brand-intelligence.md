@@ -76,6 +76,52 @@ Dopo conflict detection nel batch job, `synthesis.py` genera fino a 9 bozze (`br
 
 Senza `OPENAI_API_KEY`: batch completa facts, synthesis fallisce con warning su batch; endpoint `POST .../synthesize` risponde 503.
 
+## Salvataggio fonti e rigenerazione bozze (0.2.5)
+
+Flusso esplicito per aggiornare le fonti brand su un batch esistente e rigenerare le bozze senza rieseguire l'estrazione AI dai file.
+
+### Flusso UI
+
+1. **Salva fonti brand** — `PUT .../import-batches/{batchId}/sources` (upsert completo, nessuna AI)
+2. **Aggiorna fonti e rigenera Brand Intelligence** — salva fonti → `POST .../refresh-context` (async)
+3. Polling su `GET .../status` durante `ai_processing` → auto step 3 su `review_ready`
+
+Se non esiste ancora un batch, l'UI crea prima un batch vuoto con `POST .../import-batches`.
+
+### Upsert fonti (`PUT /sources`)
+
+| Comportamento | Dettaglio |
+|---------------|-----------|
+| Batch | Aggiorna `declaredBrandName`, `declaredWebsiteUrl` |
+| Match | Per `(source_type, normalized_url)` → update; altrimenti insert `status=pending` |
+| URL rimossi | `status=skipped`, `fetch_error="Rimossa dall'utente"` (storico conservato) |
+| URL cambiato | Reset `status=pending`, clear campi `fetched_*` per re-fetch |
+
+### Refresh context async (`POST /refresh-context`)
+
+| Progress | Step |
+|----------|------|
+| 5% | Salvataggio fonti brand |
+| 20% | Recupero sito web |
+| 35% | Recupero fonti social e recensioni |
+| 55% | Integrazione fonti esterne con i documenti |
+| 75% | Rigenerazione bozze Brand Intelligence |
+| 100% | Bozze pronte per revisione |
+
+Operazioni:
+
+1. `status=ai_processing`
+2. Re-fetch fonti (`refetch_failed=True`)
+3. Bozze non applicate (`draft`, `needs_review`, `approved`) → `rejected` — **`applied` non toccato**
+4. `synthesize_batch` crea nuove bozze
+5. `status=review_ready`
+
+Non riesegue estrazione facts dai file. Non modifica BI ufficiale né bozze già applicate.
+
+### Lista bozze ultima versione
+
+`GET /section-drafts?latestOnly=true` (default): una bozza attiva per `section_key`, esclude `rejected` e `applied`.
+
 ## Source Enrichment v1 (0.2.4)
 
 Durante l'import AI l'utente può indicare **fonti brand esterne** oltre ai file:
@@ -162,7 +208,7 @@ Base path: `/api/projects/{project_id}/brand-intelligence`
 **Section drafts (synthesis v0.2.3):**
 
 - `POST /import-batches/{batchId}/synthesize` — rigenera tutte le bozze del batch
-- `GET /section-drafts` — query: `batchId`, `status`, `sectionKey`
+- `GET /section-drafts` — query: `batchId`, `status`, `sectionKey`, `latestOnly` (default `true`, v0.2.5)
 - `GET /section-drafts/{draft_id}` — dettaglio con payload e snapshot ufficiale
 - `PATCH /section-drafts/{draft_id}` — modifica payload, status, warnings
 - `POST /section-drafts/{draft_id}/apply` — apply singolo draft approvato
@@ -178,6 +224,8 @@ Overview include `pendingSectionDraftsCount` e `latestBatchId`.
 - `GET /import-batches/{batchId}/external-sources` — fonti analizzate
 - `POST /import-batches/{batchId}/external-sources` — aggiunge fonti a batch esistente
 - `POST /import-batches/{batchId}/fetch-sources` — re-fetch manuale
+- `PUT /import-batches/{batchId}/sources` — upsert fonti brand (v0.2.5)
+- `POST /import-batches/{batchId}/refresh-context` — fetch + archivia bozze + rigenera async (v0.2.5)
 
 ## UI
 
@@ -185,7 +233,7 @@ Sidebar progetto → **Brand Intelligence** (dopo Control Room).
 
 - **Overview**: onboarding dual-path, score ring, sezioni
 - **Wizard**: minimo obbligatorio
-- **Import AI**: upload → elaborazione async con progress bar → **bozze per sezione** (step 3); review facts opzionale; storico batch
+- **Import AI**: upload → elaborazione async con progress bar → **bozze per sezione** (step 3); pulsanti **Salva fonti** / **Aggiorna e rigenera**; hydration form da batch salvato; review facts opzionale; storico batch
 - **Documenti**: elenco file caricati + link allo storico import
 - **Tab per sezione**: CRUD manuale
 

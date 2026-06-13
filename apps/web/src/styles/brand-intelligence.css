@@ -873,3 +873,47 @@
   margin: 0 0 0.5rem;
   font-size: 0.9rem;
 }
+
+.bi-sources-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  align-items: center;
+}
+
+.bi-sources-actions__primary {
+  flex: 1 1 auto;
+  min-width: 12rem;
+}
+
+.bi-sources-actions__hint {
+  font-size: 0.85rem;
+  color: var(--gcr-text-muted, #6b7280);
+  margin: 0.5rem 0 0;
+  line-height: 1.45;
+}
+
+.bi-sources-save-success {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 0.9rem;
+}
+
+.bi-section-draft-card__badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+
+.bi-section-draft-card__badge--external {
+  background: #dbeafe;
+  color: #1e40af;
+}

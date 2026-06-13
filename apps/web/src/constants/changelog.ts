@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.2.4-alpha";
+export const GCR_VERSION = "0.2.5-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.2.5-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Salvataggio fonti brand su batch esistente (PUT sources)",
+      "Refresh context async: fetch + archivia bozze + rigenera",
+      "UI Salva / Aggiorna e rigenera con polling e step 3 automatico",
+      "Section drafts latestOnly: una bozza attiva per sezione",
+      "Dati ufficiali e bozze applicate intatti",
+    ],
+  },
   {
     version: "0.2.4-alpha",
     date: "2026-06-13",

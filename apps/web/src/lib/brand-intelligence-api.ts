@@ -306,6 +306,60 @@ export function fetchBatchExternalSources(
   );
 }
 
+export function createImportBatch(
+  projectId: string,
+  body: {
+    batchName?: string;
+    brandName?: string;
+    websiteUrl?: string;
+    sources?: BrandExternalSourceInput[];
+  },
+): Promise<{ batchId: string; status: string; externalSources?: BrandExternalSource[] }> {
+  return apiFetch(`/api/projects/${projectId}/brand-intelligence/import-batches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateImportBatchSources(
+  projectId: string,
+  batchId: string,
+  body: {
+    brandName?: string;
+    websiteUrl?: string;
+    sources?: BrandExternalSourceInput[];
+  },
+): Promise<{ batchId: string; sourcesSaved: number; message: string }> {
+  return apiFetch(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/sources`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export function refreshImportBatchContext(
+  projectId: string,
+  batchId: string,
+  body?: {
+    refetchExternalSources?: boolean;
+    regenerateSectionDrafts?: boolean;
+    archivePreviousDrafts?: boolean;
+  },
+): Promise<{ batchId: string; status: string; message: string }> {
+  return apiFetch(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/refresh-context`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    },
+  );
+}
+
 export function startImportBatch(
   projectId: string,
   batchId: string,
@@ -412,12 +466,18 @@ export function synthesizeImportBatch(
 
 export function listSectionDrafts(
   projectId: string,
-  filters?: { batchId?: string; status?: SectionDraftStatus; sectionKey?: SectionDraftKey },
+  filters?: {
+    batchId?: string;
+    status?: SectionDraftStatus;
+    sectionKey?: SectionDraftKey;
+    latestOnly?: boolean;
+  },
 ): Promise<BrandSectionDraftListItem[]> {
   const params = new URLSearchParams();
   if (filters?.batchId) params.set("batchId", filters.batchId);
   if (filters?.status) params.set("status", filters.status);
   if (filters?.sectionKey) params.set("sectionKey", filters.sectionKey);
+  if (filters?.latestOnly !== false) params.set("latestOnly", "true");
   const qs = params.toString();
   return apiFetch<BrandSectionDraftListItem[]>(
     `/api/projects/${projectId}/brand-intelligence/section-drafts${qs ? `?${qs}` : ""}`,

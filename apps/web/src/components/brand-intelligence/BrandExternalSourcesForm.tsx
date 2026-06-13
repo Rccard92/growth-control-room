@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
+  BrandExternalSource,
   BrandExternalSourceInput,
   BrandExternalSourcesFormValues,
   ExternalSourceType,
@@ -35,7 +36,13 @@ const SOCIAL_FIELDS: Array<{
 interface BrandExternalSourcesFormProps {
   initialBrandName?: string;
   initialWebsiteUrl?: string;
+  hydrateFromBatch?: {
+    brandName?: string | null;
+    websiteUrl?: string | null;
+    sources?: BrandExternalSource[];
+  };
   onChange?: (values: BrandExternalSourcesFormValues, sources: BrandExternalSourceInput[]) => void;
+  children?: React.ReactNode;
 }
 
 export function buildExternalSourcesFromForm(
@@ -63,24 +70,83 @@ export function buildExternalSourcesFromForm(
   return sources;
 }
 
+export function formValuesFromExternalSources(
+  sources: BrandExternalSource[],
+  brandName = "",
+  websiteUrl = "",
+): BrandExternalSourcesFormValues {
+  const values: BrandExternalSourcesFormValues = {
+    ...EMPTY_VALUES,
+    brandName,
+    websiteUrl,
+    otherSources: [],
+  };
+
+  for (const source of sources) {
+    if (source.status === "skipped") continue;
+
+    if (source.sourceType === "other") {
+      values.otherSources.push({
+        label: source.label ?? "",
+        url: source.url,
+      });
+      continue;
+    }
+
+    if (source.sourceType === "website") {
+      values.websiteUrl = source.url;
+      continue;
+    }
+
+    const field = SOCIAL_FIELDS.find((f) => f.sourceType === source.sourceType);
+    if (field) {
+      Object.assign(values, { [field.key]: source.url });
+    }
+  }
+
+  return values;
+}
+
 export function BrandExternalSourcesForm({
   initialBrandName = "",
   initialWebsiteUrl = "",
+  hydrateFromBatch,
   onChange,
+  children,
 }: BrandExternalSourcesFormProps) {
   const [values, setValues] = useState<BrandExternalSourcesFormValues>({
     ...EMPTY_VALUES,
     brandName: initialBrandName,
     websiteUrl: initialWebsiteUrl,
   });
+  const hydratedBatchRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!hydrateFromBatch) return;
+    const key = JSON.stringify({
+      brandName: hydrateFromBatch.brandName ?? "",
+      websiteUrl: hydrateFromBatch.websiteUrl ?? "",
+      sources: (hydrateFromBatch.sources ?? []).map((s) => `${s.id}:${s.status}:${s.url}`),
+    });
+    if (hydratedBatchRef.current === key) return;
+    hydratedBatchRef.current = key;
+    setValues(
+      formValuesFromExternalSources(
+        hydrateFromBatch.sources ?? [],
+        hydrateFromBatch.brandName ?? "",
+        hydrateFromBatch.websiteUrl ?? "",
+      ),
+    );
+  }, [hydrateFromBatch]);
+
+  useEffect(() => {
+    if (hydrateFromBatch) return;
     setValues((prev) => ({
       ...prev,
       brandName: initialBrandName || prev.brandName,
       websiteUrl: initialWebsiteUrl || prev.websiteUrl,
     }));
-  }, [initialBrandName, initialWebsiteUrl]);
+  }, [initialBrandName, initialWebsiteUrl, hydrateFromBatch]);
 
   useEffect(() => {
     onChange?.(values, buildExternalSourcesFromForm(values));
@@ -194,6 +260,8 @@ export function BrandExternalSourcesForm({
           </div>
         ))}
       </div>
+
+      {children}
     </section>
   );
 }
