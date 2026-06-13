@@ -119,13 +119,6 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         </div>
       </div>
 
-      {!openaiConfigured && (
-        <div className="content-seo-banner content-seo-banner--warn">
-          AI non configurata. Aggiungi OPENAI_API_KEY per generare proposte automatiche. La
-          modifica manuale funziona comunque.
-        </div>
-      )}
-
       {!writeProductsAvailable && (
         <div className="content-seo-banner content-seo-banner--warn">
           Per applicare le modifiche su Shopify serve autorizzare write_products.
@@ -171,6 +164,11 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
               filter={productFilter}
               onFilterChange={setProductFilter}
               onEdit={(id) => handleOpenEdit("product", id)}
+              editLoadingId={
+                editEntity?.type === "product" && productDetail.isFetching
+                  ? editEntity.id
+                  : null
+              }
             />
           )}
         </div>
@@ -187,6 +185,11 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
               filter={collectionFilter}
               onFilterChange={setCollectionFilter}
               onEdit={(id) => handleOpenEdit("collection", id)}
+              editLoadingId={
+                editEntity?.type === "collection" && collectionDetail.isFetching
+                  ? editEntity.id
+                  : null
+              }
             />
           )}
         </div>
@@ -225,6 +228,7 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         productDetail={productDetail.data}
         collectionDetail={collectionDetail.data}
         detailLoading={productDetail.isLoading || collectionDetail.isLoading}
+        detailError={productDetail.isError || collectionDetail.isError}
         openaiConfigured={openaiConfigured}
         writeProductsAvailable={writeProductsAvailable}
         onDetailRefresh={refreshDetail}

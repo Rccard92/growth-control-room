@@ -1,6 +1,7 @@
 ﻿import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { AiBriefPage } from "../pages/AiBriefPage";
+import { ChangelogPage } from "../pages/ChangelogPage";
 import { ContentPage } from "../pages/ContentPage";
 import { IntegrationsPage } from "../pages/IntegrationsPage";
 import { LoginPage } from "../pages/LoginPage";
@@ -29,6 +30,7 @@ export function AppRoutes() {
         <Route path="shopify" element={<ShopifyPage />} />
         <Route path="shopify/connect" element={<ShopifyConnectPage />} />
         <Route path="content" element={<ContentPage />} />
+        <Route path="changelog" element={<ChangelogPage />} />
         <Route path="ai-brief" element={<AiBriefPage />} />
       </Route>
 

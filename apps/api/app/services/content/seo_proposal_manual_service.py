@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyStore
+from app.services.content.seo_current_values import normalize_proposal_values
 from app.services.content.seo_proposal_engine import (
     collection_current_values,
     product_current_values,
@@ -79,7 +80,10 @@ async def create_manual_proposal(
     else:
         raise ValueError("entity_type non supportato")
 
-    cleaned = _validate_proposed_values(entity_type, proposed_values)
+    cleaned = _validate_proposed_values(
+        entity_type,
+        normalize_proposal_values(entity_type, proposed_values),
+    )
     proposal = SeoOptimizationProposal(
         project_id=store.project_id,
         shopify_store_id=store.id,

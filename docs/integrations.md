@@ -209,12 +209,16 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 
 **Flusso Modifica → Proposta → Approvazione** (nessuna modifica live senza conferma):
 
-1. UI: bottone **Modifica** apre drawer con tab Campi SEO, Score, Immagini, Proposta, Storico
-2. **Proposta manuale**: `POST .../content/seo/proposals/manual` — `source=manual`, `status=draft`, non tocca Shopify
-3. **Proposta AI** (solo nel drawer): `POST .../content/seo/proposals/generate` — body `{ entityType, entityId, mode: "fill_missing_and_improve" }`
-4. **Preview**: `POST .../proposals/{id}/preview` — confronto current vs proposed, motivazione, rischio
-5. **Approve**: `POST .../proposals/{id}/approve` — non applica su Shopify
-6. **Apply**: `POST .../proposals/{id}/apply` — solo se `approved` + scope `write_products` + conferma utente
+1. UI: bottone **Modifica** in tabella apre **modal SEO** (portal, 720px) con tab Campi SEO, Score, Proposta, Storico
+2. Campi precompilati da `currentValues` (camelCase da Shopify sync): title, handle, seoTitle, metaDescription, descriptionHtml, tags, images, productType, vendor
+3. Badge per campo: **OK** / **Mancante** / **Da migliorare** (da analisi + valore)
+4. **Proposta manuale**: footer **Salva come proposta** → `POST .../proposals/manual` — non tocca Shopify
+5. **Proposta AI** (solo nella modal, footer): `POST .../proposals/generate` — se `OPENAI_API_KEY` assente, bottone disabilitato con messaggio Railway
+6. AI genera draft → tab **Proposta** mostra preview current vs proposed → **Copia proposta nel form** (non auto-apply)
+7. **Approve**: footer **Approva** — non applica su Shopify
+8. **Apply**: footer **Applica su Shopify** — solo se `approved` + scope `write_products` + conferma utente
+
+**Versioning**: progetto in Alpha `0.x.x-alpha`. Storico in [`CHANGELOG.md`](../CHANGELOG.md) e UI `/projects/:id/changelog`. Policy: [`docs/changelog-policy.md`](../docs/changelog-policy.md).
 
 **Env API**:
 

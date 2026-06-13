@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoChangeLog, SeoEntityAnalysis, SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyStore
-from app.services.content.seo_proposal_engine import (
-    collection_current_values,
-    product_current_values,
+from app.services.content.seo_current_values import (
+    collection_api_current_values,
+    product_api_current_values,
 )
 from app.services.content.seo_scoring_engine import rebuild_score_breakdown_from_analysis
 from app.services.shopify.analytics import compute_best_sellers, product_lookup
@@ -157,10 +157,11 @@ async def get_product_seo_detail(
     history = await _proposal_history(store, session, "product", product_id)
     change_logs = await _change_logs_for_entity(store, session, "product", product_id)
 
-    current_values = product_current_values(product)
     images = product.media_images or []
     if not images and product.featured_image_url:
         images = [{"url": product.featured_image_url, "altText": None}]
+
+    current_values = product_api_current_values(product, images=images)
 
     return {
         "product": {
@@ -170,6 +171,7 @@ async def get_product_seo_detail(
             "handle": product.handle,
             "status": product.status,
             "product_type": product.product_type,
+            "vendor": product.vendor,
             "featured_image_url": product.featured_image_url,
         },
         "analysis": _analysis_payload(analysis),
@@ -240,7 +242,7 @@ async def get_collection_seo_detail(
         "score_breakdown": (
             rebuild_score_breakdown_from_analysis(analysis) if analysis else None
         ),
-        "current_values": collection_current_values(collection),
+        "current_values": collection_api_current_values(collection),
         "image": {
             "url": collection.image_url,
             "alt": collection.image_alt,

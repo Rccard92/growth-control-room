@@ -14,6 +14,7 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
+from app.services.content.seo_current_values import normalize_proposal_values
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 
@@ -190,6 +191,7 @@ async def generate_seo_proposal(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
             )
+            proposed = normalize_proposal_values(entity_type, proposed)
             source = "ai"
             reasoning = proposed.pop("reasoning", []) or []
             risk_from_ai = proposed.pop("risk_level", "low")

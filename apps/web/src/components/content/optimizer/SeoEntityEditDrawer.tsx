@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   SeoCollectionDetailResponse,
   SeoOptimizationProposal,
   SeoProductDetailResponse,
 } from "@gcr/shared";
+import { SeoEditModal } from "./SeoEditModal";
 import { SeoFieldEditor } from "./SeoFieldEditor";
-import { SeoProposalActions } from "./SeoProposalActions";
+import { SeoProposalFooter } from "./SeoProposalFooter";
 import { SeoProposalPreview } from "./SeoProposalPreview";
 import { SeoScoreBadge } from "./SeoScoreBadge";
 import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
 import { SeoSkillAppliedPanel } from "./SeoSkillAppliedPanel";
+import {
+  mergeProposedIntoForm,
+  normalizeFormValues,
+  toProposalValues,
+} from "./seoFormValues";
 import {
   useGenerateProposal,
   usePreviewProposal,
@@ -17,12 +23,11 @@ import {
   useSaveManualProposal,
 } from "../../../hooks/useContentSeo";
 
-type DrawerTab = "fields" | "score" | "images" | "proposal" | "history";
+type DrawerTab = "fields" | "score" | "proposal" | "history";
 
 const TABS: { id: DrawerTab; label: string }[] = [
   { id: "fields", label: "Campi SEO" },
   { id: "score", label: "Score" },
-  { id: "images", label: "Immagini" },
   { id: "proposal", label: "Proposta" },
   { id: "history", label: "Storico" },
 ];
@@ -37,24 +42,10 @@ interface SeoEntityEditDrawerProps {
   productDetail?: SeoProductDetailResponse;
   collectionDetail?: SeoCollectionDetailResponse;
   detailLoading?: boolean;
+  detailError?: boolean;
   openaiConfigured: boolean;
   writeProductsAvailable: boolean;
   onDetailRefresh?: () => void;
-}
-
-function mergeProposedIntoForm(
-  current: Record<string, unknown>,
-  proposed: Record<string, unknown> | null | undefined,
-): Record<string, unknown> {
-  if (!proposed) return { ...current };
-  const merged = { ...current };
-  for (const [key, val] of Object.entries(proposed)) {
-    if (key === "reasoning" || key === "risk_level") continue;
-    if (val !== undefined && val !== null) {
-      merged[key] = val;
-    }
-  }
-  return merged;
 }
 
 export function SeoEntityEditDrawer({
@@ -67,6 +58,7 @@ export function SeoEntityEditDrawer({
   productDetail,
   collectionDetail,
   detailLoading,
+  detailError,
   openaiConfigured,
   writeProductsAvailable,
   onDetailRefresh,
@@ -75,12 +67,15 @@ export function SeoEntityEditDrawer({
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [activeProposalId, setActiveProposalId] = useState<string | null>(null);
   const [mediaImages, setMediaImages] = useState<Record<string, unknown>[]>([]);
+  const [formDirty, setFormDirty] = useState(false);
+  const initialFormRef = useRef<string>("");
 
   const detail = entityType === "product" ? productDetail : collectionDetail;
   const analysis = detail?.analysis as Record<string, unknown> | null | undefined;
   const scoreBreakdown = detail?.scoreBreakdown;
   const issues = (analysis?.issues as Record<string, unknown>[] | undefined) ?? null;
   const scoreTotal = (analysis?.scoreTotal ?? analysis?.score_total) as number | undefined;
+  const severity = (analysis?.severity as string | undefined) ?? undefined;
 
   const saveManual = useSaveManualProposal(projectId);
   const generateAi = useGenerateProposal(projectId);
@@ -89,10 +84,16 @@ export function SeoEntityEditDrawer({
 
   useEffect(() => {
     if (!open || !detail) return;
-    setFormValues({ ...detail.currentValues });
+    const raw =
+      detail.currentValues ??
+      (detail as { current_values?: Record<string, unknown> }).current_values;
+    const normalized = normalizeFormValues(raw, entityType, detail);
+    setFormValues(normalized);
+    initialFormRef.current = JSON.stringify(normalized);
+    setFormDirty(false);
     setMediaImages(
       entityType === "product"
-        ? (productDetail?.images ?? [])
+        ? (productDetail?.images ?? (normalized.images as Record<string, unknown>[]) ?? [])
         : collectionDetail?.image
           ? [collectionDetail.image]
           : [],
@@ -119,30 +120,37 @@ export function SeoEntityEditDrawer({
     return detail?.latestProposal;
   }, [detail?.latestProposal, preview.data]);
 
-  if (!open) return null;
+  const handleClose = () => {
+    if (formDirty) {
+      const ok = window.confirm("Hai modifiche non salvate. Chiudere comunque?");
+      if (!ok) return;
+    }
+    onClose();
+  };
 
   const handleFieldChange = (key: string, value: unknown) => {
-    setFormValues((prev) => ({ ...prev, [key]: value }));
+    setFormValues((prev) => {
+      const next = { ...prev, [key]: value };
+      setFormDirty(JSON.stringify(next) !== initialFormRef.current);
+      return next;
+    });
   };
 
   const handleImageAltChange = (index: number, alt: string) => {
     setMediaImages((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], altText: alt };
-      if (entityType === "product") {
-        setFormValues((fv) => ({ ...fv, media_images: next }));
-      }
+      setFormValues((fv) => {
+        const updated = { ...fv, images: next };
+        setFormDirty(JSON.stringify(updated) !== initialFormRef.current);
+        return updated;
+      });
       return next;
     });
   };
 
-  const buildProposedValues = (): Record<string, unknown> => {
-    const proposed = { ...formValues };
-    if (entityType === "product") {
-      proposed.media_images = mediaImages;
-    }
-    return proposed;
-  };
+  const buildProposedValues = () =>
+    toProposalValues(formValues, entityType, mediaImages);
 
   const handleSaveDraft = () => {
     saveManual.mutate(
@@ -154,6 +162,8 @@ export function SeoEntityEditDrawer({
       {
         onSuccess: (proposal) => {
           setActiveProposalId(proposal.id);
+          initialFormRef.current = JSON.stringify(formValues);
+          setFormDirty(false);
           onDetailRefresh?.();
         },
       },
@@ -171,14 +181,23 @@ export function SeoEntityEditDrawer({
       {
         onSuccess: (proposal) => {
           setActiveProposalId(proposal.id);
-          setFormValues((prev) =>
-            mergeProposedIntoForm(prev, proposal.proposedValues ?? undefined),
-          );
           setTab("proposal");
           onDetailRefresh?.();
         },
       },
     );
+  };
+
+  const handleCopyProposalToForm = () => {
+    const proposed = activeProposal?.proposedValues ?? preview.data?.proposedValues;
+    if (!proposed) return;
+    const merged = mergeProposedIntoForm(formValues, proposed, entityType);
+    setFormValues(merged);
+    if (entityType === "product" && Array.isArray(merged.images)) {
+      setMediaImages(merged.images as Record<string, unknown>[]);
+    }
+    setFormDirty(JSON.stringify(merged) !== initialFormRef.current);
+    setTab("fields");
   };
 
   const handleApply = () => {
@@ -204,184 +223,161 @@ export function SeoEntityEditDrawer({
     proposalActions.reject.isPending ||
     proposalActions.apply.isPending;
 
+  const headerExtra = scoreTotal != null && (
+    <SeoScoreBadge score={scoreTotal} severity={severity as never} />
+  );
+
+  const footer = (
+    <SeoProposalFooter
+      proposal={activeProposal}
+      writeProductsAvailable={writeProductsAvailable}
+      openaiConfigured={openaiConfigured}
+      loading={actionLoading}
+      saveLoading={saveManual.isPending}
+      generateLoading={generateAi.isPending}
+      onSaveDraft={handleSaveDraft}
+      onGenerateAi={handleGenerateAi}
+      onApprove={() => {
+        if (activeProposalId) {
+          proposalActions.approve.mutate(activeProposalId, { onSuccess: onDetailRefresh });
+        }
+      }}
+      onReject={() => {
+        if (activeProposalId) {
+          proposalActions.reject.mutate(activeProposalId, { onSuccess: onDetailRefresh });
+        }
+      }}
+      onApply={handleApply}
+      onCancel={handleClose}
+    />
+  );
+
   return (
-    <div className="seo-drawer-backdrop" onClick={onClose} role="presentation">
-      <aside
-        className="seo-drawer seo-edit-drawer gcr-card"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="Modifica SEO"
-      >
-        <header className="seo-drawer__header">
-          <div>
-            <p className="gcr-card__label">Modifica SEO</p>
-            <h3>{title}</h3>
-            {scoreTotal != null && (
-              <SeoScoreBadge
-                score={scoreTotal}
-                severity={analysis?.severity as never}
-              />
-            )}
+    <SeoEditModal
+      open={open}
+      onClose={handleClose}
+      title={title}
+      headerExtra={headerExtra}
+      footer={!detailLoading && detail ? footer : undefined}
+    >
+      {detailLoading && <div className="gcr-skeleton seo-skeleton-row" />}
+
+      {!detailLoading && detailError && (
+        <p className="shopify-empty-copy">Impossibile caricare i dati SEO. Riprova.</p>
+      )}
+
+      {!detailLoading && !detailError && !detail && (
+        <p className="shopify-empty-copy">Nessun dato disponibile per questa entità.</p>
+      )}
+
+      {!detailLoading && detail && (
+        <>
+          {entityType === "product" && productDetail && (
+            <p className="seo-edit-drawer__meta">
+              Vendite: {productDetail.quantitySold} · Stock: {productDetail.stock ?? "—"} ·
+              Revenue: {productDetail.revenue.toFixed(2)}
+            </p>
+          )}
+
+          <div className="seo-edit-drawer__tabs">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`seo-edit-drawer__tab ${tab === t.id ? "seo-edit-drawer__tab--active" : ""}`}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-          <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
-            Chiudi
-          </button>
-        </header>
 
-        {detailLoading ? (
-          <div className="gcr-skeleton seo-skeleton-row" />
-        ) : (
-          <>
-            {entityType === "product" && productDetail && (
-              <p className="seo-edit-drawer__meta">
-                Vendite: {productDetail.quantitySold} · Stock: {productDetail.stock ?? "—"} ·
-                Revenue: {productDetail.revenue.toFixed(2)}
-              </p>
-            )}
+          {tab === "fields" && (
+            <SeoFieldEditor
+              entityType={entityType}
+              values={formValues}
+              issues={issues}
+              scoreBreakdown={scoreBreakdown}
+              mediaImages={mediaImages}
+              onChange={handleFieldChange}
+              onImageAltChange={handleImageAltChange}
+            />
+          )}
 
-            <div className="seo-edit-drawer__tabs">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`seo-edit-drawer__tab ${tab === t.id ? "seo-edit-drawer__tab--active" : ""}`}
-                  onClick={() => setTab(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {tab === "fields" && (
-              <SeoFieldEditor
-                entityType={entityType}
-                values={formValues}
-                issues={issues}
-                onChange={handleFieldChange}
+          {tab === "score" && (
+            <>
+              <SeoSkillAppliedPanel skillMeta={detail.skillMeta} />
+              <SeoScoreBreakdown
+                scoreTotal={scoreTotal}
+                scoreBreakdown={scoreBreakdown}
+                skillMeta={detail.skillMeta}
               />
-            )}
+            </>
+          )}
 
-            {tab === "score" && (
-              <>
-                <SeoSkillAppliedPanel skillMeta={detail?.skillMeta} />
-                <SeoScoreBreakdown
-                  scoreTotal={scoreTotal}
-                  scoreBreakdown={scoreBreakdown}
-                  skillMeta={detail?.skillMeta}
-                />
-              </>
-            )}
+          {tab === "proposal" && (
+            <>
+              <SeoProposalPreview
+                preview={preview.data}
+                loading={preview.isLoading && Boolean(activeProposalId)}
+              />
+              {(activeProposal?.proposedValues || preview.data?.proposedValues) && (
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--secondary seo-copy-proposal-btn"
+                  onClick={handleCopyProposalToForm}
+                >
+                  Copia proposta nel form
+                </button>
+              )}
+            </>
+          )}
 
-            {tab === "images" && (
-              <div className="seo-images-tab">
-                {mediaImages.length === 0 ? (
-                  <p className="shopify-empty-copy">Nessuna immagine sincronizzata.</p>
-                ) : (
-                  mediaImages.map((img, idx) => (
-                    <div key={idx} className="seo-images-tab__item">
-                      {typeof img.url === "string" && (
-                        <img src={img.url} alt="" className="seo-images-tab__thumb" />
-                      )}
-                      <label className="seo-field-editor__field">
-                        <span className="seo-field-editor__label">Alt text</span>
-                        <input
-                          className="seo-field-editor__input"
-                          type="text"
-                          value={String(img.altText ?? img.alt ?? "")}
-                          onChange={(e) => handleImageAltChange(idx, e.target.value)}
-                        />
-                      </label>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-
-            {tab === "proposal" && (
-              <>
-                <SeoProposalPreview
-                  preview={preview.data}
-                  loading={preview.isLoading && Boolean(activeProposalId)}
-                />
-                <SeoProposalActions
-                  proposal={activeProposal}
-                  writeProductsAvailable={writeProductsAvailable}
-                  loading={actionLoading}
-                  onSaveDraft={handleSaveDraft}
-                  onGenerateAi={handleGenerateAi}
-                  aiDisabled={!openaiConfigured}
-                  aiTooltip={
-                    openaiConfigured
-                      ? undefined
-                      : "Configura OPENAI_API_KEY per generare proposte automatiche."
-                  }
-                  saveLoading={saveManual.isPending}
-                  generateLoading={generateAi.isPending}
-                  onApprove={() => {
-                    if (activeProposalId) {
-                      proposalActions.approve.mutate(activeProposalId, {
-                        onSuccess: onDetailRefresh,
-                      });
-                    }
-                  }}
-                  onReject={() => {
-                    if (activeProposalId) {
-                      proposalActions.reject.mutate(activeProposalId, {
-                        onSuccess: onDetailRefresh,
-                      });
-                    }
-                  }}
-                  onApply={handleApply}
-                />
-              </>
-            )}
-
-            {tab === "history" && (
-              <div className="seo-history-tab">
-                <h4>Proposte</h4>
-                {(detail?.proposalHistory ?? []).length === 0 ? (
-                  <p className="shopify-empty-copy">Nessuna proposta precedente.</p>
-                ) : (
-                  <ul className="shopify-seo-list">
-                    {(detail?.proposalHistory ?? []).map((p) => (
-                      <li key={p.id} className="shopify-seo-list__item">
-                        <span>
-                          {p.status} · {p.source} · {p.riskLevel}
-                        </span>
-                        <button
-                          type="button"
-                          className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-                          onClick={() => {
-                            setActiveProposalId(p.id);
-                            setTab("proposal");
-                          }}
-                        >
-                          Apri
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <h4>Change log</h4>
-                {(detail?.changeLogs ?? []).length === 0 ? (
-                  <p className="shopify-empty-copy">Nessuna modifica applicata.</p>
-                ) : (
-                  <ul className="shopify-seo-list">
-                    {(detail?.changeLogs ?? []).map((log) => (
-                      <li key={log.id} className="shopify-seo-list__item">
-                        <span>
-                          {log.status}
-                          {log.errorMessage ? ` · ${log.errorMessage}` : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </aside>
-    </div>
+          {tab === "history" && (
+            <div className="seo-history-tab">
+              <h4>Proposte</h4>
+              {(detail.proposalHistory ?? []).length === 0 ? (
+                <p className="shopify-empty-copy">Nessuna proposta precedente.</p>
+              ) : (
+                <ul className="shopify-seo-list">
+                  {(detail.proposalHistory ?? []).map((p) => (
+                    <li key={p.id} className="shopify-seo-list__item">
+                      <span>
+                        {p.status} · {p.source} · {p.riskLevel}
+                      </span>
+                      <button
+                        type="button"
+                        className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+                        onClick={() => {
+                          setActiveProposalId(p.id);
+                          setTab("proposal");
+                        }}
+                      >
+                        Apri
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <h4>Change log</h4>
+              {(detail.changeLogs ?? []).length === 0 ? (
+                <p className="shopify-empty-copy">Nessuna modifica applicata.</p>
+              ) : (
+                <ul className="shopify-seo-list">
+                  {(detail.changeLogs ?? []).map((log) => (
+                    <li key={log.id} className="shopify-seo-list__item">
+                      <span>
+                        {log.status}
+                        {log.errorMessage ? ` · ${log.errorMessage}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </SeoEditModal>
   );
 }
