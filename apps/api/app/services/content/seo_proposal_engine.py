@@ -158,6 +158,18 @@ def _rules_collection_proposal(
     }
 
 
+def _safe_claims_guardrail_suffix(brand_context: str | None) -> str:
+    if not brand_context:
+        return ""
+    if "SAFE CLAIMS" in brand_context.upper():
+        return (
+            "\n\nREGOLE SAFE CLAIMS (priorità massima): non usare claim vietati; "
+            "evitare claim medici/terapeutici; non attaccare competitor; "
+            "non divulgare process secrets."
+        )
+    return ""
+
+
 def _ai_system_prompt(skill_context: str, brand_context: str | None = None) -> str:
     base = (
         "Sei un SEO specialist ecommerce Shopify. "
@@ -173,6 +185,7 @@ def _ai_system_prompt(skill_context: str, brand_context: str | None = None) -> s
     )
     if brand_context:
         base += f"\n\n{brand_context}"
+        base += _safe_claims_guardrail_suffix(brand_context)
     return base
 
 

@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.3-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added modular Safe Claims & Red Flags section (import file, apply-proposal, manual form)
+- Migration `023`: table `brand_safe_claims` (1:1 project)
+- BrandContextBuilder: `safeClaims` in bundle and `promptContext`; prudence fallback when empty
+- Product SEO guardrails when SAFE CLAIMS block is present in brand context
+- Overview 5th card; knowledge score averaged over 4 modules
+
 ## [0.3.2-alpha] - 2026-06-13
 
 Tipo: Alpha minor

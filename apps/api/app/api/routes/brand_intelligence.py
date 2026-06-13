@@ -23,6 +23,13 @@ from app.schemas.brand_identity_visual import (
     VisualExtractRequest,
     VisualExtractResponse,
 )
+from app.schemas.brand_safe_claims import (
+    BrandSafeClaimsApplyProposalRequest,
+    BrandSafeClaimsApplyProposalResponse,
+    BrandSafeClaimsImportResponse,
+    BrandSafeClaimsRead,
+    BrandSafeClaimsUpdate,
+)
 from app.schemas.brand_profile_v1 import (
     BrandProfileApplyProposalRequest,
     BrandProfileEnrichRequest,
@@ -129,6 +136,12 @@ from app.services.brand_intelligence.identity_service import (
 from app.services.brand_intelligence.profile_enrichment import (
     apply_brand_profile_proposal,
     enrich_brand_profile,
+)
+from app.services.brand_intelligence.safe_claims_import import import_safe_claims_from_file
+from app.services.brand_intelligence.safe_claims_service import (
+    apply_safe_claims_proposal,
+    get_safe_claims,
+    upsert_safe_claims,
 )
 from app.services.brand_intelligence.visual_extraction import extract_visual_from_website
 from app.services.brand_intelligence.visual_identity_service import (
@@ -365,6 +378,74 @@ async def apply_visual_identity_proposal(
     return VisualApplyProposalResponse(
         visual_identity=BrandVisualIdentityRead.model_validate(row),
         message="Visual Identity aggiornata.",
+    )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/safe-claims",
+    response_model=BrandSafeClaimsRead,
+    response_model_by_alias=True,
+)
+async def get_brand_safe_claims(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSafeClaimsRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_safe_claims(session, project_id)
+    return BrandSafeClaimsRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/brand-intelligence/safe-claims",
+    response_model=BrandSafeClaimsRead,
+    response_model_by_alias=True,
+)
+async def update_brand_safe_claims(
+    project_id: UUID,
+    payload: BrandSafeClaimsUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSafeClaimsRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await upsert_safe_claims(session, project_id, payload)
+    return BrandSafeClaimsRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/safe-claims/import-file",
+    response_model=BrandSafeClaimsImportResponse,
+    response_model_by_alias=True,
+)
+async def import_brand_safe_claims_file(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> BrandSafeClaimsImportResponse:
+    await get_project_in_default_workspace(project_id, session)
+    data = await file.read()
+    return await import_safe_claims_from_file(
+        session,
+        project_id,
+        filename=file.filename or "document",
+        content_type=file.content_type,
+        data=data,
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/safe-claims/apply-proposal",
+    response_model=BrandSafeClaimsApplyProposalResponse,
+    response_model_by_alias=True,
+)
+async def apply_brand_safe_claims_proposal(
+    project_id: UUID,
+    payload: BrandSafeClaimsApplyProposalRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSafeClaimsApplyProposalResponse:
+    await get_project_in_default_workspace(project_id, session)
+    row = await apply_safe_claims_proposal(session, project_id, payload.proposal)
+    return BrandSafeClaimsApplyProposalResponse(
+        safe_claims=BrandSafeClaimsRead.model_validate(row),
+        message="Safe Claims aggiornati.",
     )
 
 

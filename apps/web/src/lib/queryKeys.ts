@@ -47,6 +47,7 @@ export const queryKeys = {
     identity: (projectId: string) => ["brandIntelligence", projectId, "identity"] as const,
     visualIdentity: (projectId: string) =>
       ["brandIntelligence", projectId, "visualIdentity"] as const,
+    safeClaims: (projectId: string) => ["brandIntelligence", projectId, "safeClaims"] as const,
     voice: (projectId: string) => ["brandIntelligence", projectId, "voice"] as const,
     products: (projectId: string) => ["brandIntelligence", projectId, "products"] as const,
     audience: (projectId: string) => ["brandIntelligence", projectId, "audience"] as const,

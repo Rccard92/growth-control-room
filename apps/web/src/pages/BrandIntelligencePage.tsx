@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { BrandIdentityPanel } from "../components/brand-intelligence/BrandIdentityPanel";
 import { BrandIntelligenceOverviewPanel } from "../components/brand-intelligence/BrandIntelligenceOverview";
 import { BrandProfilePanel } from "../components/brand-intelligence/BrandProfilePanel";
+import { BrandSafeClaimsPanel } from "../components/brand-intelligence/BrandSafeClaimsPanel";
 import { BrandVisualIdentityPanel } from "../components/brand-intelligence/BrandVisualIdentityPanel";
 import { useBrandIntelligenceOverview } from "../hooks/useBrandIntelligence";
 import { useProject } from "../hooks/useProjects";
@@ -16,6 +17,7 @@ const TABS: { id: BrandIntelligenceTab; label: string }[] = [
   { id: "profile", label: "Brand Profile" },
   { id: "identity", label: "Brand Identity" },
   { id: "visualIdentity", label: "Visual Identity" },
+  { id: "safeClaims", label: "Safe Claims" },
 ];
 
 export function BrandIntelligencePage() {
@@ -65,6 +67,7 @@ export function BrandIntelligencePage() {
       {tab === "profile" && <BrandProfilePanel projectId={projectId} />}
       {tab === "identity" && <BrandIdentityPanel projectId={projectId} />}
       {tab === "visualIdentity" && <BrandVisualIdentityPanel projectId={projectId} />}
+      {tab === "safeClaims" && <BrandSafeClaimsPanel projectId={projectId} />}
     </motion.div>
   );
 }

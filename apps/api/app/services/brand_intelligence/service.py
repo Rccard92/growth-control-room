@@ -16,6 +16,7 @@ from app.models.brand_intelligence import (
     BrandIdentity,
     BrandProductKnowledge,
     BrandProfile,
+    BrandSafeClaims,
     BrandSeoStrategy,
     BrandSourceDocument,
     BrandVisualIdentity,
@@ -44,6 +45,10 @@ from app.schemas.brand_intelligence import (
 from app.services.brand_intelligence.identity_service import (
     identity_completion,
     identity_missing_fields,
+)
+from app.services.brand_intelligence.safe_claims_service import (
+    safe_claims_completion,
+    safe_claims_missing_fields,
 )
 from app.services.brand_intelligence.visual_identity_service import (
     visual_completion,
@@ -427,6 +432,11 @@ async def build_overview(
             select(BrandVisualIdentity).where(BrandVisualIdentity.project_id == project_id)
         )
     ).scalar_one_or_none()
+    safe_claims = (
+        await session.execute(
+            select(BrandSafeClaims).where(BrandSafeClaims.project_id == project_id)
+        )
+    ).scalar_one_or_none()
 
     sections = [
         BrandModuleStatus(
@@ -453,6 +463,13 @@ async def build_overview(
             status=visual_completion(visual),
             missing_fields=visual_missing_fields(visual),
             updated_at=visual.updated_at if visual else None,
+        ),
+        BrandModuleStatus(
+            key="safeClaims",
+            label=SECTION_LABELS["safeClaims"],
+            status=safe_claims_completion(safe_claims),
+            missing_fields=safe_claims_missing_fields(safe_claims),
+            updated_at=safe_claims.updated_at if safe_claims else None,
         ),
     ]
 

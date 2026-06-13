@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         BrandIntelligenceBrief,
         BrandProductKnowledge,
         BrandProfile,
+        BrandSafeClaims,
         BrandSectionDraft,
         BrandSeoStrategy,
         BrandSourceDocument,
@@ -77,6 +78,11 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         uselist=False,
     )
     brand_visual_identity: Mapped["BrandVisualIdentity | None"] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    brand_safe_claims: Mapped["BrandSafeClaims | None"] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         uselist=False,

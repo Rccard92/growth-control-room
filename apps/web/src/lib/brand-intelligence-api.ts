@@ -10,6 +10,10 @@ import type {
   BrandProfileApplyProposalRequest,
   BrandProfileEnrichRequest,
   BrandProfileEnrichResponse,
+  BrandSafeClaims,
+  BrandSafeClaimsApplyProposalRequest,
+  BrandSafeClaimsApplyProposalResponse,
+  BrandSafeClaimsImportResponse,
   BrandVisualIdentity,
   VisualApplyProposalRequest,
   VisualApplyProposalResponse,
@@ -162,6 +166,47 @@ export function applyVisualProposal(
 ): Promise<VisualApplyProposalResponse> {
   return apiFetch<VisualApplyProposalResponse>(
     `/api/projects/${projectId}/brand-intelligence/visual-identity/apply-proposal`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function getBrandSafeClaims(projectId: string): Promise<BrandSafeClaims> {
+  return apiFetch<BrandSafeClaims>(`/api/projects/${projectId}/brand-intelligence/safe-claims`);
+}
+
+export function updateBrandSafeClaims(
+  projectId: string,
+  data: Partial<BrandSafeClaims>,
+): Promise<BrandSafeClaims> {
+  return apiFetch<BrandSafeClaims>(`/api/projects/${projectId}/brand-intelligence/safe-claims`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function importBrandSafeClaimsFromFile(
+  projectId: string,
+  file: File,
+): Promise<BrandSafeClaimsImportResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiUploadForm<BrandSafeClaimsImportResponse>(
+    `/api/projects/${projectId}/brand-intelligence/safe-claims/import-file`,
+    formData,
+  );
+}
+
+export function applyBrandSafeClaimsProposal(
+  projectId: string,
+  data: BrandSafeClaimsApplyProposalRequest,
+): Promise<BrandSafeClaimsApplyProposalResponse> {
+  return apiFetch<BrandSafeClaimsApplyProposalResponse>(
+    `/api/projects/${projectId}/brand-intelligence/safe-claims/apply-proposal`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -10,22 +10,31 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.brand_intelligence import BrandIdentity, BrandProfile, BrandVisualIdentity
+from app.models.brand_intelligence import BrandIdentity, BrandProfile, BrandSafeClaims, BrandVisualIdentity
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
+from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
     BrandContextBundleResponse,
     BrandKnowledgeScoreResponse,
     BrandProfileRead,
     BrandPromptContext,
 )
+from app.services.brand_intelligence.safe_claims_service import safe_claims_completion
 from app.services.brand_intelligence.score import (
     compute_brand_knowledge_score,
     identity_missing_context,
     profile_has_minimum,
     profile_missing_context,
+    safe_claims_missing_context,
     score_to_response,
     visual_missing_context,
 )
+
+SAFE_CLAIMS_PRUDENCE_FALLBACK = """SAFE CLAIMS & RED FLAGS (fallback prudenza)
+- Non usare claim medici, terapeutici o promesse di cura non verificabili.
+- Non attaccare competitor o fare confronti denigratori.
+- Non divulgare process secrets o dettagli produttivi riservati.
+- Preferire claim fattuali, verificabili e conformi al brand."""
 
 
 class BrandIntelligenceContextBuilder:
@@ -47,19 +56,32 @@ class BrandIntelligenceContextBuilder:
                 select(BrandVisualIdentity).where(BrandVisualIdentity.project_id == project_id)
             )
         ).scalar_one_or_none()
+        safe_claims = (
+            await session.execute(
+                select(BrandSafeClaims).where(BrandSafeClaims.project_id == project_id)
+            )
+        ).scalar_one_or_none()
 
         score = await compute_brand_knowledge_score(session, project_id)
         missing = (
             profile_missing_context(profile)
             + identity_missing_context(identity)
             + visual_missing_context(visual)
+            + safe_claims_missing_context(safe_claims)
         )
+        if safe_claims_completion(safe_claims) == "empty":
+            missing.append(
+                "Safe Claims non compilata: i moduli AI devono evitare claim sensibili."
+            )
 
         primary_source = "brand_profile" if profile and profile_has_minimum(profile) else "minimal"
 
         profile_read = BrandProfileRead.model_validate(profile) if profile else None
         identity_read = BrandIdentityRead.model_validate(identity) if identity else None
         visual_read = BrandVisualIdentityRead.model_validate(visual) if visual else None
+        safe_claims_read = (
+            BrandSafeClaimsRead.model_validate(safe_claims) if safe_claims else None
+        )
 
         bundle = BrandContextBundleResponse(
             brand_context_version="v1",
@@ -71,6 +93,7 @@ class BrandIntelligenceContextBuilder:
             profile=profile_read,
             brand_identity=identity_read,
             visual_identity=visual_read,
+            safe_claims=safe_claims_read,
             voice=None,
             products=[],
             categories=[],
@@ -168,6 +191,37 @@ class BrandIntelligenceContextBuilder:
         return "\n".join(parts)
 
     @staticmethod
+    def format_safe_claims_for_prompt(safe_claims: BrandSafeClaimsRead) -> str:
+        parts: list[str] = ["SAFE CLAIMS & RED FLAGS"]
+        if safe_claims.allowed_claims:
+            parts.append("Claim consentiti:")
+            parts.extend(f"- {c}" for c in safe_claims.allowed_claims[:12])
+        if safe_claims.forbidden_claims:
+            parts.append("Claim vietati:")
+            parts.extend(f"- {c}" for c in safe_claims.forbidden_claims[:12])
+        if safe_claims.caution_claims:
+            parts.append("Da usare con cautela:")
+            parts.extend(f"- {c}" for c in safe_claims.caution_claims[:10])
+        if safe_claims.disclaimers:
+            parts.append("Disclaimer:")
+            parts.extend(f"- {d}" for d in safe_claims.disclaimers[:8])
+        if safe_claims.health_claim_rules:
+            parts.append("Regole claim salutistici:")
+            parts.extend(f"- {r}" for r in safe_claims.health_claim_rules[:8])
+        if safe_claims.competitor_rules:
+            parts.append("Regole competitor:")
+            parts.extend(f"- {r}" for r in safe_claims.competitor_rules[:8])
+        if safe_claims.process_secrets:
+            parts.append("Process secrets (non divulgare):")
+            parts.extend(f"- {s}" for s in safe_claims.process_secrets[:8])
+        if safe_claims.tone_red_flags:
+            parts.append("Tone red flags:")
+            parts.extend(f"- {f}" for f in safe_claims.tone_red_flags[:8])
+        if safe_claims.notes:
+            parts.append(f"Note: {safe_claims.notes[:400]}")
+        return "\n".join(parts)
+
+    @staticmethod
     def build_prompt_context(bundle: BrandContextBundleResponse) -> BrandPromptContext | None:
         if bundle.primary_source == "minimal" or not bundle.profile:
             return None
@@ -183,18 +237,28 @@ class BrandIntelligenceContextBuilder:
             if bundle.visual_identity
             else None
         )
+        safe_claims_text = None
+        if bundle.safe_claims and safe_claims_completion(bundle.safe_claims) != "empty":
+            safe_claims_text = BrandIntelligenceContextBuilder.format_safe_claims_for_prompt(
+                bundle.safe_claims
+            )
+        else:
+            safe_claims_text = SAFE_CLAIMS_PRUDENCE_FALLBACK
 
         blocks = [profile_text]
         if identity_text and len(identity_text.splitlines()) > 1:
             blocks.append(identity_text)
         if visual_text and len(visual_text.splitlines()) > 1:
             blocks.append(visual_text)
+        if safe_claims_text:
+            blocks.append(safe_claims_text)
 
         full_text = "\n\n".join(blocks)
         return BrandPromptContext(
             brand_profile=profile_text,
             brand_identity=identity_text,
             visual_identity=visual_text,
+            safe_claims=safe_claims_text,
             full_text=full_text,
         )
 
@@ -213,6 +277,12 @@ class BrandIntelligenceContextBuilder:
             blocks.append(
                 BrandIntelligenceContextBuilder.format_visual_for_prompt(bundle.visual_identity)
             )
+        if bundle.safe_claims and safe_claims_completion(bundle.safe_claims) != "empty":
+            blocks.append(
+                BrandIntelligenceContextBuilder.format_safe_claims_for_prompt(bundle.safe_claims)
+            )
+        elif bundle.prompt_context and bundle.prompt_context.safe_claims:
+            blocks.append(bundle.prompt_context.safe_claims)
         return "\n\n".join(blocks)
 
     @staticmethod

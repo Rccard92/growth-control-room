@@ -14,6 +14,10 @@ from app.services.brand_intelligence.score import (
     profile_is_complete,
     profile_missing_context,
 )
+from app.services.brand_intelligence.safe_claims_service import (
+    safe_claims_completion,
+    safe_claims_has_minimum,
+)
 from app.services.brand_intelligence.visual_identity_service import (
     visual_completion,
     visual_has_minimum,
@@ -84,8 +88,13 @@ def test_overall_status_thresholds() -> None:
     assert _overall_status(85) == "ready"
 
 
-def test_section_labels_three_modules() -> None:
-    assert set(SECTION_LABELS.keys()) == {"brandProfile", "brandIdentity", "visualIdentity"}
+def test_section_labels_four_modules() -> None:
+    assert set(SECTION_LABELS.keys()) == {
+        "brandProfile",
+        "brandIdentity",
+        "visualIdentity",
+        "safeClaims",
+    }
 
 
 def test_identity_has_minimum() -> None:
@@ -98,6 +107,22 @@ def test_identity_has_minimum() -> None:
     )
     assert identity_has_minimum(identity) is True
     assert identity_completion(identity) == "partial"
+
+
+def test_safe_claims_completion() -> None:
+    row = SimpleNamespace(
+        allowed_claims=["ok"],
+        forbidden_claims=["no"],
+        caution_claims=None,
+        disclaimers=["disc"],
+        health_claim_rules=None,
+        competitor_rules=None,
+        process_secrets=None,
+        tone_red_flags=None,
+        notes=None,
+    )
+    assert safe_claims_has_minimum(row) is True
+    assert safe_claims_completion(row) == "complete"
 
 
 def test_visual_has_minimum() -> None:

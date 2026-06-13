@@ -3,6 +3,7 @@ import type { BrandProfileEnrichRequest, VisualExtractRequest } from "@gcr/share
 import {
   applyBrandIdentityProposal,
   applyBrandProfileProposal,
+  applyBrandSafeClaimsProposal,
   applyVisualProposal,
   enrichBrandProfile,
   extractVisualFromWebsite,
@@ -10,10 +11,13 @@ import {
   getBrandIdentity,
   getBrandIntelligenceOverview,
   getBrandProfile,
+  getBrandSafeClaims,
   getBrandVisualIdentity,
   importBrandIdentityFromFile,
+  importBrandSafeClaimsFromFile,
   updateBrandIdentity,
   updateBrandProfile,
+  updateBrandSafeClaims,
   updateBrandVisualIdentity,
 } from "../lib/brand-intelligence-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -26,6 +30,9 @@ function invalidateBrand(projectId: string, qc: ReturnType<typeof useQueryClient
   void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.identity(projectId) });
   void qc.invalidateQueries({
     queryKey: queryKeys.brandIntelligence.visualIdentity(projectId),
+  });
+  void qc.invalidateQueries({
+    queryKey: queryKeys.brandIntelligence.safeClaims(projectId),
   });
 }
 
@@ -146,6 +153,41 @@ export function useApplyVisualProposal(projectId: string) {
       applyVisualProposal(projectId, data),
     onSuccess: (data) => {
       qc.setQueryData(queryKeys.brandIntelligence.visualIdentity(projectId), data.visualIdentity);
+      invalidateBrand(projectId, qc);
+    },
+  });
+}
+
+export function useBrandSafeClaims(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.safeClaims(projectId ?? ""),
+    queryFn: () => getBrandSafeClaims(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useUpdateBrandSafeClaims(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateBrandSafeClaims>[1]) =>
+      updateBrandSafeClaims(projectId, data),
+    onSuccess: () => invalidateBrand(projectId, qc),
+  });
+}
+
+export function useImportBrandSafeClaimsFromFile(projectId: string) {
+  return useMutation({
+    mutationFn: (file: File) => importBrandSafeClaimsFromFile(projectId, file),
+  });
+}
+
+export function useApplyBrandSafeClaimsProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof applyBrandSafeClaimsProposal>[1]) =>
+      applyBrandSafeClaimsProposal(projectId, data),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.brandIntelligence.safeClaims(projectId), data.safeClaims);
       invalidateBrand(projectId, qc);
     },
   });

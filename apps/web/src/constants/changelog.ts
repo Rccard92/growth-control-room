@@ -7,9 +7,20 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.3.2-alpha";
+export const GCR_VERSION = "0.3.3-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.3-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Safe Claims & Red Flags: tab dedicata con import file e apply-proposal",
+      "Migration 023 brand_safe_claims + contesto AI con fallback prudenza",
+      "Product SEO: guardrail espliciti su claim vietati e red flags",
+      "Overview con 5ª card Safe Claims; score su 4 moduli",
+    ],
+  },
   {
     version: "0.3.2-alpha",
     date: "2026-06-13",

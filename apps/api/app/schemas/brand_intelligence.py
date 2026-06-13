@@ -9,6 +9,7 @@ from app.schemas.brand_identity_visual import (
     BrandModuleStatus,
     BrandVisualIdentityRead,
 )
+from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 
 
 class BrandProfileRead(BaseModel):
@@ -815,6 +816,7 @@ class BrandPromptContext(BaseModel):
     brand_profile: str | None = Field(default=None, serialization_alias="brandProfile")
     brand_identity: str | None = Field(default=None, serialization_alias="brandIdentity")
     visual_identity: str | None = Field(default=None, serialization_alias="visualIdentity")
+    safe_claims: str | None = Field(default=None, serialization_alias="safeClaims")
     full_text: str | None = Field(default=None, serialization_alias="fullText")
 
 
@@ -836,6 +838,9 @@ class BrandContextBundleResponse(BaseModel):
     )
     visual_identity: BrandVisualIdentityRead | None = Field(
         default=None, serialization_alias="visualIdentity"
+    )
+    safe_claims: BrandSafeClaimsRead | None = Field(
+        default=None, serialization_alias="safeClaims"
     )
     voice: BrandVoiceRead | None = None
     products: list[BrandProductKnowledgeRead] = []

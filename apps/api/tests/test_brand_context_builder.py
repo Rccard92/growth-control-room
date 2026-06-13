@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
+from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
     BrandContextBundleResponse,
     BrandKnowledgeScoreResponse,
@@ -159,3 +160,50 @@ def test_build_prompt_context_machine_ready() -> None:
     assert prompt_ctx.full_text is not None
     assert "BRAND PROFILE" in prompt_ctx.full_text
     assert "BRAND IDENTITY" in prompt_ctx.full_text
+
+
+def test_format_safe_claims_for_prompt() -> None:
+    safe = BrandSafeClaimsRead(
+        id=uuid4(),
+        project_id=_PID,
+        allowed_claims=["Artigianale"],
+        forbidden_claims=["Cura malattie"],
+        caution_claims=["Benefico"],
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+    text = BrandIntelligenceContextBuilder.format_safe_claims_for_prompt(safe)
+    assert "SAFE CLAIMS & RED FLAGS" in text
+    assert "Claim consentiti" in text
+    assert "Artigianale" in text
+    assert "Claim vietati" in text
+    assert "Cura malattie" in text
+
+
+def test_build_prompt_context_includes_safe_claims_fallback() -> None:
+    bundle = BrandContextBundleResponse(
+        brand_context_version="v1",
+        primary_source="brand_profile",
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Artisan brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        products=[],
+        categories=[],
+        audience=[],
+        claims=[],
+        content_pillars=[],
+        guardrails=[],
+        assets=[],
+        knowledge_score=_score(80),
+    )
+    prompt_ctx = BrandIntelligenceContextBuilder.build_prompt_context(bundle)
+    assert prompt_ctx is not None
+    assert prompt_ctx.safe_claims is not None
+    assert "SAFE CLAIMS" in prompt_ctx.safe_claims
+    assert "fallback prudenza" in prompt_ctx.safe_claims.lower() or "prudenza" in prompt_ctx.safe_claims.lower()
+    assert "SAFE CLAIMS" in (prompt_ctx.full_text or "")

@@ -105,6 +105,31 @@ class BrandVisualIdentity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="brand_visual_identity")
 
 
+class BrandSafeClaims(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_safe_claims"
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_safe_claims_project_id"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    allowed_claims: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    forbidden_claims: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    caution_claims: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    disclaimers: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    health_claim_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    competitor_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    process_secrets: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    tone_red_flags: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_import_source: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warnings: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_safe_claims")
+
+
 class BrandVoice(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "brand_voices"
     __table_args__ = (UniqueConstraint("project_id", name="uq_brand_voices_project_id"),)

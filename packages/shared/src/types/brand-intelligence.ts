@@ -265,6 +265,53 @@ export interface BrandIdentityApplyProposalResponse {
   message: string;
 }
 
+export interface BrandSafeClaims {
+  id: string;
+  projectId: string;
+  allowedClaims?: string[] | null;
+  forbiddenClaims?: string[] | null;
+  cautionClaims?: string[] | null;
+  disclaimers?: string[] | null;
+  healthClaimRules?: string[] | null;
+  competitorRules?: string[] | null;
+  processSecrets?: string[] | null;
+  toneRedFlags?: string[] | null;
+  notes?: string | null;
+  lastImportSource?: string | null;
+  lastConfidence?: number | null;
+  warnings?: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandSafeClaimsProposal {
+  allowedClaims?: string[] | null;
+  forbiddenClaims?: string[] | null;
+  cautionClaims?: string[] | null;
+  disclaimers?: string[] | null;
+  healthClaimRules?: string[] | null;
+  competitorRules?: string[] | null;
+  processSecrets?: string[] | null;
+  toneRedFlags?: string[] | null;
+  notes?: string | null;
+}
+
+export interface BrandSafeClaimsImportResponse {
+  proposal: BrandSafeClaimsProposal;
+  confidence: number;
+  warnings: string[];
+  sourceSummary: string;
+}
+
+export interface BrandSafeClaimsApplyProposalRequest {
+  proposal: BrandSafeClaimsProposal;
+}
+
+export interface BrandSafeClaimsApplyProposalResponse {
+  safeClaims: BrandSafeClaims;
+  message: string;
+}
+
 export interface VisualColorSwatch {
   hex: string;
   role?: string | null;
@@ -713,6 +760,7 @@ export interface BrandPromptContext {
   brandProfile?: string | null;
   brandIdentity?: string | null;
   visualIdentity?: string | null;
+  safeClaims?: string | null;
   fullText?: string | null;
 }
 
@@ -727,6 +775,7 @@ export interface BrandContextBundle {
   profile?: BrandProfile | null;
   brandIdentity?: BrandIdentity | null;
   visualIdentity?: BrandVisualIdentity | null;
+  safeClaims?: BrandSafeClaims | null;
   voice?: BrandVoice | null;
   products: BrandProductKnowledge[];
   categories: BrandProductKnowledge[];
@@ -739,4 +788,9 @@ export interface BrandContextBundle {
   knowledgeScore: BrandKnowledgeScore;
 }
 
-export type BrandIntelligenceTab = "overview" | "profile" | "identity" | "visualIdentity";
+export type BrandIntelligenceTab =
+  | "overview"
+  | "profile"
+  | "identity"
+  | "visualIdentity"
+  | "safeClaims";
