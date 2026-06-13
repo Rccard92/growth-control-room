@@ -56,7 +56,6 @@ async def analyze_single_product(
         seo_description=product.seo_description,
         description_text=desc_text,
         handle=product.handle,
-        tags=product.tags,
         media_images=product.media_images,
         featured_image_url=product.featured_image_url,
         product_type=product.product_type,

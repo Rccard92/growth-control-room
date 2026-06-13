@@ -210,16 +210,18 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 **Flusso Modifica → Proposta → Approvazione** (nessuna modifica live senza conferma):
 
 1. UI: bottone **Modifica** in tabella apre **SEO Edit Workspace** (portal, opaco, quasi full-screen) con tab Campi SEO, Score, Proposta, Storico
-2. Campi precompilati da `currentValues` (camelCase da Shopify sync): title, handle, seoTitle, metaDescription, descriptionHtml, tags, images, productType, vendor — con fallback `descriptionHtml` da `raw_payload` se assente in DB
-3. Badge per campo: **OK** / **Mancante** / **Da migliorare** (da analisi + valore)
-4. **Proposta manuale**: footer **Salva come proposta** → `POST .../proposals/manual` — non tocca Shopify
-5. **Proposta AI** (solo nella modal, footer): `POST .../proposals/generate` — se `OPENAI_API_KEY` assente, bottone disabilitato con messaggio *"AI non configurata. Puoi modificare manualmente e salvare come proposta."*
-6. AI genera draft → tab **Proposta** mostra preview current vs proposed → **Copia proposta nel form** (non auto-apply)
+2. Campi precompilati da `currentValues` (camelCase da Shopify sync): title, handle, seoTitle, metaDescription, descriptionHtml, images (con altText), productType, vendor — con fallback `descriptionHtml` da `raw_payload` se assente in DB
+3. Badge per campo: **OK** / **Mancante** / **Da migliorare** (da analisi + valore; si aggiornano lato client quando il form viene riempito)
+4. **Proposta manuale**: footer **Salva come proposta** → `POST .../proposals/manual` — salva i valori attuali del form; non tocca Shopify
+5. **Genera proposta AI** (footer): `POST .../proposals/generate` — compila **direttamente** i campi del tab Campi SEO (seo title, meta, descrizione, alt immagini); salva draft; non approva né applica su Shopify; messaggio *"Proposta AI inserita nel form. Controlla e salva prima di applicare."*
+6. Tab **Proposta** secondaria: preview current vs proposed, reasoning, risk (non serve per compilare il form)
 7. **Approve**: footer **Approva** — non applica su Shopify
-8. **Apply**: footer **Applica su Shopify** — solo se `approved` + scope `write_products` + conferma utente; senza scope: *"Per applicare su Shopify serve autorizzare write_products."*
-9. Dopo apply riuscito, GCR aggiorna **DB locale** (`ShopifyProduct`/`ShopifyCollection`) e ricalcola **analisi singola** (`SeoEntityAnalysis`) — la UI riflette subito score e campi senza sync completo
-10. **Sync singola entità** (fallback): `POST .../content/seo/products/{product_id}/sync-shopify` e `POST .../content/seo/collections/{collection_id}/sync-shopify` — riallinea una sola entità da Shopify + re-analyze
-11. **Sync completo** (`POST .../content/seo/sync-shopify`) resta per riallineamenti massivi, non dopo ogni apply
+8. **Apply**: footer **Applica su Shopify** — solo se `approved` + scope `write_products` + conferma utente; microcopy scope solo vicino al bottone Apply
+9. Dopo apply riuscito, GCR aggiorna **DB locale** e ricalcola **analisi singola** — UI aggiornata senza sync completo
+10. **Sync singola entità** (fallback): `POST .../products/{id}/sync-shopify` / `POST .../collections/{id}/sync-shopify`
+11. **Sync completo** solo per riallineamenti massivi
+12. **Score prodotto** senza componente Tag; pesi su title, handle, seo title, meta, descrizione, image alt
+13. **Collections sync**: `productsCount { count }` (GraphQL 2026-04) — nessun fallimento sync per campo Count
 
 **Detail response** (`skillMeta`):
 

@@ -17,11 +17,10 @@ SCORE_WARNING = 40
 PRODUCT_WEIGHTS = {
     "title": 15,
     "seo_title": 20,
-    "meta_description": 20,
+    "meta_description": 25,
     "description": 15,
     "handle": 10,
-    "image_alt": 10,
-    "tags": 10,
+    "image_alt": 15,
 }
 
 COLLECTION_WEIGHTS = {

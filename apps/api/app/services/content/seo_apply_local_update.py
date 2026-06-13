@@ -116,9 +116,6 @@ async def apply_proposed_values_to_product(
         if desc_html:
             product.description_html = desc_html
             product.description_text = html_to_text(desc_html)
-        tags = _get_proposed(proposed, "tags", "proposed_tags")
-        if tags is not None:
-            product.tags = tags
         media = _get_proposed(proposed, "media_images", "images")
         if media is not None:
             product.media_images = media
@@ -130,7 +127,6 @@ async def apply_proposed_values_to_product(
                 "handle": product.handle,
                 "seo": {"title": product.seo_title, "description": product.seo_description},
                 "descriptionHtml": product.description_html,
-                "tags": product.tags,
             },
         )
 

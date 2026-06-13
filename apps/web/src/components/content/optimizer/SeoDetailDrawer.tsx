@@ -65,7 +65,6 @@ export function SeoDetailDrawer({
               <div>Description: {analysis.scoreDescription}</div>
               <div>Alt immagini: {analysis.scoreImageAlt}</div>
               <div>Handle: {analysis.scoreHandle}</div>
-              {analysis.entityType === "product" && <div>Tags: {analysis.scoreTags}</div>}
             </div>
             {analysis.issues && analysis.issues.length > 0 && (
               <>

@@ -4,7 +4,7 @@ const AI_DISABLED_MSG =
   "AI non configurata. Puoi modificare manualmente e salvare come proposta.";
 
 const WRITE_PRODUCTS_MSG =
-  "Il token Shopify corrente non include write_products. Riconnetti Shopify dalla pagina Shopify.";
+  "Per applicare su Shopify serve autorizzare write_products.";
 
 interface SeoProposalFooterProps {
   proposal: SeoOptimizationProposal | null | undefined;
@@ -42,9 +42,6 @@ export function SeoProposalFooter({
     <div className="seo-proposal-footer">
       {!openaiConfigured && (
         <p className="seo-proposal-footer__hint">{AI_DISABLED_MSG}</p>
-      )}
-      {!writeProductsAvailable && (
-        <p className="seo-proposal-footer__hint">{WRITE_PRODUCTS_MSG}</p>
       )}
       {proposal && (
         <p className="seo-proposal-footer__status">
@@ -90,15 +87,22 @@ export function SeoProposalFooter({
           </>
         )}
         {proposal && canApply && (
-          <button
-            type="button"
-            className="gcr-btn gcr-btn--primary"
-            disabled={loading || !writeProductsAvailable}
-            title={writeProductsAvailable ? undefined : WRITE_PRODUCTS_MSG}
-            onClick={onApply}
-          >
-            Applica su Shopify
-          </button>
+          <div className="seo-proposal-footer__apply-group">
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              disabled={loading || !writeProductsAvailable}
+              title={writeProductsAvailable ? undefined : WRITE_PRODUCTS_MSG}
+              onClick={onApply}
+            >
+              Applica su Shopify
+            </button>
+            {!writeProductsAvailable && (
+              <p className="seo-proposal-footer__hint seo-proposal-footer__hint--inline">
+                {WRITE_PRODUCTS_MSG}
+              </p>
+            )}
+          </div>
         )}
         <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onCancel}>
           Annulla

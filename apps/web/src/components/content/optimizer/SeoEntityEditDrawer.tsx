@@ -12,8 +12,10 @@ import { SeoScoreBadge } from "./SeoScoreBadge";
 import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
 import { SeoSkillAppliedPanel } from "./SeoSkillAppliedPanel";
 import {
+  getEffectiveIssues,
   mergeProposedIntoForm,
   normalizeFormValues,
+  resolveMediaFromProposal,
   toProposalValues,
 } from "./seoFormValues";
 import {
@@ -76,12 +78,17 @@ export function SeoEntityEditDrawer({
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
   const [localUpdateFailed, setLocalUpdateFailed] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [aiToast, setAiToast] = useState<string | null>(null);
   const initialFormRef = useRef<string>("");
 
   const detail = entityType === "product" ? productDetail : collectionDetail;
   const analysis = detail?.analysis as Record<string, unknown> | null | undefined;
   const scoreBreakdown = detail?.scoreBreakdown;
   const issues = (analysis?.issues as Record<string, unknown>[] | undefined) ?? null;
+  const effectiveIssues = useMemo(
+    () => getEffectiveIssues(issues, formValues, mediaImages),
+    [issues, formValues, mediaImages],
+  );
   const scoreTotal = (analysis?.scoreTotal ?? analysis?.score_total) as number | undefined;
   const severity = (analysis?.severity as string | undefined) ?? undefined;
 
@@ -210,7 +217,24 @@ export function SeoEntityEditDrawer({
       {
         onSuccess: (proposal) => {
           setActiveProposalId(proposal.id);
-          setTab("proposal");
+          const merged = mergeProposedIntoForm(
+            formValues,
+            proposal.proposedValues ?? undefined,
+            entityType,
+          );
+          setFormValues(merged);
+          if (entityType === "product") {
+            const nextMedia = resolveMediaFromProposal(
+              proposal.proposedValues ?? undefined,
+              mediaImages.length > 0
+                ? mediaImages
+                : ((merged.images as Record<string, unknown>[]) ?? []),
+            );
+            setMediaImages(nextMedia);
+          }
+          setFormDirty(JSON.stringify(merged) !== initialFormRef.current);
+          setTab("fields");
+          setAiToast("Proposta AI inserita nel form. Controlla e salva prima di applicare.");
           onDetailRefresh?.();
         },
       },
@@ -222,8 +246,15 @@ export function SeoEntityEditDrawer({
     if (!proposed) return;
     const merged = mergeProposedIntoForm(formValues, proposed, entityType);
     setFormValues(merged);
-    if (entityType === "product" && Array.isArray(merged.images)) {
-      setMediaImages(merged.images as Record<string, unknown>[]);
+    if (entityType === "product") {
+      setMediaImages(
+        resolveMediaFromProposal(
+          proposed,
+          mediaImages.length > 0
+            ? mediaImages
+            : ((merged.images as Record<string, unknown>[]) ?? []),
+        ),
+      );
     }
     setFormDirty(JSON.stringify(merged) !== initialFormRef.current);
     setTab("fields");
@@ -386,6 +417,10 @@ export function SeoEntityEditDrawer({
             <div className="content-seo-banner content-seo-banner--success">{syncMessage}</div>
           )}
 
+          {aiToast && (
+            <div className="content-seo-banner content-seo-banner--success">{aiToast}</div>
+          )}
+
           {entityType === "product" && productDetail && (
             <p className="seo-edit-drawer__meta">
               Vendite: {productDetail.quantitySold} · Stock: {productDetail.stock ?? "—"} ·
@@ -410,7 +445,7 @@ export function SeoEntityEditDrawer({
             <SeoFieldEditor
               entityType={entityType}
               values={formValues}
-              issues={issues}
+              issues={effectiveIssues}
               scoreBreakdown={scoreBreakdown}
               mediaImages={mediaImages}
               onChange={handleFieldChange}
@@ -438,10 +473,10 @@ export function SeoEntityEditDrawer({
               {(activeProposal?.proposedValues || preview.data?.proposedValues) && (
                 <button
                   type="button"
-                  className="gcr-btn gcr-btn--secondary seo-copy-proposal-btn"
+                  className="gcr-btn gcr-btn--secondary gcr-btn--sm seo-copy-proposal-btn"
                   onClick={handleCopyProposalToForm}
                 >
-                  Copia proposta nel form
+                  Ricarica proposta nel form
                 </button>
               )}
             </>

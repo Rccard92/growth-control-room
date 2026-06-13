@@ -33,7 +33,7 @@ _SKILL_FILES: dict[str, str] = {
 
 _FALLBACK: dict[str, str] = {
     "skill": "GCR Shopify SEO optimization skill.",
-    "product_rules": "Score product title, seo title, meta, description, handle, tags, image alt.",
+    "product_rules": "Score product title, seo title, meta, description, handle, image alt.",
     "collection_rules": "Score collection title, seo title, meta, description, handle, image alt.",
     "image_alt_rules": "Image alt must describe product/collection without keyword stuffing (10-125 chars).",
     "proposal_rules": "Fill missing fields, improve weak ones, output structured JSON aligned to API.",
@@ -51,7 +51,6 @@ _SCORE_RULE_CATEGORIES_PRODUCT = (
     "meta_description",
     "description",
     "handle",
-    "tags",
     "image_alt",
 )
 

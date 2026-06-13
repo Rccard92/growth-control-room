@@ -81,8 +81,6 @@ export function SeoFieldEditor({
   onChange,
   onImageAltChange,
 }: SeoFieldEditorProps) {
-  const tags = Array.isArray(values.tags) ? (values.tags as string[]).join(", ") : "";
-
   return (
     <div className="seo-field-editor">
       <Section title="Identità prodotto/categoria">
@@ -151,27 +149,6 @@ export function SeoFieldEditor({
           multiline
         />
       </Section>
-
-      {entityType === "product" && (
-        <Section title="Classificazione">
-          <FieldRow
-            label="Tag (separati da virgola)"
-            field="tags"
-            value={tags}
-            issues={issues}
-            scoreBreakdown={scoreBreakdown}
-            onChange={(key, val) =>
-              onChange(
-                key,
-                val
-                  .split(",")
-                  .map((t) => t.trim())
-                  .filter(Boolean),
-              )
-            }
-          />
-        </Section>
-      )}
 
       <Section title="Immagini">
         {entityType === "collection" ? (

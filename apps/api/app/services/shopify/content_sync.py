@@ -69,7 +69,11 @@ async def _upsert_collection(
     row.seo_description = seo.get("description")
     row.image_url = image.get("url")
     row.image_alt = image.get("altText")
-    row.products_count = node.get("productsCount")
+    products_count_raw = node.get("productsCount")
+    if isinstance(products_count_raw, dict):
+        row.products_count = products_count_raw.get("count")
+    else:
+        row.products_count = products_count_raw
     row.raw_payload = node
     return row
 

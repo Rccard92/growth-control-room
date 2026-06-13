@@ -11,10 +11,9 @@ Adattato da claude-seo `seo-ecommerce` § Product Page Analysis per i campi Shop
 | `seo_title` | metafields global title_tag | Title tag SERP (distinto da product title) |
 | `seo_description` | metafields global description_tag | Meta description SERP |
 | `descriptionHtml` / `description_text` | body prodotto | Contenuto, keyword naturali, conversione |
-| `tags` | tags array | Categorizzazione, long-tail |
-| `productType` | product_type | Contesto semantico |
-| `vendor` | vendor | Brand name in SEO title |
-| `media_images[].alt` | media alt text | Image SEO + accessibilità |
+| `productType` | product_type | Contesto semantico (info, non score principale) |
+| `vendor` | vendor | Brand name in SEO title (info) |
+| `media_images[].altText` | media alt text | Image SEO + accessibilità |
 | stock / inventory | varianti | Priorità business (no copy inventato) |
 | vendite | `ShopifyOrderLineItem` | Boost severity best-seller |
 
@@ -24,11 +23,10 @@ Adattato da claude-seo `seo-ecommerce` § Product Page Analysis per i campi Shop
 |------------|------|--------|---------|---------|
 | score_title | 15 | Titolo chiaro ≥ 10 char | < 10 char | Assente |
 | score_seo_title | 20 | Presente 30–60 char | < 30 o > 70 | Assente |
-| score_meta_description | 20 | Presente 120–160 char | < 120 o > 170 | Assente |
+| score_meta_description | 25 | Presente 120–160 char | < 120 o > 170 | Assente |
 | score_description | 15 | body ≥ 150 char testo | 50–149 | < 50 o assente |
 | score_handle | 10 | handle leggibile kebab-case | corto/generico | assente |
-| score_image_alt | 10 | tutte immagini con alt | parziale | nessun alt |
-| score_tags | 10 | 1–10 tag coerenti | 0 tag | tag incoerenti |
+| score_image_alt | 15 | tutte immagini con alt | parziale | nessun alt |
 
 Implementazione runtime: `seo_scoring_engine.py` + `seo_scoring_constants.py`.
 
@@ -68,12 +66,6 @@ Implementazione runtime: `seo_scoring_engine.py` + `seo_scoring_constants.py`.
 - [ ] Minimo 3 caratteri
 - [ ] Evitare handle generici (`product-1`, `item`)
 - [ ] Coerente con keyword principale senza stuffing
-
-## Regole tags
-
-- [ ] 1–10 tag coerenti con prodotto
-- [ ] Derivati da title, productType, vendor reali
-- [ ] No tag duplicati o irrilevanti
 
 ## Priorità business
 

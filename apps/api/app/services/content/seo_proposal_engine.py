@@ -18,13 +18,76 @@ from app.services.content.seo_current_values import normalize_proposal_values
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 
+def _truncate_alt(text: str, *, max_len: int = 125) -> str:
+    cleaned = " ".join(text.split())
+    if len(cleaned) <= max_len:
+        return cleaned
+    return cleaned[: max_len - 1].rstrip() + "…"
+
+
+def _proposed_alt_for_product(product: ShopifyProduct, image: dict[str, Any]) -> str:
+    base = product.title or "Prodotto"
+    if product.product_type:
+        base = f"{base} — {product.product_type}"
+    if product.vendor:
+        base = f"{base} di {product.vendor}"
+    alt = _truncate_alt(base)
+    return alt if len(alt) >= 10 else _truncate_alt(f"Immagine {base}")
+
+
+def _build_image_alts(
+    product: ShopifyProduct,
+    media_images: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    image_alts: list[dict[str, Any]] = []
+    for image in media_images or []:
+        image_id = image.get("id")
+        if not image_id:
+            continue
+        current_alt = image.get("altText") or image.get("alt") or ""
+        if isinstance(current_alt, str) and current_alt.strip():
+            continue
+        proposed_alt = _proposed_alt_for_product(product, image)
+        image_alts.append(
+            {
+                "image_id": image_id,
+                "current_alt": current_alt or "",
+                "proposed_alt": proposed_alt,
+                "reason": "Alt text descrittivo derivato da titolo e contesto prodotto",
+            }
+        )
+    return image_alts
+
+
+def _apply_image_alts_to_media(
+    media_images: list[dict[str, Any]] | None,
+    image_alts: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    if not media_images:
+        return []
+    alt_by_id = {
+        str(item.get("image_id")): item.get("proposed_alt")
+        for item in image_alts or []
+        if item.get("image_id") and item.get("proposed_alt")
+    }
+    updated: list[dict[str, Any]] = []
+    for index, image in enumerate(media_images):
+        row = dict(image)
+        image_id = str(row.get("id") or "")
+        proposed_alt = alt_by_id.get(image_id)
+        if proposed_alt:
+            row["altText"] = proposed_alt
+        row.setdefault("position", index + 1)
+        updated.append(row)
+    return updated
+
+
 def product_current_values(product: ShopifyProduct) -> dict[str, Any]:
     return {
         "product_title": product.title,
         "seo_title": product.seo_title,
         "meta_description": product.seo_description,
         "handle": product.handle,
-        "tags": product.tags or [],
         "description_html": product.description_html,
         "description_text": product.description_text,
         "media_images": product.media_images or [],
@@ -56,19 +119,24 @@ def _weak_issue_fields(issues: list[dict[str, Any]] | None) -> set[str]:
 
 def _rules_product_proposal(product: ShopifyProduct, analysis: SeoEntityAnalysis) -> dict[str, Any]:
     weak = _weak_issue_fields(analysis.issues)
+    media = product.media_images or []
+    image_alts = _build_image_alts(product, media)
     proposed = {
         "product_title": product.title,
-        "seo_title": product.seo_title or (product.title[:60] if "seo_title" in weak else product.seo_title),
+        "seo_title": product.seo_title
+        or (product.title[:60] if "seo_title" in weak else product.seo_title),
         "meta_description": product.seo_description or "",
         "handle": product.handle or "",
-        "tags": product.tags or [],
         "description_html": product.description_html,
-        "media_images": product.media_images or [],
+        "media_images": _apply_image_alts_to_media(media, image_alts),
+        "image_alts": image_alts,
         "reasoning": ["Proposta rule-based: solo campi mancanti o deboli compilati con dati esistenti"],
         "risk_level": "low",
     }
     if not product.seo_title and "seo_title" in weak:
         proposed["reasoning"].append("SEO title derivato dal titolo prodotto")
+    if image_alts:
+        proposed["reasoning"].append("Alt text proposto per immagini senza alt")
     return proposed
 
 
@@ -95,6 +163,7 @@ def _ai_system_prompt(skill_context: str) -> str:
         "Non inventare claim non presenti nei dati forniti. "
         "Non modificare il significato del prodotto/collection. "
         "Evita keyword stuffing. "
+        "Non generare tag prodotto. "
         "Rispetta brand guardrails, regole SEO title, meta description, alt image. "
         "Modalità fill_missing_and_improve: compila campi mancanti e migliora solo quelli deboli; "
         "non sovrascrivere campi già ottimali.\n\n"
@@ -109,6 +178,14 @@ def _ai_user_prompt(
     analysis: SeoEntityAnalysis,
     mode: str,
 ) -> str:
+    image_alt_hint = ""
+    if entity_type == "product":
+        image_alt_hint = (
+            ' Per prodotti includi anche "image_alts": '
+            '[{"image_id":"...","current_alt":"...","proposed_alt":"...","reason":"..."}] '
+            "per ogni immagine in media_images senza alt o con alt debole. "
+            "Alt text: descrittivo, naturale, 10-125 caratteri, coerente con prodotto."
+        )
     return (
         f"mode={mode}\n"
         f"entity_type={entity_type}\n"
@@ -118,6 +195,7 @@ def _ai_user_prompt(
         f"score_breakdown={analysis.score_breakdown}\n"
         "Genera proposta JSON con chiavi allineate a current_values (stessi nomi), "
         "più reasoning (array stringhe) e risk_level (low|medium|high)."
+        f"{image_alt_hint}"
     )
 
 
@@ -192,6 +270,11 @@ async def generate_seo_proposal(
                 user_prompt=user_prompt,
             )
             proposed = normalize_proposal_values(entity_type, proposed)
+            if entity_type == "product" and proposed.get("image_alts"):
+                proposed["media_images"] = _apply_image_alts_to_media(
+                    proposed.get("media_images") or current.get("media_images"),
+                    proposed.get("image_alts"),
+                )
             source = "ai"
             reasoning = proposed.pop("reasoning", []) or []
             risk_from_ai = proposed.pop("risk_level", "low")

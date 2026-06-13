@@ -46,6 +46,87 @@ def _get_proposed(proposed: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+async def _apply_product_media_alts(
+    client: ShopifyGraphQLClient,
+    product_gid: str,
+    proposed: dict[str, Any],
+    shopify_response: dict[str, Any],
+) -> None:
+    media_updates: list[dict[str, str]] = []
+    image_alts = _get_proposed(proposed, "image_alts", "imageAlts") or []
+    alt_by_id = {
+        str(item.get("image_id") or item.get("imageId") or ""): str(
+            item.get("proposed_alt") or item.get("proposedAlt") or ""
+        )
+        for item in image_alts
+        if isinstance(item, dict)
+    }
+    media_images = _get_proposed(proposed, "media_images", "mediaImages") or []
+    for image in media_images:
+        if not isinstance(image, dict):
+            continue
+        image_id = str(image.get("id") or "")
+        alt = (
+            alt_by_id.get(image_id)
+            or str(image.get("altText") or image.get("alt") or "").strip()
+        )
+        if image_id and alt:
+            media_updates.append({"id": image_id, "alt": alt})
+
+    if not media_updates:
+        return
+
+    mutation = """
+    mutation ProductUpdateMedia($productId: ID!, $media: [UpdateMediaInput!]!) {
+      productUpdateMedia(productId: $productId, media: $media) {
+        media { id alt }
+        mediaUserErrors { field message }
+      }
+    }
+    """
+    try:
+        data = await client.execute(
+            mutation,
+            {"productId": product_gid, "media": media_updates},
+        )
+        shopify_response["productUpdateMedia"] = data.get("productUpdateMedia")
+        errors = (data.get("productUpdateMedia") or {}).get("mediaUserErrors") or []
+        if errors:
+            logger.warning(
+                "productUpdateMedia userErrors: %s",
+                "; ".join(e.get("message", "") for e in errors[:3]),
+            )
+    except ShopifyAPIError:
+        logger.exception("productUpdateMedia failed for product=%s", product_gid)
+
+
+async def _apply_collection_image_alt(
+    client: ShopifyGraphQLClient,
+    collection_gid: str,
+    proposed: dict[str, Any],
+    shopify_response: dict[str, Any],
+) -> None:
+    image_alt = _get_proposed(proposed, "image_alt", "proposed_image_alt")
+    if not image_alt:
+        return
+    mutation = """
+    mutation CollectionUpdateImageAlt($input: CollectionInput!) {
+      collectionUpdate(input: $input) {
+        collection { id image { altText } }
+        userErrors { field message }
+      }
+    }
+    """
+    try:
+        data = await client.execute(
+            mutation,
+            {"input": {"id": collection_gid, "image": {"altText": image_alt}}},
+        )
+        shopify_response["collectionImageAltUpdate"] = data.get("collectionUpdate")
+    except ShopifyAPIError:
+        logger.exception("collection image alt update failed for %s", collection_gid)
+
+
 def _proposal_payload(proposal: SeoOptimizationProposal) -> dict[str, Any]:
     return {
         "id": str(proposal.id),
@@ -192,9 +273,6 @@ async def apply_proposal(
             handle = _get_proposed(proposed, "handle", "proposed_handle")
             if handle:
                 input_data["handle"] = handle
-            tags = _get_proposed(proposed, "tags", "proposed_tags")
-            if tags is not None:
-                input_data["tags"] = tags
             seo_block: dict[str, str] = {}
             seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
             if seo_title:
@@ -218,6 +296,9 @@ async def apply_proposal(
                 raise ShopifyAPIError(
                     "; ".join(e.get("message", "") for e in errors[:3])
                 )
+            await _apply_product_media_alts(
+                client, proposal.entity_gid, proposed, shopify_response
+            )
         elif proposal.entity_type == "collection":
             mutation = """
             mutation CollectionUpdate($input: CollectionInput!) {
@@ -261,6 +342,9 @@ async def apply_proposal(
                 raise ShopifyAPIError(
                     "; ".join(e.get("message", "") for e in errors[:3])
                 )
+            await _apply_collection_image_alt(
+                client, proposal.entity_gid, proposed, shopify_response
+            )
         else:
             raise ValueError("entity_type non supportato per apply")
 

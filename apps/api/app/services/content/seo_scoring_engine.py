@@ -24,7 +24,6 @@ PRODUCT_BREAKDOWN_KEYS = (
     ("metaDescription", "score_meta_description", "seo_description", PRODUCT_WEIGHTS["meta_description"]),
     ("description", "score_description", "description", PRODUCT_WEIGHTS["description"]),
     ("handle", "score_handle", "handle", PRODUCT_WEIGHTS["handle"]),
-    ("tags", "score_tags", "tags", PRODUCT_WEIGHTS["tags"]),
     ("imageAlt", "score_image_alt", "media_images", PRODUCT_WEIGHTS["image_alt"]),
 )
 
@@ -43,7 +42,6 @@ ISSUE_FIELD_ALIASES: dict[str, str] = {
     "seo_description": "metaDescription",
     "description": "description",
     "handle": "handle",
-    "tags": "tags",
     "media_images": "imageAlt",
     "image_alt": "imageAlt",
     "product_type": "title",
@@ -139,7 +137,6 @@ def score_product(
     seo_description: str | None,
     description_text: str | None,
     handle: str | None,
-    tags: list[str] | None,
     media_images: list[dict[str, Any]] | None,
     featured_image_url: str | None,
     product_type: str | None,
@@ -233,7 +230,7 @@ def score_product(
     if not media:
         score_image_alt = 100
     else:
-        with_alt = sum(1 for m in media if (m.get("altText") or "").strip())
+        with_alt = sum(1 for m in media if (m.get("altText") or m.get("alt") or "").strip())
         score_image_alt = int(100 * with_alt / len(media)) if media else 100
         if score_image_alt < 100:
             issues.append(
@@ -244,18 +241,6 @@ def score_product(
                     "field": "media_images",
                 }
             )
-
-    tag_list = tags or []
-    score_tags = 100 if 1 <= len(tag_list) <= 10 else (40 if len(tag_list) == 0 else 70)
-    if len(tag_list) == 0:
-        issues.append(
-            {
-                "code": "missing_tags",
-                "severity": "info",
-                "message": "Nessun tag prodotto",
-                "field": "tags",
-            }
-        )
 
     if not (product_type or "").strip():
         issues.append(
@@ -274,7 +259,7 @@ def score_product(
         "score_description": score_description,
         "score_handle": score_handle,
         "score_image_alt": score_image_alt,
-        "score_tags": score_tags,
+        "score_tags": 100,
     }
     score_breakdown = build_score_breakdown(
         entity_type="product",

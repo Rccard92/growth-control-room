@@ -20,8 +20,8 @@ PRODUCT_ALLOWED_KEYS = {
     "meta_description",
     "description_html",
     "description_text",
-    "tags",
     "media_images",
+    "image_alts",
 }
 
 COLLECTION_ALLOWED_KEYS = {

@@ -81,9 +81,10 @@ def test_normalize_proposal_values_from_camel() -> None:
             "title": "New Title",
             "seoTitle": "SEO",
             "metaDescription": "Meta",
-            "tags": ["a"],
+            "imageAlts": [{"image_id": "gid://1", "proposed_alt": "Alt"}],
         },
     )
     assert result["product_title"] == "New Title"
     assert result["seo_title"] == "SEO"
     assert result["meta_description"] == "Meta"
+    assert result["image_alts"][0]["proposed_alt"] == "Alt"

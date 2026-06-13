@@ -4,7 +4,6 @@ const FIELD_LABELS: Record<string, string> = {
   metaDescription: "Meta description",
   description: "Descrizione",
   handle: "Handle",
-  tags: "Tag",
   imageAlt: "Alt immagini",
 };
 

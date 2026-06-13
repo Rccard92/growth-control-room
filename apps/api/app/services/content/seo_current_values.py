@@ -12,7 +12,6 @@ PRODUCT_API_KEYS = {
     "metaDescription",
     "descriptionHtml",
     "descriptionText",
-    "tags",
     "productType",
     "vendor",
     "images",
@@ -42,13 +41,14 @@ _PRODUCT_CAMEL_TO_SNAKE: dict[str, str] = {
     "description_html": "description_html",
     "descriptionText": "description_text",
     "description_text": "description_text",
-    "tags": "tags",
     "productType": "product_type",
     "product_type": "product_type",
     "vendor": "vendor",
     "images": "media_images",
     "mediaImages": "media_images",
     "media_images": "media_images",
+    "imageAlts": "image_alts",
+    "image_alts": "image_alts",
 }
 
 _COLLECTION_CAMEL_TO_SNAKE: dict[str, str] = {
@@ -67,6 +67,22 @@ _COLLECTION_CAMEL_TO_SNAKE: dict[str, str] = {
     "imageAlt": "image_alt",
     "image_alt": "image_alt",
 }
+
+_PRODUCT_EXTRA_KEYS = {"image_alts"}
+
+
+def _normalize_media_for_api(media: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for index, item in enumerate(media or []):
+        result.append(
+            {
+                "id": item.get("id"),
+                "url": item.get("url"),
+                "altText": item.get("altText") or item.get("alt"),
+                "position": item.get("position") or index + 1,
+            }
+        )
+    return result
 
 
 def _resolve_product_description(product: ShopifyProduct) -> tuple[str | None, str | None]:
@@ -88,7 +104,7 @@ def product_api_current_values(
 ) -> dict[str, Any]:
     media = images if images is not None else (product.media_images or [])
     if not media and product.featured_image_url:
-        media = [{"url": product.featured_image_url, "altText": None}]
+        media = [{"url": product.featured_image_url, "altText": None, "position": 1}]
     desc_html, desc_text = _resolve_product_description(product)
     return {
         "title": product.title,
@@ -97,10 +113,9 @@ def product_api_current_values(
         "metaDescription": product.seo_description,
         "descriptionHtml": desc_html,
         "descriptionText": desc_text,
-        "tags": product.tags or [],
         "productType": product.product_type,
         "vendor": product.vendor,
-        "images": media,
+        "images": _normalize_media_for_api(media),
     }
 
 
@@ -130,7 +145,7 @@ def normalize_proposal_values(
     """Convert camelCase or mixed keys from API/AI to snake_case proposal keys."""
     mapping = _PRODUCT_CAMEL_TO_SNAKE if entity_type == "product" else _COLLECTION_CAMEL_TO_SNAKE
     allowed_snake = (
-        set(_PRODUCT_CAMEL_TO_SNAKE.values())
+        set(_PRODUCT_CAMEL_TO_SNAKE.values()) | _PRODUCT_EXTRA_KEYS
         if entity_type == "product"
         else set(_COLLECTION_CAMEL_TO_SNAKE.values())
     )

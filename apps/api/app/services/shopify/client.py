@@ -124,7 +124,7 @@ COLLECTION_FIELDS = """
                 descriptionHtml
                 seo { title description }
                 image { url altText }
-                productsCount"""
+                productsCount { count }"""
 
 PAGE_FIELDS = """
                 id

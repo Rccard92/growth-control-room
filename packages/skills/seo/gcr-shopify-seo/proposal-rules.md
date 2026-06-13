@@ -4,11 +4,12 @@ Definisce come generare proposte SEO revisionabili per prodotti e collections Sh
 
 ## Vincoli universali
 
-1. **Non inventare claim** — solo attributi da title, description, tags, vendor, productType
+1. **Non inventare claim** — solo attributi da title, description, vendor, productType
 2. **Non cambiare significato** — il prodotto/collection resta lo stesso articolo
 3. **Output revisionabile** — ogni campo proposto è modificabile prima di approve
 4. **No keyword stuffing** — keyword naturali da dati reali
 5. **No modifica live** — draft → approve → apply esplicito
+6. **No tag prodotto** — non generare né proporre tag in questa fase
 
 ## Product proposal JSON (runtime GCR)
 
@@ -20,9 +21,16 @@ Allineato a `product_current_values()` e API:
   "seo_title": "...",
   "meta_description": "...",
   "handle": "...",
-  "tags": ["..."],
   "description_html": "...",
-  "media_images": [{ "id": "...", "alt": "...", "proposed_alt": "..." }],
+  "media_images": [{ "id": "...", "url": "...", "altText": "..." }],
+  "image_alts": [
+    {
+      "image_id": "...",
+      "current_alt": "...",
+      "proposed_alt": "...",
+      "reason": "..."
+    }
+  ],
   "reasoning": ["..."],
   "risk_level": "low|medium|high"
 }
@@ -34,11 +42,10 @@ Allineato a `product_current_values()` e API:
 |-------|--------|
 | `product_title` | Migliora solo se debole/generico; mantieni nome commerciale riconoscibile |
 | `seo_title` | 30–60 char; brand + keyword + beneficio breve; distinto da product_title |
-| `meta_description` | 120–160 char; beneficio reale + CTA; da description/tags esistenti |
+| `meta_description` | 120–160 char; beneficio reale + CTA; da description esistente |
 | `handle` | Kebab-case; proponi solo se generico; **high risk** se cambia URL |
-| `tags` | 1–10 tag coerenti da productType, title, vendor |
 | `description_html` | Arricchisci solo se < 150 char testo; non riscrivere totalmente senza necessità |
-| `media_images` | Solo `proposed_alt` per immagini senza alt o alt generico |
+| `image_alts` | Alt descrittivo 10–125 char per ogni immagine senza alt o con alt debole |
 
 ## Collection proposal JSON (runtime GCR)
 
@@ -80,7 +87,7 @@ Allineato a `product_current_values()` e API:
 
 ## Workflow
 
-1. Genera proposta (AI o rules)
+1. Genera proposta (AI o rules) → UI compila direttamente il form Campi SEO
 2. Utente revisiona nel drawer
 3. Salva draft / approva
 4. Apply su Shopify solo con scope `write_products` e conferma esplicita

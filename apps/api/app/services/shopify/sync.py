@@ -35,12 +35,13 @@ def _extract_media_images(node: dict[str, Any]) -> list[dict[str, Any]] | None:
                     "id": featured.get("id"),
                     "url": featured.get("url"),
                     "altText": featured.get("altText"),
+                    "position": 1,
                 }
             ]
         return None
 
     images: list[dict[str, Any]] = []
-    for media in media_nodes:
+    for index, media in enumerate(media_nodes):
         preview = (media.get("preview") or {}).get("image") or {}
         images.append(
             {
@@ -48,6 +49,7 @@ def _extract_media_images(node: dict[str, Any]) -> list[dict[str, Any]] | None:
                 "url": preview.get("url"),
                 "altText": media.get("alt") or preview.get("altText"),
                 "mediaContentType": media.get("mediaContentType"),
+                "position": index + 1,
             }
         )
     return images or None
