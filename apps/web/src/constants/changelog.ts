@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.2.2-alpha";
+export const GCR_VERSION = "0.2.3-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.2.3-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "AI synthesis: bozze Brand Intelligence complete per sezione da documenti importati",
+      "Review per sezione con editor strutturato, fonti e confidence",
+      "Apply non distruttivo con rilevamento conflitti su dati ufficiali esistenti",
+      "Migration 018 brand_section_drafts",
+      "Facts estratti restano come livello di supporto/evidenza",
+    ],
+  },
   {
     version: "0.2.2-alpha",
     date: "2026-06-13",

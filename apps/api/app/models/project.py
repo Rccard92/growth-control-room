@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         BrandImportBatch,
         BrandProductKnowledge,
         BrandProfile,
+        BrandSectionDraft,
         BrandSeoStrategy,
         BrandSourceDocument,
         BrandVoice,
@@ -109,6 +110,10 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     brand_import_batches: Mapped[list["BrandImportBatch"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    brand_section_drafts: Mapped[list["BrandSectionDraft"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

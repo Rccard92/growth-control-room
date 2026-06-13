@@ -36,6 +36,13 @@ from app.schemas.brand_intelligence import (
     BrandProductKnowledgeUpdate,
     BrandProfileRead,
     BrandProfileUpdate,
+    BrandSectionDraftApplyBatchRequest,
+    BrandSectionDraftApplyResponse,
+    BrandSectionDraftListItem,
+    BrandSectionDraftRead,
+    BrandSectionDraftRegenerateRequest,
+    BrandSectionDraftSynthesizeResponse,
+    BrandSectionDraftUpdate,
     BrandSeoStrategyRead,
     BrandSeoStrategyUpdate,
     BrandSourceDocumentRead,
@@ -52,6 +59,17 @@ from app.services.brand_intelligence.batch_service import (
     mark_batch_started,
 )
 from app.services.brand_intelligence.document_extraction import run_ai_extraction
+from app.services.brand_intelligence.draft_apply import (
+    apply_section_draft,
+    apply_section_drafts_batch,
+)
+from app.services.brand_intelligence.section_drafts_service import (
+    get_section_draft,
+    list_section_drafts,
+    patch_section_draft,
+    regenerate_section_draft,
+)
+from app.services.brand_intelligence.synthesis import synthesize_batch
 from app.services.projects import get_project_in_default_workspace
 
 router = APIRouter(prefix="/projects", tags=["brand-intelligence"])
@@ -701,3 +719,123 @@ async def apply_brand_extracted_facts(
     return await sources_service.apply_facts(
         session, project_id, payload.fact_ids, batch_id=payload.batch_id
     )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/synthesize",
+    response_model=BrandSectionDraftSynthesizeResponse,
+    response_model_by_alias=True,
+)
+async def synthesize_brand_import_batch(
+    project_id: UUID,
+    batch_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSectionDraftSynthesizeResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await synthesize_batch(session, project_id, batch_id)
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/section-drafts",
+    response_model=list[BrandSectionDraftListItem],
+    response_model_by_alias=True,
+)
+async def list_brand_section_drafts(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    batch_id: UUID | None = Query(default=None, alias="batchId"),
+    status: str | None = Query(default=None),
+    section_key: str | None = Query(default=None, alias="sectionKey"),
+) -> list[BrandSectionDraftListItem]:
+    await get_project_in_default_workspace(project_id, session)
+    rows = await list_section_drafts(
+        session,
+        project_id,
+        batch_id=batch_id,
+        status_filter=status,
+        section_key=section_key,
+    )
+    return [BrandSectionDraftListItem.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/section-drafts/{draft_id}",
+    response_model=BrandSectionDraftRead,
+    response_model_by_alias=True,
+)
+async def get_brand_section_draft(
+    project_id: UUID,
+    draft_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSectionDraftRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_section_draft(session, project_id, draft_id)
+    return BrandSectionDraftRead.model_validate(row)
+
+
+@router.patch(
+    "/{project_id}/brand-intelligence/section-drafts/{draft_id}",
+    response_model=BrandSectionDraftRead,
+    response_model_by_alias=True,
+)
+async def patch_brand_section_draft(
+    project_id: UUID,
+    draft_id: UUID,
+    payload: BrandSectionDraftUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSectionDraftRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await patch_section_draft(session, project_id, draft_id, payload)
+    return BrandSectionDraftRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/section-drafts/{draft_id}/apply",
+    response_model=BrandSectionDraftApplyResponse,
+    response_model_by_alias=True,
+)
+async def apply_brand_section_draft(
+    project_id: UUID,
+    draft_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSectionDraftApplyResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await apply_section_draft(session, project_id, draft_id)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/section-drafts/apply-batch",
+    response_model=BrandSectionDraftApplyResponse,
+    response_model_by_alias=True,
+)
+async def apply_brand_section_drafts_batch(
+    project_id: UUID,
+    payload: BrandSectionDraftApplyBatchRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSectionDraftApplyResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await apply_section_drafts_batch(session, project_id, payload.draft_ids)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/section-drafts/{draft_id}/regenerate",
+    response_model=BrandSectionDraftRead,
+    response_model_by_alias=True,
+)
+async def regenerate_brand_section_draft(
+    project_id: UUID,
+    draft_id: UUID,
+    payload: BrandSectionDraftRegenerateRequest | None = None,
+    session: AsyncSession = Depends(get_db),
+) -> BrandSectionDraftRead:
+    await get_project_in_default_workspace(project_id, session)
+    body = payload or BrandSectionDraftRegenerateRequest()
+    row = await regenerate_section_draft(
+        session,
+        project_id,
+        draft_id,
+        instructions=body.instructions,
+        include_fact_ids=body.include_fact_ids,
+    )
+    return BrandSectionDraftRead.model_validate(row)
+

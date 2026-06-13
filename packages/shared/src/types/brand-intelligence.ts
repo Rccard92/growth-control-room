@@ -159,6 +159,73 @@ export interface BrandIntelligenceOverview {
   assetsCount: number;
   sourceDocumentsCount?: number;
   pendingFactsCount?: number;
+  pendingSectionDraftsCount?: number;
+  latestBatchId?: string | null;
+}
+
+export type SectionDraftKey =
+  | "brand_profile"
+  | "voice_tone"
+  | "products_categories"
+  | "audience"
+  | "claims_compliance"
+  | "seo_strategy"
+  | "content_pillars"
+  | "ai_guardrails"
+  | "assets";
+
+export type SectionDraftStatus = "draft" | "needs_review" | "approved" | "rejected" | "applied";
+
+export interface SectionDraftWarnings {
+  messages?: string[];
+  missingInformation?: string[];
+}
+
+export interface BrandSectionDraftListItem {
+  id: string;
+  batchId?: string | null;
+  sectionKey: SectionDraftKey;
+  title: string;
+  summary?: string | null;
+  confidence?: number | null;
+  status: SectionDraftStatus;
+  sourceFactIds?: string[];
+  warnings?: SectionDraftWarnings | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandSectionDraft extends BrandSectionDraftListItem {
+  projectId: string;
+  draftPayload: unknown;
+  sourceDocumentIds?: string[];
+  aiReasoning?: string | null;
+  previousOfficialSnapshot?: unknown;
+  approvedAt?: string | null;
+  appliedAt?: string | null;
+}
+
+export interface BrandSectionDraftSynthesizeResponse {
+  batchId: string;
+  draftsCreated: number;
+  sections: Array<{
+    sectionKey: SectionDraftKey;
+    status: SectionDraftStatus;
+    confidence?: number | null;
+  }>;
+}
+
+export interface BrandSectionDraftApplyResultItem {
+  draftId: string;
+  sectionKey: string;
+  status: string;
+  message: string;
+}
+
+export interface BrandSectionDraftApplyResponse {
+  applied?: BrandSectionDraftApplyResultItem[];
+  skipped?: BrandSectionDraftApplyResultItem[];
+  conflicts?: BrandSectionDraftApplyResultItem[];
 }
 
 export type DocumentExtractionStatus =

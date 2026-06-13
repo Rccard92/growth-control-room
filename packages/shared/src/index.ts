@@ -153,5 +153,12 @@ export type {
   ImportBatchStatus,
   UpdateMode,
   ConflictStatus,
+  SectionDraftKey,
+  SectionDraftStatus,
+  BrandSectionDraft,
+  BrandSectionDraftListItem,
+  BrandSectionDraftSynthesizeResponse,
+  BrandSectionDraftApplyResponse,
+  SectionDraftWarnings,
 } from "./types/brand-intelligence";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";

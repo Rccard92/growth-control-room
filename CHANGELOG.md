@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.2.3-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- AI synthesis from imported documents: bozze complete per sezione Brand Intelligence
+- `BrandSectionDraft` con review umana prima dell'apply (facts come evidenze)
+- Migration 018: `brand_section_drafts`
+- Apply non distruttivo: enrich su campi vuoti, conflitti bloccano overwrite
+- UI Import AI: griglia bozze per sezione, editor strutturato, review facts opzionale
+
 ## [0.2.2-alpha] - 2026-06-13
 
 Tipo: Alpha patch

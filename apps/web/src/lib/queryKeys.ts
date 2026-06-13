@@ -60,6 +60,10 @@ export const queryKeys = {
       ["brandIntelligence", projectId, "importBatch", batchId] as const,
     importBatches: (projectId: string) =>
       ["brandIntelligence", projectId, "importBatches"] as const,
+    sectionDrafts: (projectId: string, filters?: Record<string, string | undefined>) =>
+      ["brandIntelligence", projectId, "sectionDrafts", filters ?? {}] as const,
+    sectionDraft: (projectId: string, draftId: string) =>
+      ["brandIntelligence", projectId, "sectionDraft", draftId] as const,
   },
   health: ["health"] as const,
 };

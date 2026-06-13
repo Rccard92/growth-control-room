@@ -22,9 +22,13 @@ Due percorsi equivalenti per i dati ufficiali:
 | Percorso | Salvataggio |
 |----------|-------------|
 | Wizard / tab CRUD | Diretto su tabelle ufficiali |
-| AI File Import | Facts `suggested` → review → `approved` → `apply` |
+| AI File Import (facts) | Facts `suggested` → review → `approved` → `apply` |
+| AI Section Synthesis (0.2.3) | Bozze `draft` → review → `approved` → `apply` (enrich non distruttivo) |
 
-Il ContextBuilder legge **solo** tabelle ufficiali. I facts in `brand_extracted_facts` non approvati sono invisibili ai moduli AI.
+Il ContextBuilder legge **solo** tabelle ufficiali. Sono esclusi dal contesto AI:
+
+- Facts in `brand_extracted_facts` non approvati
+- Bozze in `brand_section_drafts` non applicate (`draft`, `needs_review`, `approved`, `rejected`)
 
 ```mermaid
 sequenceDiagram
@@ -40,6 +44,33 @@ sequenceDiagram
   AIExtract->>FactsDB: INSERT suggested
   Review->>FactsDB: PATCH approved/rejected
   Apply->>Official: WRITE solo approved
+  CTX->>Official: READ only
+```
+
+### Section synthesis (0.2.3)
+
+File: `synthesis.py`, `draft_apply.py`, `section_drafts_service.py`
+
+- Dopo conflict detection nel batch: sintesi OpenAI per 9 sezioni → `brand_section_drafts`
+- Progress batch 80–95% con step per sezione
+- Apply enrich: nessun overwrite su campi ufficiali già valorizzati; conflitti → `needs_review`
+- Facts restano evidenze; la review principale è per bozza sezione
+
+```mermaid
+sequenceDiagram
+  participant Batch
+  participant Synth as synthesis.py
+  participant Drafts as brand_section_drafts
+  participant Review
+  participant Apply as draft_apply.py
+  participant Official as Tabelle_ufficiali
+  participant CTX as ContextBuilder
+
+  Batch->>Synth: facts + snapshot read-only
+  Synth->>Drafts: INSERT/UPDATE draft
+  Note over Drafts,Official: ZERO write su Official
+  Review->>Drafts: PATCH approved
+  Apply->>Official: enrich/create only
   CTX->>Official: READ only
 ```
 

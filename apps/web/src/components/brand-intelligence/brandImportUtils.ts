@@ -1,6 +1,7 @@
 const SECTION_LABELS: Record<string, string> = {
   brand_profile: "Brand Profile",
   voice_tone: "Voice & Tone",
+  products_categories: "Products & Categories",
   product_knowledge: "Products",
   category_knowledge: "Categories",
   audience: "Audience",

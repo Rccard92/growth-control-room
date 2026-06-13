@@ -436,6 +436,14 @@ async def build_overview(
         ).scalar_one()
     )
 
+    from app.services.brand_intelligence.section_drafts_service import (
+        count_pending_section_drafts,
+        get_latest_batch_id,
+    )
+
+    pending_drafts = await count_pending_section_drafts(session, project_id)
+    latest_batch = await get_latest_batch_id(session, project_id)
+
     sections = [
         BrandSectionStatus(
             key=key,
@@ -459,6 +467,8 @@ async def build_overview(
         assets_count=len(assets),
         source_documents_count=source_docs,
         pending_facts_count=pending_facts,
+        pending_section_drafts_count=pending_drafts,
+        latest_batch_id=latest_batch,
     )
 
 

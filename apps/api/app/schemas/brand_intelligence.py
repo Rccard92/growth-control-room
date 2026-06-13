@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class BrandProfileRead(BaseModel):
@@ -332,6 +332,125 @@ class BrandIntelligenceOverviewResponse(BaseModel):
     assets_count: int = Field(serialization_alias="assetsCount")
     source_documents_count: int = Field(default=0, serialization_alias="sourceDocumentsCount")
     pending_facts_count: int = Field(default=0, serialization_alias="pendingFactsCount")
+    pending_section_drafts_count: int = Field(
+        default=0, serialization_alias="pendingSectionDraftsCount"
+    )
+    latest_batch_id: UUID | None = Field(default=None, serialization_alias="latestBatchId")
+
+
+class BrandSectionDraftRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    project_id: UUID = Field(serialization_alias="projectId")
+    batch_id: UUID | None = Field(default=None, serialization_alias="batchId")
+    section_key: str = Field(serialization_alias="sectionKey")
+    title: str
+    draft_payload: Any = Field(serialization_alias="draftPayload")
+    summary: str | None = None
+    source_fact_ids: list[str] = Field(default_factory=list, serialization_alias="sourceFactIds")
+    source_document_ids: list[str] = Field(
+        default_factory=list, serialization_alias="sourceDocumentIds"
+    )
+    confidence: float | None = None
+    status: str
+    ai_reasoning: str | None = Field(default=None, serialization_alias="aiReasoning")
+    warnings: Any | None = None
+    previous_official_snapshot: Any | None = Field(
+        default=None, serialization_alias="previousOfficialSnapshot"
+    )
+    approved_at: datetime | None = Field(default=None, serialization_alias="approvedAt")
+    applied_at: datetime | None = Field(default=None, serialization_alias="appliedAt")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+    @field_validator("source_fact_ids", "source_document_ids", mode="before")
+    @classmethod
+    def _coerce_id_lists(cls, v: object) -> list[str]:
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return [str(x) for x in v]
+        return []
+
+
+class BrandSectionDraftListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    batch_id: UUID | None = Field(default=None, serialization_alias="batchId")
+    section_key: str = Field(serialization_alias="sectionKey")
+    title: str
+    summary: str | None = None
+    confidence: float | None = None
+    status: str
+    source_fact_ids: list[str] = Field(default_factory=list, serialization_alias="sourceFactIds")
+    warnings: Any | None = None
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+    @field_validator("source_fact_ids", mode="before")
+    @classmethod
+    def _coerce_fact_ids(cls, v: object) -> list[str]:
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return [str(x) for x in v]
+        return []
+
+
+class BrandSectionDraftUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    draft_payload: Any | None = Field(default=None, validation_alias="draftPayload")
+    status: str | None = None
+    warnings: Any | None = None
+
+
+class BrandSectionDraftSynthesizeSectionItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    section_key: str = Field(serialization_alias="sectionKey")
+    status: str
+    confidence: float | None = None
+
+
+class BrandSectionDraftSynthesizeResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    batch_id: UUID = Field(serialization_alias="batchId")
+    drafts_created: int = Field(serialization_alias="draftsCreated")
+    sections: list[BrandSectionDraftSynthesizeSectionItem] = Field(default_factory=list)
+
+
+class BrandSectionDraftRegenerateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    instructions: str | None = None
+    include_fact_ids: list[UUID] | None = Field(default=None, validation_alias="includeFactIds")
+
+
+class BrandSectionDraftApplyBatchRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    draft_ids: list[UUID] = Field(validation_alias="draftIds")
+
+
+class BrandSectionDraftApplyResultItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    draft_id: UUID = Field(serialization_alias="draftId")
+    section_key: str = Field(serialization_alias="sectionKey")
+    status: str
+    message: str
+
+
+class BrandSectionDraftApplyResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    applied: list[BrandSectionDraftApplyResultItem] = Field(default_factory=list)
+    skipped: list[BrandSectionDraftApplyResultItem] = Field(default_factory=list)
+    conflicts: list[BrandSectionDraftApplyResultItem] = Field(default_factory=list)
 
 
 class BrandSourceDocumentRead(BaseModel):

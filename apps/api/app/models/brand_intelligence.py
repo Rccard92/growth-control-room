@@ -227,6 +227,42 @@ class BrandImportBatch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="batch",
         cascade="all, delete-orphan",
     )
+    section_drafts: Mapped[list["BrandSectionDraft"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan",
+    )
+
+
+class BrandSectionDraft(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_section_drafts"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("brand_import_batches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    section_key: Mapped[str] = mapped_column(String(50), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    draft_payload: Mapped[Any] = mapped_column(JSONB, nullable=False, default=dict)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_fact_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    source_document_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default="draft", index=True)
+    ai_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    warnings: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
+    previous_official_snapshot: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_section_drafts")
+    batch: Mapped["BrandImportBatch | None"] = relationship(back_populates="section_drafts")
 
 
 class BrandSourceDocument(Base, UUIDPrimaryKeyMixin, TimestampMixin):

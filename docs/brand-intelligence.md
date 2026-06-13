@@ -32,7 +32,49 @@ Le sezioni avanzate restano compilabili nelle tab dedicate per migliorare lo sco
 
 ### Regola fondamentale
 
-Le estrazioni AI sono **suggestions**, non dati ufficiali. `BrandIntelligenceContextBuilder` legge solo le tabelle CRUD ufficiali — i facts non approvati non entrano nel contesto AI.
+Le estrazioni AI sono **suggestions**, non dati ufficiali. `BrandIntelligenceContextBuilder` legge solo le tabelle CRUD ufficiali — facts non approvati e bozze sezione non applicate non entrano nel contesto AI.
+
+## Tre livelli di dati (0.2.3)
+
+| Livello | Tabella | Ruolo |
+|---------|---------|-------|
+| **Evidenze** | `brand_extracted_facts` | Campi atomici estratti dai documenti; review granulare opzionale |
+| **Bozze sezione** | `brand_section_drafts` | Sintesi AI aggregata per sezione; review umana strutturata |
+| **Ufficiale** | Tabelle CRUD BI | Solo dati approvati e applicati; alimentano score e ContextBuilder |
+
+```mermaid
+flowchart LR
+  Docs[Documenti] --> Facts[Facts atomici]
+  Facts --> Synth[Synthesis AI]
+  Synth --> Drafts[Bozze sezione]
+  Drafts -->|approve + apply| Official[Ufficiale]
+  Facts -->|apply opzionale| Official
+  Official --> CTX[ContextBuilder]
+```
+
+## AI Section Synthesis v1 (0.2.3)
+
+Dopo conflict detection nel batch job, `synthesis.py` genera fino a 9 bozze (`brand_section_drafts`):
+
+1. Raggruppa facts per `section_key` (es. `product_knowledge` + `category_knowledge` → `products_categories`)
+2. Carica excerpt documenti e snapshot ufficiale read-only (per diff UI)
+3. OpenAI structured output → `draft_payload`, `summary`, `confidence`, `warnings`
+4. Upsert draft per `(project_id, section_key, batch_id)` in stati attivi
+
+### Review bozze (step 3 Import AI)
+
+- Griglia 9 card sezione: stato, confidence, summary, fonti, warnings
+- Editor strutturato per sezione; approve/reject prima dell'apply
+- Link secondario **Review dettagliata** → facts atomici (`BrandExtractedFactsReview`)
+
+### Apply bozze (non distruttivo)
+
+- Solo draft `status=approved`
+- Sezioni scalari (profile, voice, seo): enrich campi ufficiali **vuoti**; conflitto se campo già valorizzato e diverso → draft `needs_review`, apply bloccato
+- Liste (prodotti, audience, claims, …): match per nome/titolo, create se nuovo, enrich se esiste con campi vuoti
+- Dopo apply: `status=applied`, `applied_at` impostato; score riflette solo dati ufficiali
+
+Senza `OPENAI_API_KEY`: batch completa facts, synthesis fallisce con warning su batch; endpoint `POST .../synthesize` risponde 503.
 
 ## Sezioni
 
@@ -84,13 +126,25 @@ Base path: `/api/projects/{project_id}/brand-intelligence`
 - `PATCH /extracted-facts/{fact_id}` — review
 - `POST /extracted-facts/apply` — `{ factIds, batchId? }` solo approved
 
+**Section drafts (synthesis v0.2.3):**
+
+- `POST /import-batches/{batchId}/synthesize` — rigenera tutte le bozze del batch
+- `GET /section-drafts` — query: `batchId`, `status`, `sectionKey`
+- `GET /section-drafts/{draft_id}` — dettaglio con payload e snapshot ufficiale
+- `PATCH /section-drafts/{draft_id}` — modifica payload, status, warnings
+- `POST /section-drafts/{draft_id}/apply` — apply singolo draft approvato
+- `POST /section-drafts/apply-batch` — `{ draftIds }`
+- `POST /section-drafts/{draft_id}/regenerate` — body opzionale `instructions`, `includeFactIds`
+
+Overview include `pendingSectionDraftsCount` e `latestBatchId`.
+
 ## UI
 
 Sidebar progetto → **Brand Intelligence** (dopo Control Room).
 
 - **Overview**: onboarding dual-path, score ring, sezioni
 - **Wizard**: minimo obbligatorio
-- **Import AI**: upload → elaborazione async con progress bar → revisione con conflitti; storico batch sotto il wizard
+- **Import AI**: upload → elaborazione async con progress bar → **bozze per sezione** (step 3); review facts opzionale; storico batch
 - **Documenti**: elenco file caricati + link allo storico import
 - **Tab per sezione**: CRUD manuale
 
@@ -101,3 +155,4 @@ Route import: `/projects/:id/brand-intelligence/import`
 - `015_brand_intelligence_foundation` — 10 tabelle CRUD
 - `016_brand_intelligence_ai_import` — `brand_source_documents`, `brand_extracted_facts`
 - `017_brand_import_batches` — `brand_import_batches`, campi batch/progress/conflict su documents e facts
+- `018_brand_section_drafts` — `brand_section_drafts`, bozze AI per sezione con snapshot ufficiale

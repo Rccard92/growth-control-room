@@ -15,11 +15,17 @@ import type {
   BrandKnowledgeScore,
   BrandProductKnowledge,
   BrandProfile,
+  BrandSectionDraft,
+  BrandSectionDraftApplyResponse,
+  BrandSectionDraftListItem,
+  BrandSectionDraftSynthesizeResponse,
   BrandSeoStrategy,
   BrandSourceDocument,
   BrandSourceDocumentsUploadResponse,
   BrandVoice,
   FactStatus,
+  SectionDraftKey,
+  SectionDraftStatus,
   TargetSection,
 } from "@gcr/shared";
 import { apiFetch, apiUploadForm } from "./api";
@@ -341,6 +347,90 @@ export function applyBrandExtractedFacts(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ factIds, batchId }),
+    },
+  );
+}
+
+export function synthesizeImportBatch(
+  projectId: string,
+  batchId: string,
+): Promise<BrandSectionDraftSynthesizeResponse> {
+  return apiFetch<BrandSectionDraftSynthesizeResponse>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/synthesize`,
+    { method: "POST" },
+  );
+}
+
+export function listSectionDrafts(
+  projectId: string,
+  filters?: { batchId?: string; status?: SectionDraftStatus; sectionKey?: SectionDraftKey },
+): Promise<BrandSectionDraftListItem[]> {
+  const params = new URLSearchParams();
+  if (filters?.batchId) params.set("batchId", filters.batchId);
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.sectionKey) params.set("sectionKey", filters.sectionKey);
+  const qs = params.toString();
+  return apiFetch<BrandSectionDraftListItem[]>(
+    `/api/projects/${projectId}/brand-intelligence/section-drafts${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export function getSectionDraft(projectId: string, draftId: string): Promise<BrandSectionDraft> {
+  return apiFetch<BrandSectionDraft>(
+    `/api/projects/${projectId}/brand-intelligence/section-drafts/${draftId}`,
+  );
+}
+
+export function patchSectionDraft(
+  projectId: string,
+  draftId: string,
+  data: Partial<{ draftPayload: unknown; status: SectionDraftStatus; warnings: unknown }>,
+): Promise<BrandSectionDraft> {
+  return apiFetch<BrandSectionDraft>(
+    `/api/projects/${projectId}/brand-intelligence/section-drafts/${draftId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function applySectionDraft(
+  projectId: string,
+  draftId: string,
+): Promise<BrandSectionDraftApplyResponse> {
+  return apiFetch<BrandSectionDraftApplyResponse>(
+    `/api/projects/${projectId}/brand-intelligence/section-drafts/${draftId}/apply`,
+    { method: "POST" },
+  );
+}
+
+export function applySectionDraftsBatch(
+  projectId: string,
+  draftIds: string[],
+): Promise<BrandSectionDraftApplyResponse> {
+  return apiFetch<BrandSectionDraftApplyResponse>(
+    `/api/projects/${projectId}/brand-intelligence/section-drafts/apply-batch`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ draftIds }),
+    },
+  );
+}
+
+export function regenerateSectionDraft(
+  projectId: string,
+  draftId: string,
+  data?: { instructions?: string; includeFactIds?: string[] },
+): Promise<BrandSectionDraft> {
+  return apiFetch<BrandSectionDraft>(
+    `/api/projects/${projectId}/brand-intelligence/section-drafts/${draftId}/regenerate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data ?? {}),
     },
   );
 }

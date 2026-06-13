@@ -24,7 +24,13 @@ import {
   listBrandProducts,
   listBrandSourceDocuments,
   listImportBatches,
+  listSectionDrafts,
   patchBrandExtractedFact,
+  patchSectionDraft,
+  applySectionDraft,
+  regenerateSectionDraft,
+  getSectionDraft,
+  synthesizeImportBatch,
   startImportBatch,
   updateBrandProfile,
   updateBrandSeoStrategy,
@@ -369,6 +375,84 @@ export function useApplyBrandExtractedFacts(projectId: string) {
         queryKey: ["brandIntelligence", projectId, "extractedFacts"],
       });
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.sources(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
+    },
+  });
+}
+
+export function useSectionDrafts(
+  projectId: string | undefined,
+  filters?: Parameters<typeof listSectionDrafts>[1],
+) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.sectionDrafts(
+      projectId ?? "",
+      filters as Record<string, string | undefined>,
+    ),
+    queryFn: () => listSectionDrafts(projectId!, filters),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useSectionDraft(projectId: string | undefined, draftId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.sectionDraft(projectId ?? "", draftId ?? ""),
+    queryFn: () => getSectionDraft(projectId!, draftId!),
+    enabled: Boolean(projectId && draftId),
+  });
+}
+
+export function usePatchSectionDraft(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      draftId,
+      data,
+    }: {
+      draftId: string;
+      data: Parameters<typeof patchSectionDraft>[2];
+    }) => patchSectionDraft(projectId, draftId, data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDrafts"] });
+      void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDraft"] });
+    },
+  });
+}
+
+export function useApplySectionDraft(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (draftId: string) => applySectionDraft(projectId, draftId),
+    onSuccess: () => {
+      invalidateBrand(projectId, qc);
+      void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDrafts"] });
+    },
+  });
+}
+
+export function useRegenerateSectionDraft(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      draftId,
+      instructions,
+    }: {
+      draftId: string;
+      instructions?: string;
+    }) => regenerateSectionDraft(projectId, draftId, { instructions }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDrafts"] });
+      void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDraft"] });
+    },
+  });
+}
+
+export function useSynthesizeImportBatch(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) => synthesizeImportBatch(projectId, batchId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["brandIntelligence", projectId, "sectionDrafts"] });
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
     },
   });

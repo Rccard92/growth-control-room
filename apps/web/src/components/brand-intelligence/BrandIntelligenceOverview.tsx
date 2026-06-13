@@ -63,7 +63,16 @@ export function BrandIntelligenceOverviewPanel({
         </section>
       )}
 
-      {(overview.pendingFactsCount ?? 0) > 0 && (
+      {(overview.pendingSectionDraftsCount ?? 0) > 0 && (
+        <div className="gcr-alert gcr-alert--info" style={{ marginBottom: "1rem" }}>
+          Bozze AI pronte da revisionare: {overview.pendingSectionDraftsCount} sezioni.{" "}
+          <button type="button" className="gcr-btn gcr-btn--primary gcr-btn--sm" onClick={onStartImport}>
+            Revisiona bozze Brand Intelligence
+          </button>
+        </div>
+      )}
+
+      {(overview.pendingFactsCount ?? 0) > 0 && (overview.pendingSectionDraftsCount ?? 0) === 0 && (
         <div className="gcr-alert" style={{ marginBottom: "1rem" }}>
           Hai {overview.pendingFactsCount} informazioni estratte da revisionare.{" "}
           <button type="button" className="gcr-btn gcr-btn--ghost gcr-btn--sm" onClick={onStartImport}>
