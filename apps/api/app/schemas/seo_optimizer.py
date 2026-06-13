@@ -143,6 +143,18 @@ class SeoProposalPreviewResponse(BaseModel):
     )
 
 
+class SeoSkillMetaRead(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    version: str
+    attribution: str
+    score_rule_categories: list[str] = Field(serialization_alias="scoreRuleCategories")
+    external_skills: list[str] = Field(
+        default_factory=list, serialization_alias="externalSkills"
+    )
+
+
 class SeoProductDetailResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -165,6 +177,9 @@ class SeoProductDetailResponse(BaseModel):
     change_logs: list[dict[str, Any]] = Field(
         default_factory=list, serialization_alias="changeLogs"
     )
+    skill_meta: SeoSkillMetaRead | None = Field(
+        default=None, serialization_alias="skillMeta"
+    )
 
 
 class SeoCollectionDetailResponse(BaseModel):
@@ -185,6 +200,9 @@ class SeoCollectionDetailResponse(BaseModel):
     )
     change_logs: list[dict[str, Any]] = Field(
         default_factory=list, serialization_alias="changeLogs"
+    )
+    skill_meta: SeoSkillMetaRead | None = Field(
+        default=None, serialization_alias="skillMeta"
     )
 
 

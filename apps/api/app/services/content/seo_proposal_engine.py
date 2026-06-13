@@ -178,7 +178,7 @@ async def generate_seo_proposal(
     skill_ctx = load_seo_skill_context()
 
     if use_ai and is_openai_configured():
-        system_prompt = _ai_system_prompt(skill_ctx.as_prompt_context())
+        system_prompt = _ai_system_prompt(skill_ctx.as_proposal_prompt_context())
         user_prompt = _ai_user_prompt(
             entity_type=entity_type,
             current=current,

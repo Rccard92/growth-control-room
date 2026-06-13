@@ -239,10 +239,19 @@ export interface SeoChangeLogEntry {
   proposalId: string;
 }
 
+export interface SeoSkillMeta {
+  name: string;
+  version: string;
+  attribution: string;
+  scoreRuleCategories: string[];
+  externalSkills?: string[];
+}
+
 export interface SeoProductDetailResponse {
   product: Record<string, unknown>;
   analysis?: Record<string, unknown> | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
+  skillMeta?: SeoSkillMeta | null;
   currentValues: Record<string, unknown>;
   images: Record<string, unknown>[];
   quantitySold: number;
@@ -257,6 +266,7 @@ export interface SeoCollectionDetailResponse {
   collection: Record<string, unknown>;
   analysis?: Record<string, unknown> | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
+  skillMeta?: SeoSkillMeta | null;
   currentValues: Record<string, unknown>;
   image?: Record<string, unknown> | null;
   latestProposal?: SeoOptimizationProposal | null;

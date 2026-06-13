@@ -100,6 +100,7 @@ export type {
   SeoProposalPreviewResponse,
   SeoProductDetailResponse,
   SeoCollectionDetailResponse,
+  SeoSkillMeta,
   SeoChangeLogEntry,
   SeoOptimizerSeverity,
   SeoProposalStatus,

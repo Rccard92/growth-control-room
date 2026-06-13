@@ -9,6 +9,7 @@ import { SeoProposalActions } from "./SeoProposalActions";
 import { SeoProposalPreview } from "./SeoProposalPreview";
 import { SeoScoreBadge } from "./SeoScoreBadge";
 import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
+import { SeoSkillAppliedPanel } from "./SeoSkillAppliedPanel";
 import {
   useGenerateProposal,
   usePreviewProposal,
@@ -261,7 +262,14 @@ export function SeoEntityEditDrawer({
             )}
 
             {tab === "score" && (
-              <SeoScoreBreakdown scoreTotal={scoreTotal} scoreBreakdown={scoreBreakdown} />
+              <>
+                <SeoSkillAppliedPanel skillMeta={detail?.skillMeta} />
+                <SeoScoreBreakdown
+                  scoreTotal={scoreTotal}
+                  scoreBreakdown={scoreBreakdown}
+                  skillMeta={detail?.skillMeta}
+                />
+              </>
             )}
 
             {tab === "images" && (

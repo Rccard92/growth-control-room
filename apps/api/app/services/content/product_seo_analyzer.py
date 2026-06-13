@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.seo_optimizer import SeoEntityAnalysis
 from app.models.shopify import ShopifyProduct, ShopifyStore
 from app.services.content.seo_scoring_engine import score_product
+from app.services.content.seo_skill_loader import (
+    load_seo_skill_context,
+    skill_recommendation_metadata,
+)
 from app.services.shopify.analytics import compute_best_sellers, product_lookup
 
 
@@ -36,6 +40,9 @@ async def analyze_products_for_store(
         limit=20,
     )
     best_titles = {item.get("product_title") for item in best_sellers}
+
+    load_seo_skill_context()
+    skill_meta = skill_recommendation_metadata()
 
     result = ProductAnalyzeResult()
     now = datetime.now(UTC)
@@ -73,11 +80,15 @@ async def analyze_products_for_store(
             )
         ).scalar_one_or_none()
 
+        recommendations = list(analysis.get("recommendations") or [])
+        recommendations.append(skill_meta)
+
         fields = {
             "entity_gid": product.shopify_gid,
             "entity_title": product.title,
             "last_analyzed_at": now,
-            **analysis,
+            **{k: v for k, v in analysis.items() if k != "recommendations"},
+            "recommendations": recommendations,
         }
 
         if existing is None:

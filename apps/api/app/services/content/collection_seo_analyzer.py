@@ -8,6 +8,10 @@ from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoEntityAnalysis
 from app.models.shopify import ShopifyStore
 from app.services.content.seo_scoring_engine import score_collection
+from app.services.content.seo_skill_loader import (
+    load_seo_skill_context,
+    skill_recommendation_metadata,
+)
 
 
 @dataclass
@@ -29,6 +33,9 @@ async def analyze_collections_for_store(
             )
         )
     ).scalars().all()
+
+    load_seo_skill_context()
+    skill_meta = skill_recommendation_metadata()
 
     result = CollectionAnalyzeResult()
     now = datetime.now(UTC)
@@ -56,11 +63,15 @@ async def analyze_collections_for_store(
             )
         ).scalar_one_or_none()
 
+        recommendations = list(analysis.get("recommendations") or [])
+        recommendations.append(skill_meta)
+
         fields = {
             "entity_gid": collection.shopify_gid,
             "entity_title": collection.title,
             "last_analyzed_at": now,
-            **analysis,
+            **{k: v for k, v in analysis.items() if k != "recommendations"},
+            "recommendations": recommendations,
         }
 
         if existing is None:

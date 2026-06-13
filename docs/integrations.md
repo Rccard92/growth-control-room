@@ -187,7 +187,8 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 - Prodotti: title, seoTitle, metaDescription, description, handle, tags, imageAlt
 - Collections: title, seoTitle, metaDescription, description, handle, imageAlt
 - Formula: ogni componente ha score 0–100; punti = `round(score × peso / 100)`; totale = somma punti (pesi sommano a 100)
-- Skill di riferimento: `packages/skills/seo/shopify-product-collection/` (7 file markdown), caricata da `seo_skill_loader.py` con fallback e log warning
+- Skill runtime: `packages/skills/seo/gcr-shopify-seo/`, caricata da `seo_skill_loader.py` (fallback + log)
+- UI drawer tab Score: sezione **Skill SEO applicata** + `skillMeta` in risposta dettaglio
 
 **Sync** (`POST /api/projects/{id}/content/seo/sync-shopify`):
 
@@ -225,6 +226,38 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 **Migrations**: `010_product_collection_seo_optimizer`, `011_seo_score_breakdown` (colonna `score_breakdown` JSONB)
 
 **Legacy**: `GET .../content/seo/dashboard` resta disponibile (fix empty-safe); UI usa endpoint optimizer.
+
+### SEO Skill Pack
+
+Growth Control Room usa un **SEO skill pack interno** ispirato e adattato da [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) (MIT License).
+
+**Reference pack** (non runtime): `packages/skills/external/claude-seo/imported-skills/`
+
+- `seo-ecommerce`, `seo-images`, `seo-content-brief`, `seo-schema`, `seo-cluster`
+- Solo file markdown auditati; nessuno script, hook o estensione MCP
+
+**Runtime pack** (caricato dal backend): `packages/skills/seo/gcr-shopify-seo/`
+
+| File | Uso attuale |
+|------|-------------|
+| `product-seo-rules.md` | Scoring prodotti (allineato a `seo_scoring_engine.py`) |
+| `collection-seo-rules.md` | Scoring collections |
+| `image-alt-rules.md` | Alt text + proposte AI |
+| `proposal-rules.md` | Proposte manuale/AI |
+| `brand-guardrails.md` | Vincoli prompt AI |
+| `content-brief-rules.md` | **Futuro** blog/ricette |
+| `schema-rules.md` | **Futuro** JSON-LD Product/Breadcrumb |
+| `source-map.md` | Tracciabilità origine regole |
+
+**Cosa usiamo ora**: scoring prodotti/collections, alt text, proposte AI con guardrails.
+
+**Cosa useremo dopo**: blog brief, schema markup live, keyword cluster (reference da `seo-cluster`).
+
+**Differenza reference vs runtime**: il pack external è archivio MIT per audit e attribuzione; il pack `gcr-shopify-seo` è adattato ai campi Shopify syncati in GCR e alimenta loader, analyzer metadata e prompt AI.
+
+Attribuzione completa: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
+
+Pack legacy deprecato: `packages/skills/seo/shopify-product-collection/` (vedi README in cartella).
 
 ## Flusso OAuth (design futuro)
 

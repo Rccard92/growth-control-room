@@ -2,6 +2,9 @@
   "plugins": {
     "shopify-plugin": {
       "enabled": true
+    },
+    "firecrawl": {
+      "enabled": true
     }
   }
 }

@@ -1,3 +1,6 @@
+# Aligned with packages/skills/seo/gcr-shopify-seo/product-seo-rules.md
+# and collection-seo-rules.md
+
 SEO_TITLE_MIN = 30
 SEO_TITLE_MAX = 60
 META_DESC_MIN = 120

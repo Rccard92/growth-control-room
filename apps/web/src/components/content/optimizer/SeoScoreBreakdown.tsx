@@ -1,16 +1,26 @@
-import type { SeoScoreBreakdown } from "@gcr/shared";
+import type { SeoScoreBreakdown, SeoSkillMeta } from "@gcr/shared";
 import { breakdownFieldLabel } from "./SeoMissingFieldBadge";
 
 interface SeoScoreBreakdownProps {
   scoreTotal?: number | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
   title?: string;
+  skillMeta?: SeoSkillMeta | null;
 }
+
+const DEFAULT_CATEGORIES = [
+  "Regole prodotto",
+  "Regole metadata",
+  "Regole immagini",
+  "Regole contenuto",
+  "Regole Shopify/GCR",
+];
 
 export function SeoScoreBreakdown({
   scoreTotal,
   scoreBreakdown,
   title = "Come è calcolato lo score",
+  skillMeta,
 }: SeoScoreBreakdownProps) {
   if (!scoreBreakdown || Object.keys(scoreBreakdown).length === 0) {
     return (
@@ -23,6 +33,10 @@ export function SeoScoreBreakdown({
   return (
     <section className="seo-score-breakdown">
       <h4>{title}</h4>
+      <p className="seo-score-breakdown__subtitle">
+        Lo score deriva da:{" "}
+        {(skillMeta?.scoreRuleCategories ?? DEFAULT_CATEGORIES).join(" · ")}
+      </p>
       {scoreTotal != null && (
         <p className="seo-score-breakdown__total">
           Score totale: <strong>{scoreTotal}</strong> / 100
