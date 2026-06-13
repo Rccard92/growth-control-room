@@ -1,7 +1,10 @@
 import type { SeoOptimizationProposal } from "@gcr/shared";
 
 const AI_DISABLED_MSG =
-  "AI non configurata. Aggiungi OPENAI_API_KEY su Railway per generare proposte automatiche.";
+  "AI non configurata. Puoi modificare manualmente e salvare come proposta.";
+
+const WRITE_PRODUCTS_MSG =
+  "Per applicare su Shopify serve autorizzare write_products.";
 
 interface SeoProposalFooterProps {
   proposal: SeoOptimizationProposal | null | undefined;
@@ -39,6 +42,9 @@ export function SeoProposalFooter({
     <div className="seo-proposal-footer">
       {!openaiConfigured && (
         <p className="seo-proposal-footer__hint">{AI_DISABLED_MSG}</p>
+      )}
+      {!writeProductsAvailable && (
+        <p className="seo-proposal-footer__hint">{WRITE_PRODUCTS_MSG}</p>
       )}
       {proposal && (
         <p className="seo-proposal-footer__status">
@@ -91,7 +97,7 @@ export function SeoProposalFooter({
             title={
               writeProductsAvailable
                 ? undefined
-                : "Serve scope write_products per applicare su Shopify"
+                : WRITE_PRODUCTS_MSG
             }
             onClick={onApply}
           >

@@ -43,6 +43,7 @@ interface SeoEntityEditDrawerProps {
   collectionDetail?: SeoCollectionDetailResponse;
   detailLoading?: boolean;
   detailError?: boolean;
+  detailErrorMessage?: string;
   openaiConfigured: boolean;
   writeProductsAvailable: boolean;
   onDetailRefresh?: () => void;
@@ -59,6 +60,7 @@ export function SeoEntityEditDrawer({
   collectionDetail,
   detailLoading,
   detailError,
+  detailErrorMessage,
   openaiConfigured,
   writeProductsAvailable,
   onDetailRefresh,
@@ -260,10 +262,29 @@ export function SeoEntityEditDrawer({
       headerExtra={headerExtra}
       footer={!detailLoading && detail ? footer : undefined}
     >
-      {detailLoading && <div className="gcr-skeleton seo-skeleton-row" />}
+      {detailLoading && (
+        <div className="seo-edit-drawer__skeleton" aria-busy="true">
+          <div className="gcr-skeleton seo-skeleton-row" />
+          <div className="gcr-skeleton seo-skeleton-row" />
+          <div className="gcr-skeleton seo-skeleton-row" />
+        </div>
+      )}
 
       {!detailLoading && detailError && (
-        <p className="shopify-empty-copy">Impossibile caricare i dati SEO. Riprova.</p>
+        <div className="seo-edit-drawer__error">
+          <p className="seo-edit-drawer__error-message">
+            {detailErrorMessage ?? "Impossibile caricare i dati SEO."}
+          </p>
+          {onDetailRefresh && (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              onClick={() => onDetailRefresh()}
+            >
+              Riprova
+            </button>
+          )}
+        </div>
       )}
 
       {!detailLoading && !detailError && !detail && (

@@ -2,6 +2,7 @@ from typing import Any
 
 from app.models.content_seo import ShopifyCollection
 from app.models.shopify import ShopifyProduct
+from app.services.shopify.html_utils import html_to_text
 
 # CamelCase keys for API detail responses (currentValues)
 PRODUCT_API_KEYS = {
@@ -68,6 +69,18 @@ _COLLECTION_CAMEL_TO_SNAKE: dict[str, str] = {
 }
 
 
+def _resolve_product_description(product: ShopifyProduct) -> tuple[str | None, str | None]:
+    html = product.description_html
+    text = product.description_text
+    if html or text:
+        return html, text
+    raw = product.raw_payload if isinstance(product.raw_payload, dict) else {}
+    html = raw.get("descriptionHtml")
+    if isinstance(html, str) and html.strip():
+        return html, html_to_text(html)
+    return None, None
+
+
 def product_api_current_values(
     product: ShopifyProduct,
     *,
@@ -76,29 +89,37 @@ def product_api_current_values(
     media = images if images is not None else (product.media_images or [])
     if not media and product.featured_image_url:
         media = [{"url": product.featured_image_url, "altText": None}]
+    desc_html, desc_text = _resolve_product_description(product)
     return {
-        "title": product.title or "",
-        "handle": product.handle or "",
-        "seoTitle": product.seo_title or "",
-        "metaDescription": product.seo_description or "",
-        "descriptionHtml": product.description_html or "",
-        "descriptionText": product.description_text or "",
+        "title": product.title,
+        "handle": product.handle,
+        "seoTitle": product.seo_title,
+        "metaDescription": product.seo_description,
+        "descriptionHtml": desc_html,
+        "descriptionText": desc_text,
         "tags": product.tags or [],
-        "productType": product.product_type or "",
-        "vendor": product.vendor or "",
+        "productType": product.product_type,
+        "vendor": product.vendor,
         "images": media,
     }
 
 
 def collection_api_current_values(collection: ShopifyCollection) -> dict[str, Any]:
+    html = collection.description_html
+    text = collection.description_text
+    if not html and not text:
+        raw = collection.raw_payload if isinstance(collection.raw_payload, dict) else {}
+        html = raw.get("descriptionHtml") or raw.get("description")
+        if isinstance(html, str) and html.strip():
+            text = html_to_text(html)
     return {
-        "title": collection.title or "",
-        "handle": collection.handle or "",
-        "seoTitle": collection.seo_title or "",
-        "metaDescription": collection.seo_description or "",
-        "descriptionHtml": collection.description_html or "",
-        "descriptionText": collection.description_text or "",
-        "imageAlt": collection.image_alt or "",
+        "title": collection.title,
+        "handle": collection.handle,
+        "seoTitle": collection.seo_title,
+        "metaDescription": collection.seo_description,
+        "descriptionHtml": html,
+        "descriptionText": text,
+        "imageAlt": collection.image_alt,
     }
 
 

@@ -48,7 +48,7 @@ from app.services.content.seo_optimizer_list import (
     list_proposals,
 )
 from app.services.content.seo_proposal_manual_service import create_manual_proposal
-from app.services.content.seo_skill_loader import get_seo_skill_metadata
+from app.services.content.seo_skill_loader import skill_meta_for_detail_response
 from app.services.content.seo_proposal_preview_service import build_proposal_preview
 from app.services.content.seo_proposal_engine import generate_seo_proposal
 from app.services.projects import get_project_in_default_workspace
@@ -261,7 +261,7 @@ def _build_product_detail(data: dict) -> SeoProductDetailResponse:
         product=data["product"],
         analysis=data.get("analysis"),
         score_breakdown=data.get("score_breakdown"),
-        skill_meta=get_seo_skill_metadata().to_dict(),
+        skill_meta=skill_meta_for_detail_response("product"),
         current_values=data["current_values"],
         images=data.get("images") or [],
         quantity_sold=data.get("quantity_sold", 0),
@@ -279,7 +279,7 @@ def _build_collection_detail(data: dict) -> SeoCollectionDetailResponse:
         collection=data["collection"],
         analysis=data.get("analysis"),
         score_breakdown=data.get("score_breakdown"),
-        skill_meta=get_seo_skill_metadata().to_dict(),
+        skill_meta=skill_meta_for_detail_response("collection"),
         current_values=data["current_values"],
         image=data.get("image"),
         latest_proposal=_proposal_from_dict(data.get("latest_proposal")),

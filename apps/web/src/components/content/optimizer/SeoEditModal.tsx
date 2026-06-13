@@ -35,11 +35,12 @@ export function SeoEditModal({
   if (!open) return null;
 
   return createPortal(
-    <div
-      className="seo-edit-modal"
-      role="presentation"
-      onClick={onClose}
-    >
+    <div className="seo-edit-modal" role="presentation">
+      <div
+        className="seo-edit-modal__overlay"
+        aria-hidden="true"
+        onClick={onClose}
+      />
       <div
         className="seo-edit-modal__panel"
         role="dialog"
@@ -49,7 +50,7 @@ export function SeoEditModal({
       >
         <header className="seo-edit-modal__header">
           <div className="seo-edit-modal__header-main">
-            <p className="gcr-card__label">Modifica SEO</p>
+            <p className="seo-edit-modal__label">Modifica SEO</p>
             <h3 className="seo-edit-modal__title">{title}</h3>
             {headerExtra}
           </div>

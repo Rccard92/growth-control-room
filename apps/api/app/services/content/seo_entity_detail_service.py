@@ -103,6 +103,36 @@ def _analysis_payload(analysis: SeoEntityAnalysis | None) -> dict[str, Any] | No
     }
 
 
+def _append_sync_data_issues(
+    analysis_payload: dict[str, Any] | None,
+    *,
+    missing_description: bool,
+    missing_images: bool,
+) -> dict[str, Any] | None:
+    if analysis_payload is None or (not missing_description and not missing_images):
+        return analysis_payload
+    issues = list(analysis_payload.get("issues") or [])
+    if missing_description:
+        issues.append(
+            {
+                "field": "description",
+                "severity": "info",
+                "message": "Descrizione non disponibile dai dati sincronizzati",
+            }
+        )
+    if missing_images:
+        issues.append(
+            {
+                "field": "image_alt",
+                "severity": "info",
+                "message": "Immagini non disponibili dai dati sincronizzati",
+            }
+        )
+    enriched = dict(analysis_payload)
+    enriched["issues"] = issues
+    return enriched
+
+
 def _proposal_payload(proposal: SeoOptimizationProposal | None) -> dict[str, Any] | None:
     if proposal is None:
         return None
@@ -162,6 +192,10 @@ async def get_product_seo_detail(
         images = [{"url": product.featured_image_url, "altText": None}]
 
     current_values = product_api_current_values(product, images=images)
+    missing_description = not current_values.get("descriptionHtml") and not current_values.get(
+        "descriptionText"
+    )
+    missing_images = not images
 
     return {
         "product": {
@@ -174,7 +208,11 @@ async def get_product_seo_detail(
             "vendor": product.vendor,
             "featured_image_url": product.featured_image_url,
         },
-        "analysis": _analysis_payload(analysis),
+        "analysis": _append_sync_data_issues(
+            _analysis_payload(analysis),
+            missing_description=missing_description,
+            missing_images=missing_images,
+        ),
         "score_breakdown": (
             rebuild_score_breakdown_from_analysis(analysis) if analysis else None
         ),
@@ -229,6 +267,12 @@ async def get_collection_seo_detail(
     history = await _proposal_history(store, session, "collection", collection_id)
     change_logs = await _change_logs_for_entity(store, session, "collection", collection_id)
 
+    current_values = collection_api_current_values(collection)
+    missing_description = not current_values.get("descriptionHtml") and not current_values.get(
+        "descriptionText"
+    )
+    missing_images = not collection.image_url
+
     return {
         "collection": {
             "id": str(collection.id),
@@ -238,7 +282,11 @@ async def get_collection_seo_detail(
             "image_url": collection.image_url,
             "products_count": collection.products_count,
         },
-        "analysis": _analysis_payload(analysis),
+        "analysis": _append_sync_data_issues(
+            _analysis_payload(analysis),
+            missing_description=missing_description,
+            missing_images=missing_images,
+        ),
         "score_breakdown": (
             rebuild_score_breakdown_from_analysis(analysis) if analysis else None
         ),

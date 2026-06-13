@@ -23,6 +23,22 @@ class _FakeProduct:
     vendor = "Apicoltura Test"
     media_images = [{"url": "https://x/img.jpg", "altText": "Barattolo"}]
     featured_image_url = None
+    raw_payload = {}
+
+
+class _FakeProductRawDescription:
+    title = "Miele"
+    handle = "miele"
+    seo_title = None
+    seo_description = None
+    description_html = None
+    description_text = None
+    tags = []
+    product_type = None
+    vendor = None
+    media_images = []
+    featured_image_url = None
+    raw_payload = {"descriptionHtml": "<p>Da raw payload</p>"}
 
 
 class _FakeCollection:
@@ -43,6 +59,12 @@ def test_product_api_current_values_camel_case() -> None:
     assert data["productType"] == "Miele"
     assert data["vendor"] == "Apicoltura Test"
     assert len(data["images"]) == 1
+
+
+def test_product_description_fallback_from_raw_payload() -> None:
+    data = product_api_current_values(_FakeProductRawDescription())
+    assert data["descriptionHtml"] == "<p>Da raw payload</p>"
+    assert data["descriptionText"] == "Da raw payload"
 
 
 def test_collection_api_current_values_camel_case() -> None:

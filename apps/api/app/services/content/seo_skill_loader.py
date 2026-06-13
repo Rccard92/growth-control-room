@@ -45,13 +45,24 @@ _FALLBACK: dict[str, str] = {
 
 _SKILL_NAME = "GCR Shopify SEO Skill"
 _ATTRIBUTION = "Inspired by claude-seo ecommerce/images/content-brief rules (MIT)"
-_SCORE_RULE_CATEGORIES = [
-    "Regole prodotto",
-    "Regole metadata",
-    "Regole immagini",
-    "Regole contenuto",
-    "Regole Shopify/GCR",
-]
+_SCORE_RULE_CATEGORIES_PRODUCT = (
+    "title",
+    "seo_title",
+    "meta_description",
+    "description",
+    "handle",
+    "tags",
+    "image_alt",
+)
+
+_SCORE_RULE_CATEGORIES_COLLECTION = (
+    "title",
+    "seo_title",
+    "meta_description",
+    "description",
+    "handle",
+    "image_alt",
+)
 
 
 @dataclass(frozen=True)
@@ -95,8 +106,8 @@ class SeoSkillMetadata:
             "name": self.name,
             "version": self.version,
             "attribution": self.attribution,
-            "scoreRuleCategories": list(self.score_rule_categories),
-            "externalSkills": list(self.external_skills),
+            "score_rule_categories": list(self.score_rule_categories),
+            "external_skills": list(self.external_skills),
         }
 
 
@@ -197,8 +208,27 @@ def get_seo_skill_metadata() -> SeoSkillMetadata:
         name=_SKILL_NAME,
         version=ctx.version,
         attribution=_ATTRIBUTION,
-        score_rule_categories=tuple(_SCORE_RULE_CATEGORIES),
+        score_rule_categories=_SCORE_RULE_CATEGORIES_PRODUCT,
         external_skills=load_external_skill_references(),
+    )
+
+
+def skill_meta_for_detail_response(entity_type: str):
+    """Build validated SeoSkillMetaRead for product/collection detail endpoints."""
+    from app.schemas.seo_optimizer import SeoSkillMetaRead
+
+    meta = get_seo_skill_metadata()
+    categories = (
+        list(_SCORE_RULE_CATEGORIES_PRODUCT)
+        if entity_type == "product"
+        else list(_SCORE_RULE_CATEGORIES_COLLECTION)
+    )
+    return SeoSkillMetaRead(
+        name=meta.name,
+        version=meta.version,
+        attribution=meta.attribution,
+        score_rule_categories=categories,
+        external_skills=list(meta.external_skills),
     )
 
 

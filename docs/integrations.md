@@ -209,14 +209,20 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 
 **Flusso Modifica → Proposta → Approvazione** (nessuna modifica live senza conferma):
 
-1. UI: bottone **Modifica** in tabella apre **modal SEO** (portal, 720px) con tab Campi SEO, Score, Proposta, Storico
-2. Campi precompilati da `currentValues` (camelCase da Shopify sync): title, handle, seoTitle, metaDescription, descriptionHtml, tags, images, productType, vendor
+1. UI: bottone **Modifica** in tabella apre **modal SEO** (portal, 760–960px, 90vh) con tab Campi SEO, Score, Proposta, Storico
+2. Campi precompilati da `currentValues` (camelCase da Shopify sync): title, handle, seoTitle, metaDescription, descriptionHtml, tags, images, productType, vendor — con fallback `descriptionHtml` da `raw_payload` se assente in DB
 3. Badge per campo: **OK** / **Mancante** / **Da migliorare** (da analisi + valore)
 4. **Proposta manuale**: footer **Salva come proposta** → `POST .../proposals/manual` — non tocca Shopify
-5. **Proposta AI** (solo nella modal, footer): `POST .../proposals/generate` — se `OPENAI_API_KEY` assente, bottone disabilitato con messaggio Railway
+5. **Proposta AI** (solo nella modal, footer): `POST .../proposals/generate` — se `OPENAI_API_KEY` assente, bottone disabilitato con messaggio *"AI non configurata. Puoi modificare manualmente e salvare come proposta."*
 6. AI genera draft → tab **Proposta** mostra preview current vs proposed → **Copia proposta nel form** (non auto-apply)
 7. **Approve**: footer **Approva** — non applica su Shopify
-8. **Apply**: footer **Applica su Shopify** — solo se `approved` + scope `write_products` + conferma utente
+8. **Apply**: footer **Applica su Shopify** — solo se `approved` + scope `write_products` + conferma utente; senza scope: *"Per applicare su Shopify serve autorizzare write_products."*
+
+**Detail response** (`skillMeta`):
+
+- `skillMeta` costruito via `SeoSkillMetaRead` (validazione snake_case interna, serializzazione camelCase in JSON)
+- `scoreRuleCategories` con fallback `default_factory=list` — nessun 500 per campi skill mancanti
+- Apply resta bloccato senza `write_products`
 
 **Versioning**: progetto in Alpha `0.x.x-alpha`. Storico in [`CHANGELOG.md`](../CHANGELOG.md) e UI `/projects/:id/changelog`. Policy: [`docs/changelog-policy.md`](../docs/changelog-policy.md).
 

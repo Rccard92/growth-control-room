@@ -146,10 +146,13 @@ class SeoProposalPreviewResponse(BaseModel):
 class SeoSkillMetaRead(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    name: str
-    version: str
-    attribution: str
-    score_rule_categories: list[str] = Field(serialization_alias="scoreRuleCategories")
+    name: str = "GCR Shopify SEO Skill"
+    version: str = "1.0.0"
+    attribution: str = ""
+    score_rule_categories: list[str] = Field(
+        default_factory=list,
+        serialization_alias="scoreRuleCategories",
+    )
     external_skills: list[str] = Field(
         default_factory=list, serialization_alias="externalSkills"
     )

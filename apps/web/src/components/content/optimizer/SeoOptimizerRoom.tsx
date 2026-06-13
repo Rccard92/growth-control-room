@@ -80,6 +80,15 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
     }
   };
 
+  const activeDetailQuery =
+    editEntity?.type === "product" ? productDetail : collectionDetail;
+  const detailErrorMessage =
+    activeDetailQuery.isError && activeDetailQuery.error instanceof Error
+      ? activeDetailQuery.error.message
+      : activeDetailQuery.isError
+        ? "Impossibile caricare i dati SEO."
+        : undefined;
+
   return (
     <>
       <div className="seo-optimizer-header">
@@ -229,6 +238,7 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         collectionDetail={collectionDetail.data}
         detailLoading={productDetail.isLoading || collectionDetail.isLoading}
         detailError={productDetail.isError || collectionDetail.isError}
+        detailErrorMessage={detailErrorMessage}
         openaiConfigured={openaiConfigured}
         writeProductsAvailable={writeProductsAvailable}
         onDetailRefresh={refreshDetail}
