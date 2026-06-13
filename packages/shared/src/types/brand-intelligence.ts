@@ -278,10 +278,20 @@ export interface VisualExtractRequest {
 
 export interface VisualExtractProposal {
   primaryLogoUrl?: string | null;
+  secondaryLogoUrl?: string | null;
   faviconUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+  backgroundColor?: string | null;
+  textColor?: string | null;
   colorPalette?: VisualColorSwatch[];
   fonts?: VisualFontEntry[];
   visualStyleNotes?: string | null;
+  imageStyleNotes?: string | null;
+  doShow?: string[] | null;
+  doNotShow?: string[] | null;
+  websiteExtractedPalette?: VisualColorSwatch[] | null;
 }
 
 export interface VisualExtractResponse {
@@ -291,6 +301,11 @@ export interface VisualExtractResponse {
 
 export interface VisualApplyProposalRequest {
   proposal: VisualExtractProposal;
+}
+
+export interface VisualApplyProposalResponse {
+  visualIdentity: BrandVisualIdentity;
+  message: string;
 }
 
 export interface BrandIntelligenceOverview {

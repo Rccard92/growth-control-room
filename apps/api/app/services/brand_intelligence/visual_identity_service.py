@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -15,6 +15,14 @@ from app.schemas.brand_identity_visual import (
 )
 
 CompletionStatus = Literal["complete", "partial", "empty"]
+
+_ROLE_COLOR_FIELDS = {
+    "primary": "primary_color",
+    "secondary": "secondary_color",
+    "accent": "accent_color",
+    "background": "background_color",
+    "text": "text_color",
+}
 
 
 def _has_text(value: str | None) -> bool:
@@ -90,14 +98,47 @@ async def upsert_visual_identity(
     return row
 
 
-def _palette_to_dicts(palette: list) -> list[dict]:
-    out: list[dict] = []
+def _palette_to_dicts(palette: list) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     for item in palette:
         if hasattr(item, "model_dump"):
-            out.append(item.model_dump(by_alias=True))
+            out.append(item.model_dump())
         elif isinstance(item, dict):
             out.append(item)
     return out
+
+
+def _fonts_to_dicts(fonts: list) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in fonts:
+        if hasattr(item, "model_dump"):
+            out.append(item.model_dump())
+        elif isinstance(item, dict):
+            out.append(item)
+    return out
+
+
+def _apply_palette_roles(row: BrandVisualIdentity, palette: list[dict[str, Any]]) -> None:
+    for swatch in palette:
+        role = (swatch.get("role") or "").lower()
+        hex_val = swatch.get("hex")
+        if not hex_val:
+            continue
+        field = _ROLE_COLOR_FIELDS.get(role)
+        if field:
+            setattr(row, field, hex_val)
+    if palette and not row.primary_color:
+        row.primary_color = palette[0].get("hex")
+
+
+def _apply_string_field(row: BrandVisualIdentity, attr: str, value: str | None) -> None:
+    if _has_text(value):
+        setattr(row, attr, value.strip())
+
+
+def _apply_list_field(row: BrandVisualIdentity, attr: str, value: list | None) -> None:
+    if _has_list(value):
+        setattr(row, attr, value)
 
 
 async def apply_visual_proposal(
@@ -107,39 +148,34 @@ async def apply_visual_proposal(
 ) -> BrandVisualIdentity:
     row = await _get_or_create_visual(session, project_id)
 
-    if proposal.primary_logo_url:
-        row.primary_logo_url = proposal.primary_logo_url
-    if proposal.favicon_url:
-        row.favicon_url = proposal.favicon_url
-    if proposal.visual_style_notes:
-        row.visual_style_notes = proposal.visual_style_notes
+    _apply_string_field(row, "primary_logo_url", proposal.primary_logo_url)
+    _apply_string_field(row, "secondary_logo_url", proposal.secondary_logo_url)
+    _apply_string_field(row, "favicon_url", proposal.favicon_url)
+    _apply_string_field(row, "primary_color", proposal.primary_color)
+    _apply_string_field(row, "secondary_color", proposal.secondary_color)
+    _apply_string_field(row, "accent_color", proposal.accent_color)
+    _apply_string_field(row, "background_color", proposal.background_color)
+    _apply_string_field(row, "text_color", proposal.text_color)
+    _apply_string_field(row, "visual_style_notes", proposal.visual_style_notes)
+    _apply_string_field(row, "image_style_notes", proposal.image_style_notes)
 
     palette = _palette_to_dicts(proposal.color_palette or [])
     if palette:
         row.color_palette = palette
         row.website_extracted_palette = palette
-        for swatch in palette:
-            role = (swatch.get("role") or "").lower()
-            hex_val = swatch.get("hex")
-            if not hex_val:
-                continue
-            if role == "primary" and not row.primary_color:
-                row.primary_color = hex_val
-            elif role == "secondary" and not row.secondary_color:
-                row.secondary_color = hex_val
-            elif role == "accent" and not row.accent_color:
-                row.accent_color = hex_val
-            elif role == "background" and not row.background_color:
-                row.background_color = hex_val
-            elif role == "text" and not row.text_color:
-                row.text_color = hex_val
-        if not row.primary_color and palette:
-            row.primary_color = palette[0].get("hex")
+        _apply_palette_roles(row, palette)
+    elif proposal.website_extracted_palette:
+        extracted = _palette_to_dicts(proposal.website_extracted_palette)
+        if extracted:
+            row.website_extracted_palette = extracted
 
     if proposal.fonts:
-        row.fonts = [
-            f.model_dump(by_alias=True) if hasattr(f, "model_dump") else f for f in proposal.fonts
-        ]
+        fonts = _fonts_to_dicts(proposal.fonts)
+        if fonts:
+            row.fonts = fonts
+
+    _apply_list_field(row, "do_show", proposal.do_show)
+    _apply_list_field(row, "do_not_show", proposal.do_not_show)
 
     await session.commit()
     await session.refresh(row)

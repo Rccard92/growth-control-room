@@ -67,6 +67,45 @@ function textToFonts(text: string): BrandVisualIdentity["fonts"] {
     });
 }
 
+function visualToForm(visual: BrandVisualIdentity): Partial<BrandVisualIdentity> {
+  return {
+    primaryLogoUrl: visual.primaryLogoUrl ?? "",
+    secondaryLogoUrl: visual.secondaryLogoUrl ?? "",
+    faviconUrl: visual.faviconUrl ?? "",
+    primaryColor: visual.primaryColor ?? "",
+    secondaryColor: visual.secondaryColor ?? "",
+    accentColor: visual.accentColor ?? "",
+    backgroundColor: visual.backgroundColor ?? "",
+    textColor: visual.textColor ?? "",
+    colorPalette: visual.colorPalette ?? [],
+    fonts: visual.fonts ?? [],
+    visualStyleNotes: visual.visualStyleNotes ?? "",
+    imageStyleNotes: visual.imageStyleNotes ?? "",
+    doShow: visual.doShow ?? [],
+    doNotShow: visual.doNotShow ?? [],
+  };
+}
+
+function proposalHasData(proposal: VisualExtractProposal): boolean {
+  return Boolean(
+    proposal.primaryLogoUrl?.trim()
+      || proposal.faviconUrl?.trim()
+      || proposal.visualStyleNotes?.trim()
+      || (proposal.colorPalette?.length ?? 0) > 0
+      || (proposal.fonts?.length ?? 0) > 0,
+  );
+}
+
+function visualHasData(visual: BrandVisualIdentity): boolean {
+  return Boolean(
+    visual.primaryLogoUrl?.trim()
+      || visual.faviconUrl?.trim()
+      || visual.visualStyleNotes?.trim()
+      || (visual.colorPalette?.length ?? 0) > 0
+      || visual.primaryColor?.trim(),
+  );
+}
+
 export function BrandVisualIdentityPanel({ projectId }: BrandVisualIdentityPanelProps) {
   const { data: visual, isLoading } = useBrandVisualIdentity(projectId);
   const { data: profile } = useBrandProfile(projectId);
@@ -79,25 +118,11 @@ export function BrandVisualIdentityPanel({ projectId }: BrandVisualIdentityPanel
   const [proposal, setProposal] = useState<VisualExtractProposal | null>(null);
   const [extractWarnings, setExtractWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visual) return;
-    setForm({
-      primaryLogoUrl: visual.primaryLogoUrl ?? "",
-      secondaryLogoUrl: visual.secondaryLogoUrl ?? "",
-      faviconUrl: visual.faviconUrl ?? "",
-      primaryColor: visual.primaryColor ?? "",
-      secondaryColor: visual.secondaryColor ?? "",
-      accentColor: visual.accentColor ?? "",
-      backgroundColor: visual.backgroundColor ?? "",
-      textColor: visual.textColor ?? "",
-      colorPalette: visual.colorPalette ?? [],
-      fonts: visual.fonts ?? [],
-      visualStyleNotes: visual.visualStyleNotes ?? "",
-      imageStyleNotes: visual.imageStyleNotes ?? "",
-      doShow: visual.doShow ?? [],
-      doNotShow: visual.doNotShow ?? [],
-    });
+    setForm(visualToForm(visual));
   }, [visual]);
 
   function handleSave(e: FormEvent) {
@@ -146,10 +171,18 @@ export function BrandVisualIdentityPanel({ projectId }: BrandVisualIdentityPanel
   function handleApplyProposal() {
     if (!proposal) return;
     setError(null);
+    setSuccessMessage(null);
+    const hadProposalData = proposalHasData(proposal);
     applyProposal.mutate(
       { proposal },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          if (hadProposalData && !visualHasData(data.visualIdentity)) {
+            setError("La proposta non è stata salvata correttamente. Riprova.");
+            return;
+          }
+          setForm(visualToForm(data.visualIdentity));
+          setSuccessMessage(data.message || "Visual Identity aggiornata.");
           setProposal(null);
           setExtractWarnings([]);
         },
@@ -167,6 +200,11 @@ export function BrandVisualIdentityPanel({ projectId }: BrandVisualIdentityPanel
       {error && (
         <div className="gcr-alert gcr-alert--error" style={{ marginBottom: "1rem" }}>
           {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="gcr-alert gcr-alert--success" style={{ marginBottom: "1rem" }}>
+          {successMessage}
         </div>
       )}
 
@@ -285,6 +323,14 @@ export function BrandVisualIdentityPanel({ projectId }: BrandVisualIdentityPanel
       )}
 
       <form onSubmit={handleSave}>
+        <section className="bi-profile-block gcr-card">
+          <h3 className="bi-panel__title">Visual Identity ufficiale</h3>
+          <p className="bi-panel__subtitle">
+            Dati salvati ufficialmente. Aggiornati automaticamente dopo Applica proposta o
+            salvataggio manuale.
+          </p>
+        </section>
+
         <section className="bi-profile-block gcr-card">
           <h3 className="bi-panel__title">Logo &amp; Assets</h3>
           <div className="bi-form-grid">

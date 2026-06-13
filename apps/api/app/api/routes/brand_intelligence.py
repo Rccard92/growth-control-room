@@ -16,6 +16,7 @@ from app.schemas.brand_identity_visual import (
     BrandVisualIdentityRead,
     BrandVisualIdentityUpdate,
     VisualApplyProposalRequest,
+    VisualApplyProposalResponse,
     VisualExtractRequest,
     VisualExtractResponse,
 )
@@ -304,17 +305,20 @@ async def extract_visual_identity_from_website(
 
 @router.post(
     "/{project_id}/brand-intelligence/visual-identity/apply-proposal",
-    response_model=BrandVisualIdentityRead,
+    response_model=VisualApplyProposalResponse,
     response_model_by_alias=True,
 )
 async def apply_visual_identity_proposal(
     project_id: UUID,
     payload: VisualApplyProposalRequest,
     session: AsyncSession = Depends(get_db),
-) -> BrandVisualIdentityRead:
+) -> VisualApplyProposalResponse:
     await get_project_in_default_workspace(project_id, session)
     row = await apply_visual_proposal(session, project_id, payload.proposal)
-    return BrandVisualIdentityRead.model_validate(row)
+    return VisualApplyProposalResponse(
+        visual_identity=BrandVisualIdentityRead.model_validate(row),
+        message="Visual Identity aggiornata.",
+    )
 
 
 @router.get(

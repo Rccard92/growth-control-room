@@ -138,6 +138,7 @@ export type {
   VisualExtractProposal,
   VisualExtractResponse,
   VisualApplyProposalRequest,
+  VisualApplyProposalResponse,
   BrandModuleStatus,
   ModuleCompletionStatus,
   BrandVoice,

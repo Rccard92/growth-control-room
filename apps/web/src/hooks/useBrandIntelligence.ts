@@ -124,6 +124,9 @@ export function useApplyVisualProposal(projectId: string) {
   return useMutation({
     mutationFn: (data: Parameters<typeof applyVisualProposal>[1]) =>
       applyVisualProposal(projectId, data),
-    onSuccess: () => invalidateBrand(projectId, qc),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.brandIntelligence.visualIdentity(projectId), data.visualIdentity);
+      invalidateBrand(projectId, qc);
+    },
   });
 }

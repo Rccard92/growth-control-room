@@ -118,19 +118,84 @@ class VisualExtractRequest(BaseModel):
 class VisualExtractProposal(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    primary_logo_url: str | None = Field(default=None, serialization_alias="primaryLogoUrl")
-    favicon_url: str | None = Field(default=None, serialization_alias="faviconUrl")
+    primary_logo_url: str | None = Field(
+        default=None,
+        validation_alias="primaryLogoUrl",
+        serialization_alias="primaryLogoUrl",
+    )
+    secondary_logo_url: str | None = Field(
+        default=None,
+        validation_alias="secondaryLogoUrl",
+        serialization_alias="secondaryLogoUrl",
+    )
+    favicon_url: str | None = Field(
+        default=None,
+        validation_alias="faviconUrl",
+        serialization_alias="faviconUrl",
+    )
+    primary_color: str | None = Field(
+        default=None,
+        validation_alias="primaryColor",
+        serialization_alias="primaryColor",
+    )
+    secondary_color: str | None = Field(
+        default=None,
+        validation_alias="secondaryColor",
+        serialization_alias="secondaryColor",
+    )
+    accent_color: str | None = Field(
+        default=None,
+        validation_alias="accentColor",
+        serialization_alias="accentColor",
+    )
+    background_color: str | None = Field(
+        default=None,
+        validation_alias="backgroundColor",
+        serialization_alias="backgroundColor",
+    )
+    text_color: str | None = Field(
+        default=None,
+        validation_alias="textColor",
+        serialization_alias="textColor",
+    )
     color_palette: list[VisualColorSwatch] = Field(
-        default_factory=list, serialization_alias="colorPalette"
+        default_factory=list,
+        validation_alias="colorPalette",
+        serialization_alias="colorPalette",
     )
     fonts: list[VisualFontEntry] = Field(default_factory=list)
-    visual_style_notes: str | None = Field(default=None, serialization_alias="visualStyleNotes")
+    visual_style_notes: str | None = Field(
+        default=None,
+        validation_alias="visualStyleNotes",
+        serialization_alias="visualStyleNotes",
+    )
+    image_style_notes: str | None = Field(
+        default=None,
+        validation_alias="imageStyleNotes",
+        serialization_alias="imageStyleNotes",
+    )
+    do_show: list[str] | None = Field(default=None, validation_alias="doShow", serialization_alias="doShow")
+    do_not_show: list[str] | None = Field(
+        default=None, validation_alias="doNotShow", serialization_alias="doNotShow"
+    )
+    website_extracted_palette: list[VisualColorSwatch] | None = Field(
+        default=None,
+        validation_alias="websiteExtractedPalette",
+        serialization_alias="websiteExtractedPalette",
+    )
 
     @field_validator("color_palette", mode="before")
     @classmethod
     def _coerce_palette(cls, value: Any) -> list:
         if value is None:
             return []
+        return value
+
+    @field_validator("website_extracted_palette", mode="before")
+    @classmethod
+    def _coerce_extracted_palette(cls, value: Any) -> list | None:
+        if value is None:
+            return None
         return value
 
     @field_validator("fonts", mode="before")
@@ -152,6 +217,13 @@ class VisualApplyProposalRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     proposal: VisualExtractProposal
+
+
+class VisualApplyProposalResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    visual_identity: BrandVisualIdentityRead = Field(serialization_alias="visualIdentity")
+    message: str = "Visual Identity aggiornata."
 
 
 class BrandModuleStatus(BaseModel):

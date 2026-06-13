@@ -9,6 +9,7 @@ import type {
   BrandProfileEnrichResponse,
   BrandVisualIdentity,
   VisualApplyProposalRequest,
+  VisualApplyProposalResponse,
   VisualExtractRequest,
   VisualExtractResponse,
 } from "@gcr/shared";
@@ -129,8 +130,8 @@ export function extractVisualFromWebsite(
 export function applyVisualProposal(
   projectId: string,
   data: VisualApplyProposalRequest,
-): Promise<BrandVisualIdentity> {
-  return apiFetch<BrandVisualIdentity>(
+): Promise<VisualApplyProposalResponse> {
+  return apiFetch<VisualApplyProposalResponse>(
     `/api/projects/${projectId}/brand-intelligence/visual-identity/apply-proposal`,
     {
       method: "POST",
