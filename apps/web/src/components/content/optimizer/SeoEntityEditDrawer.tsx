@@ -3,6 +3,7 @@ import type {
   SeoCollectionDetailResponse,
   SeoProductDetailResponse,
   SeoProductMetafieldItem,
+  SeoProposalGenerateFieldResponse,
 } from "@gcr/shared";
 import { SeoEditModal } from "./SeoEditModal";
 import { SeoFieldEditor } from "./SeoFieldEditor";
@@ -10,46 +11,41 @@ import { SeoMetafieldsEditor } from "./SeoMetafieldsEditor";
 import { SeoProposalFooter } from "./SeoProposalFooter";
 import { SeoScoreBadge } from "./SeoScoreBadge";
 import {
-  applyGlobalMergeToFieldState,
   applyFieldValueToForm,
   applyMetafieldValue,
   acceptFieldState,
   applyAiFieldState,
   buildApplyFieldsPayload,
   buildChangedProposalValues,
-  collectChangedKeysFromMerge,
   commitFieldStateAsOriginal,
   formatApplicableFieldLabels,
   getApplicableFieldKeys,
   hasApplicableChanges,
   imageAltFieldKey,
   initFieldStateMap,
-  markFieldsFromGlobalAi,
   metafieldFieldKey,
+  parseImageAltFieldKey,
   restoreFieldOriginal,
+  setFieldAiSkipped,
   setFieldGenerating,
+  clearFieldGenerating,
   updateFieldStateValue,
   type FieldStateMap,
   type SeoEditableField,
 } from "./seoFieldState";
 import {
-  extractProposedValues,
   getEffectiveIssues,
-  hasUsableProposalFields,
-  mergeProposedIntoForm,
-  needsImageAltWarning,
   normalizeFormValues,
-  resolveMediaFromProposal,
 } from "./seoFormValues";
 import {
   useApplyEntityFields,
-  useGenerateProposal,
-  useGenerateProposalField,
   useSaveManualProposal,
   useSyncCollectionSeo,
   useSyncMetafieldDefinitions,
   useSyncProductSeo,
 } from "../../../hooks/useContentSeo";
+import { useSeoAiQueue } from "../../../hooks/useSeoAiQueue";
+import { generateProposalField } from "../../../lib/content-api";
 
 type DrawerTab = "main" | "metafields";
 
@@ -61,9 +57,8 @@ function buildMetafieldValues(metafields: SeoProductMetafieldItem[]): Record<str
   return map;
 }
 
-function normalizeReasoning(reasoning: unknown[] | null | undefined): string[] {
-  if (!reasoning) return [];
-  return reasoning.map((r) => (typeof r === "string" ? r : String(r)));
+function countMissingAlts(mediaImages: Record<string, unknown>[]): number {
+  return mediaImages.filter((img) => !String(img.altText ?? img.alt ?? "").trim()).length;
 }
 
 interface SeoEntityEditDrawerProps {
@@ -109,13 +104,28 @@ export function SeoEntityEditDrawer({
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
   const [localUpdateFailed, setLocalUpdateFailed] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [aiToast, setAiToast] = useState<string | null>(null);
-  const [aiToastVariant, setAiToastVariant] = useState<"success" | "error" | "warn">("success");
-  const [aiReasoning, setAiReasoning] = useState<string[]>([]);
-  const [aiRiskLevel, setAiRiskLevel] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
   const [fieldStateMap, setFieldStateMap] = useState<FieldStateMap>({});
   const initialFormRef = useRef<string>("");
   const lastInitKeyRef = useRef<string | null>(null);
+
+  const formValuesRef = useRef(formValues);
+  const mediaImagesRef = useRef(mediaImages);
+  const metafieldValuesRef = useRef(metafieldValues);
+  const fieldStateMapRef = useRef(fieldStateMap);
+
+  useEffect(() => {
+    formValuesRef.current = formValues;
+  }, [formValues]);
+  useEffect(() => {
+    mediaImagesRef.current = mediaImages;
+  }, [mediaImages]);
+  useEffect(() => {
+    metafieldValuesRef.current = metafieldValues;
+  }, [metafieldValues]);
+  useEffect(() => {
+    fieldStateMapRef.current = fieldStateMap;
+  }, [fieldStateMap]);
 
   const entityKey = `${entityType}:${entityId}`;
   const detail = entityType === "product" ? productDetail : collectionDetail;
@@ -139,11 +149,85 @@ export function SeoEntityEditDrawer({
 
   const saveManual = useSaveManualProposal(projectId);
   const applyFields = useApplyEntityFields(projectId);
-  const generateAi = useGenerateProposal(projectId);
-  const generateField = useGenerateProposalField(projectId);
   const syncProduct = useSyncProductSeo(projectId);
   const syncCollection = useSyncCollectionSeo(projectId);
   const syncDefinitions = useSyncMetafieldDefinitions(projectId);
+
+  const markDirty = useCallback((nextForm: Record<string, unknown>, nextMf: Record<string, string>) => {
+    const snapshot = JSON.stringify({ form: nextForm, metafields: nextMf });
+    setFormDirty(snapshot !== initialFormRef.current);
+  }, []);
+
+  const applyAiResult = useCallback(
+    (fieldKey: string, res: SeoProposalGenerateFieldResponse) => {
+      if (fieldKey.startsWith("metafield:")) {
+        const metafieldId = fieldKey.slice("metafield:".length);
+        const strValue = String(res.value ?? "");
+        const nextMf = applyMetafieldValue(metafieldValuesRef.current, metafieldId, strValue);
+        setMetafieldValues(nextMf);
+        markDirty(formValuesRef.current, nextMf);
+        setFieldStateMap((prev) =>
+          applyAiFieldState(prev, fieldKey, strValue, res.reasoning ?? undefined, res.riskLevel),
+        );
+        return;
+      }
+
+      let field: SeoEditableField;
+      let imageId: string | undefined;
+      if (fieldKey.startsWith("imageAlt:")) {
+        field = "imageAlt";
+        imageId = parseImageAltFieldKey(fieldKey) ?? undefined;
+      } else {
+        field = fieldKey as SeoEditableField;
+      }
+
+      const applied = applyFieldValueToForm(
+        formValuesRef.current,
+        mediaImagesRef.current,
+        field,
+        res.value,
+        entityType,
+      );
+      setFormValues(applied.formValues);
+      setMediaImages(applied.mediaImages);
+
+      let strValue = "";
+      if (field === "imageAlt" && entityType === "product" && imageId) {
+        const img = applied.mediaImages.find((m) => String(m.id ?? "") === imageId);
+        strValue = String(img?.altText ?? img?.alt ?? "");
+      } else if (field === "imageAlt") {
+        strValue = String(applied.formValues.imageAlt ?? "");
+      } else {
+        strValue = String(applied.formValues[field] ?? "");
+      }
+
+      setFieldStateMap((prev) =>
+        applyAiFieldState(prev, fieldKey, strValue, res.reasoning ?? undefined, res.riskLevel),
+      );
+      markDirty(applied.formValues, metafieldValuesRef.current);
+    },
+    [entityType, markDirty],
+  );
+
+  const aiQueue = useSeoAiQueue({
+    onStartGenerating: (fieldKey) => {
+      setFieldStateMap((prev) => setFieldGenerating(prev, fieldKey));
+    },
+    onClearGenerating: (fieldKey) => {
+      setFieldStateMap((prev) => clearFieldGenerating(prev, fieldKey));
+    },
+    onApplyResult: applyAiResult,
+    onSkipped: (fieldKey, message) => {
+      setFieldStateMap((prev) => setFieldAiSkipped(prev, fieldKey, message));
+    },
+    onError: (fieldKey, message) => {
+      setFieldStateMap((prev) => setFieldAiSkipped(prev, fieldKey, message));
+    },
+    getFieldState: (fieldKey) => {
+      const row = fieldStateMapRef.current[fieldKey];
+      return row ? { value: row.value, source: row.source } : undefined;
+    },
+  });
 
   const initFormFromDetail = useCallback(
     (detailSource: SeoProductDetailResponse | SeoCollectionDetailResponse) => {
@@ -169,13 +253,11 @@ export function SeoEntityEditDrawer({
       setMetafields(productMetafields);
       setMetafieldValues(mfValues);
       setFieldStateMap(initFieldStateMap(normalized, entityType, images, productMetafields, mfValues));
-      setAiReasoning([]);
-      setAiRiskLevel(null);
-      setAiToast(null);
       setTab("main");
       setAppliedAt(null);
       setApplyMessage(null);
       setLocalUpdateFailed(false);
+      setApplyError(null);
     },
     [entityType, productDetail?.images, collectionDetail?.image],
   );
@@ -183,18 +265,21 @@ export function SeoEntityEditDrawer({
   useEffect(() => {
     if (!open) {
       lastInitKeyRef.current = null;
+      aiQueue.clear();
       return;
     }
     if (!detail || formDirty) return;
     if (lastInitKeyRef.current === entityKey) return;
     initFormFromDetail(detail);
     lastInitKeyRef.current = entityKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clear only on close
   }, [open, entityKey, detail, formDirty, initFormFromDetail]);
 
-  const markDirty = (nextForm: Record<string, unknown>, nextMf: Record<string, string>) => {
-    const snapshot = JSON.stringify({ form: nextForm, metafields: nextMf });
-    setFormDirty(snapshot !== initialFormRef.current);
-  };
+  useEffect(() => {
+    if (!syncMessage) return;
+    const timer = window.setTimeout(() => setSyncMessage(null), 5500);
+    return () => window.clearTimeout(timer);
+  }, [syncMessage]);
 
   const refreshFormFromValues = (
     values: Record<string, unknown> | null | undefined,
@@ -217,8 +302,6 @@ export function SeoEntityEditDrawer({
     setMetafields(productMetafields);
     setMetafieldValues(mfValues);
     setFieldStateMap(initFieldStateMap(normalized, entityType, images, productMetafields, mfValues));
-    setAiReasoning([]);
-    setAiRiskLevel(null);
     if (entityType === "product" && Array.isArray(normalized.images)) {
       setMediaImages(normalized.images as Record<string, unknown>[]);
     }
@@ -227,9 +310,12 @@ export function SeoEntityEditDrawer({
   const handleRestoreOriginal = () => {
     if (!detail) return;
     if (formDirty) {
-      const ok = window.confirm("Ripristinare i valori originali da Shopify? Le modifiche non salvate andranno perse.");
+      const ok = window.confirm(
+        "Ripristinare i valori originali da Shopify? Le modifiche non salvate andranno perse.",
+      );
       if (!ok) return;
     }
+    aiQueue.clear();
     initFormFromDetail(detail);
     lastInitKeyRef.current = entityKey;
   };
@@ -239,6 +325,7 @@ export function SeoEntityEditDrawer({
       const ok = window.confirm("Hai modifiche non salvate. Chiudere comunque?");
       if (!ok) return;
     }
+    aiQueue.clear();
     onClose();
   };
 
@@ -318,92 +405,49 @@ export function SeoEntityEditDrawer({
     setFieldStateMap((prev) => acceptFieldState(prev, fieldKey));
   };
 
-  const handleGenerateFieldAi = (field: SeoEditableField, imageId?: string) => {
-    const stateKey =
-      field === "imageAlt" && imageId ? imageAltFieldKey(imageId) : field;
-    setFieldStateMap((prev) => setFieldGenerating(prev, stateKey));
-    generateField.mutate(
-      { entityType, entityId, field, imageId, useAi: true },
-      {
-        onSuccess: (res) => {
-          const applied = applyFieldValueToForm(
-            formValues,
-            mediaImages,
-            field,
-            res.value,
-            entityType,
-          );
-          setFormValues(applied.formValues);
-          setMediaImages(applied.mediaImages);
-          let strValue = "";
-          if (field === "imageAlt" && entityType === "product" && imageId) {
-            const img = applied.mediaImages.find((m) => String(m.id ?? "") === imageId);
-            strValue = String(img?.altText ?? img?.alt ?? "");
-          } else if (field === "imageAlt") {
-            strValue = String(applied.formValues.imageAlt ?? "");
-          } else {
-            strValue = String(applied.formValues[field] ?? "");
-          }
-          setFieldStateMap((prev) =>
-            applyAiFieldState(prev, stateKey, strValue, res.reasoning ?? undefined, res.riskLevel),
-          );
-          markDirty(applied.formValues, metafieldValues);
-          setAiToastVariant("success");
-          setAiToast(`Campo aggiornato con AI. Accetta il campo e applica le modifiche selezionate.`);
-        },
-        onError: () => {
-          setFieldStateMap((prev) => {
-            const row = prev[stateKey];
-            if (!row) return prev;
-            return { ...prev, [stateKey]: { ...row, generating: false } };
-          });
-          setAiToastVariant("error");
-          setAiToast("Generazione AI del campo non riuscita.");
-        },
-      },
-    );
+  const enqueueFieldAi = (field: SeoEditableField, imageId?: string) => {
+    const stateKey = field === "imageAlt" && imageId ? imageAltFieldKey(imageId) : field;
+    const row = fieldStateMapRef.current[stateKey];
+    aiQueue.enqueue({
+      fieldKey: stateKey,
+      valueAtEnqueue: row?.value ?? "",
+      sourceAtEnqueue: row?.source ?? "original",
+      run: () =>
+        generateProposalField(projectId, entityType, entityId, {
+          field,
+          imageId,
+          useAi: true,
+        }),
+    });
   };
 
-  const handleGenerateMetafieldAi = (mf: SeoProductMetafieldItem) => {
+  const enqueueMetafieldAi = (mf: SeoProductMetafieldItem) => {
     const stateKey = metafieldFieldKey(mf.id);
-    setFieldStateMap((prev) => setFieldGenerating(prev, stateKey));
-    generateField.mutate(
-      {
-        entityType,
-        entityId,
-        field: "metafield",
-        metafieldId: mf.metafieldId ?? null,
-        definitionId: mf.definitionId,
-        namespace: mf.namespace,
-        key: mf.key,
-        type: mf.type,
-        useAi: true,
-      },
-      {
-        onSuccess: (res) => {
-          const strValue = String(res.value ?? "");
-          setMetafieldValues((prev) => {
-            const next = applyMetafieldValue(prev, mf.id, strValue);
-            markDirty(formValues, next);
-            return next;
-          });
-          setFieldStateMap((prev) =>
-            applyAiFieldState(prev, stateKey, strValue, res.reasoning ?? undefined, res.riskLevel),
-          );
-          setAiToastVariant("success");
-          setAiToast("Metafield aggiornato con AI. Accetta il campo e applica le modifiche selezionate.");
-        },
-        onError: () => {
-          setFieldStateMap((prev) => {
-            const row = prev[stateKey];
-            if (!row) return prev;
-            return { ...prev, [stateKey]: { ...row, generating: false } };
-          });
-          setAiToastVariant("error");
-          setAiToast("Generazione AI del metafield non riuscita.");
-        },
-      },
-    );
+    const row = fieldStateMapRef.current[stateKey];
+    aiQueue.enqueue({
+      fieldKey: stateKey,
+      valueAtEnqueue: row?.value ?? "",
+      sourceAtEnqueue: row?.source ?? "original",
+      run: () =>
+        generateProposalField(projectId, entityType, entityId, {
+          field: "metafield",
+          metafieldId: mf.metafieldId ?? null,
+          definitionId: mf.definitionId,
+          namespace: mf.namespace,
+          key: mf.key,
+          type: mf.type,
+          useAi: true,
+        }),
+    });
+  };
+
+  const handleGenerateMissingAlts = () => {
+    mediaImagesRef.current.forEach((img, idx) => {
+      const alt = String(img.altText ?? img.alt ?? "").trim();
+      if (alt) return;
+      const imageId = String(img.id ?? idx);
+      enqueueFieldAi("imageAlt", imageId);
+    });
   };
 
   const handleSaveDraft = () => {
@@ -414,11 +458,8 @@ export function SeoEntityEditDrawer({
       fieldStateMap,
       metafields,
     );
-    if (changedFields.length === 0) {
-      setAiToastVariant("warn");
-      setAiToast("Nessuna modifica da salvare.");
-      return;
-    }
+    if (changedFields.length === 0) return;
+
     saveManual.mutate(
       {
         entityType,
@@ -431,79 +472,7 @@ export function SeoEntityEditDrawer({
           initialFormRef.current = JSON.stringify({ form: formValues, metafields: metafieldValues });
           setFormDirty(false);
           setFieldStateMap(commitFieldStateAsOriginal(fieldStateMap));
-          setAiToastVariant("success");
-          setAiToast("Bozza salvata.");
           onDetailRefresh?.();
-        },
-      },
-    );
-  };
-
-  const handleGenerateAi = () => {
-    generateAi.mutate(
-      {
-        entityType,
-        entityId,
-        useAi: true,
-        mode: "fill_missing_and_improve",
-      },
-      {
-        onSuccess: (proposal) => {
-          const proposed = extractProposedValues(proposal);
-          const merged = mergeProposedIntoForm(formValues, proposed, entityType);
-          let nextMedia = mediaImages;
-          if (entityType === "product") {
-            nextMedia = resolveMediaFromProposal(
-              proposed,
-              mediaImages.length > 0
-                ? mediaImages
-                : ((merged.images as Record<string, unknown>[]) ?? []),
-            );
-            setMediaImages(nextMedia);
-          }
-          const usable = hasUsableProposalFields(
-            formValues,
-            merged,
-            entityType,
-            mediaImages,
-            nextMedia,
-          );
-          if (!usable) {
-            setAiToastVariant("error");
-            setAiToast("La proposta AI non contiene campi utilizzabili.");
-            return;
-          }
-          setFormValues(merged);
-          markDirty(merged, metafieldValues);
-          const changed = collectChangedKeysFromMerge(
-            formValues,
-            merged,
-            entityType,
-            mediaImages,
-            nextMedia,
-          );
-          setFieldStateMap((prev) =>
-            markFieldsFromGlobalAi(
-              applyGlobalMergeToFieldState(prev, merged, nextMedia, changed),
-              changed,
-              normalizeReasoning(proposal.reasoning)[0],
-              proposal.riskLevel ?? undefined,
-            ),
-          );
-          setAiReasoning(normalizeReasoning(proposal.reasoning));
-          setAiRiskLevel(proposal.riskLevel ?? null);
-          setTab("main");
-          if (needsImageAltWarning(entityType, nextMedia, proposed)) {
-            setAiToastVariant("warn");
-            setAiToast(
-              "La proposta AI non ha generato alt text per le immagini. Proposta AI inserita nei campi. Controlla, modifica se serve e salva come proposta.",
-            );
-          } else {
-            setAiToastVariant("success");
-            setAiToast(
-              "Proposta AI inserita nei campi. Accetta i campi desiderati e applica le modifiche selezionate.",
-            );
-          }
         },
       },
     );
@@ -511,11 +480,8 @@ export function SeoEntityEditDrawer({
 
   const handleApplySelectedFields = () => {
     const applicableKeys = getApplicableFieldKeys(fieldStateMap);
-    if (applicableKeys.length === 0) {
-      setAiToastVariant("warn");
-      setAiToast("Nessuna modifica selezionata da applicare. Accetta i campi AI o modifica manualmente.");
-      return;
-    }
+    if (applicableKeys.length === 0) return;
+
     const { fields, changedFields } = buildApplyFieldsPayload(
       formValues,
       entityType,
@@ -524,17 +490,15 @@ export function SeoEntityEditDrawer({
       metafields,
       metafieldValues,
     );
-    if (changedFields.length === 0) {
-      setAiToastVariant("warn");
-      setAiToast("Nessuna modifica selezionata da applicare.");
-      return;
-    }
+    if (changedFields.length === 0) return;
+
     const labels = formatApplicableFieldLabels(applicableKeys, entityType);
     const confirmed = window.confirm(
       `Stai applicando: ${labels.join(", ")}.\n\nConfermi di applicare su Shopify? Questa azione modifica il negozio live.`,
     );
     if (!confirmed) return;
 
+    setApplyError(null);
     applyFields.mutate(
       { entityType, entityId, fields, changedFields },
       {
@@ -560,14 +524,11 @@ export function SeoEntityEditDrawer({
               initialFormRef.current = JSON.stringify({ form: formValues, metafields: metafieldValues });
               setFormDirty(false);
             }
-            setAiToastVariant("success");
-            setAiToast(res.message ?? "Modifiche applicate su Shopify.");
           }
           onDetailRefresh?.();
         },
         onError: () => {
-          setAiToastVariant("error");
-          setAiToast("Applicazione su Shopify non riuscita.");
+          setApplyError("Applicazione su Shopify non riuscita.");
         },
       },
     );
@@ -593,16 +554,50 @@ export function SeoEntityEditDrawer({
 
   const syncLoading = syncProduct.isPending || syncCollection.isPending;
 
-  const actionLoading =
-    saveManual.isPending ||
-    applyFields.isPending ||
-    generateAi.isPending ||
-    generateField.isPending ||
-    syncLoading;
+  const actionLoading = saveManual.isPending || applyFields.isPending || syncLoading;
+
+  const missingAltCount = useMemo(
+    () => (entityType === "product" ? countMissingAlts(mediaImages) : 0),
+    [entityType, mediaImages],
+  );
+
+  const batchAltLoading = useMemo(
+    () =>
+      mediaImages.some((img, idx) => {
+        const fk = imageAltFieldKey(String(img.id ?? idx));
+        return fieldStateMap[fk]?.generating;
+      }),
+    [mediaImages, fieldStateMap],
+  );
 
   const headerExtra = scoreTotal != null && (
     <SeoScoreBadge score={scoreTotal} severity={severity as never} />
   );
+
+  const headerActions = (
+    <>
+      <button
+        type="button"
+        className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+        disabled={syncLoading || actionLoading}
+        onClick={handleSyncFromShopify}
+      >
+        {syncLoading ? "Sincronizzazione…" : "Sincronizza da Shopify"}
+      </button>
+      <button
+        type="button"
+        className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+        disabled={actionLoading || aiQueue.isProcessing}
+        onClick={handleRestoreOriginal}
+      >
+        Ripristina valori originali
+      </button>
+    </>
+  );
+
+  const headerStatus = syncMessage ? (
+    <span className="seo-edit-modal__sync-status">{syncMessage}</span>
+  ) : null;
 
   const footer = (
     <SeoProposalFooter
@@ -611,30 +606,13 @@ export function SeoEntityEditDrawer({
       loading={actionLoading}
       saveLoading={saveManual.isPending}
       applyLoading={applyFields.isPending}
-      generateLoading={generateAi.isPending}
       applyDisabled={!hasApplicableChanges(fieldStateMap)}
       saveDisabled={!hasApplicableChanges(fieldStateMap)}
-      applyDisabledMessage={
-        !hasApplicableChanges(fieldStateMap)
-          ? "Nessuna modifica selezionata. Accetta i campi AI o modifica manualmente."
-          : undefined
-      }
-      saveDisabledMessage={
-        !hasApplicableChanges(fieldStateMap) ? "Nessuna modifica da salvare." : undefined
-      }
       onApplySelected={handleApplySelectedFields}
       onSaveDraft={handleSaveDraft}
-      onGenerateAi={handleGenerateAi}
       onCancel={handleClose}
     />
   );
-
-  const aiBannerClass =
-    aiToastVariant === "error"
-      ? "content-seo-banner content-seo-banner--warn"
-      : aiToastVariant === "warn"
-        ? "content-seo-banner content-seo-banner--warn"
-        : "content-seo-banner content-seo-banner--success";
 
   return (
     <SeoEditModal
@@ -642,6 +620,8 @@ export function SeoEntityEditDrawer({
       onClose={handleClose}
       title={title}
       headerExtra={headerExtra}
+      headerActions={headerActions}
+      headerStatus={headerStatus}
       footer={!detailLoading && detail ? footer : undefined}
     >
       {detailLoading && (
@@ -675,25 +655,6 @@ export function SeoEntityEditDrawer({
 
       {!detailLoading && detail && (
         <>
-          <div className="seo-edit-drawer__toolbar">
-            <button
-              type="button"
-              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-              disabled={syncLoading || actionLoading}
-              onClick={handleSyncFromShopify}
-            >
-              {syncLoading ? "Sincronizzazione…" : "Sincronizza da Shopify"}
-            </button>
-            <button
-              type="button"
-              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-              disabled={actionLoading}
-              onClick={handleRestoreOriginal}
-            >
-              Ripristina valori originali
-            </button>
-          </div>
-
           {appliedAt && (
             <div className="content-seo-banner content-seo-banner--success">
               Applicato su Shopify
@@ -709,17 +670,17 @@ export function SeoEntityEditDrawer({
             </div>
           )}
 
-          {syncMessage && (
-            <div className="content-seo-banner content-seo-banner--success">{syncMessage}</div>
+          {applyError && (
+            <div className="content-seo-banner content-seo-banner--warn">{applyError}</div>
           )}
 
-          {aiToast && <div className={aiBannerClass}>{aiToast}</div>}
-
-          <div className="seo-edit-drawer__tabs">
+          <div className="seo-edit-drawer__tabs" role="tablist" aria-label="Sezioni modifica SEO">
             {tabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
+                role="tab"
+                aria-selected={tab === t.id}
                 className={`seo-edit-drawer__tab ${tab === t.id ? "seo-edit-drawer__tab--active" : ""}`}
                 onClick={() => setTab(t.id)}
               >
@@ -729,38 +690,23 @@ export function SeoEntityEditDrawer({
           </div>
 
           {tab === "main" && (
-            <>
-              <SeoFieldEditor
-                entityType={entityType}
-                values={formValues}
-                issues={effectiveIssues}
-                scoreBreakdown={scoreBreakdown}
-                fieldStateMap={fieldStateMap}
-                mediaImages={mediaImages}
-                openaiConfigured={openaiConfigured}
-                onChange={handleFieldChange}
-                onImageAltChange={handleImageAltChange}
-                onGenerateField={handleGenerateFieldAi}
-                onRestoreField={handleRestoreField}
-                onAcceptField={handleAcceptField}
-              />
-              {(aiReasoning.length > 0 || aiRiskLevel) && (
-                <div className="gcr-card seo-ai-reasoning-card">
-                  {aiRiskLevel && (
-                    <p className="seo-ai-reasoning-card__risk">
-                      Rischio proposta: <strong>{aiRiskLevel}</strong>
-                    </p>
-                  )}
-                  {aiReasoning.length > 0 && (
-                    <ul className="seo-ai-reasoning-card__list">
-                      {aiReasoning.map((line, i) => (
-                        <li key={i}>{line}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </>
+            <SeoFieldEditor
+              entityType={entityType}
+              values={formValues}
+              issues={effectiveIssues}
+              scoreBreakdown={scoreBreakdown}
+              fieldStateMap={fieldStateMap}
+              mediaImages={mediaImages}
+              openaiConfigured={openaiConfigured}
+              missingAltCount={missingAltCount}
+              batchAltLoading={batchAltLoading}
+              onChange={handleFieldChange}
+              onImageAltChange={handleImageAltChange}
+              onGenerateField={enqueueFieldAi}
+              onGenerateMissingAlts={handleGenerateMissingAlts}
+              onRestoreField={handleRestoreField}
+              onAcceptField={handleAcceptField}
+            />
           )}
 
           {tab === "metafields" && entityType === "product" && (
@@ -772,7 +718,7 @@ export function SeoEntityEditDrawer({
               definitionsSyncLoading={syncDefinitions.isPending}
               hasDefinitions={productDetail?.hasMetafieldDefinitions}
               onMetafieldChange={handleMetafieldChange}
-              onGenerateMetafield={handleGenerateMetafieldAi}
+              onGenerateMetafield={enqueueMetafieldAi}
               onRestoreField={handleRestoreField}
               onAcceptField={handleAcceptField}
               onSyncMetafields={handleSyncFromShopify}

@@ -12,9 +12,12 @@ interface SeoImagesEditorProps {
   mediaImages?: Record<string, unknown>[];
   fieldStateMap?: FieldStateMap;
   openaiConfigured?: boolean;
+  missingAltCount?: number;
+  batchAltLoading?: boolean;
   onChange: (key: string, value: unknown) => void;
   onImageAltChange?: (index: number, alt: string) => void;
   onGenerateField?: (field: "imageAlt", imageId?: string) => void;
+  onGenerateMissingAlts?: () => void;
   onRestoreField?: (field: string) => void;
   onAcceptField?: (field: string) => void;
 }
@@ -27,14 +30,40 @@ export function SeoImagesEditor({
   mediaImages = [],
   fieldStateMap,
   openaiConfigured,
+  missingAltCount = 0,
+  batchAltLoading = false,
   onChange,
   onImageAltChange,
   onGenerateField,
+  onGenerateMissingAlts,
   onRestoreField,
   onAcceptField,
 }: SeoImagesEditorProps) {
+  const allHaveAlt = entityType === "product" && mediaImages.length > 0 && missingAltCount === 0;
+
   return (
     <div className="seo-field-editor seo-images-editor">
+      {entityType === "product" && mediaImages.length > 0 && openaiConfigured && onGenerateMissingAlts && (
+        <div className="seo-images-editor__toolbar">
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+            disabled={allHaveAlt || batchAltLoading}
+            title={
+              allHaveAlt ? "Tutte le immagini hanno già un ALT text." : undefined
+            }
+            onClick={onGenerateMissingAlts}
+          >
+            {batchAltLoading ? "Generazione ALT…" : "Genera ALT mancanti"}
+          </button>
+          {missingAltCount > 0 && !batchAltLoading && (
+            <span className="seo-images-editor__hint">
+              {missingAltCount} {missingAltCount === 1 ? "immagine senza ALT" : "immagini senza ALT"}
+            </span>
+          )}
+        </div>
+      )}
+
       {entityType === "collection" ? (
         <label className="seo-field-editor__field">
           <span className="seo-field-editor__label">
@@ -84,6 +113,9 @@ export function SeoImagesEditor({
             disabled={fieldStateMap?.imageAlt?.generating}
             onChange={(e) => onChange("imageAlt", e.target.value)}
           />
+          {fieldStateMap?.imageAlt?.reasoning && (
+            <span className="seo-field-editor__note">{fieldStateMap.imageAlt.reasoning}</span>
+          )}
         </label>
       ) : mediaImages.length === 0 ? (
         <p className="shopify-empty-copy">Nessuna immagine sincronizzata.</p>

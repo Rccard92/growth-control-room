@@ -134,7 +134,7 @@ export function SeoMetafieldsEditor({
               type="button"
               role="tab"
               aria-selected={filter === id}
-              className={`seo-metafields-editor__filter${filter === id ? " seo-metafields-editor__filter--active" : ""}`}
+              className={`seo-filter-chip ${filter === id ? "seo-filter-chip--active" : ""}`}
               onClick={() => setFilter(id)}
             >
               {label}

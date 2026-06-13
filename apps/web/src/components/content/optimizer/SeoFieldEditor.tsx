@@ -13,9 +13,12 @@ interface SeoFieldEditorProps {
   fieldStateMap?: FieldStateMap;
   mediaImages?: Record<string, unknown>[];
   openaiConfigured?: boolean;
+  missingAltCount?: number;
+  batchAltLoading?: boolean;
   onChange: (key: string, value: unknown) => void;
   onImageAltChange?: (index: number, alt: string) => void;
   onGenerateField?: (field: SeoEditableField, imageId?: string) => void;
+  onGenerateMissingAlts?: () => void;
   onRestoreField?: (field: string) => void;
   onAcceptField?: (field: string) => void;
 }
@@ -141,9 +144,12 @@ export function SeoFieldEditor({
   fieldStateMap,
   mediaImages = [],
   openaiConfigured,
+  missingAltCount = 0,
+  batchAltLoading = false,
   onChange,
   onImageAltChange,
   onGenerateField,
+  onGenerateMissingAlts,
   onRestoreField,
   onAcceptField,
 }: SeoFieldEditorProps) {
@@ -185,9 +191,12 @@ export function SeoFieldEditor({
           mediaImages={mediaImages}
           fieldStateMap={fieldStateMap}
           openaiConfigured={openaiConfigured}
+          missingAltCount={missingAltCount}
+          batchAltLoading={batchAltLoading}
           onChange={onChange}
           onImageAltChange={onImageAltChange}
           onGenerateField={onGenerateField}
+          onGenerateMissingAlts={onGenerateMissingAlts}
           onRestoreField={onRestoreField}
           onAcceptField={onAcceptField}
         />

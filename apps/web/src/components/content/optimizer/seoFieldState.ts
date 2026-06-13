@@ -160,6 +160,23 @@ export function setFieldGenerating(map: FieldStateMap, key: string): FieldStateM
   };
 }
 
+export function clearFieldGenerating(map: FieldStateMap, key: string): FieldStateMap {
+  const prev = map[key];
+  if (!prev) return map;
+  return {
+    ...map,
+    [key]: { ...prev, generating: false },
+  };
+}
+
+export function setFieldAiSkipped(map: FieldStateMap, key: string, message: string): FieldStateMap {
+  const prev = map[key] ?? emptyFieldState();
+  return {
+    ...map,
+    [key]: { ...prev, generating: false, reasoning: message },
+  };
+}
+
 export function applyAiFieldState(
   map: FieldStateMap,
   key: string,

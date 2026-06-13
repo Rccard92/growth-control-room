@@ -6,6 +6,8 @@ interface SeoEditModalProps {
   onClose: () => void;
   title: string;
   headerExtra?: ReactNode;
+  headerActions?: ReactNode;
+  headerStatus?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
 }
@@ -15,6 +17,8 @@ export function SeoEditModal({
   onClose,
   title,
   headerExtra,
+  headerActions,
+  headerStatus,
   footer,
   children,
 }: SeoEditModalProps) {
@@ -51,17 +55,27 @@ export function SeoEditModal({
         <header className="seo-edit-modal__header">
           <div className="seo-edit-modal__header-main">
             <p className="seo-edit-modal__label">Modifica SEO</p>
-            <h3 className="seo-edit-modal__title">{title}</h3>
-            {headerExtra}
+            <div className="seo-edit-modal__title-row">
+              <h3 className="seo-edit-modal__title">{title}</h3>
+              {headerExtra}
+            </div>
+            {headerStatus && (
+              <div className="seo-edit-modal__header-status">{headerStatus}</div>
+            )}
           </div>
-          <button
-            type="button"
-            className="gcr-btn gcr-btn--secondary"
-            onClick={onClose}
-            aria-label="Chiudi"
-          >
-            Chiudi
-          </button>
+          <div className="seo-edit-modal__header-right">
+            {headerActions && (
+              <div className="seo-edit-modal__header-actions">{headerActions}</div>
+            )}
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              onClick={onClose}
+              aria-label="Chiudi"
+            >
+              Chiudi
+            </button>
+          </div>
         </header>
 
         <div className="seo-edit-modal__body">{children}</div>

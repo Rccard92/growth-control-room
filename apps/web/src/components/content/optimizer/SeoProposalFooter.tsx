@@ -10,14 +10,10 @@ interface SeoProposalFooterProps {
   loading?: boolean;
   saveLoading?: boolean;
   applyLoading?: boolean;
-  generateLoading?: boolean;
   applyDisabled?: boolean;
   saveDisabled?: boolean;
-  applyDisabledMessage?: string;
-  saveDisabledMessage?: string;
   onApplySelected: () => void;
   onSaveDraft: () => void;
-  onGenerateAi: () => void;
   onCancel: () => void;
 }
 
@@ -27,14 +23,10 @@ export function SeoProposalFooter({
   loading,
   saveLoading,
   applyLoading,
-  generateLoading,
   applyDisabled,
   saveDisabled,
-  applyDisabledMessage,
-  saveDisabledMessage,
   onApplySelected,
   onSaveDraft,
-  onGenerateAi,
   onCancel,
 }: SeoProposalFooterProps) {
   return (
@@ -43,9 +35,6 @@ export function SeoProposalFooter({
         <p className="seo-proposal-footer__hint">{AI_DISABLED_MSG}</p>
       )}
       <div className="seo-proposal-footer__actions">
-        {applyDisabled && applyDisabledMessage && (
-          <p className="seo-proposal-footer__hint">{applyDisabledMessage}</p>
-        )}
         <div className="seo-proposal-footer__apply-group">
           <button
             type="button"
@@ -70,21 +59,9 @@ export function SeoProposalFooter({
         >
           {saveLoading ? "Salvataggio…" : "Salva bozza"}
         </button>
-        <button
-          type="button"
-          className="gcr-btn gcr-btn--secondary"
-          disabled={!openaiConfigured || generateLoading || loading}
-          title={openaiConfigured ? undefined : AI_DISABLED_MSG}
-          onClick={onGenerateAi}
-        >
-          {generateLoading ? "Generazione…" : "Genera proposta AI"}
-        </button>
         <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onCancel}>
           Annulla
         </button>
-        {saveDisabled && saveDisabledMessage && (
-          <p className="seo-proposal-footer__hint">{saveDisabledMessage}</p>
-        )}
       </div>
     </div>
   );
