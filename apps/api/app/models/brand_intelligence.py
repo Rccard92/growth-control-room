@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -190,3 +191,60 @@ class BrandAsset(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="brand_assets")
+
+
+class BrandSourceDocument(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_source_documents"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    filename: Mapped[str] = mapped_column(String(500))
+    content_type: Mapped[str] = mapped_column(String(255))
+    file_size: Mapped[int] = mapped_column(Integer)
+    storage_mode: Mapped[str] = mapped_column(String(50), default="text_only")
+    extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    document_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extraction_status: Mapped[str] = mapped_column(String(50), default="uploaded")
+    extraction_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_source_documents")
+    extracted_facts: Mapped[list["BrandExtractedFact"]] = relationship(
+        back_populates="source_document",
+        cascade="all, delete-orphan",
+    )
+
+
+class BrandExtractedFact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_extracted_facts"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("brand_source_documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    target_section: Mapped[str] = mapped_column(String(100))
+    target_entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    field_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    extracted_value: Mapped[Any] = mapped_column(JSONB, nullable=True)
+    source_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(50), default="suggested")
+    ai_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_extracted_facts")
+    source_document: Mapped["BrandSourceDocument | None"] = relationship(
+        back_populates="extracted_facts",
+    )

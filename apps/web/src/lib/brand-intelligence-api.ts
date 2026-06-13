@@ -1,18 +1,25 @@
 import type {
   BrandAiGuardrail,
+  BrandApplyFactsResponse,
   BrandAsset,
   BrandAudienceInsight,
   BrandClaimRule,
   BrandContentPillar,
   BrandContextBundle,
+  BrandExtractBatchResponse,
+  BrandExtractedFact,
   BrandIntelligenceOverview,
   BrandKnowledgeScore,
   BrandProductKnowledge,
   BrandProfile,
   BrandSeoStrategy,
+  BrandSourceDocument,
+  BrandSourceDocumentsUploadResponse,
   BrandVoice,
+  FactStatus,
+  TargetSection,
 } from "@gcr/shared";
-import { apiFetch } from "./api";
+import { apiFetch, apiUploadForm } from "./api";
 
 export function getBrandIntelligenceOverview(
   projectId: string,
@@ -216,4 +223,90 @@ export function createBrandAsset(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+}
+
+export function listBrandSourceDocuments(projectId: string): Promise<BrandSourceDocument[]> {
+  return apiFetch<BrandSourceDocument[]>(
+    `/api/projects/${projectId}/brand-intelligence/sources`,
+  );
+}
+
+export function uploadBrandSourceDocuments(
+  projectId: string,
+  files: File[],
+): Promise<BrandSourceDocumentsUploadResponse> {
+  const form = new FormData();
+  for (const file of files) {
+    form.append("files", file);
+  }
+  return apiUploadForm<BrandSourceDocumentsUploadResponse>(
+    `/api/projects/${projectId}/brand-intelligence/sources/upload`,
+    form,
+  );
+}
+
+export function extractBrandSourceBatch(
+  projectId: string,
+  documentIds: string[],
+): Promise<BrandExtractBatchResponse> {
+  return apiFetch<BrandExtractBatchResponse>(
+    `/api/projects/${projectId}/brand-intelligence/sources/extract-batch`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentIds }),
+    },
+  );
+}
+
+export function listBrandExtractedFacts(
+  projectId: string,
+  filters?: {
+    status?: FactStatus;
+    targetSection?: TargetSection;
+    sourceDocumentId?: string;
+  },
+): Promise<BrandExtractedFact[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.targetSection) params.set("targetSection", filters.targetSection);
+  if (filters?.sourceDocumentId) params.set("sourceDocumentId", filters.sourceDocumentId);
+  const qs = params.toString();
+  return apiFetch<BrandExtractedFact[]>(
+    `/api/projects/${projectId}/brand-intelligence/extracted-facts${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export function patchBrandExtractedFact(
+  projectId: string,
+  factId: string,
+  data: Partial<{
+    targetSection: TargetSection;
+    fieldName: string;
+    extractedValue: unknown;
+    status: FactStatus;
+  }>,
+): Promise<BrandExtractedFact> {
+  return apiFetch<BrandExtractedFact>(
+    `/api/projects/${projectId}/brand-intelligence/extracted-facts/${factId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function applyBrandExtractedFacts(
+  projectId: string,
+  factIds: string[],
+): Promise<BrandApplyFactsResponse> {
+  return apiFetch<BrandApplyFactsResponse>(
+    `/api/projects/${projectId}/brand-intelligence/extracted-facts/apply`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ factIds }),
+    },
+  );
 }

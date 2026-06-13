@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.2.0-alpha";
+export const GCR_VERSION = "0.2.1-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.2.1-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "AI File Import v1: upload PDF/DOCX/TXT/MD con estrazione testo",
+      "Extracted facts review: approve, modifica, sposta sezione, rifiuta, apply",
+      "Onboarding dual-path in Overview: wizard manuale vs Import AI",
+      "Migration 016 brand_source_documents + brand_extracted_facts",
+      "Regola no auto-save: solo facts approvati nel contesto AI ufficiale",
+    ],
+  },
   {
     version: "0.2.0-alpha",
     date: "2026-06-13",

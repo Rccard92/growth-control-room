@@ -157,6 +157,103 @@ export interface BrandIntelligenceOverview {
   guardrailsCount: number;
   pillarsCount: number;
   assetsCount: number;
+  sourceDocumentsCount?: number;
+  pendingFactsCount?: number;
+}
+
+export type DocumentExtractionStatus =
+  | "uploaded"
+  | "extracting"
+  | "extracted"
+  | "failed"
+  | "reviewed";
+
+export type FactStatus = "suggested" | "approved" | "rejected" | "needs_review";
+
+export type TargetSection =
+  | "brand_profile"
+  | "voice_tone"
+  | "product_knowledge"
+  | "category_knowledge"
+  | "audience"
+  | "claims_compliance"
+  | "seo_strategy"
+  | "content_pillars"
+  | "ai_guardrails"
+  | "assets"
+  | "unknown";
+
+export interface BrandSourceDocument {
+  id: string;
+  projectId: string;
+  filename: string;
+  contentType: string;
+  fileSize: number;
+  storageMode: string;
+  documentType?: string | null;
+  documentSummary?: string | null;
+  extractionStatus: DocumentExtractionStatus;
+  extractionError?: string | null;
+  uploadedAt: string;
+  processedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandSourceDocumentUploadItem {
+  id: string;
+  filename: string;
+  status: string;
+}
+
+export interface BrandSourceDocumentsUploadResponse {
+  documents: BrandSourceDocumentUploadItem[];
+}
+
+export interface BrandExtractedFact {
+  id: string;
+  projectId: string;
+  sourceDocumentId?: string | null;
+  targetSection: TargetSection;
+  targetEntityType?: string | null;
+  fieldName?: string | null;
+  extractedValue?: unknown;
+  sourceExcerpt?: string | null;
+  confidence: number;
+  status: FactStatus;
+  aiReasoning?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandExtractBatchResult {
+  documentId: string;
+  status: string;
+  factsCount: number;
+  error?: string | null;
+}
+
+export interface BrandExtractBatchResponse {
+  results: BrandExtractBatchResult[];
+}
+
+export interface BrandApplyFactsResultItem {
+  factId: string;
+  targetSection: string;
+  fieldName?: string | null;
+  message: string;
+}
+
+export interface BrandApplyFactsResponse {
+  saved: BrandApplyFactsResultItem[];
+  skipped: BrandApplyFactsResultItem[];
+  counts: {
+    saved: number;
+    skipped: number;
+    needsReview: number;
+    rejected: number;
+  };
 }
 
 export interface BrandContextBundle {
@@ -176,6 +273,7 @@ export interface BrandContextBundle {
 export type BrandIntelligenceTab =
   | "overview"
   | "wizard"
+  | "import"
   | "profile"
   | "voice"
   | "products"

@@ -6,9 +6,11 @@ from app.models.brand_intelligence import (
     BrandAudienceInsight,
     BrandClaimRule,
     BrandContentPillar,
+    BrandExtractedFact,
     BrandProductKnowledge,
     BrandProfile,
     BrandSeoStrategy,
+    BrandSourceDocument,
     BrandVoice,
 )
 from app.models.integration import Integration
@@ -44,9 +46,11 @@ __all__ = [
     "BrandAudienceInsight",
     "BrandClaimRule",
     "BrandContentPillar",
+    "BrandExtractedFact",
     "BrandProductKnowledge",
     "BrandProfile",
     "BrandSeoStrategy",
+    "BrandSourceDocument",
     "BrandVoice",
     "Integration",
     "IntegrationCredential",

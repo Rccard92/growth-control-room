@@ -181,9 +181,11 @@ Assicurati che `CORS_ORIGINS` includa il dominio WEB.
 
 ## Brand Intelligence
 
-Ogni progetto può definire un profilo brand strutturato (voice, prodotti, audience, claims, SEO, guardrails) con **Brand Knowledge Score** e wizard guidato.
+Ogni progetto può definire un profilo brand strutturato (voice, prodotti, audience, claims, SEO, guardrails) con **Brand Knowledge Score**, wizard guidato e **Import AI** da documenti.
 
-**Regola architetturale:** i moduli AI che generano contenuti brand-facing devono chiamare `BrandIntelligenceContextBuilder.build_brand_context(project_id)` prima di generare output. Il SEO Optimizer lo usa in modo opzionale (fallback se incompleto); i moduli futuri lo renderanno obbligatorio.
+**Onboarding:** compilazione manuale minima oppure upload file con estrazione AI e review umana prima del salvataggio.
+
+**Regola architetturale:** i moduli AI che generano contenuti brand-facing devono chiamare `BrandIntelligenceContextBuilder.build_brand_context(project_id)`. Le estrazioni AI sono suggestions in `brand_extracted_facts` — solo i facts approvati e applicati entrano nel contesto ufficiale.
 
 Vedi [docs/brand-intelligence.md](docs/brand-intelligence.md) e [docs/ai-architecture.md](docs/ai-architecture.md).
 
@@ -203,6 +205,7 @@ Implementato:
 - **Content SEO Engine Foundation**: sync contenuti Shopify, audit legacy
 - **Product & Collection SEO Optimizer**: score trasparente, modal Modifica SEO (campi precompilati, badge stato), proposta manuale/AI con preview e approve/apply controllato
 - **Brand Intelligence Foundation**: profilo brand, wizard, knowledge score, context builder AI, integrazione SEO non distruttiva
+- **Brand Intelligence Import AI v1**: upload documenti, extracted facts review, apply controllato
 - **Changelog Alpha**: versioning `0.x.x-alpha` — vedi [`CHANGELOG.md`](CHANGELOG.md) e `/projects/:id/changelog`
 - Struttura connectors e skills (stub OAuth per altri provider)
 

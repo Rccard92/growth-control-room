@@ -1,14 +1,37 @@
-export function BrandSourcesPanel() {
+import { BrandImportDocumentsList } from "./BrandImportDocumentsList";
+import { useBrandSourceDocuments } from "../../hooks/useBrandIntelligence";
+
+interface BrandSourcesPanelProps {
+  projectId: string;
+  onGoToImport: () => void;
+}
+
+export function BrandSourcesPanel({ projectId, onGoToImport }: BrandSourcesPanelProps) {
+  const { data: documents = [], isLoading } = useBrandSourceDocuments(projectId);
+
   return (
-    <div className="bi-coming-soon">
-      <h3 className="bi-coming-soon__title">Sources — In arrivo</h3>
-      <p>
-        Presto potrai caricare documenti, cataloghi, PDF, Word e far estrarre all&apos;AI
-        informazioni da approvare prima del salvataggio.
+    <div className="bi-panel">
+      <h3 className="bi-panel__title">Documenti caricati</h3>
+      <p className="bi-panel__subtitle">
+        Elenco dei file importati. Per caricare nuovi documenti o revisionare le estrazioni AI, usa Import AI.
       </p>
-      <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem" }}>
-        Anche scan sito e social per arricchire automaticamente il profilo brand.
-      </p>
+      {isLoading ? (
+        <p className="bi-panel__subtitle">Caricamento…</p>
+      ) : documents.length === 0 ? (
+        <div className="bi-coming-soon">
+          <p>Nessun documento ancora.</p>
+          <button type="button" className="gcr-btn gcr-btn--primary gcr-btn--sm" onClick={onGoToImport}>
+            Carica documenti
+          </button>
+        </div>
+      ) : (
+        <>
+          <BrandImportDocumentsList documents={documents} />
+          <button type="button" className="gcr-btn gcr-btn--ghost gcr-btn--sm" onClick={onGoToImport}>
+            Vai a Import AI
+          </button>
+        </>
+      )}
     </div>
   );
 }

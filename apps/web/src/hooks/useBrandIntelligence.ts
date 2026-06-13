@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  applyBrandExtractedFacts,
   createBrandAsset,
   createBrandAudience,
   createBrandClaim,
   createBrandGuardrail,
   createBrandPillar,
   createBrandProduct,
+  extractBrandSourceBatch,
   getBrandContext,
   getBrandIntelligenceOverview,
   getBrandKnowledgeScore,
@@ -15,12 +17,16 @@ import {
   listBrandAssets,
   listBrandAudience,
   listBrandClaims,
+  listBrandExtractedFacts,
   listBrandGuardrails,
   listBrandPillars,
   listBrandProducts,
+  listBrandSourceDocuments,
+  patchBrandExtractedFact,
   updateBrandProfile,
   updateBrandSeoStrategy,
   updateBrandVoice,
+  uploadBrandSourceDocuments,
 } from "../lib/brand-intelligence-api";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -232,6 +238,83 @@ export function useCreateBrandAsset(projectId: string) {
     onSuccess: () => {
       invalidateBrand(projectId, qc);
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.assets(projectId) });
+    },
+  });
+}
+
+export function useBrandSourceDocuments(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.sources(projectId ?? ""),
+    queryFn: () => listBrandSourceDocuments(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useUploadBrandSources(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (files: File[]) => uploadBrandSourceDocuments(projectId, files),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.sources(projectId) });
+    },
+  });
+}
+
+export function useExtractBrandSourcesBatch(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (documentIds: string[]) => extractBrandSourceBatch(projectId, documentIds),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.sources(projectId) });
+      void qc.invalidateQueries({
+        queryKey: ["brandIntelligence", projectId, "extractedFacts"],
+      });
+    },
+  });
+}
+
+export function useBrandExtractedFacts(
+  projectId: string | undefined,
+  filters?: Parameters<typeof listBrandExtractedFacts>[1],
+) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.extractedFacts(
+      projectId ?? "",
+      filters as Record<string, string | undefined>,
+    ),
+    queryFn: () => listBrandExtractedFacts(projectId!, filters),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function usePatchBrandExtractedFact(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      factId,
+      data,
+    }: {
+      factId: string;
+      data: Parameters<typeof patchBrandExtractedFact>[2];
+    }) => patchBrandExtractedFact(projectId, factId, data),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ["brandIntelligence", projectId, "extractedFacts"],
+      });
+    },
+  });
+}
+
+export function useApplyBrandExtractedFacts(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (factIds: string[]) => applyBrandExtractedFacts(projectId, factIds),
+    onSuccess: () => {
+      invalidateBrand(projectId, qc);
+      void qc.invalidateQueries({
+        queryKey: ["brandIntelligence", projectId, "extractedFacts"],
+      });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.sources(projectId) });
     },
   });
 }

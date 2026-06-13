@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
@@ -12,9 +12,11 @@ from app.models.brand_intelligence import (
     BrandAudienceInsight,
     BrandClaimRule,
     BrandContentPillar,
+    BrandExtractedFact,
     BrandProductKnowledge,
     BrandProfile,
     BrandSeoStrategy,
+    BrandSourceDocument,
     BrandVoice,
 )
 from app.schemas.brand_intelligence import (
@@ -412,6 +414,27 @@ async def build_overview(
     guardrails = await list_guardrails(session, project_id)
     pillars = await list_pillars(session, project_id)
     assets = await list_assets(session, project_id)
+    pending_facts = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(BrandExtractedFact)
+                .where(
+                    BrandExtractedFact.project_id == project_id,
+                    BrandExtractedFact.status.in_(("suggested", "needs_review")),
+                )
+            )
+        ).scalar_one()
+    )
+    source_docs = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(BrandSourceDocument)
+                .where(BrandSourceDocument.project_id == project_id)
+            )
+        ).scalar_one()
+    )
 
     sections = [
         BrandSectionStatus(
@@ -434,6 +457,8 @@ async def build_overview(
         guardrails_count=len(guardrails),
         pillars_count=len(pillars),
         assets_count=len(assets),
+        source_documents_count=source_docs,
+        pending_facts_count=pending_facts,
     )
 
 

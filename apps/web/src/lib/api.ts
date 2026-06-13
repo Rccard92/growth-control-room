@@ -72,3 +72,21 @@ export async function apiFetch<T>(
   }
   return response.json() as Promise<T>;
 }
+
+export async function apiUploadForm<T>(path: string, formData: FormData): Promise<T> {
+  if (!isApiBaseConfigured()) {
+    throw new Error(
+      "VITE_API_URL non configurato: imposta l'URL pubblico dell'API su Railway e rebuild WEB.",
+    );
+  }
+
+  const response = await fetch(apiUrl(path), {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw buildFetchError(path, response.status, text);
+  }
+  return response.json() as Promise<T>;
+}

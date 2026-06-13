@@ -15,9 +15,11 @@ if TYPE_CHECKING:
         BrandAudienceInsight,
         BrandClaimRule,
         BrandContentPillar,
+        BrandExtractedFact,
         BrandProductKnowledge,
         BrandProfile,
         BrandSeoStrategy,
+        BrandSourceDocument,
         BrandVoice,
     )
     from app.models.integration import Integration
@@ -94,6 +96,14 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     brand_assets: Mapped[list["BrandAsset"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    brand_source_documents: Mapped[list["BrandSourceDocument"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    brand_extracted_facts: Mapped[list["BrandExtractedFact"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

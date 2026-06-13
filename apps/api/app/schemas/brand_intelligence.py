@@ -330,6 +330,108 @@ class BrandIntelligenceOverviewResponse(BaseModel):
     guardrails_count: int = Field(serialization_alias="guardrailsCount")
     pillars_count: int = Field(serialization_alias="pillarsCount")
     assets_count: int = Field(serialization_alias="assetsCount")
+    source_documents_count: int = Field(default=0, serialization_alias="sourceDocumentsCount")
+    pending_facts_count: int = Field(default=0, serialization_alias="pendingFactsCount")
+
+
+class BrandSourceDocumentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    project_id: UUID = Field(serialization_alias="projectId")
+    filename: str
+    content_type: str = Field(serialization_alias="contentType")
+    file_size: int = Field(serialization_alias="fileSize")
+    storage_mode: str = Field(serialization_alias="storageMode")
+    document_type: str | None = Field(default=None, serialization_alias="documentType")
+    document_summary: str | None = Field(default=None, serialization_alias="documentSummary")
+    extraction_status: str = Field(serialization_alias="extractionStatus")
+    extraction_error: str | None = Field(default=None, serialization_alias="extractionError")
+    uploaded_at: datetime = Field(serialization_alias="uploadedAt")
+    processed_at: datetime | None = Field(default=None, serialization_alias="processedAt")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+
+class BrandSourceDocumentUploadItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: UUID
+    filename: str
+    status: str
+
+
+class BrandSourceDocumentsUploadResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    documents: list[BrandSourceDocumentUploadItem]
+
+
+class BrandExtractedFactRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    project_id: UUID = Field(serialization_alias="projectId")
+    source_document_id: UUID | None = Field(default=None, serialization_alias="sourceDocumentId")
+    target_section: str = Field(serialization_alias="targetSection")
+    target_entity_type: str | None = Field(default=None, serialization_alias="targetEntityType")
+    field_name: str | None = Field(default=None, serialization_alias="fieldName")
+    extracted_value: Any = Field(default=None, serialization_alias="extractedValue")
+    source_excerpt: str | None = Field(default=None, serialization_alias="sourceExcerpt")
+    confidence: float
+    status: str
+    ai_reasoning: str | None = Field(default=None, serialization_alias="aiReasoning")
+    reviewed_at: datetime | None = Field(default=None, serialization_alias="reviewedAt")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+
+class BrandExtractedFactUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    target_section: str | None = Field(default=None, validation_alias="targetSection")
+    target_entity_type: str | None = Field(default=None, validation_alias="targetEntityType")
+    field_name: str | None = Field(default=None, validation_alias="fieldName")
+    extracted_value: Any | None = Field(default=None, validation_alias="extractedValue")
+    status: str | None = None
+
+
+class BrandExtractBatchRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    document_ids: list[UUID] = Field(validation_alias="documentIds")
+
+
+class BrandApplyFactsRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    fact_ids: list[UUID] = Field(validation_alias="factIds")
+
+
+class BrandApplyFactsResultItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    fact_id: UUID = Field(serialization_alias="factId")
+    target_section: str = Field(serialization_alias="targetSection")
+    field_name: str | None = Field(default=None, serialization_alias="fieldName")
+    message: str
+
+
+class BrandApplyFactsCounts(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    saved: int
+    skipped: int
+    needs_review: int = Field(serialization_alias="needsReview")
+    rejected: int
+
+
+class BrandApplyFactsResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    saved: list[BrandApplyFactsResultItem]
+    skipped: list[BrandApplyFactsResultItem]
+    counts: BrandApplyFactsCounts
 
 
 class BrandContextBundleResponse(BaseModel):

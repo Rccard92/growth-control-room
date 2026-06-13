@@ -126,6 +126,9 @@ export function BrandWizard({ projectId, onComplete }: BrandWizardProps) {
 
   return (
     <div className="bi-wizard">
+      <p className="bi-panel__subtitle" style={{ marginBottom: "1rem" }}>
+        Questo wizard raccoglie solo le informazioni obbligatorie minime. Usa le tab o Import AI per arricchire il profilo e migliorare lo score.
+      </p>
       <div className="bi-wizard__stepper">
         {WIZARD_STEPS.map((s) => (
           <div
@@ -142,7 +145,9 @@ export function BrandWizard({ projectId, onComplete }: BrandWizardProps) {
         {step === 1 && (
           <>
             <h3 className="bi-panel__title">Brand Basics</h3>
-            <p className="bi-panel__subtitle">Nome, descrizione e presenza online del brand.</p>
+            <p className="bi-panel__subtitle">
+              Informazioni obbligatorie minime. Le sezioni avanzate potrai completarle dopo nelle tab dedicate.
+            </p>
             <div className="bi-form-grid">
               <div className="gcr-field">
                 <label>Nome brand *</label>

@@ -53,6 +53,9 @@ export const queryKeys = {
     pillars: (projectId: string) => ["brandIntelligence", projectId, "pillars"] as const,
     guardrails: (projectId: string) => ["brandIntelligence", projectId, "guardrails"] as const,
     assets: (projectId: string) => ["brandIntelligence", projectId, "assets"] as const,
+    sources: (projectId: string) => ["brandIntelligence", projectId, "sources"] as const,
+    extractedFacts: (projectId: string, filters?: Record<string, string | undefined>) =>
+      ["brandIntelligence", projectId, "extractedFacts", filters ?? {}] as const,
   },
   health: ["health"] as const,
 };

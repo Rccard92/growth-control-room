@@ -13,6 +13,36 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 
 Se `prompt_block` è `None`, il modulo decide se bloccare (futuro) o procedere con fallback (SEO v1).
 
+**Nessun modulo AI brand-facing deve generare contenuti ignorando Brand Intelligence.**
+
+## Popolamento Brand Intelligence
+
+Due percorsi equivalenti per i dati ufficiali:
+
+| Percorso | Salvataggio |
+|----------|-------------|
+| Wizard / tab CRUD | Diretto su tabelle ufficiali |
+| AI File Import | Facts `suggested` → review → `approved` → `apply` |
+
+Il ContextBuilder legge **solo** tabelle ufficiali. I facts in `brand_extracted_facts` non approvati sono invisibili ai moduli AI.
+
+```mermaid
+sequenceDiagram
+  participant Upload
+  participant AIExtract
+  participant FactsDB as brand_extracted_facts
+  participant Review
+  participant Apply
+  participant Official as Tabelle_ufficiali
+  participant CTX as ContextBuilder
+
+  Upload->>FactsDB: no write
+  AIExtract->>FactsDB: INSERT suggested
+  Review->>FactsDB: PATCH approved/rejected
+  Apply->>Official: WRITE solo approved
+  CTX->>Official: READ only
+```
+
 ## Moduli e integrazione
 
 ### SEO Proposal Engine (implementato)
@@ -21,8 +51,17 @@ File: `apps/api/app/services/content/seo_proposal_engine.py`, `seo_proposal_fiel
 
 - Prima della chiamata OpenAI: `get_prompt_context(session, project_id)`
 - Se presente, append `# Brand Intelligence` al system prompt
-- **Nessuna nuova chiamata OpenAI** — solo arricchimento prompt esistente
 - Fallback se profilo assente o score &lt; 10
+
+### AI Document Import (implementato v1)
+
+File: `document_extraction.py`, `fact_apply.py`, `text_extraction.py`
+
+- Upload + estrazione testo senza OpenAI
+- Estrazione AI richiede `OPENAI_API_KEY`
+- Output structured JSON: `document_type`, `facts[]`, `warnings[]`
+- Regole: no invenzioni, confidence cap su deduzioni, `unknown` se incerto
+- Apply mappa facts approvati su entità CRUD esistenti
 
 ### PED / Product Editorial (futuro)
 
@@ -36,17 +75,6 @@ Obbligatorio: profile, audience, claims. Validazione claim `forbidden` post-gene
 
 Obbligatorio: voice, audience, content pillars. Tone check su output.
 
-## Flusso dati
-
-```mermaid
-flowchart LR
-  UI[Brand Intelligence UI] --> API[CRUD API]
-  API --> DB[(PostgreSQL)]
-  SEO[SEO Engine] --> CTX[BrandIntelligenceContextBuilder]
-  CTX --> DB
-  SEO --> OpenAI[OpenAI prompt enriched]
-```
-
 ## Score come gate
 
 | Score | Comportamento SEO v1 | Comportamento moduli futuri |
@@ -58,6 +86,6 @@ flowchart LR
 
 ## Estensioni pianificate
 
-- Sources: upload PDF/Word, estrazione AI con approvazione umana
 - Site scan e social per arricchimento automatico
+- OCR immagini/PDF scansionati
 - Validazione output AI contro `BrandClaimRule` e `BrandAiGuardrail`

@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.2.1-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- AI document import foundation: upload PDF/DOCX/TXT/MD, estrazione testo, classificazione OpenAI
+- Extracted facts review workflow con approve/modify/reject/apply
+- Onboarding dual-path: compilazione guidata vs Import AI
+- Migration 016: `brand_source_documents`, `brand_extracted_facts`
+- Nessun auto-save: solo facts approvati entrano nelle tabelle ufficiali
+
 ## [0.2.0-alpha] - 2026-06-13
 
 Tipo: Alpha minor

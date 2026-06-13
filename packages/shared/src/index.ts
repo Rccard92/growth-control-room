@@ -138,5 +138,13 @@ export type {
   BrandIntelligenceOverview,
   BrandContextBundle,
   BrandIntelligenceTab,
+  BrandSourceDocument,
+  BrandExtractedFact,
+  BrandApplyFactsResponse,
+  BrandSourceDocumentsUploadResponse,
+  BrandExtractBatchResponse,
+  TargetSection,
+  FactStatus,
+  DocumentExtractionStatus,
 } from "./types/brand-intelligence";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";

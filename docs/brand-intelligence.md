@@ -2,6 +2,29 @@
 
 Brand Intelligence è la knowledge base strutturata del brand in Growth Control Room. Ogni progetto ha un profilo brand che alimenta i moduli AI (SEO, futuri PED/Ads/Email) con contesto coerente, compliance e voice.
 
+## Onboarding
+
+All'apertura di un progetto nuovo o con score basso, l'Overview propone due percorsi:
+
+1. **Compilazione guidata** — wizard manuale con sole informazioni obbligatorie minime
+2. **Importa da file con AI** — upload PDF/DOCX/TXT/MD, estrazione testo, classificazione OpenAI, review umana
+
+Le sezioni avanzate restano compilabili nelle tab dedicate per migliorare lo score.
+
+## AI File Import v1
+
+### Flusso
+
+1. **Upload** — `POST .../sources/upload` (multipart, max 10 file, 15MB ciascuno)
+2. **Estrazione testo** — sincrona al upload (pypdf, python-docx); storage alpha: `text_only` (metadata + testo, no binario)
+3. **Estrazione AI** — `POST .../sources/{id}/extract` o batch; crea `BrandExtractedFact` con `status=suggested`
+4. **Review umana** — approva, modifica, sposta sezione o rifiuta ogni fact
+5. **Apply** — `POST .../extracted-facts/apply` salva **solo** facts `approved` nelle tabelle ufficiali
+
+### Regola fondamentale
+
+Le estrazioni AI sono **suggestions**, non dati ufficiali. `BrandIntelligenceContextBuilder` legge solo le tabelle CRUD ufficiali — i facts non approvati non entrano nel contesto AI.
+
 ## Sezioni
 
 | Sezione | Obbligatoria (score minimo) | Descrizione |
@@ -24,7 +47,7 @@ Punteggio 0–100 calcolato come media pesata delle 9 sezioni:
 - **developing** (60–79): utilizzabile con lacune
 - **ready** (≥ 80): profilo maturo per generazione contenuti
 
-L'endpoint `GET /api/projects/{id}/brand-intelligence/score` restituisce score, sezioni, campi mancanti e raccomandazioni.
+Riflette solo dati ufficiali (post-apply). L'endpoint `GET /api/projects/{id}/brand-intelligence/score` restituisce score, sezioni, campi mancanti e raccomandazioni.
 
 ## Uso AI
 
@@ -33,27 +56,35 @@ L'endpoint `GET /api/projects/{id}/brand-intelligence/score` restituisce score, 
 - **SEO Optimizer (v1)**: integrazione opzionale — se il profilo è vuoto o score &lt; 10, il prompt SEO resta invariato (fallback).
 - **Moduli futuri** (PED, Ads, Email): il contesto brand sarà **obbligatorio** prima della generazione.
 
-Il metodo `format_for_prompt()` produce un blocco compatto `# Brand Intelligence` da appendere al system prompt.
-
 ## API
 
 Base path: `/api/projects/{project_id}/brand-intelligence`
 
-- `GET /` — overview + score
-- `GET /score` — solo score
-- `GET /context` — bundle completo per moduli AI
-- `GET/PUT /profile`, `/voice`, `/seo-strategy`
-- `GET/POST/PUT/DELETE` per products, audience, claims, content-pillars, guardrails, assets
+**CRUD ufficiale:** overview, score, context, profile, voice, products, audience, claims, seo-strategy, pillars, guardrails, assets
+
+**Import AI:**
+
+- `POST /sources/upload` — multipart `files[]`
+- `GET /sources` — lista documenti
+- `POST /sources/{document_id}/extract` — estrazione AI singola
+- `POST /sources/extract-batch` — `{ documentIds: [] }`
+- `GET /extracted-facts` — query: `status`, `targetSection`, `sourceDocumentId`
+- `PATCH /extracted-facts/{fact_id}` — review
+- `POST /extracted-facts/apply` — `{ factIds: [] }` solo approved
 
 ## UI
 
 Sidebar progetto → **Brand Intelligence** (dopo Control Room).
 
-- **Overview**: score ring, stato sezioni, CTA wizard
-- **Wizard**: 7 step guidati con salvataggio progressivo
+- **Overview**: onboarding dual-path, score ring, sezioni
+- **Wizard**: minimo obbligatorio
+- **Import AI**: 3 step (carica → estrai → revisiona)
+- **Documenti**: elenco file caricati
 - **Tab per sezione**: CRUD manuale
-- **Sources**: placeholder (upload documenti in roadmap)
+
+Route import: `/projects/:id/brand-intelligence/import`
 
 ## Migration
 
-`015_brand_intelligence_foundation` — 10 tabelle con FK `projects.id` CASCADE.
+- `015_brand_intelligence_foundation` — 10 tabelle CRUD
+- `016_brand_intelligence_ai_import` — `brand_source_documents`, `brand_extracted_facts`

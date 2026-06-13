@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useParams } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { BrandIntelligenceTab } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
 import { BrandIntelligenceOverviewPanel } from "../components/brand-intelligence/BrandIntelligenceOverview";
@@ -22,6 +22,7 @@ import { APP_ROUTES } from "../routes/config";
 const TABS: { id: BrandIntelligenceTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "wizard", label: "Wizard" },
+  { id: "import", label: "Import AI" },
   { id: "profile", label: "Profile" },
   { id: "voice", label: "Voice" },
   { id: "products", label: "Products" },
@@ -31,15 +32,34 @@ const TABS: { id: BrandIntelligenceTab; label: string }[] = [
   { id: "pillars", label: "Pillars" },
   { id: "guardrails", label: "Guardrails" },
   { id: "assets", label: "Assets" },
-  { id: "sources", label: "Sources" },
+  { id: "sources", label: "Documenti" },
 ];
 
 export function BrandIntelligencePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
+  const navigate = useNavigate();
+  const location = useLocation();
   const { data: project } = useProject(id);
   const { data: overview, isLoading } = useBrandIntelligenceOverview(projectId);
   const [tab, setTab] = useState<BrandIntelligenceTab>("overview");
+
+  const isImportRoute = location.pathname.endsWith("/import");
+
+  useEffect(() => {
+    if (isImportRoute) {
+      setTab("import");
+    }
+  }, [isImportRoute]);
+
+  function goToTab(next: BrandIntelligenceTab) {
+    setTab(next);
+    if (next === "import" && id) {
+      navigate(APP_ROUTES.projectBrandIntelligenceImport(id));
+    } else if (isImportRoute && id) {
+      navigate(APP_ROUTES.projectBrandIntelligence(id));
+    }
+  }
 
   return (
     <motion.div
@@ -63,39 +83,48 @@ export function BrandIntelligencePage() {
             key={t.id}
             type="button"
             className={`bi-tabs__btn ${tab === t.id ? "bi-tabs__btn--active" : ""}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => goToTab(t.id)}
           >
             {t.label}
           </button>
         ))}
       </nav>
 
-      {isLoading && tab === "overview" && (
-        <p className="bi-panel__subtitle">Caricamento overview…</p>
-      )}
+      {isImportRoute ? (
+        <Outlet />
+      ) : (
+        <>
+          {isLoading && tab === "overview" && (
+            <p className="bi-panel__subtitle">Caricamento overview…</p>
+          )}
 
-      {tab === "overview" && overview && (
-        <BrandIntelligenceOverviewPanel
-          overview={overview}
-          onStartWizard={() => setTab("wizard")}
-          onGoToTab={setTab}
-        />
-      )}
+          {tab === "overview" && overview && (
+            <BrandIntelligenceOverviewPanel
+              overview={overview}
+              onStartWizard={() => goToTab("wizard")}
+              onStartImport={() => goToTab("import")}
+              onGoToTab={goToTab}
+            />
+          )}
 
-      {tab === "wizard" && projectId && (
-        <BrandWizard projectId={projectId} onComplete={() => setTab("overview")} />
-      )}
+          {tab === "wizard" && projectId && (
+            <BrandWizard projectId={projectId} onComplete={() => goToTab("overview")} />
+          )}
 
-      {tab === "profile" && projectId && <BrandProfilePanel projectId={projectId} />}
-      {tab === "voice" && projectId && <BrandVoicePanel projectId={projectId} />}
-      {tab === "products" && projectId && <BrandProductsPanel projectId={projectId} />}
-      {tab === "audience" && projectId && <BrandAudiencePanel projectId={projectId} />}
-      {tab === "claims" && projectId && <BrandClaimsPanel projectId={projectId} />}
-      {tab === "seo" && projectId && <BrandSeoStrategyPanel projectId={projectId} />}
-      {tab === "pillars" && projectId && <BrandContentPillarsPanel projectId={projectId} />}
-      {tab === "guardrails" && projectId && <BrandGuardrailsPanel projectId={projectId} />}
-      {tab === "assets" && projectId && <BrandAssetsPanel projectId={projectId} />}
-      {tab === "sources" && <BrandSourcesPanel />}
+          {tab === "profile" && projectId && <BrandProfilePanel projectId={projectId} />}
+          {tab === "voice" && projectId && <BrandVoicePanel projectId={projectId} />}
+          {tab === "products" && projectId && <BrandProductsPanel projectId={projectId} />}
+          {tab === "audience" && projectId && <BrandAudiencePanel projectId={projectId} />}
+          {tab === "claims" && projectId && <BrandClaimsPanel projectId={projectId} />}
+          {tab === "seo" && projectId && <BrandSeoStrategyPanel projectId={projectId} />}
+          {tab === "pillars" && projectId && <BrandContentPillarsPanel projectId={projectId} />}
+          {tab === "guardrails" && projectId && <BrandGuardrailsPanel projectId={projectId} />}
+          {tab === "assets" && projectId && <BrandAssetsPanel projectId={projectId} />}
+          {tab === "sources" && projectId && (
+            <BrandSourcesPanel projectId={projectId} onGoToImport={() => goToTab("import")} />
+          )}
+        </>
+      )}
     </motion.div>
   );
 }

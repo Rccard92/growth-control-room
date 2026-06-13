@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -8,6 +8,8 @@ from app.schemas.brand_intelligence import (
     BrandAiGuardrailCreate,
     BrandAiGuardrailRead,
     BrandAiGuardrailUpdate,
+    BrandApplyFactsRequest,
+    BrandApplyFactsResponse,
     BrandAssetCreate,
     BrandAssetRead,
     BrandAssetUpdate,
@@ -21,6 +23,9 @@ from app.schemas.brand_intelligence import (
     BrandContentPillarRead,
     BrandContentPillarUpdate,
     BrandContextBundleResponse,
+    BrandExtractBatchRequest,
+    BrandExtractedFactRead,
+    BrandExtractedFactUpdate,
     BrandIntelligenceOverviewResponse,
     BrandKnowledgeScoreResponse,
     BrandProductKnowledgeCreate,
@@ -30,10 +35,14 @@ from app.schemas.brand_intelligence import (
     BrandProfileUpdate,
     BrandSeoStrategyRead,
     BrandSeoStrategyUpdate,
+    BrandSourceDocumentRead,
+    BrandSourceDocumentsUploadResponse,
     BrandVoiceRead,
     BrandVoiceUpdate,
 )
 from app.services.brand_intelligence import service as bi_service
+from app.services.brand_intelligence import sources_service
+from app.services.brand_intelligence.document_extraction import run_ai_extraction
 from app.services.projects import get_project_in_default_workspace
 
 router = APIRouter(prefix="/projects", tags=["brand-intelligence"])
@@ -517,3 +526,111 @@ async def delete_brand_asset(
 ) -> None:
     await get_project_in_default_workspace(project_id, session)
     await bi_service.delete_asset(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/sources/upload",
+    response_model=BrandSourceDocumentsUploadResponse,
+    response_model_by_alias=True,
+)
+async def upload_brand_source_documents(
+    project_id: UUID,
+    files: list[UploadFile] = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> BrandSourceDocumentsUploadResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await sources_service.upload_source_documents(session, project_id, files)
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/sources",
+    response_model=list[BrandSourceDocumentRead],
+    response_model_by_alias=True,
+)
+async def list_brand_source_documents(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> list[BrandSourceDocumentRead]:
+    await get_project_in_default_workspace(project_id, session)
+    rows = await sources_service.list_source_documents(session, project_id)
+    return [BrandSourceDocumentRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/sources/{document_id}/extract",
+    response_model=list[BrandExtractedFactRead],
+    response_model_by_alias=True,
+)
+async def extract_brand_source_document(
+    project_id: UUID,
+    document_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> list[BrandExtractedFactRead]:
+    await get_project_in_default_workspace(project_id, session)
+    facts = await run_ai_extraction(session, project_id, document_id)
+    return [BrandExtractedFactRead.model_validate(f) for f in facts]
+
+
+@router.post("/{project_id}/brand-intelligence/sources/extract-batch")
+async def extract_brand_source_batch(
+    project_id: UUID,
+    payload: BrandExtractBatchRequest,
+    session: AsyncSession = Depends(get_db),
+) -> dict:
+    await get_project_in_default_workspace(project_id, session)
+    return await sources_service.extract_document_batch(
+        session, project_id, payload.document_ids
+    )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/extracted-facts",
+    response_model=list[BrandExtractedFactRead],
+    response_model_by_alias=True,
+)
+async def list_brand_extracted_facts(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    status: str | None = Query(default=None),
+    target_section: str | None = Query(default=None, alias="targetSection"),
+    source_document_id: UUID | None = Query(default=None, alias="sourceDocumentId"),
+) -> list[BrandExtractedFactRead]:
+    await get_project_in_default_workspace(project_id, session)
+    rows = await sources_service.list_extracted_facts(
+        session,
+        project_id,
+        status_filter=status,
+        target_section=target_section,
+        source_document_id=source_document_id,
+    )
+    return [BrandExtractedFactRead.model_validate(r) for r in rows]
+
+
+@router.patch(
+    "/{project_id}/brand-intelligence/extracted-facts/{fact_id}",
+    response_model=BrandExtractedFactRead,
+    response_model_by_alias=True,
+)
+async def patch_brand_extracted_fact(
+    project_id: UUID,
+    fact_id: UUID,
+    payload: BrandExtractedFactUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandExtractedFactRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await sources_service.patch_extracted_fact(session, project_id, fact_id, payload)
+    return BrandExtractedFactRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/extracted-facts/apply",
+    response_model=BrandApplyFactsResponse,
+    response_model_by_alias=True,
+)
+async def apply_brand_extracted_facts(
+    project_id: UUID,
+    payload: BrandApplyFactsRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandApplyFactsResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await sources_service.apply_facts(session, project_id, payload.fact_ids)
