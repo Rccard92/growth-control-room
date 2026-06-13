@@ -31,6 +31,7 @@ from app.services.content.seo_proposal_engine import (
     product_current_values,
 )
 from app.services.content.seo_skill_loader import load_seo_skill_context
+from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.shopify.metafield_merge import build_product_metafields_merged
 from app.services.shopify.metafield_utils import (
     is_ai_generatable_metafield_type,
@@ -406,13 +407,17 @@ async def generate_seo_proposal_field(
         raise ValueError("image_id richiesto per imageAlt prodotto")
 
     skill_ctx = load_seo_skill_context()
+    brand_ctx = await BrandIntelligenceContextBuilder.get_prompt_context(session, store.project_id)
     value: Any
     reasoning: str
     risk_level: str
 
     if field == "metafield" and metafield_ctx is not None:
         if use_ai and is_openai_configured():
-            system_prompt = _ai_system_prompt(skill_ctx.as_proposal_prompt_context())
+            system_prompt = _ai_system_prompt(
+                skill_ctx.as_proposal_prompt_context(),
+                brand_ctx,
+            )
             user_prompt = _ai_field_user_prompt(
                 entity_type=entity_type,
                 field=field,
@@ -453,7 +458,10 @@ async def generate_seo_proposal_field(
         }
 
     if use_ai and is_openai_configured():
-        system_prompt = _ai_system_prompt(skill_ctx.as_proposal_prompt_context())
+        system_prompt = _ai_system_prompt(
+            skill_ctx.as_proposal_prompt_context(),
+            brand_ctx,
+        )
         user_prompt = _ai_field_user_prompt(
             entity_type=entity_type,
             field=field,

@@ -1,0 +1,192 @@
+import uuid
+from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from app.models.project import Project
+
+
+class BrandProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_profiles"
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_profiles_project_id"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    short_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    story: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mission: Mapped[str | None] = mapped_column(Text, nullable=True)
+    values: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    differentiators: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_profile")
+
+
+class BrandVoice(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_voices"
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_voices_project_id"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    tone: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    style_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    formality_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    emoji_policy: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    words_to_use: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    words_to_avoid: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    examples_good: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    examples_bad: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_voice")
+
+
+class BrandProductKnowledge(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_product_knowledge"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(500))
+    entity_type: Mapped[str] = mapped_column(String(50), default="product")
+    shopify_gid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ingredients: Mapped[str | None] = mapped_column(Text, nullable=True)
+    origin: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    production_process: Mapped[str | None] = mapped_column(Text, nullable=True)
+    usage_suggestions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    conservation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    taste_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objections: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    faq: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    claims_allowed: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    claims_forbidden: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    related_products: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    priority: Mapped[str] = mapped_column(String(20), default="medium")
+
+    project: Mapped["Project"] = relationship(back_populates="brand_product_knowledge")
+
+
+class BrandAudienceInsight(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_audience_insights"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    segment_name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    motivations: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    pain_points: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    objections: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    questions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    buying_triggers: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_audience_insights")
+
+
+class BrandClaimRule(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_claim_rules"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    rule_type: Mapped[str] = mapped_column(String(50))
+    title: Mapped[str] = mapped_column(String(500))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    examples: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    severity: Mapped[str] = mapped_column(String(20), default="info")
+
+    project: Mapped["Project"] = relationship(back_populates="brand_claim_rules")
+
+
+class BrandSeoStrategy(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_seo_strategies"
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_seo_strategies_project_id"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    primary_keywords: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    secondary_keywords: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    keyword_clusters: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    priority_pages: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    internal_linking_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta_title_pattern: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    meta_description_pattern: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    url_handle_pattern: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    competitors: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_seo_strategy")
+
+
+class BrandContentPillar(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_content_pillars"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objective: Mapped[str | None] = mapped_column(Text, nullable=True)
+    products: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    channels: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    example_topics: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    cta_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_content_pillars")
+
+
+class BrandAiGuardrail(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_ai_guardrails"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(500))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rule_type: Mapped[str] = mapped_column(String(50))
+    applies_to: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_ai_guardrails")
+
+
+class BrandAsset(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_assets"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    asset_type: Mapped[str] = mapped_column(String(50))
+    name: Mapped[str] = mapped_column(String(255))
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_assets")

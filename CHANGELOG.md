@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.2.0-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- **Brand Intelligence Foundation**: 10 modelli DB, migration 015, API CRUD completa
+- Brand Knowledge Score (9 sezioni pesate, status incomplete/developing/ready)
+- `BrandIntelligenceContextBuilder` per contesto AI unificato
+- UI: Overview, wizard 7 step, tab per sezione, sidebar e shortcut Control Room
+- Integrazione non distruttiva SEO Optimizer (arricchimento prompt, fallback se profilo vuoto)
+- Documentazione `docs/brand-intelligence.md` e `docs/ai-architecture.md`
+
 ## [0.1.2-alpha] - 2026-06-13
 
 Tipo: Alpha patch

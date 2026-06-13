@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.1.2-alpha";
+export const GCR_VERSION = "0.2.0-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.2.0-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Brand Intelligence Foundation: 10 modelli DB, migration 015, API CRUD",
+      "Brand Knowledge Score e BrandIntelligenceContextBuilder per moduli AI",
+      "UI Overview, wizard 7 step, tab per sezione, sidebar e shortcut",
+      "Integrazione SEO non distruttiva (arricchimento prompt con fallback)",
+      "Documentazione brand-intelligence e ai-architecture",
+    ],
+  },
   {
     version: "0.1.2-alpha",
     date: "2026-06-13",

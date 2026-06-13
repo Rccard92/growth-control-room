@@ -175,7 +175,17 @@ Assicurati che `CORS_ORIGINS` includa il dominio WEB.
 ## Documentazione
 
 - [Architettura](docs/architecture.md)
+- [Brand Intelligence](docs/brand-intelligence.md)
+- [Architettura AI](docs/ai-architecture.md)
 - [Integrazioni](docs/integrations.md)
+
+## Brand Intelligence
+
+Ogni progetto può definire un profilo brand strutturato (voice, prodotti, audience, claims, SEO, guardrails) con **Brand Knowledge Score** e wizard guidato.
+
+**Regola architetturale:** i moduli AI che generano contenuti brand-facing devono chiamare `BrandIntelligenceContextBuilder.build_brand_context(project_id)` prima di generare output. Il SEO Optimizer lo usa in modo opzionale (fallback se incompleto); i moduli futuri lo renderanno obbligatorio.
+
+Vedi [docs/brand-intelligence.md](docs/brand-intelligence.md) e [docs/ai-architecture.md](docs/ai-architecture.md).
 
 ## Stato attuale
 
@@ -192,6 +202,7 @@ Implementato:
 - **Shopify Dashboard v2**: E-commerce Control Room con product intelligence, inventory risk, order operations, SEO opportunities, alert center, daily diagnosis e attribution intelligence (Shopify-only; GA4/Meta/Google Ads/Klaviyo in roadmap)
 - **Content SEO Engine Foundation**: sync contenuti Shopify, audit legacy
 - **Product & Collection SEO Optimizer**: score trasparente, modal Modifica SEO (campi precompilati, badge stato), proposta manuale/AI con preview e approve/apply controllato
+- **Brand Intelligence Foundation**: profilo brand, wizard, knowledge score, context builder AI, integrazione SEO non distruttiva
 - **Changelog Alpha**: versioning `0.x.x-alpha` — vedi [`CHANGELOG.md`](CHANGELOG.md) e `/projects/:id/changelog`
 - Struttura connectors e skills (stub OAuth per altri provider)
 

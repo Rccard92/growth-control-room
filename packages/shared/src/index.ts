@@ -123,4 +123,20 @@ export type {
   ContentBriefStatus,
   SearchIntent,
 } from "./types/content";
+export type {
+  BrandProfile,
+  BrandVoice,
+  BrandProductKnowledge,
+  BrandAudienceInsight,
+  BrandClaimRule,
+  BrandSeoStrategy,
+  BrandContentPillar,
+  BrandAiGuardrail,
+  BrandAsset,
+  BrandKnowledgeScore,
+  BrandSectionStatus,
+  BrandIntelligenceOverview,
+  BrandContextBundle,
+  BrandIntelligenceTab,
+} from "./types/brand-intelligence";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";

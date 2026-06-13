@@ -39,5 +39,20 @@ export const queryKeys = {
     proposalPreview: (projectId: string, proposalId: string) =>
       ["contentSeo", projectId, "proposalPreview", proposalId] as const,
   },
+  brandIntelligence: {
+    overview: (projectId: string) => ["brandIntelligence", projectId, "overview"] as const,
+    score: (projectId: string) => ["brandIntelligence", projectId, "score"] as const,
+    context: (projectId: string) => ["brandIntelligence", projectId, "context"] as const,
+    profile: (projectId: string) => ["brandIntelligence", projectId, "profile"] as const,
+    voice: (projectId: string) => ["brandIntelligence", projectId, "voice"] as const,
+    products: (projectId: string) => ["brandIntelligence", projectId, "products"] as const,
+    audience: (projectId: string) => ["brandIntelligence", projectId, "audience"] as const,
+    claims: (projectId: string) => ["brandIntelligence", projectId, "claims"] as const,
+    seoStrategy: (projectId: string) =>
+      ["brandIntelligence", projectId, "seoStrategy"] as const,
+    pillars: (projectId: string) => ["brandIntelligence", projectId, "pillars"] as const,
+    guardrails: (projectId: string) => ["brandIntelligence", projectId, "guardrails"] as const,
+    assets: (projectId: string) => ["brandIntelligence", projectId, "assets"] as const,
+  },
   health: ["health"] as const,
 };

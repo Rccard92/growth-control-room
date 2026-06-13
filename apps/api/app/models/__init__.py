@@ -1,5 +1,16 @@
 from app.models.ai_run import AiRun
 from app.models.alert import Alert
+from app.models.brand_intelligence import (
+    BrandAiGuardrail,
+    BrandAsset,
+    BrandAudienceInsight,
+    BrandClaimRule,
+    BrandContentPillar,
+    BrandProductKnowledge,
+    BrandProfile,
+    BrandSeoStrategy,
+    BrandVoice,
+)
 from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
 from app.models.project import Project
@@ -28,6 +39,15 @@ from app.models.workspace import Workspace
 __all__ = [
     "AiRun",
     "Alert",
+    "BrandAiGuardrail",
+    "BrandAsset",
+    "BrandAudienceInsight",
+    "BrandClaimRule",
+    "BrandContentPillar",
+    "BrandProductKnowledge",
+    "BrandProfile",
+    "BrandSeoStrategy",
+    "BrandVoice",
     "Integration",
     "IntegrationCredential",
     "Project",

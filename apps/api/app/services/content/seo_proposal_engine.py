@@ -16,6 +16,7 @@ from app.services.ai.openai_client import (
 )
 from app.services.content.seo_current_values import normalize_proposal_values
 from app.services.content.seo_proposal_diff import compute_changed_proposed
+from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 
@@ -157,8 +158,8 @@ def _rules_collection_proposal(
     }
 
 
-def _ai_system_prompt(skill_context: str) -> str:
-    return (
+def _ai_system_prompt(skill_context: str, brand_context: str | None = None) -> str:
+    base = (
         "Sei un SEO specialist ecommerce Shopify. "
         "Rispondi SOLO con JSON valido strutturato. "
         "Non inventare claim non presenti nei dati forniti. "
@@ -170,6 +171,9 @@ def _ai_system_prompt(skill_context: str) -> str:
         "non sovrascrivere campi già ottimali.\n\n"
         f"{skill_context}"
     )
+    if brand_context:
+        base += f"\n\n{brand_context}"
+    return base
 
 
 def _ai_user_prompt(
@@ -256,9 +260,13 @@ async def generate_seo_proposal(
     reasoning: list[Any]
 
     skill_ctx = load_seo_skill_context()
+    brand_ctx = await BrandIntelligenceContextBuilder.get_prompt_context(session, store.project_id)
 
     if use_ai and is_openai_configured():
-        system_prompt = _ai_system_prompt(skill_ctx.as_proposal_prompt_context())
+        system_prompt = _ai_system_prompt(
+            skill_ctx.as_proposal_prompt_context(),
+            brand_ctx,
+        )
         user_prompt = _ai_user_prompt(
             entity_type=entity_type,
             current=current,

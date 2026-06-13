@@ -1,6 +1,7 @@
 ﻿import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { AiBriefPage } from "../pages/AiBriefPage";
+import { BrandIntelligencePage } from "../pages/BrandIntelligencePage";
 import { ChangelogPage } from "../pages/ChangelogPage";
 import { ContentPage } from "../pages/ContentPage";
 import { IntegrationsPage } from "../pages/IntegrationsPage";
@@ -26,6 +27,7 @@ export function AppRoutes() {
 
       <Route path="projects/:id" element={<AppShell showSidebar />}>
         <Route index element={<ProjectOverviewPage />} />
+        <Route path="brand-intelligence" element={<BrandIntelligencePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="shopify" element={<ShopifyPage />} />
         <Route path="shopify/connect" element={<ShopifyConnectPage />} />
