@@ -106,7 +106,7 @@ export function initFieldStateMap(
     }
     for (const mf of metafields) {
       const fk = metafieldFieldKey(mf.id);
-      const val = metafieldValues[mf.id] ?? mf.value ?? "";
+      const val = metafieldValues[mf.id] ?? mf.displayValue ?? mf.value ?? "";
       map[fk] = emptyFieldState(val);
     }
   }
@@ -454,7 +454,9 @@ export function buildChangedProposalValues(
         proposedValues.metafields = [];
       }
       (proposedValues.metafields as Record<string, unknown>[]).push({
-        id: mf.id,
+        id: mf.metafieldId ?? null,
+        metafieldId: mf.metafieldId ?? null,
+        definitionId: mf.definitionId,
         namespace: mf.namespace,
         key: mf.key,
         type: mf.type,

@@ -93,6 +93,7 @@ export type {
   SeoCollectionListResponse,
   SeoEntityAnalysis,
   SeoProposalGenerateFieldResponse,
+  SeoMetafieldDefinitionsSyncResponse,
   SeoOptimizationProposal,
   SeoProposalListResponse,
   SeoApplyFieldsRequest,

@@ -94,6 +94,10 @@ class SeoProposalGenerateFieldRequest(BaseModel):
     field: str
     image_id: str | None = Field(default=None, validation_alias="imageId")
     metafield_id: str | None = Field(default=None, validation_alias="metafieldId")
+    definition_id: str | None = Field(default=None, validation_alias="definitionId")
+    namespace: str | None = None
+    key: str | None = None
+    type: str | None = None
     use_ai: bool = Field(default=True, validation_alias="useAi")
 
 
@@ -105,6 +109,15 @@ class SeoProposalGenerateFieldResponse(BaseModel):
     reasoning: str | None = None
     risk_level: str = Field(serialization_alias="riskLevel")
     metafield_id: str | None = Field(default=None, serialization_alias="metafieldId")
+    definition_id: str | None = Field(default=None, serialization_alias="definitionId")
+
+
+class SeoMetafieldDefinitionsSyncResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    definitions_synced: int = Field(serialization_alias="definitionsSynced")
+    owner_type: str = Field(serialization_alias="ownerType")
+    warnings: list[str] = Field(default_factory=list)
 
 
 class SeoScoreBreakdownItem(BaseModel):
@@ -175,16 +188,22 @@ class SeoProductMetafieldItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: str
+    definition_id: str = Field(serialization_alias="definitionId")
+    metafield_id: str | None = Field(default=None, serialization_alias="metafieldId")
     namespace: str
     key: str
     type: str
     value: str = ""
+    raw_value: str = Field(default="", serialization_alias="rawValue")
+    display_value: str = Field(default="", serialization_alias="displayValue")
     definition_name: str | None = Field(default=None, serialization_alias="definitionName")
     definition_description: str | None = Field(
         default=None, serialization_alias="definitionDescription"
     )
     editable: bool = False
     ai_generatable: bool = Field(default=False, serialization_alias="aiGeneratable")
+    exists_on_product: bool = Field(default=False, serialization_alias="existsOnProduct")
+    is_empty: bool = Field(default=True, serialization_alias="isEmpty")
     updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
 
 
@@ -214,6 +233,12 @@ class SeoProductDetailResponse(BaseModel):
     current_values: dict[str, Any] = Field(serialization_alias="currentValues")
     images: list[dict[str, Any]] = Field(default_factory=list)
     metafields: list[SeoProductMetafieldItem] = Field(default_factory=list)
+    metafield_definitions_count: int = Field(
+        default=0, serialization_alias="metafieldDefinitionsCount"
+    )
+    has_metafield_definitions: bool = Field(
+        default=False, serialization_alias="hasMetafieldDefinitions"
+    )
     quantity_sold: int = Field(default=0, serialization_alias="quantitySold")
     revenue: float = 0
     stock: int | None = None

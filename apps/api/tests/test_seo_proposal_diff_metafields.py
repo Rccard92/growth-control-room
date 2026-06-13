@@ -64,3 +64,26 @@ def test_diff_metafields_unchanged_excluded() -> None:
     delta, fields = compute_changed_proposed(current, proposed)
     assert "metafields" not in fields
     assert delta == {}
+
+
+def test_diff_metafields_new_slot_without_id() -> None:
+    current = {"metafields": []}
+    proposed = {
+        "metafields": [
+            {
+                "id": None,
+                "metafieldId": None,
+                "definitionId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "namespace": "custom",
+                "key": "domanda_1",
+                "type": "single_line_text_field",
+                "value": "Quanto costa?",
+            }
+        ]
+    }
+    delta, fields = compute_changed_proposed(current, proposed)
+    assert fields == ["metafields"]
+    assert len(delta["metafields"]) == 1
+    assert delta["metafields"][0]["namespace"] == "custom"
+    assert delta["metafields"][0]["key"] == "domanda_1"
+    assert delta["metafields"][0]["value"] == "Quanto costa?"

@@ -154,30 +154,47 @@ def _diff_metafields(
 
     current_list = current.get("metafields") or []
     current_by_id: dict[str, dict[str, Any]] = {}
+    current_by_ns_key: dict[tuple[str, str], dict[str, Any]] = {}
     for item in current_list:
-        if isinstance(item, dict) and item.get("id"):
-            current_by_id[str(item["id"])] = item
+        if not isinstance(item, dict):
+            continue
+        mid = str(item.get("id") or item.get("metafield_id") or "")
+        if mid:
+            current_by_id[mid] = item
+        ns = str(item.get("namespace") or "")
+        key = str(item.get("key") or "")
+        if ns and key:
+            current_by_ns_key[(ns, key)] = item
 
     changed: list[dict[str, Any]] = []
     for entry in proposed_list:
         if not isinstance(entry, dict):
             continue
-        mid = str(entry.get("id") or "")
-        if not mid:
-            continue
-        cur = current_by_id.get(mid)
-        if cur is None:
-            continue
+        mid = str(entry.get("id") or entry.get("metafield_id") or "")
+        namespace = str(entry.get("namespace") or "")
+        key = str(entry.get("key") or "")
+        type_name = str(entry.get("type") or "")
+        definition_id = entry.get("definition_id") or entry.get("definitionId")
         prop_val = str(entry.get("value") or "").strip()
-        cur_val = str(cur.get("value") or "").strip()
+        if not namespace or not key or not type_name:
+            continue
+
+        cur = current_by_id.get(mid) if mid else None
+        if cur is None:
+            cur = current_by_ns_key.get((namespace, key))
+        cur_val = str(cur.get("value") or cur.get("display_value") or "").strip() if cur else ""
         if prop_val == cur_val:
+            continue
+        if not prop_val:
             continue
         changed.append(
             {
-                "id": mid,
-                "namespace": entry.get("namespace") or cur.get("namespace"),
-                "key": entry.get("key") or cur.get("key"),
-                "type": entry.get("type") or cur.get("type"),
+                "id": mid or None,
+                "metafield_id": mid or None,
+                "definition_id": definition_id,
+                "namespace": namespace,
+                "key": key,
+                "type": type_name,
                 "value": prop_val,
             }
         )

@@ -13,6 +13,7 @@ import type {
   SeoProductListResponse,
   SeoProposalListResponse,
   SeoProposalGenerateFieldResponse,
+  SeoMetafieldDefinitionsSyncResponse,
   SeoProposalPreviewResponse,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
@@ -119,7 +120,16 @@ export function generateProposalField(
   projectId: string,
   entityType: "product" | "collection",
   entityId: string,
-  options: { field: string; imageId?: string; metafieldId?: string; useAi?: boolean },
+  options: {
+    field: string;
+    imageId?: string;
+    metafieldId?: string | null;
+    definitionId?: string;
+    namespace?: string;
+    key?: string;
+    type?: string;
+    useAi?: boolean;
+  },
 ): Promise<SeoProposalGenerateFieldResponse> {
   return apiFetch<SeoProposalGenerateFieldResponse>(
     `/api/projects/${projectId}/content/seo/proposals/generate-field`,
@@ -132,9 +142,22 @@ export function generateProposalField(
         field: options.field,
         imageId: options.imageId,
         metafieldId: options.metafieldId,
+        definitionId: options.definitionId,
+        namespace: options.namespace,
+        key: options.key,
+        type: options.type,
         useAi: options.useAi ?? true,
       }),
     },
+  );
+}
+
+export function syncMetafieldDefinitions(
+  projectId: string,
+): Promise<SeoMetafieldDefinitionsSyncResponse> {
+  return apiFetch<SeoMetafieldDefinitionsSyncResponse>(
+    `/api/projects/${projectId}/content/seo/metafield-definitions/sync`,
+    { method: "POST" },
   );
 }
 

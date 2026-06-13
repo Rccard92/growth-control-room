@@ -86,6 +86,7 @@ async def _refresh_local_after_apply(
             proposal.entity_id,
             proposed,
             shopify_response=shopify_response,
+            store_id=store.id,
         )
         if updated is None:
             return False

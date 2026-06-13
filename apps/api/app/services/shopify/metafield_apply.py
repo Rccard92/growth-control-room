@@ -7,6 +7,7 @@ from typing import Any
 
 from app.services.shopify.client import ShopifyGraphQLClient
 from app.services.shopify.metafield_utils import is_editable_metafield_type
+from app.services.shopify.metafield_value_format import serialize_metafield_value
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +41,18 @@ async def apply_product_metafields(
         if not is_editable_metafield_type(type_name, value_str):
             warnings.append(f"{namespace}.{key}: {UNSUPPORTED_TYPE_MESSAGE}")
             continue
+        try:
+            serialized = serialize_metafield_value(type_name, value_str)
+        except ValueError as exc:
+            warnings.append(f"{namespace}.{key}: {exc}")
+            continue
         inputs.append(
             {
                 "ownerId": product_gid,
                 "namespace": namespace,
                 "key": key,
                 "type": type_name,
-                "value": value_str,
+                "value": serialized,
             }
         )
 

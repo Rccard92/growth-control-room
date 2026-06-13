@@ -14,6 +14,7 @@ from app.services.content.seo_proposal_engine import (
     collection_current_values,
     product_current_values,
 )
+from app.services.shopify.metafield_merge import build_product_metafields_merged
 from app.services.shopify.metafield_utils import (
     is_editable_metafield_type,
     metafields_current_snapshot,
@@ -54,7 +55,8 @@ def _validate_proposed_values(entity_type: str, proposed: dict[str, Any]) -> dic
             for entry in entries:
                 if not isinstance(entry, dict):
                     continue
-                mid = str(entry.get("id") or "").strip()
+                mid = str(entry.get("id") or entry.get("metafield_id") or entry.get("metafieldId") or "").strip()
+                definition_id = entry.get("definition_id") or entry.get("definitionId")
                 namespace = str(entry.get("namespace") or "").strip()
                 key = str(entry.get("key") or "").strip()
                 type_name = str(entry.get("type") or "").strip()
@@ -62,7 +64,9 @@ def _validate_proposed_values(entity_type: str, proposed: dict[str, Any]) -> dic
                 if value is None:
                     value = ""
                 value_str = str(value)
-                if not mid or not namespace or not key or not type_name:
+                if not namespace or not key or not type_name:
+                    continue
+                if not mid and not definition_id:
                     continue
                 if not is_editable_metafield_type(type_name, value_str):
                     raise ValueError(
@@ -70,7 +74,9 @@ def _validate_proposed_values(entity_type: str, proposed: dict[str, Any]) -> dic
                     )
                 validated.append(
                     {
-                        "id": mid,
+                        "id": mid or None,
+                        "metafield_id": mid or None,
+                        "definition_id": definition_id,
                         "namespace": namespace,
                         "key": key,
                         "type": type_name,
@@ -92,17 +98,33 @@ async def _product_current_with_metafields(
     product: ShopifyProduct,
 ) -> dict[str, Any]:
     current = product_current_values(product)
-    rows = list(
-        (
-            await session.execute(
-                select(ShopifyProductMetafield).where(
-                    ShopifyProductMetafield.shopify_store_id == store.id,
-                    ShopifyProductMetafield.product_id == product.id,
+    merged, _ = await build_product_metafields_merged(store, session, product.id)
+    current["metafields"] = [
+        {
+            "id": m.get("metafield_id") or m.get("definition_id"),
+            "metafield_id": m.get("metafield_id"),
+            "definition_id": m.get("definition_id"),
+            "namespace": m["namespace"],
+            "key": m["key"],
+            "type": m["type"],
+            "value": m.get("display_value") or m.get("value") or "",
+            "display_value": m.get("display_value") or m.get("value") or "",
+        }
+        for m in merged
+        if m.get("exists_on_product")
+    ]
+    if not current["metafields"]:
+        rows = list(
+            (
+                await session.execute(
+                    select(ShopifyProductMetafield).where(
+                        ShopifyProductMetafield.shopify_store_id == store.id,
+                        ShopifyProductMetafield.product_id == product.id,
+                    )
                 )
-            )
-        ).scalars().all()
-    )
-    current["metafields"] = metafields_current_snapshot(rows)
+            ).scalars().all()
+        )
+        current["metafields"] = metafields_current_snapshot(rows)
     return current
 
 

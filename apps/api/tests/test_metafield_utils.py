@@ -27,6 +27,7 @@ def test_json_not_editable_invalid() -> None:
     assert not is_editable_metafield_type("json", "{bad json")
 
 
-def test_ai_generatable_includes_text_and_json() -> None:
+def test_ai_generatable_text_types() -> None:
     assert is_ai_generatable_metafield_type("single_line_text_field")
-    assert is_ai_generatable_metafield_type("json", '{"x":1}')
+    assert is_ai_generatable_metafield_type("rich_text_field")
+    assert not is_ai_generatable_metafield_type("json", '{"x":1}')

@@ -19,6 +19,7 @@ import {
   rejectProposal,
   saveManualProposal,
   syncCollectionSeo,
+  syncMetafieldDefinitions,
   syncProductSeo,
   syncSeoOptimizer,
 } from "../lib/content-api";
@@ -123,21 +124,44 @@ export function useGenerateProposalField(projectId: string) {
       field,
       imageId,
       metafieldId,
+      definitionId,
+      namespace,
+      key,
+      type,
       useAi,
     }: {
       entityType: "product" | "collection";
       entityId: string;
       field: string;
       imageId?: string;
-      metafieldId?: string;
+      metafieldId?: string | null;
+      definitionId?: string;
+      namespace?: string;
+      key?: string;
+      type?: string;
       useAi?: boolean;
     }) =>
       generateProposalField(projectId, entityType, entityId, {
         field,
         imageId,
         metafieldId,
+        definitionId,
+        namespace,
+        key,
+        type,
         useAi,
       }),
+  });
+}
+
+export function useSyncMetafieldDefinitions(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => syncMetafieldDefinitions(projectId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
+      void qc.invalidateQueries({ queryKey: ["contentSeo", "productDetail", projectId] });
+    },
   });
 }
 

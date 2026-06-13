@@ -19,6 +19,7 @@ from app.schemas.seo_optimizer import (
     SeoContentDebugResponse,
     SeoEntityAnalysisRead,
     SeoEntitySyncResponse,
+    SeoMetafieldDefinitionsSyncResponse,
     SeoOptimizerSyncResponse,
     SeoProductDetailResponse,
     SeoProductListResponse,
@@ -69,6 +70,7 @@ from app.services.projects import get_project_in_default_workspace
 from app.services.shopify.client import ShopifyAPIError
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
 from app.services.shopify.content_sync import sync_shopify_collections_only
+from app.services.shopify.metafield_definitions_sync import sync_metafield_definitions
 from app.services.shopify.scopes import resolve_shopify_scopes
 from app.services.shopify.sync import sync_shopify_store
 
@@ -142,6 +144,13 @@ async def content_seo_sync_shopify(
         collections_synced = collection_result.collections_synced
         duration += collection_result.duration_seconds
         warnings.extend(collection_result.warnings)
+        try:
+            def_result = await sync_metafield_definitions(store, client, session)
+            await session.commit()
+            if def_result.get("warnings"):
+                warnings.extend(def_result["warnings"][:3])
+        except Exception:
+            pass
         if collection_result.errors and collections_synced == 0:
             message = collection_result.errors[0]
         elif collection_result.warnings:
@@ -317,6 +326,8 @@ def _build_product_detail(data: dict) -> SeoProductDetailResponse:
         current_values=data["current_values"],
         images=data.get("images") or [],
         metafields=data.get("metafields") or [],
+        metafield_definitions_count=data.get("metafield_definitions_count", 0),
+        has_metafield_definitions=data.get("has_metafield_definitions", False),
         quantity_sold=data.get("quantity_sold", 0),
         revenue=data.get("revenue", 0),
         stock=data.get("stock"),
@@ -547,12 +558,38 @@ async def generate_proposal_field(
             field=body.field,
             image_id=body.image_id,
             metafield_id=body.metafield_id,
+            definition_id=body.definition_id,
+            namespace=body.namespace,
+            key=body.key,
+            type_name=body.type,
             use_ai=body.use_ai,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return SeoProposalGenerateFieldResponse.model_validate(result)
+
+
+@router.post(
+    "/{project_id}/content/seo/metafield-definitions/sync",
+    response_model=SeoMetafieldDefinitionsSyncResponse,
+    response_model_by_alias=True,
+)
+async def sync_metafield_definitions_route(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SeoMetafieldDefinitionsSyncResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    try:
+        client = await get_shopify_client_for_store(store)
+        result = await sync_metafield_definitions(store, client, session)
+        await session.commit()
+    except ShopifyAPIError as exc:
+        raise _map_shopify_error(exc) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SeoMetafieldDefinitionsSyncResponse.model_validate(result)
 
 
 @router.post(

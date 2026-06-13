@@ -47,6 +47,7 @@ import {
   useGenerateProposalField,
   useSaveManualProposal,
   useSyncCollectionSeo,
+  useSyncMetafieldDefinitions,
   useSyncProductSeo,
 } from "../../../hooks/useContentSeo";
 
@@ -55,7 +56,7 @@ type DrawerTab = "main" | "metafields";
 function buildMetafieldValues(metafields: SeoProductMetafieldItem[]): Record<string, string> {
   const map: Record<string, string> = {};
   for (const mf of metafields) {
-    map[mf.id] = mf.value ?? "";
+    map[mf.id] = mf.displayValue ?? mf.value ?? "";
   }
   return map;
 }
@@ -142,6 +143,7 @@ export function SeoEntityEditDrawer({
   const generateField = useGenerateProposalField(projectId);
   const syncProduct = useSyncProductSeo(projectId);
   const syncCollection = useSyncCollectionSeo(projectId);
+  const syncDefinitions = useSyncMetafieldDefinitions(projectId);
 
   const initFormFromDetail = useCallback(
     (detailSource: SeoProductDetailResponse | SeoCollectionDetailResponse) => {
@@ -362,16 +364,26 @@ export function SeoEntityEditDrawer({
     );
   };
 
-  const handleGenerateMetafieldAi = (metafieldId: string) => {
-    const stateKey = metafieldFieldKey(metafieldId);
+  const handleGenerateMetafieldAi = (mf: SeoProductMetafieldItem) => {
+    const stateKey = metafieldFieldKey(mf.id);
     setFieldStateMap((prev) => setFieldGenerating(prev, stateKey));
     generateField.mutate(
-      { entityType, entityId, field: "metafield", metafieldId, useAi: true },
+      {
+        entityType,
+        entityId,
+        field: "metafield",
+        metafieldId: mf.metafieldId ?? null,
+        definitionId: mf.definitionId,
+        namespace: mf.namespace,
+        key: mf.key,
+        type: mf.type,
+        useAi: true,
+      },
       {
         onSuccess: (res) => {
           const strValue = String(res.value ?? "");
           setMetafieldValues((prev) => {
-            const next = applyMetafieldValue(prev, metafieldId, strValue);
+            const next = applyMetafieldValue(prev, mf.id, strValue);
             markDirty(formValues, next);
             return next;
           });
@@ -757,11 +769,24 @@ export function SeoEntityEditDrawer({
               fieldStateMap={fieldStateMap}
               openaiConfigured={openaiConfigured}
               syncLoading={syncLoading}
+              definitionsSyncLoading={syncDefinitions.isPending}
+              hasDefinitions={productDetail?.hasMetafieldDefinitions}
               onMetafieldChange={handleMetafieldChange}
               onGenerateMetafield={handleGenerateMetafieldAi}
               onRestoreField={handleRestoreField}
               onAcceptField={handleAcceptField}
               onSyncMetafields={handleSyncFromShopify}
+              onSyncDefinitions={() => {
+                syncDefinitions.mutate(undefined, {
+                  onSuccess: () => {
+                    setSyncMessage("Definizioni metafield sincronizzate.");
+                    onDetailRefresh?.();
+                  },
+                  onError: () => {
+                    setSyncMessage("Sincronizzazione definizioni non riuscita.");
+                  },
+                });
+              }}
             />
           )}
         </>

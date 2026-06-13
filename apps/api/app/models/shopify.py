@@ -75,6 +75,46 @@ class ShopifyStore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="store",
         cascade="all, delete-orphan",
     )
+    metafield_definitions: Mapped[list["ShopifyMetafieldDefinition"]] = relationship(
+        back_populates="store",
+        cascade="all, delete-orphan",
+    )
+
+
+class ShopifyMetafieldDefinition(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "shopify_metafield_definitions"
+    __table_args__ = (
+        UniqueConstraint(
+            "shopify_store_id",
+            "shopify_definition_gid",
+            name="uq_shopify_metafield_definitions_store_gid",
+        ),
+        UniqueConstraint(
+            "shopify_store_id",
+            "owner_type",
+            "namespace",
+            "key",
+            name="uq_shopify_metafield_definitions_store_owner_ns_key",
+        ),
+    )
+
+    shopify_store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_stores.id", ondelete="CASCADE"),
+        index=True,
+    )
+    shopify_definition_gid: Mapped[str] = mapped_column(String(255))
+    owner_type: Mapped[str] = mapped_column(String(50))
+    namespace: Mapped[str] = mapped_column(String(255))
+    key: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    type_name: Mapped[str] = mapped_column(String(100))
+    type_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    validations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    store: Mapped["ShopifyStore"] = relationship(back_populates="metafield_definitions")
 
 
 class ShopifyProduct(Base, UUIDPrimaryKeyMixin, TimestampMixin):

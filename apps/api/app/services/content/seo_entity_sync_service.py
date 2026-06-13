@@ -20,6 +20,7 @@ from app.services.content.seo_entity_detail_service import (
 )
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 from app.services.shopify.content_sync import _upsert_collection
+from app.services.shopify.metafield_definitions_sync import sync_metafield_definitions
 from app.services.shopify.sync import _upsert_product, _upsert_variants
 
 
@@ -48,6 +49,10 @@ async def sync_single_product(
     node = await client.fetch_product_by_gid(product.shopify_gid)
     product = await _upsert_product(session, store.id, node)
     await _upsert_variants(session, store.id, product, node)
+    try:
+        await sync_metafield_definitions(store, client, session)
+    except Exception:
+        pass
     await analyze_single_product(store, session, product_id)
     await session.commit()
 

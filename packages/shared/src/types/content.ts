@@ -228,6 +228,13 @@ export interface SeoProposalGenerateFieldResponse {
   reasoning?: string | null;
   riskLevel: "low" | "medium" | "high";
   metafieldId?: string | null;
+  definitionId?: string | null;
+}
+
+export interface SeoMetafieldDefinitionsSyncResponse {
+  definitionsSynced: number;
+  ownerType: string;
+  warnings: string[];
 }
 
 export interface SeoProposalPreviewField {
@@ -272,14 +279,20 @@ export interface SeoSkillMeta {
 
 export interface SeoProductMetafieldItem {
   id: string;
+  definitionId: string;
+  metafieldId?: string | null;
   namespace: string;
   key: string;
   type: string;
   value: string;
+  rawValue?: string;
+  displayValue?: string;
   definitionName?: string | null;
   definitionDescription?: string | null;
   editable: boolean;
   aiGeneratable: boolean;
+  existsOnProduct?: boolean;
+  isEmpty?: boolean;
   updatedAt?: string | null;
 }
 
@@ -291,6 +304,8 @@ export interface SeoProductDetailResponse {
   currentValues: Record<string, unknown>;
   images: Record<string, unknown>[];
   metafields?: SeoProductMetafieldItem[];
+  metafieldDefinitionsCount?: number;
+  hasMetafieldDefinitions?: boolean;
   quantitySold: number;
   revenue: number;
   stock?: number | null;

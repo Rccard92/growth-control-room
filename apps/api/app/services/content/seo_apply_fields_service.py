@@ -113,7 +113,6 @@ async def apply_entity_fields(
 
     applied_values: dict[str, Any] = {}
     shopify_response: dict[str, Any] = {}
-    effective_delta: dict[str, Any] = {}
 
     try:
         if entity_type == "product":
@@ -176,6 +175,7 @@ async def apply_entity_fields(
             entity_id,
             effective_delta,
             shopify_response=shopify_response,
+            store_id=store.id,
         )
         local_ok = updated is not None
         if local_ok:

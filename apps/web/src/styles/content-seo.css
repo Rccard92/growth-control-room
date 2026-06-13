@@ -915,3 +915,107 @@
     grid-template-columns: 1fr;
   }
 }
+
+.seo-metafields-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seo-metafields-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.seo-metafields-editor__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.seo-metafields-editor__filter {
+  border: 1px solid var(--gcr-border, #e2e8f0);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.seo-metafields-editor__filter--active {
+  background: var(--gcr-accent-muted, #eef2ff);
+  border-color: var(--gcr-accent, #4f46e5);
+}
+
+.seo-metafields-editor__sync-group,
+.seo-metafields-editor__empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.seo-metafield-item {
+  border: 1px solid var(--gcr-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.seo-metafield-item__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.seo-metafield-item__name {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.seo-metafield-item__ns-key {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.seo-metafield-item__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.seo-metafield-item__type,
+.seo-metafield-item__badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--gcr-surface-muted, #f1f5f9);
+  color: var(--gcr-text-muted);
+}
+
+.seo-metafield-item__description {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--gcr-text-muted);
+}
+
+.seo-metafield-item__raw {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.seo-metafield-item__raw-pre {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem;
+  background: var(--gcr-surface-muted, #f8fafc);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.7rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

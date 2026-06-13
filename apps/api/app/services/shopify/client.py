@@ -697,6 +697,57 @@ class ShopifyGraphQLClient:
         nodes = await self.fetch_all_orders(page_size=min(limit, DEFAULT_PAGE_SIZE))
         return nodes[:limit]
 
+    async def fetch_metafield_definitions(
+        self,
+        *,
+        owner_type: str = "PRODUCT",
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict[str, Any]]:
+        query_template = """
+        query MetafieldDefinitions($first: Int!, $after: String, $ownerType: MetafieldOwnerType!) {
+          metafieldDefinitions(first: $first, after: $after, ownerType: $ownerType) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            edges {
+              node {
+                id
+                ownerType
+                namespace
+                key
+                name
+                description
+                type { name category }
+                validations { name type value }
+              }
+            }
+          }
+        }
+        """
+        all_nodes: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            variables: dict[str, Any] = {
+                "first": page_size,
+                "after": cursor,
+                "ownerType": owner_type,
+            }
+            data = await self.execute(query_template, variables)
+            connection = data.get("metafieldDefinitions") or {}
+            edges = connection.get("edges") or []
+            for edge in edges:
+                node = edge.get("node")
+                if node:
+                    all_nodes.append(node)
+            page_info = connection.get("pageInfo") or {}
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info.get("endCursor")
+            if not cursor:
+                break
+        return all_nodes
+
     async def metafields_set(self, inputs: list[dict[str, Any]]) -> dict[str, Any]:
         if not inputs:
             return {"metafieldsSet": {"metafields": [], "userErrors": []}}

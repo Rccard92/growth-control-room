@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from copy import deepcopy
 from typing import Any
 from uuid import UUID
@@ -10,8 +11,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_seo import ShopifyCollection
-from app.models.shopify import ShopifyProduct, ShopifyProductMetafield
+from app.models.shopify import (
+    ShopifyMetafieldDefinition,
+    ShopifyProduct,
+    ShopifyProductMetafield,
+    ShopifyStore,
+)
 from app.services.shopify.html_utils import html_to_text
+from app.services.shopify.metafield_value_format import serialize_metafield_value
 
 
 def _get_proposed(proposed: dict[str, Any], *keys: str) -> Any:
@@ -84,12 +91,126 @@ def _apply_shopify_collection_node(collection: ShopifyCollection, node: dict[str
     )
 
 
+async def _upsert_product_metafields_from_proposed(
+    session: AsyncSession,
+    store_id: UUID,
+    product_id: UUID,
+    proposed: dict[str, Any],
+    shopify_response: dict[str, Any] | None,
+) -> None:
+    metafields = proposed.get("metafields")
+    if not isinstance(metafields, list):
+        return
+
+    shopify_by_ns_key: dict[tuple[str, str], dict[str, Any]] = {}
+    if shopify_response:
+        set_block = shopify_response.get("metafieldsSet") or {}
+        for node in set_block.get("metafields") or []:
+            if isinstance(node, dict):
+                ns = str(node.get("namespace") or "")
+                key = str(node.get("key") or "")
+                if ns and key:
+                    shopify_by_ns_key[(ns, key)] = node
+
+    for entry in metafields:
+        if not isinstance(entry, dict):
+            continue
+        namespace = str(entry.get("namespace") or "")
+        key = str(entry.get("key") or "")
+        type_name = str(entry.get("type") or "")
+        display_val = str(entry.get("value") or "")
+        if not namespace or not key or not type_name:
+            continue
+        try:
+            raw_value = serialize_metafield_value(type_name, display_val)
+        except ValueError:
+            raw_value = display_val
+
+        shopify_node = shopify_by_ns_key.get((namespace, key))
+        shopify_gid = str(shopify_node.get("id") or "") if shopify_node else ""
+
+        mid = entry.get("metafield_id") or entry.get("id")
+        row: ShopifyProductMetafield | None = None
+        if mid:
+            try:
+                mf_uuid = UUID(str(mid))
+                row = (
+                    await session.execute(
+                        select(ShopifyProductMetafield).where(
+                            ShopifyProductMetafield.id == mf_uuid,
+                            ShopifyProductMetafield.product_id == product_id,
+                        )
+                    )
+                ).scalar_one_or_none()
+            except ValueError:
+                row = None
+        if row is None:
+            row = (
+                await session.execute(
+                    select(ShopifyProductMetafield).where(
+                        ShopifyProductMetafield.shopify_store_id == store_id,
+                        ShopifyProductMetafield.product_id == product_id,
+                        ShopifyProductMetafield.namespace == namespace,
+                        ShopifyProductMetafield.key == key,
+                    )
+                )
+            ).scalar_one_or_none()
+
+        definition_id = entry.get("definition_id") or entry.get("definitionId")
+        def_name: str | None = None
+        def_desc: str | None = None
+        if definition_id:
+            try:
+                def_row = (
+                    await session.execute(
+                        select(ShopifyMetafieldDefinition).where(
+                            ShopifyMetafieldDefinition.id == UUID(str(definition_id)),
+                            ShopifyMetafieldDefinition.shopify_store_id == store_id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if def_row is not None:
+                    def_name = def_row.name
+                    def_desc = def_row.description
+            except ValueError:
+                pass
+
+        if row is not None:
+            row.value = raw_value
+            if shopify_gid:
+                row.shopify_metafield_gid = shopify_gid
+            if def_name:
+                row.definition_name = def_name
+            if def_desc:
+                row.definition_description = def_desc
+            continue
+
+        if not shopify_gid:
+            shopify_gid = f"gid://shopify/Metafield/pending-{namespace}-{key}"
+        row = ShopifyProductMetafield(
+            id=uuid.uuid4(),
+            shopify_store_id=store_id,
+            product_id=product_id,
+            shopify_metafield_gid=shopify_gid,
+            namespace=namespace,
+            key=key,
+            type=type_name,
+            value=raw_value,
+            definition_name=def_name,
+            definition_description=def_desc,
+            raw_payload=shopify_node,
+        )
+        session.add(row)
+
+
 async def apply_proposed_values_to_product(
     session: AsyncSession,
     product_id: UUID,
     proposed: dict[str, Any],
     *,
     shopify_node: dict[str, Any] | None = None,
+    shopify_response: dict[str, Any] | None = None,
+    store_id: UUID | None = None,
 ) -> ShopifyProduct | None:
     product = (
         await session.execute(select(ShopifyProduct).where(ShopifyProduct.id == product_id))
@@ -120,28 +241,14 @@ async def apply_proposed_values_to_product(
         if media is not None:
             product.media_images = media
 
-        metafields = proposed.get("metafields")
-        if isinstance(metafields, list):
-            for entry in metafields:
-                if not isinstance(entry, dict):
-                    continue
-                mid = entry.get("id")
-                if not mid:
-                    continue
-                try:
-                    mf_uuid = UUID(str(mid))
-                except ValueError:
-                    continue
-                row = (
-                    await session.execute(
-                        select(ShopifyProductMetafield).where(
-                            ShopifyProductMetafield.id == mf_uuid,
-                            ShopifyProductMetafield.product_id == product_id,
-                        )
-                    )
-                ).scalar_one_or_none()
-                if row is not None and entry.get("value") is not None:
-                    row.value = str(entry.get("value"))
+        if store_id is not None:
+            await _upsert_product_metafields_from_proposed(
+                session,
+                store_id,
+                product_id,
+                proposed,
+                shopify_response,
+            )
 
         product.raw_payload = _merge_raw_payload(
             product.raw_payload,
@@ -218,6 +325,7 @@ async def apply_proposed_values_to_entity(
     proposed: dict[str, Any],
     *,
     shopify_response: dict[str, Any] | None = None,
+    store_id: UUID | None = None,
 ) -> ShopifyProduct | ShopifyCollection | None:
     shopify_node: dict[str, Any] | None = None
     if shopify_response:
@@ -228,7 +336,12 @@ async def apply_proposed_values_to_entity(
 
     if entity_type == "product":
         return await apply_proposed_values_to_product(
-            session, entity_id, proposed, shopify_node=shopify_node
+            session,
+            entity_id,
+            proposed,
+            shopify_node=shopify_node,
+            shopify_response=shopify_response,
+            store_id=store_id,
         )
     if entity_type == "collection":
         return await apply_proposed_values_to_collection(
