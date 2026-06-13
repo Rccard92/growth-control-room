@@ -403,6 +403,34 @@ class ShopifyGraphQLClient:
 
         return all_nodes
 
+    async def fetch_product_by_gid(self, gid: str) -> dict[str, Any]:
+        query = f"""
+        query ProductById($id: ID!) {{
+          product(id: $id) {{
+            {PRODUCT_FIELDS}
+          }}
+        }}
+        """
+        data = await self.execute(query, {"id": gid})
+        node = data.get("product") or {}
+        if not node:
+            raise ShopifyAPIError("Prodotto non trovato su Shopify", status_code=404)
+        return node
+
+    async def fetch_collection_by_gid(self, gid: str) -> dict[str, Any]:
+        query = f"""
+        query CollectionById($id: ID!) {{
+          collection(id: $id) {{
+            {COLLECTION_FIELDS}
+          }}
+        }}
+        """
+        data = await self.execute(query, {"id": gid})
+        node = data.get("collection") or {}
+        if not node:
+            raise ShopifyAPIError("Collezione non trovata su Shopify", status_code=404)
+        return node
+
     async def fetch_all_products(
         self,
         page_size: int = DEFAULT_PAGE_SIZE,

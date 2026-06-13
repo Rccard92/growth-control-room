@@ -16,6 +16,8 @@ import {
   previewProposal,
   rejectProposal,
   saveManualProposal,
+  syncCollectionSeo,
+  syncProductSeo,
   syncSeoOptimizer,
 } from "../lib/content-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -175,10 +177,55 @@ export function useProposalActions(projectId: string) {
       onSuccess: invalidate,
     }),
     apply: useMutation({
-      mutationFn: (proposalId: string) => applyProposal(projectId, proposalId),
-      onSuccess: invalidate,
+      mutationFn: ({
+        proposalId,
+      }: {
+        proposalId: string;
+        entityType?: "product" | "collection";
+        entityId?: string;
+      }) => applyProposal(projectId, proposalId),
+      onSuccess: (_data, vars) => {
+        invalidate();
+        if (vars.entityType && vars.entityId) {
+          if (vars.entityType === "product") {
+            void qc.invalidateQueries({
+              queryKey: queryKeys.contentSeo.productDetail(projectId, vars.entityId),
+            });
+          } else {
+            void qc.invalidateQueries({
+              queryKey: queryKeys.contentSeo.collectionDetail(projectId, vars.entityId),
+            });
+          }
+        }
+      },
     }),
   };
+}
+
+export function useSyncProductSeo(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (productId: string) => syncProductSeo(projectId, productId),
+    onSuccess: (_data, productId) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
+      void qc.invalidateQueries({
+        queryKey: queryKeys.contentSeo.productDetail(projectId, productId),
+      });
+    },
+  });
+}
+
+export function useSyncCollectionSeo(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (collectionId: string) => syncCollectionSeo(projectId, collectionId),
+    onSuccess: (_data, collectionId) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.collections(projectId) });
+      void qc.invalidateQueries({
+        queryKey: queryKeys.contentSeo.collectionDetail(projectId, collectionId),
+      });
+    },
+  });
 }
 
 export function useProductAnalysis(projectId: string, entityId: string | null) {

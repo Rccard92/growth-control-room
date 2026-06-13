@@ -282,6 +282,20 @@ export interface SeoApplyResponse {
   applied: boolean;
   requiresScope?: string | null;
   requiresReconnect?: boolean;
+  localUpdateFailed?: boolean;
+  entityType?: string | null;
+  entityId?: string | null;
+  updatedEntity?: Record<string, unknown> | null;
+  updatedAnalysis?: Record<string, unknown> | null;
+  detail?: Record<string, unknown> | null;
+  proposal?: SeoOptimizationProposal | null;
   message?: string | null;
   proposalId?: string | null;
+}
+
+export interface SeoEntitySyncResponse {
+  entityType: "product" | "collection";
+  entityId: string;
+  detail: SeoProductDetailResponse | SeoCollectionDetailResponse;
+  message: string;
 }

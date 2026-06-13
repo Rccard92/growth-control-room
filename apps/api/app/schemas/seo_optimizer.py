@@ -221,8 +221,28 @@ class SeoApplyResponse(BaseModel):
     applied: bool
     requires_scope: str | None = Field(default=None, serialization_alias="requiresScope")
     requires_reconnect: bool = Field(default=False, serialization_alias="requiresReconnect")
+    local_update_failed: bool = Field(default=False, serialization_alias="localUpdateFailed")
+    entity_type: str | None = Field(default=None, serialization_alias="entityType")
+    entity_id: str | None = Field(default=None, serialization_alias="entityId")
+    updated_entity: dict[str, Any] | None = Field(
+        default=None, serialization_alias="updatedEntity"
+    )
+    updated_analysis: dict[str, Any] | None = Field(
+        default=None, serialization_alias="updatedAnalysis"
+    )
+    detail: dict[str, Any] | None = None
+    proposal: dict[str, Any] | None = None
     message: str | None = None
     proposal_id: str | None = Field(default=None, serialization_alias="proposalId")
+
+
+class SeoEntitySyncResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    entity_type: str = Field(serialization_alias="entityType")
+    entity_id: str = Field(serialization_alias="entityId")
+    detail: dict[str, Any]
+    message: str
 
 
 class SeoEntityAnalysisRead(BaseModel):

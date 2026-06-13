@@ -217,6 +217,9 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 6. AI genera draft → tab **Proposta** mostra preview current vs proposed → **Copia proposta nel form** (non auto-apply)
 7. **Approve**: footer **Approva** — non applica su Shopify
 8. **Apply**: footer **Applica su Shopify** — solo se `approved` + scope `write_products` + conferma utente; senza scope: *"Per applicare su Shopify serve autorizzare write_products."*
+9. Dopo apply riuscito, GCR aggiorna **DB locale** (`ShopifyProduct`/`ShopifyCollection`) e ricalcola **analisi singola** (`SeoEntityAnalysis`) — la UI riflette subito score e campi senza sync completo
+10. **Sync singola entità** (fallback): `POST .../content/seo/products/{product_id}/sync-shopify` e `POST .../content/seo/collections/{collection_id}/sync-shopify` — riallinea una sola entità da Shopify + re-analyze
+11. **Sync completo** (`POST .../content/seo/sync-shopify`) resta per riallineamenti massivi, non dopo ogni apply
 
 **Detail response** (`skillMeta`):
 
@@ -237,8 +240,8 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 - **Scope concessi** (token salvato): permessi realmente associati al token OAuth corrente
 - Dopo aver aggiunto `write_products` in app Shopify **e** in `SHOPIFY_SCOPES`, serve **riconnettere Shopify** (token vecchio non eredita nuovi permessi)
 - Verifica live: `GET /api/projects/{id}/shopify/scopes` — interroga Shopify (`currentAppInstallation.accessScopes` con fallback REST `access_scopes.json`) e aggiorna cache `shopify_stores.granted_scopes`
-- UI Content SEO mostra pannello **Shopify Permission Check** con configured/granted/missing scopes e CTA **Verifica permessi** / **Riconnetti Shopify**
-- Apply (`POST .../proposals/{id}/apply`) verifica scope reali del token, non solo env statica
+- UI **Shopify Control Room** (`/projects/:id/shopify`): card collassabile **Permessi Shopify** con configured/granted/missing scopes e CTA **Verifica permessi** / **Riconnetti Shopify** (non più in Content SEO)
+- Apply (`POST .../proposals/{id}/apply`) verifica scope reali del token, non solo env statica; response arricchita con `updatedEntity`, `updatedAnalysis`, `localUpdateFailed`
 
 **Migrations**: `010_product_collection_seo_optimizer`, `011_seo_score_breakdown`, `012_shopify_granted_scopes`
 

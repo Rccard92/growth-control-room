@@ -3,7 +3,6 @@ import type { SeoOptimizationProposal, SeoOptimizerTab } from "@gcr/shared";
 import { StatusBadge } from "../../StatusBadge";
 import { EntitySeoTable, type EntityFilter } from "./EntitySeoTable";
 import { SeoEntityEditDrawer } from "./SeoEntityEditDrawer";
-import { ShopifyScopesPanel } from "./ShopifyScopesPanel";
 import {
   useAnalyzeCollectionsSeo,
   useAnalyzeProductsSeo,
@@ -14,7 +13,7 @@ import {
   useProposalsSeo,
   useSeoOptimizerSync,
 } from "../../../hooks/useContentSeo";
-import { useShopifyScopes, useShopifyStatus } from "../../../hooks/useShopify";
+import { useShopifyScopes } from "../../../hooks/useShopify";
 
 const TABS: { id: SeoOptimizerTab; label: string; comingSoon?: boolean }[] = [
   { id: "products", label: "Prodotti" },
@@ -44,7 +43,6 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
     connected,
   );
   const { data: proposalsData } = useProposalsSeo(projectId, connected);
-  const { data: shopifyStatus } = useShopifyStatus(projectId);
   const shopifyScopesQuery = useShopifyScopes(projectId, connected);
 
   const syncMutation = useSeoOptimizerSync(projectId);
@@ -66,10 +64,8 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
     productsData?.writeProductsAvailable ??
     collectionsData?.writeProductsAvailable ??
     false;
-  const scopeBannerMessage = shopifyScopesQuery.data?.message;
 
   const handleOpenEdit = (entityType: "product" | "collection", entityId: string) => {
-    void shopifyScopesQuery.refetch();
     const title =
       entityType === "product"
         ? productsData?.items.find((p) => p.id === entityId)?.title
@@ -136,19 +132,6 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
           </button>
         </div>
       </div>
-
-      <ShopifyScopesPanel
-        scopes={shopifyScopesQuery.data}
-        loading={shopifyScopesQuery.isFetching}
-        shopDomain={shopifyStatus?.shopDomain ?? shopifyScopesQuery.data?.shopDomain}
-        onRefresh={() => void shopifyScopesQuery.refetch()}
-      />
-
-      {!writeProductsAvailable && scopeBannerMessage && (
-        <div className="content-seo-banner content-seo-banner--warn">
-          {scopeBannerMessage}
-        </div>
-      )}
 
       {(syncMutation.isSuccess ||
         analyzeProductsMutation.isSuccess ||
@@ -257,9 +240,6 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         detailErrorMessage={detailErrorMessage}
         openaiConfigured={openaiConfigured}
         writeProductsAvailable={writeProductsAvailable}
-        shopifyScopes={shopifyScopesQuery.data}
-        shopDomain={shopifyStatus?.shopDomain ?? shopifyScopesQuery.data?.shopDomain}
-        onScopesRefresh={() => void shopifyScopesQuery.refetch()}
         onDetailRefresh={refreshDetail}
       />
     </>

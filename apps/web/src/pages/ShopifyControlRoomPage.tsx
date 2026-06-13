@@ -18,8 +18,9 @@ import { ShopifyAttributionIntelligencePanel } from "../components/shopify/Shopi
 import { ShopifyControlRoomHeader } from "../components/shopify/ShopifyControlRoomHeader";
 import { ShopifyExecutiveStrip } from "../components/shopify/ShopifyExecutiveStrip";
 import { ShopifySyncSummary } from "../components/shopify/ShopifySyncSummary";
+import { ShopifyScopesPanel } from "../components/content/optimizer/ShopifyScopesPanel";
 import { TrendIntelligencePanel } from "../components/shopify/TrendIntelligencePanel";
-import { useShopifyDashboard, useShopifyStatus, useShopifySync } from "../hooks/useShopify";
+import { useShopifyDashboard, useShopifyScopes, useShopifyStatus, useShopifySync } from "../hooks/useShopify";
 import { useDateRangeParams } from "../hooks/useDateRangeParams";
 import { getDateRangeDisplayLabel } from "../lib/date-range";
 import { resolveShopifyDashboardBlocks } from "../lib/shopify-dashboard-blocks";
@@ -66,6 +67,8 @@ export function ShopifyControlRoomPage() {
     error: dashboardError,
   } = useShopifyDashboard(id, connected, dateRange);
   const syncMutation = useShopifySync(projectId);
+  const [permissionsOpen, setPermissionsOpen] = useState(true);
+  const shopifyScopesQuery = useShopifyScopes(projectId, connected);
 
   useEffect(() => {
     const connectedParam = searchParams.get("shopify_connected");
@@ -189,6 +192,25 @@ export function ShopifyControlRoomPage() {
       {syncMutation.isError && (
         <div className="gcr-alert gcr-alert--error">{syncMutation.error.message}</div>
       )}
+
+      <div className="gcr-card shopify-permissions-card">
+        <button
+          type="button"
+          className="shopify-permissions-card__toggle"
+          onClick={() => setPermissionsOpen((open) => !open)}
+        >
+          <span className="gcr-card__title">Permessi Shopify</span>
+          <span>{permissionsOpen ? "Nascondi" : "Mostra"}</span>
+        </button>
+        {permissionsOpen && (
+          <ShopifyScopesPanel
+            scopes={shopifyScopesQuery.data}
+            loading={shopifyScopesQuery.isFetching}
+            shopDomain={status?.shopDomain ?? shopifyScopesQuery.data?.shopDomain}
+            onRefresh={() => void shopifyScopesQuery.refetch()}
+          />
+        )}
+      </div>
 
       {dashboardLoading && <DashboardSkeleton />}
 

@@ -94,6 +94,7 @@ export type {
   SeoOptimizationProposal,
   SeoProposalListResponse,
   SeoApplyResponse,
+  SeoEntitySyncResponse,
   SeoScoreBreakdown,
   SeoScoreBreakdownItem,
   SeoProposalSource,

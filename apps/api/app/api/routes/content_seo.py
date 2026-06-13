@@ -15,6 +15,7 @@ from app.schemas.seo_optimizer import (
     SeoCollectionDetailResponse,
     SeoCollectionListResponse,
     SeoEntityAnalysisRead,
+    SeoEntitySyncResponse,
     SeoOptimizerSyncResponse,
     SeoProductDetailResponse,
     SeoProductListResponse,
@@ -38,6 +39,10 @@ from app.services.content.seo_apply_service import (
 from app.services.content.seo_entity_detail_service import (
     get_collection_seo_detail,
     get_product_seo_detail,
+)
+from app.services.content.seo_entity_sync_service import (
+    sync_single_collection,
+    sync_single_product,
 )
 from app.services.content.seo_optimizer_list import (
     analysis_to_read,
@@ -324,6 +329,60 @@ async def get_collection_seo_detail_route(
     if data is None:
         raise HTTPException(status_code=404, detail="Collection non trovata")
     return _build_collection_detail(data)
+
+
+@router.post(
+    "/{project_id}/content/seo/products/{product_id}/sync-shopify",
+    response_model=SeoEntitySyncResponse,
+    response_model_by_alias=True,
+)
+async def sync_product_seo_from_shopify(
+    project_id: UUID,
+    product_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SeoEntitySyncResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    try:
+        client = await get_shopify_client_for_store(store)
+        result = await sync_single_product(store, client, session, product_id)
+    except ShopifyAPIError as exc:
+        raise _map_shopify_error(exc) from exc
+
+    detail = _build_product_detail(result["detail"])
+    return SeoEntitySyncResponse(
+        entity_type="product",
+        entity_id=str(product_id),
+        detail=detail.model_dump(by_alias=True),
+        message=result["message"],
+    )
+
+
+@router.post(
+    "/{project_id}/content/seo/collections/{collection_id}/sync-shopify",
+    response_model=SeoEntitySyncResponse,
+    response_model_by_alias=True,
+)
+async def sync_collection_seo_from_shopify(
+    project_id: UUID,
+    collection_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SeoEntitySyncResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    try:
+        client = await get_shopify_client_for_store(store)
+        result = await sync_single_collection(store, client, session, collection_id)
+    except ShopifyAPIError as exc:
+        raise _map_shopify_error(exc) from exc
+
+    detail = _build_collection_detail(result["detail"])
+    return SeoEntitySyncResponse(
+        entity_type="collection",
+        entity_id=str(collection_id),
+        detail=detail.model_dump(by_alias=True),
+        message=result["message"],
+    )
 
 
 @router.get(

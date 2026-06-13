@@ -1,12 +1,14 @@
-import type { SeoOptimizationProposal, ShopifyScopesResponse } from "@gcr/shared";
+import type { SeoOptimizationProposal } from "@gcr/shared";
 
 const AI_DISABLED_MSG =
   "AI non configurata. Puoi modificare manualmente e salvare come proposta.";
 
+const WRITE_PRODUCTS_MSG =
+  "Il token Shopify corrente non include write_products. Riconnetti Shopify dalla pagina Shopify.";
+
 interface SeoProposalFooterProps {
   proposal: SeoOptimizationProposal | null | undefined;
   writeProductsAvailable: boolean;
-  shopifyScopes?: ShopifyScopesResponse;
   openaiConfigured: boolean;
   loading?: boolean;
   saveLoading?: boolean;
@@ -22,7 +24,6 @@ interface SeoProposalFooterProps {
 export function SeoProposalFooter({
   proposal,
   writeProductsAvailable,
-  shopifyScopes,
   openaiConfigured,
   loading,
   saveLoading,
@@ -36,19 +37,14 @@ export function SeoProposalFooter({
 }: SeoProposalFooterProps) {
   const canApprove = proposal?.status === "draft" || proposal?.status === "rejected";
   const canApply = proposal?.status === "approved";
-  const scopeMessage =
-    shopifyScopes?.message ??
-    (writeProductsAvailable
-      ? undefined
-      : "Il token Shopify corrente non include write_products. Riconnetti Shopify.");
 
   return (
     <div className="seo-proposal-footer">
       {!openaiConfigured && (
         <p className="seo-proposal-footer__hint">{AI_DISABLED_MSG}</p>
       )}
-      {!writeProductsAvailable && scopeMessage && (
-        <p className="seo-proposal-footer__hint">{scopeMessage}</p>
+      {!writeProductsAvailable && (
+        <p className="seo-proposal-footer__hint">{WRITE_PRODUCTS_MSG}</p>
       )}
       {proposal && (
         <p className="seo-proposal-footer__status">
@@ -98,7 +94,7 @@ export function SeoProposalFooter({
             type="button"
             className="gcr-btn gcr-btn--primary"
             disabled={loading || !writeProductsAvailable}
-            title={writeProductsAvailable ? undefined : scopeMessage}
+            title={writeProductsAvailable ? undefined : WRITE_PRODUCTS_MSG}
             onClick={onApply}
           >
             Applica su Shopify

@@ -3,12 +3,10 @@ import type {
   SeoCollectionDetailResponse,
   SeoOptimizationProposal,
   SeoProductDetailResponse,
-  ShopifyScopesResponse,
 } from "@gcr/shared";
 import { SeoEditModal } from "./SeoEditModal";
 import { SeoFieldEditor } from "./SeoFieldEditor";
 import { SeoProposalFooter } from "./SeoProposalFooter";
-import { ShopifyScopesPanel } from "./ShopifyScopesPanel";
 import { SeoProposalPreview } from "./SeoProposalPreview";
 import { SeoScoreBadge } from "./SeoScoreBadge";
 import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
@@ -23,6 +21,8 @@ import {
   usePreviewProposal,
   useProposalActions,
   useSaveManualProposal,
+  useSyncCollectionSeo,
+  useSyncProductSeo,
 } from "../../../hooks/useContentSeo";
 
 type DrawerTab = "fields" | "score" | "proposal" | "history";
@@ -48,9 +48,6 @@ interface SeoEntityEditDrawerProps {
   detailErrorMessage?: string;
   openaiConfigured: boolean;
   writeProductsAvailable: boolean;
-  shopifyScopes?: ShopifyScopesResponse;
-  shopDomain?: string | null;
-  onScopesRefresh?: () => void;
   onDetailRefresh?: () => void;
 }
 
@@ -68,9 +65,6 @@ export function SeoEntityEditDrawer({
   detailErrorMessage,
   openaiConfigured,
   writeProductsAvailable,
-  shopifyScopes,
-  shopDomain,
-  onScopesRefresh,
   onDetailRefresh,
 }: SeoEntityEditDrawerProps) {
   const [tab, setTab] = useState<DrawerTab>("fields");
@@ -78,6 +72,10 @@ export function SeoEntityEditDrawer({
   const [activeProposalId, setActiveProposalId] = useState<string | null>(null);
   const [mediaImages, setMediaImages] = useState<Record<string, unknown>[]>([]);
   const [formDirty, setFormDirty] = useState(false);
+  const [appliedAt, setAppliedAt] = useState<string | null>(null);
+  const [applyMessage, setApplyMessage] = useState<string | null>(null);
+  const [localUpdateFailed, setLocalUpdateFailed] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const initialFormRef = useRef<string>("");
 
   const detail = entityType === "product" ? productDetail : collectionDetail;
@@ -91,6 +89,8 @@ export function SeoEntityEditDrawer({
   const generateAi = useGenerateProposal(projectId);
   const proposalActions = useProposalActions(projectId);
   const preview = usePreviewProposal(projectId, activeProposalId);
+  const syncProduct = useSyncProductSeo(projectId);
+  const syncCollection = useSyncCollectionSeo(projectId);
 
   useEffect(() => {
     if (!open || !detail) return;
@@ -110,7 +110,26 @@ export function SeoEntityEditDrawer({
     );
     setActiveProposalId(detail.latestProposal?.id ?? null);
     setTab("fields");
+    if (detail.latestProposal?.status !== "applied") {
+      setAppliedAt(null);
+      setApplyMessage(null);
+      setLocalUpdateFailed(false);
+    }
   }, [open, detail, entityType, productDetail, collectionDetail]);
+
+  const refreshFormFromValues = (
+    values: Record<string, unknown> | null | undefined,
+    detailSource?: SeoProductDetailResponse | SeoCollectionDetailResponse,
+  ) => {
+    if (!values) return;
+    const normalized = normalizeFormValues(values, entityType, detailSource ?? detail);
+    setFormValues(normalized);
+    initialFormRef.current = JSON.stringify(normalized);
+    setFormDirty(false);
+    if (entityType === "product" && Array.isArray(normalized.images)) {
+      setMediaImages(normalized.images as Record<string, unknown>[]);
+    }
+  };
 
   const activeProposal: SeoOptimizationProposal | null | undefined = useMemo(() => {
     if (preview.data) {
@@ -216,22 +235,58 @@ export function SeoEntityEditDrawer({
       "Confermi di applicare le modifiche approvate su Shopify? Questa azione modifica il negozio live.",
     );
     if (!confirmed) return;
-    proposalActions.apply.mutate(activeProposalId, {
+    proposalActions.apply.mutate(
+      { proposalId: activeProposalId, entityType, entityId },
+      {
+        onSuccess: (res) => {
+          if (res.message && !res.applied) {
+            alert(res.message);
+            return;
+          }
+          if (res.applied) {
+            setAppliedAt(res.proposal?.appliedAt ?? new Date().toISOString());
+            setApplyMessage(res.message ?? "Applicato su Shopify.");
+            setLocalUpdateFailed(Boolean(res.localUpdateFailed));
+            refreshFormFromValues(
+              res.updatedEntity ??
+                (res.detail as { currentValues?: Record<string, unknown> } | undefined)
+                  ?.currentValues,
+              res.detail as SeoProductDetailResponse | SeoCollectionDetailResponse | undefined,
+            );
+          }
+          onDetailRefresh?.();
+        },
+      },
+    );
+  };
+
+  const handleSyncFromShopify = () => {
+    const mutation = entityType === "product" ? syncProduct : syncCollection;
+    mutation.mutate(entityId, {
       onSuccess: (res) => {
-        if (res.message && !res.applied) {
-          alert(res.message);
+        setSyncMessage(res.message);
+        setLocalUpdateFailed(false);
+        const detailPayload = res.detail as
+          | SeoProductDetailResponse
+          | SeoCollectionDetailResponse
+          | undefined;
+        if (detailPayload?.currentValues) {
+          refreshFormFromValues(detailPayload.currentValues, detailPayload);
         }
         onDetailRefresh?.();
       },
     });
   };
 
+  const syncLoading = syncProduct.isPending || syncCollection.isPending;
+
   const actionLoading =
     saveManual.isPending ||
     generateAi.isPending ||
     proposalActions.approve.isPending ||
     proposalActions.reject.isPending ||
-    proposalActions.apply.isPending;
+    proposalActions.apply.isPending ||
+    syncLoading;
 
   const headerExtra = scoreTotal != null && (
     <SeoScoreBadge score={scoreTotal} severity={severity as never} />
@@ -241,7 +296,6 @@ export function SeoEntityEditDrawer({
     <SeoProposalFooter
       proposal={activeProposal}
       writeProductsAvailable={writeProductsAvailable}
-      shopifyScopes={shopifyScopes}
       openaiConfigured={openaiConfigured}
       loading={actionLoading}
       saveLoading={saveManual.isPending}
@@ -302,12 +356,35 @@ export function SeoEntityEditDrawer({
 
       {!detailLoading && detail && (
         <>
-          <ShopifyScopesPanel
-            scopes={shopifyScopes}
-            shopDomain={shopDomain}
-            onRefresh={onScopesRefresh}
-            compact
-          />
+          <div className="seo-edit-drawer__toolbar">
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              disabled={syncLoading || actionLoading}
+              onClick={handleSyncFromShopify}
+            >
+              {syncLoading ? "Sincronizzazione…" : "Sincronizza da Shopify"}
+            </button>
+          </div>
+
+          {appliedAt && (
+            <div className="content-seo-banner content-seo-banner--success">
+              Applicato su Shopify
+              {applyMessage ? ` — ${applyMessage}` : ""}
+              {appliedAt ? ` (${new Date(appliedAt).toLocaleString("it-IT")})` : ""}
+            </div>
+          )}
+
+          {localUpdateFailed && (
+            <div className="content-seo-banner content-seo-banner--warn">
+              Aggiornamento locale non riuscito. Usa &quot;Sincronizza da Shopify&quot; per
+              riallineare i dati.
+            </div>
+          )}
+
+          {syncMessage && (
+            <div className="content-seo-banner content-seo-banner--success">{syncMessage}</div>
+          )}
 
           {entityType === "product" && productDetail && (
             <p className="seo-edit-drawer__meta">

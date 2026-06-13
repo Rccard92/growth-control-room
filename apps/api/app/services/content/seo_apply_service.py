@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -7,8 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.seo_optimizer import SeoChangeLog, SeoOptimizationProposal
 from app.models.shopify import ShopifyStore
+from app.services.content.seo_apply_local_update import apply_proposed_values_to_entity
+from app.services.content.seo_entity_analyze_single import (
+    analyze_single_collection,
+    analyze_single_product,
+)
+from app.services.content.seo_entity_detail_service import (
+    get_collection_seo_detail,
+    get_product_seo_detail,
+)
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 from app.services.shopify.scopes import can_apply_with_write_products
+
+logger = logging.getLogger(__name__)
 
 
 def write_products_required_response(
@@ -32,6 +44,88 @@ def _get_proposed(proposed: dict[str, Any], *keys: str) -> Any:
         if key in proposed and proposed[key] is not None:
             return proposed[key]
     return None
+
+
+def _proposal_payload(proposal: SeoOptimizationProposal) -> dict[str, Any]:
+    return {
+        "id": str(proposal.id),
+        "entityType": proposal.entity_type,
+        "entityId": str(proposal.entity_id),
+        "entityGid": proposal.entity_gid,
+        "status": proposal.status,
+        "source": proposal.source,
+        "currentValues": proposal.current_values,
+        "proposedValues": proposal.proposed_values,
+        "reasoning": proposal.reasoning,
+        "riskLevel": proposal.risk_level,
+        "approvedAt": proposal.approved_at,
+        "appliedAt": proposal.applied_at,
+        "createdAt": proposal.created_at,
+    }
+
+
+async def _refresh_local_after_apply(
+    store: ShopifyStore,
+    session: AsyncSession,
+    proposal: SeoOptimizationProposal,
+    proposed: dict[str, Any],
+    shopify_response: dict[str, Any],
+) -> bool:
+    try:
+        updated = await apply_proposed_values_to_entity(
+            session,
+            proposal.entity_type,
+            proposal.entity_id,
+            proposed,
+            shopify_response=shopify_response,
+        )
+        if updated is None:
+            return False
+        if proposal.entity_type == "product":
+            await analyze_single_product(store, session, proposal.entity_id)
+        else:
+            await analyze_single_collection(store, session, proposal.entity_id)
+        return True
+    except Exception:
+        logger.exception(
+            "Local SEO refresh failed after Shopify apply proposal=%s",
+            proposal.id,
+        )
+        return False
+
+
+async def _build_apply_success_response(
+    store: ShopifyStore,
+    session: AsyncSession,
+    proposal: SeoOptimizationProposal,
+    *,
+    local_update_failed: bool,
+) -> dict[str, Any]:
+    detail: dict[str, Any] | None = None
+    if proposal.entity_type == "product":
+        detail = await get_product_seo_detail(store, session, proposal.entity_id)
+    else:
+        detail = await get_collection_seo_detail(store, session, proposal.entity_id)
+
+    message = (
+        "Modifica applicata su Shopify, ma aggiornamento locale non riuscito. "
+        "Usa 'Sincronizza da Shopify'."
+        if local_update_failed
+        else "Modifiche applicate su Shopify e dati locali aggiornati."
+    )
+
+    return {
+        "applied": True,
+        "local_update_failed": local_update_failed,
+        "entity_type": proposal.entity_type,
+        "entity_id": str(proposal.entity_id),
+        "updated_entity": detail.get("current_values") if detail else None,
+        "updated_analysis": detail.get("analysis") if detail else None,
+        "detail": detail,
+        "proposal": _proposal_payload(proposal),
+        "proposal_id": str(proposal.id),
+        "message": message,
+    }
 
 
 async def approve_proposal(
@@ -84,7 +178,7 @@ async def apply_proposal(
             mutation = """
             mutation ProductUpdate($input: ProductInput!) {
               productUpdate(input: $input) {
-                product { id title handle seo { title description } }
+                product { id title handle seo { title description } descriptionHtml }
                 userErrors { field message }
               }
             }
@@ -128,7 +222,7 @@ async def apply_proposal(
             mutation = """
             mutation CollectionUpdate($input: CollectionInput!) {
               collectionUpdate(input: $input) {
-                collection { id title handle seo { title description } }
+                collection { id title handle seo { title description } descriptionHtml }
                 userErrors { field message }
               }
             }
@@ -170,6 +264,10 @@ async def apply_proposal(
         else:
             raise ValueError("entity_type non supportato per apply")
 
+        local_ok = await _refresh_local_after_apply(
+            store, session, proposal, proposed, shopify_response
+        )
+
         proposal.status = "applied"
         proposal.applied_at = datetime.now(UTC)
         log = SeoChangeLog(
@@ -184,7 +282,11 @@ async def apply_proposal(
         )
         session.add(log)
         await session.commit()
-        return {"applied": True, "proposal_id": str(proposal.id)}
+        await session.refresh(proposal)
+
+        return await _build_apply_success_response(
+            store, session, proposal, local_update_failed=not local_ok
+        )
 
     except ShopifyAPIError as exc:
         log = SeoChangeLog(

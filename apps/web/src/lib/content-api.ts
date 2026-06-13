@@ -4,6 +4,7 @@ import type {
   SeoCollectionDetailResponse,
   SeoCollectionListResponse,
   SeoEntityAnalysis,
+  SeoEntitySyncResponse,
   SeoOptimizationProposal,
   SeoOptimizerSyncResponse,
   SeoProductDetailResponse,
@@ -172,6 +173,26 @@ export function applyProposal(
 ): Promise<SeoApplyResponse> {
   return apiFetch<SeoApplyResponse>(
     `/api/projects/${projectId}/content/seo/proposals/${proposalId}/apply`,
+    { method: "POST" },
+  );
+}
+
+export function syncProductSeo(
+  projectId: string,
+  productId: string,
+): Promise<SeoEntitySyncResponse> {
+  return apiFetch<SeoEntitySyncResponse>(
+    `/api/projects/${projectId}/content/seo/products/${productId}/sync-shopify`,
+    { method: "POST" },
+  );
+}
+
+export function syncCollectionSeo(
+  projectId: string,
+  collectionId: string,
+): Promise<SeoEntitySyncResponse> {
+  return apiFetch<SeoEntitySyncResponse>(
+    `/api/projects/${projectId}/content/seo/collections/${collectionId}/sync-shopify`,
     { method: "POST" },
   );
 }
