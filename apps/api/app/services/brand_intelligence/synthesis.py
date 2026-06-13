@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
     BrandExtractedFact,
+    BrandExternalSource,
     BrandImportBatch,
     BrandSectionDraft,
     BrandSourceDocument,
@@ -38,6 +39,7 @@ from app.services.brand_intelligence.conflict_detection import (
     build_bi_summary,
     load_official_snapshot,
 )
+from app.services.brand_intelligence.source_fetcher import format_external_source_for_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -76,18 +78,24 @@ Return JSON only with this shape:
   "warnings": ["..."],
   "missing_information": ["..."],
   "source_fact_ids": ["uuid strings from input facts used"],
+  "source_external_ids": ["uuid strings from external sources used"],
   "ai_reasoning": "how you built this draft"
 }
 
 Rules:
-- Do NOT invent data not supported by the provided facts/documents.
+- Do NOT invent data not supported by the provided facts/documents/external sources.
+- Always cite whether data comes from file facts (source_fact_ids) or external sources (source_external_ids).
+- If file facts and website/social/review sources conflict, add warnings — do not pick arbitrarily.
 - If inferred (not explicit), confidence must be <= 0.65.
+- Social sources with limited metadata → confidence <= 0.6 for voice/tone.
+- Review platforms: aggregated customer insights only, not single reviews as truth.
+- If external source status is failed/skipped, do NOT fill gaps with invented data.
 - If documents conflict, add warnings — do not pick arbitrarily.
 - If data is sparse, produce partial draft and list missing_information.
 - Do not mix sections (claims vs products vs audience).
 - Claims/compliance: be conservative; only include explicit claims.
-- Audience objections/FAQ must not be mixed into product descriptions.
-- Use only source_fact_ids that appear in the input facts list.
+- Priority sections for enrichment: brand_profile, voice_tone, audience, claims_compliance, seo_strategy, content_pillars.
+- Use only source_fact_ids and source_external_ids that appear in the input.
 """
 
 
@@ -199,6 +207,7 @@ async def _persist_section_draft(
     summary: str | None,
     source_fact_ids: list[str],
     source_document_ids: list[str],
+    source_external_ids: list[str],
     confidence: float | None,
     draft_status: str,
     ai_reasoning: str | None,
@@ -224,6 +233,7 @@ async def _persist_section_draft(
         existing.summary = summary
         existing.source_fact_ids = source_fact_ids or None
         existing.source_document_ids = source_document_ids or None
+        existing.source_external_ids = source_external_ids or None
         existing.confidence = confidence
         existing.status = draft_status
         existing.ai_reasoning = ai_reasoning
@@ -245,6 +255,7 @@ async def _persist_section_draft(
         summary=summary,
         source_fact_ids=source_fact_ids or None,
         source_document_ids=source_document_ids or None,
+        source_external_ids=source_external_ids or None,
         confidence=confidence,
         status=draft_status,
         ai_reasoning=ai_reasoning,
@@ -276,7 +287,7 @@ async def synthesize_section(
             detail="OPENAI_API_KEY non configurata. La sintesi AI è disabilitata.",
         )
 
-    await _get_batch(session, project_id, batch_id)
+    batch = await _get_batch(session, project_id, batch_id)
     facts = list(
         (
             await session.execute(
@@ -292,7 +303,17 @@ async def synthesize_section(
         facts = [f for f in facts if str(f.id) in id_set]
 
     section_facts = _facts_for_section(facts, section_key)
-    if not section_facts and not extra_instructions:
+    external_sources = list(
+        (
+            await session.execute(
+                select(BrandExternalSource).where(BrandExternalSource.batch_id == batch_id)
+            )
+        ).scalars().all()
+    )
+    has_external_content = any(
+        s.status == "fetched" or s.url for s in external_sources
+    )
+    if not section_facts and not extra_instructions and not has_external_content:
         return None
 
     docs = list(
@@ -303,11 +324,16 @@ async def synthesize_section(
         ).scalars().all()
     )
     doc_ids = list({str(f.source_document_id) for f in section_facts if f.source_document_id})
+    ext_ids_from_facts = list(
+        {str(f.source_external_id) for f in section_facts if f.source_external_id}
+    )
     snapshot = await load_official_snapshot(session, project_id)
     official_json = _serialize_official_snapshot(snapshot)
+    external_block = "\n".join(
+        format_external_source_for_prompt(s) for s in external_sources
+    ) or "No external sources."
 
     if update_progress:
-        batch = await _get_batch(session, project_id, batch_id)
         await update_batch_progress(
             session,
             batch,
@@ -315,12 +341,20 @@ async def synthesize_section(
             commit=True,
         )
 
+    batch_header = ""
+    if batch.declared_brand_name:
+        batch_header += f"Declared brand name: {batch.declared_brand_name}\n"
+    if batch.declared_website_url:
+        batch_header += f"Declared website URL: {batch.declared_website_url}\n"
+
     user_prompt = (
         f"Section: {section_key}\n"
         f"Expected draft_payload shape example: {SECTION_PAYLOAD_HINTS.get(section_key, '{}')}\n\n"
+        f"{batch_header}\n"
         f"Existing official Brand Intelligence (read-only):\n{json.dumps(official_json, ensure_ascii=False)}\n\n"
         f"Brand summary:\n{build_bi_summary(snapshot)}\n\n"
         f"Extracted facts for this section:\n{_format_facts_for_prompt(section_facts)}\n\n"
+        f"External sources (public URLs — cite source_external_ids when used):\n{external_block}\n\n"
         f"Document summaries:\n"
         + "\n".join(
             f"- {d.filename}: {d.document_summary or 'N/A'}"
@@ -366,8 +400,17 @@ async def synthesize_section(
         source_fact_ids = [str(f.id) for f in section_facts]
     source_fact_ids = [str(x) for x in source_fact_ids]
 
+    source_external_ids = parsed.get("source_external_ids") or ext_ids_from_facts
+    if not isinstance(source_external_ids, list):
+        source_external_ids = ext_ids_from_facts
+    source_external_ids = [str(x) for x in source_external_ids]
+
     draft_status = "draft"
-    if confidence < 0.5 or warnings_obj.get("missing_information") or not section_facts:
+    if (
+        confidence < 0.5
+        or warnings_obj.get("missing_information")
+        or (not section_facts and not source_external_ids)
+    ):
         draft_status = "needs_review"
 
     return await _persist_section_draft(
@@ -379,6 +422,7 @@ async def synthesize_section(
         summary=summary[:2000] if summary else None,
         source_fact_ids=source_fact_ids,
         source_document_ids=doc_ids,
+        source_external_ids=source_external_ids,
         confidence=confidence,
         draft_status=draft_status,
         ai_reasoning=str(parsed.get("ai_reasoning") or "")[:4000] or None,
@@ -406,7 +450,7 @@ async def synthesize_batch(
 
     for idx, section_key in enumerate(SECTION_SYNTHESIS_ORDER):
         if update_progress:
-            pct = 80 + int((idx / len(SECTION_SYNTHESIS_ORDER)) * 15)
+            pct = 75 + int((idx / len(SECTION_SYNTHESIS_ORDER)) * 20)
             await update_batch_progress(
                 session,
                 batch,

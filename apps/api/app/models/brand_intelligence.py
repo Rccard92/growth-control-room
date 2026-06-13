@@ -215,6 +215,8 @@ class BrandImportBatch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     needs_review_facts: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     warnings: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    declared_brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    declared_website_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -230,6 +232,41 @@ class BrandImportBatch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     section_drafts: Mapped[list["BrandSectionDraft"]] = relationship(
         back_populates="batch",
         cascade="all, delete-orphan",
+    )
+    external_sources: Mapped[list["BrandExternalSource"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan",
+    )
+
+
+class BrandExternalSource(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_external_sources"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("brand_import_batches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source_type: Mapped[str] = mapped_column(String(50))
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    url: Mapped[str] = mapped_column(String(2000))
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    fetched_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetch_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_external_sources")
+    batch: Mapped["BrandImportBatch | None"] = relationship(back_populates="external_sources")
+    extracted_facts: Mapped[list["BrandExtractedFact"]] = relationship(
+        back_populates="source_external",
     )
 
 
@@ -253,6 +290,7 @@ class BrandSectionDraft(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_fact_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     source_document_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    source_external_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="draft", index=True)
     ai_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -320,6 +358,12 @@ class BrandExtractedFact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
+    source_external_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("brand_external_sources.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     batch_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("brand_import_batches.id", ondelete="SET NULL"),
@@ -346,5 +390,8 @@ class BrandExtractedFact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="brand_extracted_facts")
     batch: Mapped["BrandImportBatch | None"] = relationship(back_populates="extracted_facts")
     source_document: Mapped["BrandSourceDocument | None"] = relationship(
+        back_populates="extracted_facts",
+    )
+    source_external: Mapped["BrandExternalSource | None"] = relationship(
         back_populates="extracted_facts",
     )

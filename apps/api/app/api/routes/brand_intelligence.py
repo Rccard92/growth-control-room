@@ -26,6 +26,11 @@ from app.schemas.brand_intelligence import (
     BrandExtractBatchRequest,
     BrandExtractedFactRead,
     BrandExtractedFactUpdate,
+    BrandExternalSourceRead,
+    BrandExternalSourcesAddRequest,
+    BrandExternalSourcesFetchResponse,
+    BrandImportBatchCreateRequest,
+    BrandImportBatchCreateResponse,
     BrandImportBatchListItem,
     BrandImportBatchStartResponse,
     BrandImportBatchStatusResponse,
@@ -54,9 +59,16 @@ from app.services.brand_intelligence import service as bi_service
 from app.services.brand_intelligence import sources_service
 from app.services.brand_intelligence.batch_processor import schedule_batch_processing
 from app.services.brand_intelligence.batch_service import (
+    create_import_batch_with_sources,
     get_batch_status,
     list_batches,
     mark_batch_started,
+)
+from app.services.brand_intelligence.external_sources_service import (
+    add_external_sources_to_batch,
+    fetch_batch_external_sources,
+    list_external_sources_for_batch,
+    parse_sources_json,
 )
 from app.services.brand_intelligence.document_extraction import run_ai_extraction
 from app.services.brand_intelligence.draft_apply import (
@@ -556,19 +568,46 @@ async def delete_brand_asset(
 
 
 @router.post(
+    "/{project_id}/brand-intelligence/import-batches",
+    response_model=BrandImportBatchCreateResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_brand_import_batch(
+    project_id: UUID,
+    body: BrandImportBatchCreateRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandImportBatchCreateResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await create_import_batch_with_sources(
+        session,
+        project_id,
+        batch_name=body.batch_name,
+        brand_name=body.brand_name,
+        website_url=body.website_url,
+        sources=body.sources,
+    )
+
+
+@router.post(
     "/{project_id}/brand-intelligence/sources/upload",
     response_model=BrandSourceDocumentsUploadResponse,
     response_model_by_alias=True,
 )
 async def upload_brand_source_documents(
     project_id: UUID,
-    files: list[UploadFile] = File(...),
+    files: list[UploadFile] = File(default=[]),
     batch_name: str | None = Form(default=None, alias="batchName"),
     source_type: str = Form(default="file_upload", alias="sourceType"),
     notes: str | None = Form(default=None),
+    brand_name: str | None = Form(default=None, alias="brandName"),
+    website_url: str | None = Form(default=None, alias="websiteUrl"),
+    sources: str | None = Form(default=None),
+    batch_id: UUID | None = Form(default=None, alias="batchId"),
     session: AsyncSession = Depends(get_db),
 ) -> BrandSourceDocumentsUploadResponse:
     await get_project_in_default_workspace(project_id, session)
+    parsed_sources = parse_sources_json(sources)
     return await sources_service.upload_source_documents(
         session,
         project_id,
@@ -576,6 +615,10 @@ async def upload_brand_source_documents(
         batch_name=batch_name,
         source_type=source_type,
         notes=notes,
+        brand_name=brand_name,
+        website_url=website_url,
+        sources=parsed_sources,
+        batch_id=batch_id,
     )
 
 
@@ -620,6 +663,60 @@ async def list_brand_import_batches(
 ) -> list[BrandImportBatchListItem]:
     await get_project_in_default_workspace(project_id, session)
     return await list_batches(session, project_id)
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/external-sources",
+    response_model=list[BrandExternalSourceRead],
+    response_model_by_alias=True,
+)
+async def list_batch_external_sources(
+    project_id: UUID,
+    batch_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> list[BrandExternalSourceRead]:
+    await get_project_in_default_workspace(project_id, session)
+    rows = await list_external_sources_for_batch(session, project_id, batch_id)
+    return [BrandExternalSourceRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/external-sources",
+    response_model=list[BrandExternalSourceRead],
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_batch_external_sources(
+    project_id: UUID,
+    batch_id: UUID,
+    body: BrandExternalSourcesAddRequest,
+    session: AsyncSession = Depends(get_db),
+) -> list[BrandExternalSourceRead]:
+    await get_project_in_default_workspace(project_id, session)
+    return await add_external_sources_to_batch(
+        session, project_id, batch_id, body.sources
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/fetch-sources",
+    response_model=BrandExternalSourcesFetchResponse,
+    response_model_by_alias=True,
+)
+async def fetch_batch_external_sources_route(
+    project_id: UUID,
+    batch_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandExternalSourcesFetchResponse:
+    await get_project_in_default_workspace(project_id, session)
+    await get_batch_status(session, project_id, batch_id)
+    warnings, fetched_count = await fetch_batch_external_sources(
+        session, batch_id, refetch_failed=True
+    )
+    return BrandExternalSourcesFetchResponse(
+        fetched_count=fetched_count,
+        warnings=warnings,
+    )
 
 
 @router.get(

@@ -45,6 +45,10 @@ async def upload_source_documents(
     batch_name: str | None = None,
     source_type: str = "file_upload",
     notes: str | None = None,
+    brand_name: str | None = None,
+    website_url: str | None = None,
+    sources: list | None = None,
+    batch_id: UUID | None = None,
 ):
     return await upload_files_to_batch(
         session,
@@ -53,6 +57,10 @@ async def upload_source_documents(
         batch_name=batch_name,
         source_type=source_type,
         notes=notes,
+        brand_name=brand_name,
+        website_url=website_url,
+        sources=sources,
+        batch_id=batch_id,
     )
 
 

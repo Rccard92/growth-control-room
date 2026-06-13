@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import type { BrandExternalSourceInput } from "@gcr/shared";
+import { BrandAnalyzedSourcesPanel } from "./BrandAnalyzedSourcesPanel";
+import { BrandExtractedFactsReview } from "./BrandExtractedFactsReview";
+import { BrandExternalSourcesForm } from "./BrandExternalSourcesForm";
 import { BrandFileDropzone } from "./BrandFileDropzone";
 import { BrandImportDocumentsList } from "./BrandImportDocumentsList";
 import { BrandImportHistoryPanel } from "./BrandImportHistoryPanel";
 import { BrandImportProgressBar } from "./BrandImportProgressBar";
 import { BrandSectionDraftsGrid } from "./BrandSectionDraftsGrid";
-import { BrandExtractedFactsReview } from "./BrandExtractedFactsReview";
 import {
   useBrandExtractedFacts,
+  useBrandProfile,
   useBrandSourceDocuments,
   useImportBatchStatus,
   useImportBatches,
@@ -17,7 +21,7 @@ import {
 } from "../../hooks/useBrandIntelligence";
 
 const STEPS = [
-  { id: 1, label: "Carica documenti" },
+  { id: 1, label: "Fonti e documenti" },
   { id: 2, label: "Elaborazione" },
   { id: 3, label: "Revisiona bozze" },
 ] as const;
@@ -33,7 +37,11 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
   const [batchId, setBatchId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showDetailedFacts, setShowDetailedFacts] = useState(false);
+  const [brandName, setBrandName] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [externalSources, setExternalSources] = useState<BrandExternalSourceInput[]>([]);
 
+  const { data: profile } = useBrandProfile(projectId);
   const { data: documents = [] } = useBrandSourceDocuments(projectId);
   const { data: batches = [] } = useImportBatches(projectId);
   const { data: batchStatus } = useImportBatchStatus(projectId, batchId ?? undefined, {
@@ -53,10 +61,37 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
       batchStatus.status !== "failed",
   );
 
-  async function handleUpload(files: File[]) {
+  const handleFormChange = useCallback(
+    (
+      values: { brandName: string; websiteUrl: string },
+      sources: BrandExternalSourceInput[],
+    ) => {
+      setBrandName(values.brandName);
+      setWebsiteUrl(values.websiteUrl);
+      setExternalSources(sources);
+    },
+    [],
+  );
+
+  async function startImport(files: File[]) {
     setUploadError(null);
+    const hasBrand = Boolean(brandName.trim());
+    const hasWebsite = Boolean(websiteUrl.trim());
+    const hasFiles = files.length > 0;
+
+    if (!hasBrand && !hasWebsite && !hasFiles && externalSources.length === 0) {
+      setUploadError("Inserisci almeno il nome brand, il sito web o un file da caricare.");
+      return;
+    }
+
     try {
-      const result = await upload.mutateAsync({ files });
+      const result = await upload.mutateAsync({
+        files,
+        brandName: brandName.trim() || undefined,
+        websiteUrl: websiteUrl.trim() || undefined,
+        sources: externalSources.length ? externalSources : undefined,
+        batchName: brandName.trim() || undefined,
+      });
       setBatchId(result.batchId);
       setStep(2);
       await startBatch.mutateAsync(result.batchId);
@@ -69,6 +104,8 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
     setBatchId(id);
     setStep(3);
   }
+
+  const analyzedSources = batchStatus?.externalSources ?? [];
 
   return (
     <div className="bi-import">
@@ -86,12 +123,33 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
 
       {step === 1 && (
         <div className="bi-panel">
-          <h3 className="bi-panel__title">Carica documenti</h3>
+          <BrandExternalSourcesForm
+            initialBrandName={profile?.brandName ?? ""}
+            initialWebsiteUrl={profile?.websiteUrl ?? ""}
+            onChange={handleFormChange}
+          />
+
+          <h3 className="bi-panel__title" style={{ marginTop: "1.5rem" }}>
+            Carica documenti
+          </h3>
           <p className="bi-panel__subtitle">
-            PDF, Word, cataloghi o schede prodotto. L&apos;AI genererà bozze complete per sezione da
-            revisionare prima del salvataggio. Nessun dato ufficiale viene sovrascritto automaticamente.
+            PDF, Word, cataloghi o schede prodotto. L&apos;AI arricchirà le bozze anche con le fonti
+            brand indicate sopra. Nessun dato ufficiale viene sovrascritto automaticamente.
           </p>
-          <BrandFileDropzone onFilesSelected={handleUpload} disabled={upload.isPending || startBatch.isPending} />
+          <BrandFileDropzone
+            onFilesSelected={startImport}
+            disabled={upload.isPending || startBatch.isPending}
+          />
+          <div className="bi-wizard__actions" style={{ marginTop: "0.75rem" }}>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--ghost gcr-btn--sm"
+              disabled={upload.isPending || startBatch.isPending}
+              onClick={() => startImport([])}
+            >
+              Avvia solo con fonti brand (senza file)
+            </button>
+          </div>
           {(upload.isPending || startBatch.isPending) && (
             <p className="bi-panel__subtitle">Caricamento e avvio elaborazione…</p>
           )}
@@ -108,8 +166,8 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
         <div className="bi-panel">
           <h3 className="bi-panel__title">Elaborazione import</h3>
           <p className="bi-panel__subtitle">
-            Estrazione testo, facts, sintesi per sezione e rilevamento conflitti. Il progresso si
-            aggiorna automaticamente ogni 2 secondi.
+            Estrazione testo, recupero fonti esterne, facts, sintesi per sezione e rilevamento
+            conflitti. Il progresso si aggiorna automaticamente ogni 2 secondi.
           </p>
 
           {batchStatus ? (
@@ -120,6 +178,10 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
                 processedFiles={batchStatus.processedFiles}
                 totalFiles={batchStatus.totalFiles}
                 totalFacts={batchStatus.totalFacts}
+              />
+              <BrandAnalyzedSourcesPanel
+                sources={analyzedSources}
+                warnings={batchStatus.warnings}
               />
               <BrandImportDocumentsList
                 documents={batchStatus.documents.map((d) => ({
@@ -170,10 +232,14 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
           <h3 className="bi-panel__title">Bozze Brand Intelligence generate</h3>
           <p className="bi-panel__subtitle">
             Revisiona ogni sezione come bozza completa. Approva e applica solo ciò che vuoi salvare
-            nella Brand Intelligence ufficiale. I facts estratti restano disponibili come evidenze.
+            nella Brand Intelligence ufficiale. I facts e le fonti esterne restano come evidenze.
           </p>
 
-          {batchId && sectionDrafts.length === 0 && (
+          {analyzedSources.length > 0 && (
+            <BrandAnalyzedSourcesPanel sources={analyzedSources} warnings={batchStatus?.warnings} />
+          )}
+
+          {batchId && (
             <div className="bi-wizard__actions" style={{ marginBottom: "1rem" }}>
               <button
                 type="button"
@@ -181,12 +247,19 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
                 disabled={synthesize.isPending}
                 onClick={() => synthesize.mutate(batchId)}
               >
-                {synthesize.isPending ? "Sintesi in corso…" : "Genera bozze sezione"}
+                {synthesize.isPending
+                  ? "Rigenerazione in corso…"
+                  : "Rigenera bozze usando file + fonti esterne"}
               </button>
             </div>
           )}
 
-          <BrandSectionDraftsGrid projectId={projectId} batchId={batchId} drafts={sectionDrafts} />
+          <BrandSectionDraftsGrid
+            projectId={projectId}
+            batchId={batchId}
+            drafts={sectionDrafts}
+            externalSources={analyzedSources}
+          />
 
           <div style={{ marginTop: "1.5rem" }}>
             <button

@@ -8,6 +8,8 @@ import type {
   BrandContextBundle,
   BrandExtractBatchResponse,
   BrandExtractedFact,
+  BrandExternalSource,
+  BrandExternalSourceInput,
   BrandImportBatchListItem,
   BrandImportBatchStartResponse,
   BrandImportBatchStatusResponse,
@@ -243,7 +245,14 @@ export function listBrandSourceDocuments(projectId: string): Promise<BrandSource
 export function uploadBrandSourceDocuments(
   projectId: string,
   files: File[],
-  options?: { batchName?: string; notes?: string },
+  options?: {
+    batchName?: string;
+    notes?: string;
+    brandName?: string;
+    websiteUrl?: string;
+    sources?: BrandExternalSourceInput[];
+    batchId?: string;
+  },
 ): Promise<BrandSourceDocumentsUploadResponse> {
   const form = new FormData();
   for (const file of files) {
@@ -251,9 +260,49 @@ export function uploadBrandSourceDocuments(
   }
   if (options?.batchName) form.append("batchName", options.batchName);
   if (options?.notes) form.append("notes", options.notes);
+  if (options?.brandName) form.append("brandName", options.brandName);
+  if (options?.websiteUrl) form.append("websiteUrl", options.websiteUrl);
+  if (options?.sources?.length) {
+    form.append("sources", JSON.stringify(options.sources));
+  }
+  if (options?.batchId) form.append("batchId", options.batchId);
   return apiUploadForm<BrandSourceDocumentsUploadResponse>(
     `/api/projects/${projectId}/brand-intelligence/sources/upload`,
     form,
+  );
+}
+
+export function listBatchExternalSources(
+  projectId: string,
+  batchId: string,
+): Promise<BrandExternalSource[]> {
+  return apiFetch<BrandExternalSource[]>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/external-sources`,
+  );
+}
+
+export function addBatchExternalSources(
+  projectId: string,
+  batchId: string,
+  sources: BrandExternalSourceInput[],
+): Promise<BrandExternalSource[]> {
+  return apiFetch<BrandExternalSource[]>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/external-sources`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sources }),
+    },
+  );
+}
+
+export function fetchBatchExternalSources(
+  projectId: string,
+  batchId: string,
+): Promise<{ fetchedCount: number; warnings: string[] }> {
+  return apiFetch<{ fetchedCount: number; warnings: string[] }>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/fetch-sources`,
+    { method: "POST" },
   );
 }
 

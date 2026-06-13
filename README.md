@@ -208,6 +208,7 @@ Implementato:
 - **Brand Intelligence Import AI v1**: upload documenti, extracted facts review, apply controllato
 - **Brand Intelligence Import Jobs v0.2.2**: batch persistenti, progress async, conflict detection, storico import
 - **Brand Intelligence AI Synthesis v0.2.3**: bozze per sezione, review strutturata, apply controllato
+- **Brand Intelligence Source Enrichment v0.2.4**: sito, social, recensioni nell'import AI
 - **Changelog Alpha**: versioning `0.x.x-alpha` — vedi [`CHANGELOG.md`](CHANGELOG.md) e `/projects/:id/changelog`
 - Struttura connectors e skills (stub OAuth per altri provider)
 

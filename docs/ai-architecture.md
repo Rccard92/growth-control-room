@@ -24,11 +24,13 @@ Due percorsi equivalenti per i dati ufficiali:
 | Wizard / tab CRUD | Diretto su tabelle ufficiali |
 | AI File Import (facts) | Facts `suggested` → review → `approved` → `apply` |
 | AI Section Synthesis (0.2.3) | Bozze `draft` → review → `approved` → `apply` (enrich non distruttivo) |
+| Source Enrichment (0.2.4) | URL sito/social/recensioni → fetch leggero → facts/bozze (proposta) |
 
 Il ContextBuilder legge **solo** tabelle ufficiali. Sono esclusi dal contesto AI:
 
 - Facts in `brand_extracted_facts` non approvati
 - Bozze in `brand_section_drafts` non applicate (`draft`, `needs_review`, `approved`, `rejected`)
+- Contenuti fetchati da `brand_external_sources` (solo input alla proposta AI)
 
 ```mermaid
 sequenceDiagram
@@ -73,6 +75,15 @@ sequenceDiagram
   Apply->>Official: enrich/create only
   CTX->>Official: READ only
 ```
+
+### Source enrichment (0.2.4)
+
+File: `source_fetcher.py`, `external_sources_service.py`
+
+- Import AI può combinare **file + fonti pubbliche** (sito, social, recensioni)
+- Fetch singolo GET per URL; social spesso `skipped`; warning non bloccanti
+- Sintesi e estrazione facts distinguono file vs web vs social vs review
+- Layer di **proposta** — non verità automatica; moduli AI brand-facing usano solo dati approvati
 
 ## Moduli e integrazione
 

@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.2.3-alpha";
+export const GCR_VERSION = "0.2.4-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.2.4-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Import AI: fonti brand esterne (sito, social, recensioni)",
+      "Fetch pubblico leggero con warning se fonte non accessibile",
+      "Sintesi sezione arricchita da file + fonti esterne",
+      "Migration 019 brand_external_sources",
+      "Nessun salvataggio automatico su BI ufficiale",
+    ],
+  },
   {
     version: "0.2.3-alpha",
     date: "2026-06-13",

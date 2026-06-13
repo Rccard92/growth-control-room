@@ -11,15 +11,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
     BrandExtractedFact,
+    BrandExternalSource,
     BrandImportBatch,
     BrandSourceDocument,
 )
 from app.schemas.brand_intelligence import (
+    BrandExternalSourceInput,
+    BrandExternalSourceRead,
+    BrandImportBatchCreateResponse,
     BrandImportBatchDocumentStatus,
     BrandImportBatchListItem,
     BrandImportBatchStatusResponse,
     BrandSourceDocumentUploadItem,
     BrandSourceDocumentsUploadResponse,
+)
+from app.services.brand_intelligence.external_sources_service import (
+    build_sources_from_form,
+    create_external_sources_for_batch,
+    validate_batch_input,
 )
 from app.services.brand_intelligence.text_extraction import (
     MAX_BATCH_FILES,
@@ -122,6 +131,54 @@ async def finalize_batch_counts(session: AsyncSession, batch_id: UUID) -> BrandI
     return batch
 
 
+async def create_import_batch_with_sources(
+    session: AsyncSession,
+    project_id: UUID,
+    *,
+    batch_name: str | None = None,
+    brand_name: str | None = None,
+    website_url: str | None = None,
+    sources: list[BrandExternalSourceInput] | None = None,
+    source_type: str = "mixed_import",
+) -> BrandImportBatchCreateResponse:
+    merged = build_sources_from_form(
+        website_url=website_url,
+        sources=sources or [],
+    )
+    validate_batch_input(
+        brand_name=brand_name,
+        website_url=website_url,
+        files_count=0,
+        sources_count=len(merged),
+    )
+
+    batch = await create_batch(
+        session,
+        project_id,
+        name=batch_name or f"Import {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
+        source_type=source_type,
+    )
+    batch.declared_brand_name = brand_name.strip() if brand_name and brand_name.strip() else None
+    batch.declared_website_url = (
+        website_url.strip() if website_url and website_url.strip() else None
+    )
+    batch.status = "pending"
+    batch.current_step = "Batch creato"
+    batch.started_at = datetime.now(timezone.utc)
+
+    ext_rows = await create_external_sources_for_batch(
+        session, project_id, batch.id, merged
+    )
+    await session.commit()
+    await session.refresh(batch)
+
+    return BrandImportBatchCreateResponse(
+        batch_id=batch.id,
+        status=batch.status,
+        external_sources=[BrandExternalSourceRead.model_validate(r) for r in ext_rows],
+    )
+
+
 async def upload_files_to_batch(
     session: AsyncSession,
     project_id: UUID,
@@ -130,26 +187,61 @@ async def upload_files_to_batch(
     batch_name: str | None = None,
     source_type: str = "file_upload",
     notes: str | None = None,
+    brand_name: str | None = None,
+    website_url: str | None = None,
+    sources: list[BrandExternalSourceInput] | None = None,
+    batch_id: UUID | None = None,
 ) -> BrandSourceDocumentsUploadResponse:
-    if not files:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun file caricato.")
+    merged_sources = build_sources_from_form(
+        website_url=website_url,
+        sources=sources or [],
+    )
+    validate_batch_input(
+        brand_name=brand_name,
+        website_url=website_url,
+        files_count=len(files),
+        sources_count=len(merged_sources),
+    )
     if len(files) > MAX_BATCH_FILES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Massimo {MAX_BATCH_FILES} file per batch.",
         )
 
-    batch = await create_batch(
-        session,
-        project_id,
-        name=batch_name or f"Import {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
-        source_type=source_type,
-        notes=notes,
-    )
+    if batch_id:
+        batch = await _get_batch_for_project(session, project_id, batch_id)
+    else:
+        batch = await create_batch(
+            session,
+            project_id,
+            name=batch_name or f"Import {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
+            source_type=source_type if merged_sources else source_type,
+            notes=notes,
+        )
+        if merged_sources:
+            batch.source_type = "mixed_import"
+        batch.declared_brand_name = (
+            brand_name.strip() if brand_name and brand_name.strip() else None
+        )
+        batch.declared_website_url = (
+            website_url.strip() if website_url and website_url.strip() else None
+        )
+
     batch.status = "uploading"
     batch.current_step = "Caricamento file"
     batch.total_files = len(files)
-    batch.started_at = datetime.now(timezone.utc)
+    if not batch.started_at:
+        batch.started_at = datetime.now(timezone.utc)
+
+    ext_rows: list[BrandExternalSource] = []
+    if merged_sources and not batch_id:
+        ext_rows = await create_external_sources_for_batch(
+            session, project_id, batch.id, merged_sources
+        )
+    elif merged_sources and batch_id:
+        ext_rows = await create_external_sources_for_batch(
+            session, project_id, batch.id, merged_sources
+        )
 
     now = datetime.now(timezone.utc)
     uploaded: list[BrandSourceDocumentUploadItem] = []
@@ -197,10 +289,22 @@ async def upload_files_to_batch(
     batch.current_step = "Upload completato"
     await session.commit()
 
+    if not ext_rows and batch_id:
+        ext_rows = list(
+            (
+                await session.execute(
+                    select(BrandExternalSource).where(
+                        BrandExternalSource.batch_id == batch.id
+                    )
+                )
+            ).scalars().all()
+        )
+
     return BrandSourceDocumentsUploadResponse(
         batch_id=batch.id,
         status=batch.status,
         documents=uploaded,
+        external_sources=[BrandExternalSourceRead.model_validate(r) for r in ext_rows],
     )
 
 
@@ -220,6 +324,15 @@ async def get_batch_status(
         ).scalars().all()
     )
     warnings = batch.warnings or []
+    ext_sources = list(
+        (
+            await session.execute(
+                select(BrandExternalSource)
+                .where(BrandExternalSource.batch_id == batch_id)
+                .order_by(BrandExternalSource.created_at.asc())
+            )
+        ).scalars().all()
+    )
     return BrandImportBatchStatusResponse(
         id=batch.id,
         project_id=batch.project_id,
@@ -237,6 +350,8 @@ async def get_batch_status(
         needs_review_facts=batch.needs_review_facts,
         error_message=batch.error_message,
         warnings=warnings,
+        declared_brand_name=batch.declared_brand_name,
+        declared_website_url=batch.declared_website_url,
         started_at=batch.started_at,
         completed_at=batch.completed_at,
         created_at=batch.created_at,
@@ -253,6 +368,7 @@ async def get_batch_status(
             )
             for d in docs
         ],
+        external_sources=[BrandExternalSourceRead.model_validate(s) for s in ext_sources],
     )
 
 

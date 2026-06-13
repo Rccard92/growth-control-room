@@ -190,6 +190,7 @@ export interface BrandSectionDraftListItem {
   confidence?: number | null;
   status: SectionDraftStatus;
   sourceFactIds?: string[];
+  sourceExternalIds?: string[];
   warnings?: SectionDraftWarnings | null;
   createdAt: string;
   updatedAt: string;
@@ -199,6 +200,7 @@ export interface BrandSectionDraft extends BrandSectionDraftListItem {
   projectId: string;
   draftPayload: unknown;
   sourceDocumentIds?: string[];
+  sourceExternalIds?: string[];
   aiReasoning?: string | null;
   previousOfficialSnapshot?: unknown;
   approvedAt?: string | null;
@@ -277,10 +279,65 @@ export interface BrandSourceDocumentUploadItem {
   status: string;
 }
 
+export type ExternalSourceType =
+  | "website"
+  | "instagram"
+  | "facebook"
+  | "tiktok"
+  | "youtube"
+  | "linkedin"
+  | "trustpilot"
+  | "google_business"
+  | "other";
+
+export type ExternalSourceStatus =
+  | "pending"
+  | "fetching"
+  | "fetched"
+  | "failed"
+  | "skipped";
+
+export interface BrandExternalSourceInput {
+  sourceType: ExternalSourceType;
+  url: string;
+  label?: string | null;
+}
+
+export interface BrandExternalSource {
+  id: string;
+  projectId: string;
+  batchId?: string | null;
+  sourceType: ExternalSourceType;
+  label?: string | null;
+  url: string;
+  status: ExternalSourceStatus;
+  fetchedTitle?: string | null;
+  fetchedText?: string | null;
+  fetchedSummary?: string | null;
+  fetchError?: string | null;
+  lastFetchedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandExternalSourcesFormValues {
+  brandName: string;
+  websiteUrl: string;
+  instagramUrl: string;
+  facebookUrl: string;
+  tiktokUrl: string;
+  youtubeUrl: string;
+  linkedinUrl: string;
+  trustpilotUrl: string;
+  googleBusinessUrl: string;
+  otherSources: Array<{ label: string; url: string }>;
+}
+
 export interface BrandSourceDocumentsUploadResponse {
   batchId: string;
   status: string;
   documents: BrandSourceDocumentUploadItem[];
+  externalSources?: BrandExternalSource[];
 }
 
 export type ImportBatchStatus =
@@ -323,6 +380,8 @@ export interface BrandImportBatch {
   needsReviewFacts: number;
   errorMessage?: string | null;
   warnings: string[];
+  declaredBrandName?: string | null;
+  declaredWebsiteUrl?: string | null;
   startedAt?: string | null;
   completedAt?: string | null;
   createdAt: string;
@@ -331,6 +390,7 @@ export interface BrandImportBatch {
 
 export interface BrandImportBatchStatusResponse extends BrandImportBatch {
   documents: BrandImportBatchDocumentStatus[];
+  externalSources?: BrandExternalSource[];
 }
 
 export interface BrandImportBatchListItem {
@@ -355,6 +415,7 @@ export interface BrandExtractedFact {
   id: string;
   projectId: string;
   sourceDocumentId?: string | null;
+  sourceExternalId?: string | null;
   batchId?: string | null;
   targetSection: TargetSection;
   targetEntityType?: string | null;

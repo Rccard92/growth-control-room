@@ -160,5 +160,10 @@ export type {
   BrandSectionDraftSynthesizeResponse,
   BrandSectionDraftApplyResponse,
   SectionDraftWarnings,
+  BrandExternalSource,
+  BrandExternalSourceInput,
+  BrandExternalSourcesFormValues,
+  ExternalSourceType,
+  ExternalSourceStatus,
 } from "./types/brand-intelligence";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";

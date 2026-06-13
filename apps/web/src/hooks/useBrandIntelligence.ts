@@ -266,11 +266,27 @@ export function useUploadBrandSources(projectId: string) {
       files,
       batchName,
       notes,
+      brandName,
+      websiteUrl,
+      sources,
+      batchId,
     }: {
       files: File[];
       batchName?: string;
       notes?: string;
-    }) => uploadBrandSourceDocuments(projectId, files, { batchName, notes }),
+      brandName?: string;
+      websiteUrl?: string;
+      sources?: import("@gcr/shared").BrandExternalSourceInput[];
+      batchId?: string;
+    }) =>
+      uploadBrandSourceDocuments(projectId, files, {
+        batchName,
+        notes,
+        brandName,
+        websiteUrl,
+        sources,
+        batchId,
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.sources(projectId) });
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });

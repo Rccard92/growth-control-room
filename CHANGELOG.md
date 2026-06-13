@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.2.4-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Source Enrichment Import AI: brand name, sito web, social e piattaforme recensioni
+- `BrandExternalSource` con fetch pubblico leggero (no scraping aggressivo)
+- Migration 019: `brand_external_sources`, `source_external_ids` su bozze
+- Sintesi source-aware: file + fonti esterne, warning su conflitti
+- UI: form Fonti brand, pannello Fonti analizzate, rigenera bozze con fonti esterne
+
 ## [0.2.3-alpha] - 2026-06-13
 
 Tipo: Alpha minor

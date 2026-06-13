@@ -352,6 +352,9 @@ class BrandSectionDraftRead(BaseModel):
     source_document_ids: list[str] = Field(
         default_factory=list, serialization_alias="sourceDocumentIds"
     )
+    source_external_ids: list[str] = Field(
+        default_factory=list, serialization_alias="sourceExternalIds"
+    )
     confidence: float | None = None
     status: str
     ai_reasoning: str | None = Field(default=None, serialization_alias="aiReasoning")
@@ -364,7 +367,7 @@ class BrandSectionDraftRead(BaseModel):
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
-    @field_validator("source_fact_ids", "source_document_ids", mode="before")
+    @field_validator("source_fact_ids", "source_document_ids", "source_external_ids", mode="before")
     @classmethod
     def _coerce_id_lists(cls, v: object) -> list[str]:
         if v is None:
@@ -385,11 +388,14 @@ class BrandSectionDraftListItem(BaseModel):
     confidence: float | None = None
     status: str
     source_fact_ids: list[str] = Field(default_factory=list, serialization_alias="sourceFactIds")
+    source_external_ids: list[str] = Field(
+        default_factory=list, serialization_alias="sourceExternalIds"
+    )
     warnings: Any | None = None
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
-    @field_validator("source_fact_ids", mode="before")
+    @field_validator("source_fact_ids", "source_external_ids", mode="before")
     @classmethod
     def _coerce_fact_ids(cls, v: object) -> list[str]:
         if v is None:
@@ -494,6 +500,68 @@ class BrandSourceDocumentsUploadResponse(BaseModel):
     batch_id: UUID = Field(serialization_alias="batchId")
     status: str
     documents: list[BrandSourceDocumentUploadItem]
+    external_sources: list["BrandExternalSourceRead"] = Field(
+        default_factory=list, serialization_alias="externalSources"
+    )
+
+
+class BrandExternalSourceInput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_type: str = Field(validation_alias="sourceType")
+    url: str
+    label: str | None = None
+
+
+class BrandExternalSourceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    project_id: UUID = Field(serialization_alias="projectId")
+    batch_id: UUID | None = Field(default=None, serialization_alias="batchId")
+    source_type: str = Field(serialization_alias="sourceType")
+    label: str | None = None
+    url: str
+    status: str
+    fetched_title: str | None = Field(default=None, serialization_alias="fetchedTitle")
+    fetched_text: str | None = Field(default=None, serialization_alias="fetchedText")
+    fetched_summary: str | None = Field(default=None, serialization_alias="fetchedSummary")
+    fetch_error: str | None = Field(default=None, serialization_alias="fetchError")
+    last_fetched_at: datetime | None = Field(default=None, serialization_alias="lastFetchedAt")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+
+class BrandImportBatchCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    batch_name: str | None = Field(default=None, validation_alias="batchName")
+    brand_name: str | None = Field(default=None, validation_alias="brandName")
+    website_url: str | None = Field(default=None, validation_alias="websiteUrl")
+    sources: list[BrandExternalSourceInput] = Field(default_factory=list)
+
+
+class BrandImportBatchCreateResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    batch_id: UUID = Field(serialization_alias="batchId")
+    status: str
+    external_sources: list[BrandExternalSourceRead] = Field(
+        default_factory=list, serialization_alias="externalSources"
+    )
+
+
+class BrandExternalSourcesAddRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    sources: list[BrandExternalSourceInput] = Field(default_factory=list)
+
+
+class BrandExternalSourcesFetchResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    fetched_count: int = Field(serialization_alias="fetchedCount")
+    warnings: list[str] = Field(default_factory=list)
 
 
 class BrandImportBatchDocumentStatus(BaseModel):
@@ -527,6 +595,8 @@ class BrandImportBatchRead(BaseModel):
     needs_review_facts: int = Field(serialization_alias="needsReviewFacts")
     error_message: str | None = Field(default=None, serialization_alias="errorMessage")
     warnings: list[str] = Field(default_factory=list)
+    declared_brand_name: str | None = Field(default=None, serialization_alias="declaredBrandName")
+    declared_website_url: str | None = Field(default=None, serialization_alias="declaredWebsiteUrl")
     started_at: datetime | None = Field(default=None, serialization_alias="startedAt")
     completed_at: datetime | None = Field(default=None, serialization_alias="completedAt")
     created_at: datetime = Field(serialization_alias="createdAt")
@@ -535,6 +605,9 @@ class BrandImportBatchRead(BaseModel):
 
 class BrandImportBatchStatusResponse(BrandImportBatchRead):
     documents: list[BrandImportBatchDocumentStatus] = Field(default_factory=list)
+    external_sources: list[BrandExternalSourceRead] = Field(
+        default_factory=list, serialization_alias="externalSources"
+    )
 
 
 class BrandImportBatchListItem(BaseModel):
@@ -565,6 +638,7 @@ class BrandExtractedFactRead(BaseModel):
     id: UUID
     project_id: UUID = Field(serialization_alias="projectId")
     source_document_id: UUID | None = Field(default=None, serialization_alias="sourceDocumentId")
+    source_external_id: UUID | None = Field(default=None, serialization_alias="sourceExternalId")
     batch_id: UUID | None = Field(default=None, serialization_alias="batchId")
     target_section: str = Field(serialization_alias="targetSection")
     target_entity_type: str | None = Field(default=None, serialization_alias="targetEntityType")

@@ -76,6 +76,39 @@ Dopo conflict detection nel batch job, `synthesis.py` genera fino a 9 bozze (`br
 
 Senza `OPENAI_API_KEY`: batch completa facts, synthesis fallisce con warning su batch; endpoint `POST .../synthesize` risponde 503.
 
+## Source Enrichment v1 (0.2.4)
+
+Durante l'import AI l'utente può indicare **fonti brand esterne** oltre ai file:
+
+| Campo | Note |
+|-------|------|
+| Brand name | Opzionale ma consigliato |
+| Website URL | Fetch HTML pubblico (title, meta, testo principale) |
+| Social | Instagram, Facebook, TikTok, YouTube, LinkedIn — metadati pubblici se accessibili |
+| Recensioni | Trustpilot, Google Business — tentativo singolo GET |
+| Altre fonti | Lista dinamica URL + label |
+
+### Limiti v1
+
+- Una sola richiesta HTTP per fonte; timeout breve; nessun login
+- Nessuno scraping aggressivo o crawl multi-pagina
+- Social spesso bloccati → status `skipped`, solo URL dichiarata come fonte
+- Fonte non accessibile → warning batch, batch continua, nessuna invenzione AI
+- Dati estratti restano in **facts/bozze** fino ad approve+apply — zero write su BI ufficiale
+
+### Progress batch (con fonti esterne)
+
+| Fase | Progress |
+|------|----------|
+| Upload / estrazione testo | 5–35% |
+| Recupero fonti esterne | 35–50% |
+| AI facts extraction | 50–75% |
+| Conflict detection | ~73% |
+| Section synthesis | 75–95% |
+| Review ready | 100% |
+
+Tabella: `brand_external_sources` (migration 019). Bozze tracciano `source_external_ids`.
+
 ## Sezioni
 
 | Sezione | Obbligatoria (score minimo) | Descrizione |
@@ -138,6 +171,14 @@ Base path: `/api/projects/{project_id}/brand-intelligence`
 
 Overview include `pendingSectionDraftsCount` e `latestBatchId`.
 
+**External sources (enrichment v0.2.4):**
+
+- `POST /import-batches` — crea batch + fonti (JSON: `brandName`, `websiteUrl`, `sources[]`)
+- `POST /sources/upload` — esteso: `brandName`, `websiteUrl`, `sources` (JSON), `batchId` opzionale
+- `GET /import-batches/{batchId}/external-sources` — fonti analizzate
+- `POST /import-batches/{batchId}/external-sources` — aggiunge fonti a batch esistente
+- `POST /import-batches/{batchId}/fetch-sources` — re-fetch manuale
+
 ## UI
 
 Sidebar progetto → **Brand Intelligence** (dopo Control Room).
@@ -156,3 +197,4 @@ Route import: `/projects/:id/brand-intelligence/import`
 - `016_brand_intelligence_ai_import` — `brand_source_documents`, `brand_extracted_facts`
 - `017_brand_import_batches` — `brand_import_batches`, campi batch/progress/conflict su documents e facts
 - `018_brand_section_drafts` — `brand_section_drafts`, bozze AI per sezione con snapshot ufficiale
+- `019_brand_external_sources` — `brand_external_sources`, enrichment URL sito/social/recensioni

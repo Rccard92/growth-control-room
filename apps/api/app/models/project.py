@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         BrandClaimRule,
         BrandContentPillar,
         BrandExtractedFact,
+        BrandExternalSource,
         BrandImportBatch,
         BrandProductKnowledge,
         BrandProfile,
@@ -114,6 +115,10 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     brand_section_drafts: Mapped[list["BrandSectionDraft"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    brand_external_sources: Mapped[list["BrandExternalSource"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

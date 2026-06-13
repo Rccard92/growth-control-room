@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BrandSectionDraftListItem } from "@gcr/shared";
+import type { BrandExternalSource, BrandSectionDraftListItem } from "@gcr/shared";
 import { targetSectionLabel } from "./brandImportUtils";
 import { BrandSectionDraftEditor } from "./BrandSectionDraftEditor";
 import { BrandSectionDraftSourcesDrawer } from "./BrandSectionDraftSourcesDrawer";
@@ -15,6 +15,7 @@ interface BrandSectionDraftsGridProps {
   projectId: string;
   batchId: string | null;
   drafts: BrandSectionDraftListItem[];
+  externalSources?: BrandExternalSource[];
 }
 
 function statusLabel(status: string): string {
@@ -28,7 +29,12 @@ function statusLabel(status: string): string {
   return map[status] ?? status;
 }
 
-export function BrandSectionDraftsGrid({ projectId, batchId, drafts }: BrandSectionDraftsGridProps) {
+export function BrandSectionDraftsGrid({
+  projectId,
+  batchId,
+  drafts,
+  externalSources = [],
+}: BrandSectionDraftsGridProps) {
   const [openDraftId, setOpenDraftId] = useState<string | null>(null);
   const [sourcesDraftId, setSourcesDraftId] = useState<string | null>(null);
   const [regenInstructions, setRegenInstructions] = useState("");
@@ -71,7 +77,9 @@ export function BrandSectionDraftsGrid({ projectId, batchId, drafts }: BrandSect
               )}
               {draft.summary && <p className="bi-section-draft-card__summary">{draft.summary}</p>}
               <p className="bi-section-draft-card__meta">
-                {(draft.sourceFactIds ?? []).length} fonti
+                {(draft.sourceFactIds ?? []).length} facts file
+                {(draft.sourceExternalIds ?? []).length > 0 &&
+                  ` · ${(draft.sourceExternalIds ?? []).length} fonti esterne`}
                 {warnCount > 0 && ` · ${warnCount} warning`}
               </p>
               <div className="bi-section-draft-card__actions">
@@ -174,6 +182,7 @@ export function BrandSectionDraftsGrid({ projectId, batchId, drafts }: BrandSect
           onClose={() => setSourcesDraftId(null)}
           draft={sourcesDraft}
           facts={facts}
+          externalSources={externalSources}
         />
       )}
     </div>
