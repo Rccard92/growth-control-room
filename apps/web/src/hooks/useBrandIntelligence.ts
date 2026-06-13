@@ -14,6 +14,7 @@ import {
   getBrandProfile,
   getBrandSeoStrategy,
   getBrandVoice,
+  getImportBatchStatus,
   listBrandAssets,
   listBrandAudience,
   listBrandClaims,
@@ -22,7 +23,9 @@ import {
   listBrandPillars,
   listBrandProducts,
   listBrandSourceDocuments,
+  listImportBatches,
   patchBrandExtractedFact,
+  startImportBatch,
   updateBrandProfile,
   updateBrandSeoStrategy,
   updateBrandVoice,
@@ -253,9 +256,59 @@ export function useBrandSourceDocuments(projectId: string | undefined) {
 export function useUploadBrandSources(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (files: File[]) => uploadBrandSourceDocuments(projectId, files),
+    mutationFn: ({
+      files,
+      batchName,
+      notes,
+    }: {
+      files: File[];
+      batchName?: string;
+      notes?: string;
+    }) => uploadBrandSourceDocuments(projectId, files, { batchName, notes }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.sources(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
+    },
+  });
+}
+
+const POLLING_STATUSES = new Set(["pending", "uploading", "extracting", "ai_processing"]);
+
+export function useImportBatchStatus(
+  projectId: string | undefined,
+  batchId: string | undefined,
+  options?: { enabled?: boolean; polling?: boolean },
+) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.importBatch(projectId ?? "", batchId ?? ""),
+    queryFn: () => getImportBatchStatus(projectId!, batchId!),
+    enabled: Boolean(projectId && batchId && (options?.enabled ?? true)),
+    refetchInterval: (query) => {
+      if (!options?.polling) return false;
+      const status = query.state.data?.status;
+      if (!status) return 2000;
+      return POLLING_STATUSES.has(status) ? 2000 : false;
+    },
+  });
+}
+
+export function useImportBatches(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.importBatches(projectId ?? ""),
+    queryFn: () => listImportBatches(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useStartImportBatch(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) => startImportBatch(projectId, batchId),
+    onSuccess: (_data, batchId) => {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.brandIntelligence.importBatch(projectId, batchId),
+      });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
     },
   });
 }
@@ -308,13 +361,15 @@ export function usePatchBrandExtractedFact(projectId: string) {
 export function useApplyBrandExtractedFacts(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (factIds: string[]) => applyBrandExtractedFacts(projectId, factIds),
+    mutationFn: ({ factIds, batchId }: { factIds: string[]; batchId?: string }) =>
+      applyBrandExtractedFacts(projectId, factIds, batchId),
     onSuccess: () => {
       invalidateBrand(projectId, qc);
       void qc.invalidateQueries({
         queryKey: ["brandIntelligence", projectId, "extractedFacts"],
       });
       void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.sources(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.brandIntelligence.importBatches(projectId) });
     },
   });
 }

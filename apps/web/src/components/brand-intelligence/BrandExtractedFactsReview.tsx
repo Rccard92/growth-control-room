@@ -12,6 +12,26 @@ interface BrandExtractedFactsReviewProps {
   applying?: boolean;
 }
 
+function updateModeLabel(mode?: string): string {
+  const map: Record<string, string> = {
+    create: "Nuovo",
+    enrich: "Arricchimento",
+    update: "Aggiornamento",
+    duplicate_candidate: "Possibile duplicato",
+    unknown: "Da classificare",
+  };
+  return map[mode ?? ""] ?? mode ?? "";
+}
+
+function conflictLabel(status?: string): string {
+  const map: Record<string, string> = {
+    none: "",
+    possible_conflict: "Possibile conflitto",
+    confirmed_conflict: "Conflitto confermato",
+  };
+  return map[status ?? ""] ?? "";
+}
+
 function formatValue(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value;
@@ -55,9 +75,38 @@ export function BrandExtractedFactsReview({
       {grouped.map(({ section, items }) => (
         <div key={section} className="bi-facts-group">
           <h4 className="bi-facts-group__title">{targetSectionLabel(section)}</h4>
-          {items.map((fact) => (
-            <div key={fact.id} className={`bi-fact-row bi-fact-row--${fact.status}`}>
+          {items.map((fact) => {
+            const rowClass = [
+              "bi-fact-row",
+              `bi-fact-row--${fact.status}`,
+              fact.conflictStatus === "possible_conflict" ? "bi-fact-row--conflict" : "",
+              fact.status === "needs_review" ? "bi-fact-row--needs_review" : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+
+            return (
+            <div key={fact.id} className={rowClass}>
               <div className="bi-fact-row__main">
+                {(fact.updateMode || fact.conflictStatus) && (
+                  <div className="bi-fact-row__badges">
+                    {fact.updateMode && (
+                      <span className="bi-fact-badge bi-fact-badge--mode">{updateModeLabel(fact.updateMode)}</span>
+                    )}
+                    {conflictLabel(fact.conflictStatus) && (
+                      <span className="bi-fact-badge bi-fact-badge--conflict">
+                        {conflictLabel(fact.conflictStatus)}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {fact.previousValue != null && fact.updateMode === "update" && (
+                  <div className="bi-fact-row__diff">
+                    <span className="bi-fact-row__diff-label">Valore ufficiale attuale:</span>
+                    <span className="bi-fact-row__diff-old">{formatValue(fact.previousValue)}</span>
+                    <span className="bi-fact-row__diff-label">Valore proposto:</span>
+                  </div>
+                )}
                 <div className="bi-fact-row__value">
                   {editingId === fact.id ? (
                     <textarea
@@ -132,7 +181,8 @@ export function BrandExtractedFactsReview({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ))}
 

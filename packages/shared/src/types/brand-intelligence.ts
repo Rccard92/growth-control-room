@@ -186,18 +186,22 @@ export type TargetSection =
 export interface BrandSourceDocument {
   id: string;
   projectId: string;
+  batchId?: string | null;
   filename: string;
   contentType: string;
-  fileSize: number;
-  storageMode: string;
+  fileSize?: number;
+  storageMode?: string;
   documentType?: string | null;
   documentSummary?: string | null;
-  extractionStatus: DocumentExtractionStatus;
+  extractionStatus: DocumentExtractionStatus | string;
   extractionError?: string | null;
-  uploadedAt: string;
+  processingOrder?: number | null;
+  progressPercent?: number;
+  currentStep?: string | null;
+  uploadedAt?: string;
   processedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BrandSourceDocumentUploadItem {
@@ -207,13 +211,84 @@ export interface BrandSourceDocumentUploadItem {
 }
 
 export interface BrandSourceDocumentsUploadResponse {
+  batchId: string;
+  status: string;
   documents: BrandSourceDocumentUploadItem[];
+}
+
+export type ImportBatchStatus =
+  | "pending"
+  | "uploading"
+  | "extracting"
+  | "ai_processing"
+  | "review_ready"
+  | "partially_failed"
+  | "completed"
+  | "failed";
+
+export type UpdateMode = "create" | "enrich" | "update" | "duplicate_candidate" | "unknown";
+export type ConflictStatus = "none" | "possible_conflict" | "confirmed_conflict";
+
+export interface BrandImportBatchDocumentStatus {
+  id: string;
+  filename: string;
+  extractionStatus: string;
+  progressPercent: number;
+  currentStep?: string | null;
+  extractedFactsCount: number;
+  extractionError?: string | null;
+}
+
+export interface BrandImportBatch {
+  id: string;
+  projectId: string;
+  name?: string | null;
+  sourceType: string;
+  notes?: string | null;
+  status: ImportBatchStatus;
+  progressPercent: number;
+  currentStep?: string | null;
+  totalFiles: number;
+  processedFiles: number;
+  totalFacts: number;
+  approvedFacts: number;
+  rejectedFacts: number;
+  needsReviewFacts: number;
+  errorMessage?: string | null;
+  warnings: string[];
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandImportBatchStatusResponse extends BrandImportBatch {
+  documents: BrandImportBatchDocumentStatus[];
+}
+
+export interface BrandImportBatchListItem {
+  id: string;
+  name?: string | null;
+  sourceType: string;
+  status: ImportBatchStatus;
+  progressPercent: number;
+  totalFiles: number;
+  totalFacts: number;
+  needsReviewFacts: number;
+  createdAt: string;
+  completedAt?: string | null;
+}
+
+export interface BrandImportBatchStartResponse {
+  batchId: string;
+  status: string;
 }
 
 export interface BrandExtractedFact {
   id: string;
   projectId: string;
   sourceDocumentId?: string | null;
+  batchId?: string | null;
   targetSection: TargetSection;
   targetEntityType?: string | null;
   fieldName?: string | null;
@@ -222,6 +297,13 @@ export interface BrandExtractedFact {
   confidence: number;
   status: FactStatus;
   aiReasoning?: string | null;
+  isUpdateSuggestion?: boolean;
+  existingTargetId?: string | null;
+  updateMode?: UpdateMode;
+  previousValue?: unknown;
+  conflictStatus?: ConflictStatus;
+  sourceCreatedAt?: string | null;
+  importRound?: number | null;
   reviewedAt?: string | null;
   createdAt: string;
   updatedAt: string;

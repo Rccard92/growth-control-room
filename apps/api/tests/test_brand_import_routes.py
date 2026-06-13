@@ -13,6 +13,9 @@ def test_import_routes_registered() -> None:
     assert f"{base}/extracted-facts" in paths
     assert f"{base}/extracted-facts/{{fact_id}}" in paths
     assert f"{base}/extracted-facts/apply" in paths
+    assert f"{base}/import-batches" in paths
+    assert f"{base}/import-batches/{{batch_id}}/start" in paths
+    assert f"{base}/import-batches/{{batch_id}}/status" in paths
 
 
 def test_upload_limits_constants() -> None:

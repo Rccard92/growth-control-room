@@ -9,7 +9,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 interface BrandImportDocumentsListProps {
-  documents: BrandSourceDocument[];
+  documents: Pick<
+    BrandSourceDocument,
+    "id" | "filename" | "extractionStatus" | "extractionError" | "documentType" | "documentSummary" | "fileSize" | "progressPercent" | "currentStep"
+  >[];
 }
 
 export function BrandImportDocumentsList({ documents }: BrandImportDocumentsListProps) {
@@ -24,8 +27,12 @@ export function BrandImportDocumentsList({ documents }: BrandImportDocumentsList
           <div>
             <div className="bi-list__item-title">{doc.filename}</div>
             <div className="bi-list__item-meta">
-              {(doc.fileSize / 1024).toFixed(0)} KB ·{" "}
+              {doc.fileSize != null ? `${(doc.fileSize / 1024).toFixed(0)} KB · ` : ""}
               {STATUS_LABELS[doc.extractionStatus] ?? doc.extractionStatus}
+              {doc.progressPercent != null && doc.progressPercent > 0 && doc.progressPercent < 100
+                ? ` · ${doc.progressPercent}%`
+                : ""}
+              {doc.currentStep ? ` · ${doc.currentStep}` : ""}
               {doc.documentType ? ` · ${doc.documentType}` : ""}
             </div>
             {doc.extractionError && (

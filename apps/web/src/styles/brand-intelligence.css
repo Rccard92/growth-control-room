@@ -377,6 +377,160 @@
   border-color: rgba(52, 211, 153, 0.3);
 }
 
+.bi-fact-row--needs_review {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.bi-fact-row--conflict {
+  border-color: rgba(251, 113, 133, 0.45);
+  background: rgba(251, 113, 133, 0.06);
+}
+
+.bi-fact-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.bi-fact-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.bi-fact-badge--mode {
+  background: rgba(167, 139, 250, 0.2);
+  color: #c4b5fd;
+}
+
+.bi-fact-badge--conflict {
+  background: rgba(251, 113, 133, 0.2);
+  color: #fda4af;
+}
+
+.bi-fact-row__diff {
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.bi-fact-row__diff-label {
+  display: block;
+  color: var(--gcr-text-muted);
+  font-size: 0.72rem;
+  margin-top: 0.25rem;
+}
+
+.bi-fact-row__diff-old {
+  display: block;
+  padding: 0.35rem 0.5rem;
+  margin: 0.2rem 0 0.5rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+.bi-progress {
+  margin: 1rem 0;
+}
+
+.bi-progress__header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.bi-progress__percent {
+  font-weight: 600;
+  color: #a78bfa;
+}
+
+.bi-progress__track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.bi-progress__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  transition: width 0.4s ease;
+}
+
+.bi-progress__meta {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.bi-batch-history {
+  margin-top: 2rem;
+  padding: 1.25rem;
+}
+
+.bi-batch-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.bi-batch-history__item {
+  padding: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.bi-batch-history__main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.bi-batch-history__status {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(167, 139, 250, 0.15);
+}
+
+.bi-batch-history__meta {
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.bi-batch-history__actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.bi-batch-log {
+  margin-top: 0.75rem;
+  padding: 0.65rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.bi-batch-log__error {
+  color: #fb7185;
+}
+
+.bi-batch-log__doc {
+  margin-top: 0.35rem;
+}
+
 .bi-fact-row__main {
   flex: 1;
   min-width: 200px;

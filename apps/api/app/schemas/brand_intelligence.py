@@ -339,6 +339,7 @@ class BrandSourceDocumentRead(BaseModel):
 
     id: UUID
     project_id: UUID = Field(serialization_alias="projectId")
+    batch_id: UUID | None = Field(default=None, serialization_alias="batchId")
     filename: str
     content_type: str = Field(serialization_alias="contentType")
     file_size: int = Field(serialization_alias="fileSize")
@@ -347,6 +348,13 @@ class BrandSourceDocumentRead(BaseModel):
     document_summary: str | None = Field(default=None, serialization_alias="documentSummary")
     extraction_status: str = Field(serialization_alias="extractionStatus")
     extraction_error: str | None = Field(default=None, serialization_alias="extractionError")
+    processing_order: int | None = Field(default=None, serialization_alias="processingOrder")
+    progress_percent: int = Field(default=0, serialization_alias="progressPercent")
+    current_step: str | None = Field(default=None, serialization_alias="currentStep")
+    extracted_facts_count: int = Field(default=0, serialization_alias="extractedFactsCount")
+    needs_review_count: int = Field(default=0, serialization_alias="needsReviewCount")
+    approved_count: int = Field(default=0, serialization_alias="approvedCount")
+    rejected_count: int = Field(default=0, serialization_alias="rejectedCount")
     uploaded_at: datetime = Field(serialization_alias="uploadedAt")
     processed_at: datetime | None = Field(default=None, serialization_alias="processedAt")
     created_at: datetime = Field(serialization_alias="createdAt")
@@ -364,7 +372,72 @@ class BrandSourceDocumentUploadItem(BaseModel):
 class BrandSourceDocumentsUploadResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    batch_id: UUID = Field(serialization_alias="batchId")
+    status: str
     documents: list[BrandSourceDocumentUploadItem]
+
+
+class BrandImportBatchDocumentStatus(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    filename: str
+    extraction_status: str = Field(serialization_alias="extractionStatus")
+    progress_percent: int = Field(serialization_alias="progressPercent")
+    current_step: str | None = Field(default=None, serialization_alias="currentStep")
+    extracted_facts_count: int = Field(serialization_alias="extractedFactsCount")
+    extraction_error: str | None = Field(default=None, serialization_alias="extractionError")
+
+
+class BrandImportBatchRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    project_id: UUID = Field(serialization_alias="projectId")
+    name: str | None = None
+    source_type: str = Field(serialization_alias="sourceType")
+    notes: str | None = None
+    status: str
+    progress_percent: int = Field(serialization_alias="progressPercent")
+    current_step: str | None = Field(default=None, serialization_alias="currentStep")
+    total_files: int = Field(serialization_alias="totalFiles")
+    processed_files: int = Field(serialization_alias="processedFiles")
+    total_facts: int = Field(serialization_alias="totalFacts")
+    approved_facts: int = Field(serialization_alias="approvedFacts")
+    rejected_facts: int = Field(serialization_alias="rejectedFacts")
+    needs_review_facts: int = Field(serialization_alias="needsReviewFacts")
+    error_message: str | None = Field(default=None, serialization_alias="errorMessage")
+    warnings: list[str] = Field(default_factory=list)
+    started_at: datetime | None = Field(default=None, serialization_alias="startedAt")
+    completed_at: datetime | None = Field(default=None, serialization_alias="completedAt")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+
+class BrandImportBatchStatusResponse(BrandImportBatchRead):
+    documents: list[BrandImportBatchDocumentStatus] = Field(default_factory=list)
+
+
+class BrandImportBatchListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    name: str | None = None
+    source_type: str = Field(serialization_alias="sourceType")
+    status: str
+    progress_percent: int = Field(serialization_alias="progressPercent")
+    total_files: int = Field(serialization_alias="totalFiles")
+    total_facts: int = Field(serialization_alias="totalFacts")
+    needs_review_facts: int = Field(serialization_alias="needsReviewFacts")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    completed_at: datetime | None = Field(default=None, serialization_alias="completedAt")
+
+
+class BrandImportBatchStartResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    batch_id: UUID = Field(serialization_alias="batchId")
+    status: str
 
 
 class BrandExtractedFactRead(BaseModel):
@@ -373,6 +446,7 @@ class BrandExtractedFactRead(BaseModel):
     id: UUID
     project_id: UUID = Field(serialization_alias="projectId")
     source_document_id: UUID | None = Field(default=None, serialization_alias="sourceDocumentId")
+    batch_id: UUID | None = Field(default=None, serialization_alias="batchId")
     target_section: str = Field(serialization_alias="targetSection")
     target_entity_type: str | None = Field(default=None, serialization_alias="targetEntityType")
     field_name: str | None = Field(default=None, serialization_alias="fieldName")
@@ -381,6 +455,13 @@ class BrandExtractedFactRead(BaseModel):
     confidence: float
     status: str
     ai_reasoning: str | None = Field(default=None, serialization_alias="aiReasoning")
+    is_update_suggestion: bool = Field(default=False, serialization_alias="isUpdateSuggestion")
+    existing_target_id: UUID | None = Field(default=None, serialization_alias="existingTargetId")
+    update_mode: str = Field(default="create", serialization_alias="updateMode")
+    previous_value: Any | None = Field(default=None, serialization_alias="previousValue")
+    conflict_status: str = Field(default="none", serialization_alias="conflictStatus")
+    source_created_at: datetime | None = Field(default=None, serialization_alias="sourceCreatedAt")
+    import_round: int | None = Field(default=None, serialization_alias="importRound")
     reviewed_at: datetime | None = Field(default=None, serialization_alias="reviewedAt")
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
@@ -406,6 +487,7 @@ class BrandApplyFactsRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     fact_ids: list[UUID] = Field(validation_alias="factIds")
+    batch_id: UUID | None = Field(default=None, validation_alias="batchId")
 
 
 class BrandApplyFactsResultItem(BaseModel):

@@ -206,6 +206,7 @@ Implementato:
 - **Product & Collection SEO Optimizer**: score trasparente, modal Modifica SEO (campi precompilati, badge stato), proposta manuale/AI con preview e approve/apply controllato
 - **Brand Intelligence Foundation**: profilo brand, wizard, knowledge score, context builder AI, integrazione SEO non distruttiva
 - **Brand Intelligence Import AI v1**: upload documenti, extracted facts review, apply controllato
+- **Brand Intelligence Import Jobs v0.2.2**: batch persistenti, progress async, conflict detection, storico import
 - **Changelog Alpha**: versioning `0.x.x-alpha` — vedi [`CHANGELOG.md`](CHANGELOG.md) e `/projects/:id/changelog`
 - Struttura connectors e skills (stub OAuth per altri provider)
 

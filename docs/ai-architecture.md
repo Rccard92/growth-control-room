@@ -53,15 +53,18 @@ File: `apps/api/app/services/content/seo_proposal_engine.py`, `seo_proposal_fiel
 - Se presente, append `# Brand Intelligence` al system prompt
 - Fallback se profilo assente o score &lt; 10
 
-### AI Document Import (implementato v1)
+### AI Document Import (implementato v1 + batch jobs v0.2.2)
 
-File: `document_extraction.py`, `fact_apply.py`, `text_extraction.py`
+File: `batch_service.py`, `batch_processor.py`, `conflict_detection.py`, `document_extraction.py`, `fact_apply.py`, `text_extraction.py`
 
+- Upload crea `BrandImportBatch` persistente; start job async con `asyncio.create_task`
+- Progress tracking su DB; frontend polling ogni 2s
+- Conflict detection read-only vs tabelle ufficiali (`update_mode`, `previous_value`, `conflict_status`)
 - Upload + estrazione testo senza OpenAI
 - Estrazione AI richiede `OPENAI_API_KEY`
 - Output structured JSON: `document_type`, `facts[]`, `warnings[]`
 - Regole: no invenzioni, confidence cap su deduzioni, `unknown` se incerto
-- Apply mappa facts approvati su entità CRUD esistenti
+- Apply mappa facts approvati su entità CRUD esistenti; rispetta `update_mode` (no overwrite automatico)
 
 ### PED / Product Editorial (futuro)
 

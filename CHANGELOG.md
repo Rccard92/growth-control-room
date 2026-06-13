@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.2.2-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Brand Intelligence import batch jobs: `brand_import_batches` persistente, elaborazione async
+- Progress tracking su DB con polling frontend ogni 2s
+- Conflict detection per import incrementali (`update_mode`, `previous_value`, `conflict_status`)
+- Review obbligatoria prima dell'apply — nessun overwrite automatico dei dati approvati
+- Migration 017: batch, progress e campi conflict su documents/facts
+
 ## [0.2.1-alpha] - 2026-06-13
 
 Tipo: Alpha patch

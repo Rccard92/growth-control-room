@@ -142,9 +142,16 @@ export type {
   BrandExtractedFact,
   BrandApplyFactsResponse,
   BrandSourceDocumentsUploadResponse,
+  BrandImportBatch,
+  BrandImportBatchStatusResponse,
+  BrandImportBatchListItem,
+  BrandImportBatchStartResponse,
   BrandExtractBatchResponse,
   TargetSection,
   FactStatus,
   DocumentExtractionStatus,
+  ImportBatchStatus,
+  UpdateMode,
+  ConflictStatus,
 } from "./types/brand-intelligence";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";

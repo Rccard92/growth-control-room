@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.2.1-alpha";
+export const GCR_VERSION = "0.2.2-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.2.2-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Import batch jobs: elaborazione async con progress tracking su DB",
+      "Polling frontend ogni 2s durante estrazione AI",
+      "Conflict detection per import incrementali (update_mode, previous_value)",
+      "Storico import e review con badge conflitti",
+      "Migration 017 brand_import_batches",
+    ],
+  },
   {
     version: "0.2.1-alpha",
     date: "2026-06-13",

@@ -157,6 +157,19 @@ async def apply_approved_facts(
             )
             continue
 
+        if getattr(fact, "update_mode", "create") == "duplicate_candidate":
+            result.skipped.append(
+                ApplyResultItem(
+                    fact.id,
+                    fact.target_section,
+                    fact.field_name,
+                    "Duplicato rilevato: nessuna modifica applicata.",
+                )
+            )
+            fact.status = "needs_review"
+            result.needs_review += 1
+            continue
+
         applied = await _apply_single_fact(
             session,
             project_id,
@@ -217,6 +230,16 @@ async def _apply_single_fact(
 
     if section == "brand_profile":
         if field_name and field_name in PROFILE_FIELDS:
+            if getattr(fact, "update_mode", "create") == "enrich":
+                profile = await bi_service.get_profile(session, project_id)
+                existing = getattr(profile, field_name, None)
+                if not _is_empty_official(existing):
+                    return ApplyResultItem(
+                        fact.id,
+                        section,
+                        field_name,
+                        "Campo profilo già valorizzato; enrich saltato.",
+                    )
             profile_updates[field_name] = _coerce_profile_field(field_name, value)
             return ApplyResultItem(fact.id, section, field_name, "Campo profilo aggiornato.")
         if not field_name:
@@ -228,6 +251,16 @@ async def _apply_single_fact(
 
     if section == "voice_tone":
         if field_name and field_name in VOICE_FIELDS:
+            if getattr(fact, "update_mode", "create") == "enrich":
+                voice = await bi_service.get_voice(session, project_id)
+                existing = getattr(voice, field_name, None)
+                if not _is_empty_official(existing):
+                    return ApplyResultItem(
+                        fact.id,
+                        section,
+                        field_name,
+                        "Campo voice già valorizzato; enrich saltato.",
+                    )
             voice_updates[field_name] = _coerce_voice_field(field_name, value)
             return ApplyResultItem(fact.id, section, field_name, "Voice aggiornata.")
         if not field_name:
@@ -256,6 +289,16 @@ async def _apply_single_fact(
                 seo_keyword_append.extend(keywords)
                 return ApplyResultItem(fact.id, section, "primary_keywords", "Keyword SEO aggiunte.")
         if field_name and field_name in SEO_FIELDS:
+            if getattr(fact, "update_mode", "create") == "enrich":
+                seo_row = await bi_service.get_seo_strategy(session, project_id)
+                existing = getattr(seo_row, field_name, None)
+                if not _is_empty_official(existing):
+                    return ApplyResultItem(
+                        fact.id,
+                        section,
+                        field_name,
+                        "Campo SEO già valorizzato; enrich saltato.",
+                    )
             seo_updates[field_name] = _coerce_seo_field(field_name, value)
             return ApplyResultItem(fact.id, section, field_name, "Strategia SEO aggiornata.")
         return None
@@ -290,6 +333,16 @@ def _coerce_seo_field(field_name: str, value: Any) -> Any:
     return _as_str(value)
 
 
+def _is_empty_official(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, list):
+        return len(value) == 0
+    if isinstance(value, str):
+        return not value.strip()
+    return False
+
+
 async def _apply_product_fact(
     session: AsyncSession,
     project_id: UUID,
@@ -319,6 +372,13 @@ async def _apply_product_fact(
         name = description[:120]
     if not name:
         return None
+    if getattr(fact, "update_mode", "create") == "duplicate_candidate":
+        return ApplyResultItem(
+            fact.id,
+            fact.target_section,
+            fact.field_name,
+            f"{'Prodotto' if entity_type == 'product' else 'Categoria'} già esistente: {name}",
+        )
     if not description:
         description = _as_str(value) if not isinstance(value, dict) else None
     if not description:

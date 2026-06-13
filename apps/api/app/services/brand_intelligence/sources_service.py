@@ -16,16 +16,11 @@ from app.schemas.brand_intelligence import (
     BrandApplyFactsResultItem,
     BrandExtractedFactUpdate,
     BrandSourceDocumentRead,
-    BrandSourceDocumentUploadItem,
-    BrandSourceDocumentsUploadResponse,
 )
+from app.services.brand_intelligence.batch_service import update_batch_after_apply, upload_files_to_batch
 from app.services.brand_intelligence.document_extraction import run_ai_extraction_batch
 from app.services.brand_intelligence.fact_apply import apply_approved_facts
-from app.services.brand_intelligence.text_extraction import (
-    MAX_BATCH_FILES,
-    TextExtractionError,
-    extract_text_from_bytes,
-)
+from app.services.brand_intelligence.text_extraction import MAX_BATCH_FILES  # noqa: F401 — re-export for tests
 
 
 async def list_source_documents(
@@ -46,54 +41,19 @@ async def upload_source_documents(
     session: AsyncSession,
     project_id: UUID,
     files: list[UploadFile],
-) -> BrandSourceDocumentsUploadResponse:
-    if not files:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun file caricato.")
-    if len(files) > MAX_BATCH_FILES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Massimo {MAX_BATCH_FILES} file per batch.",
-        )
-
-    now = datetime.now(timezone.utc)
-    uploaded: list[BrandSourceDocumentUploadItem] = []
-
-    for upload in files:
-        filename = upload.filename or "document"
-        data = await upload.read()
-        doc = BrandSourceDocument(
-            project_id=project_id,
-            filename=filename,
-            content_type=upload.content_type or "application/octet-stream",
-            file_size=len(data),
-            storage_mode="text_only",
-            extraction_status="uploaded",
-            uploaded_at=now,
-        )
-        try:
-            doc.extracted_text = extract_text_from_bytes(
-                content_type=doc.content_type,
-                filename=filename,
-                data=data,
-            )
-            doc.extraction_error = None
-        except TextExtractionError as exc:
-            doc.extraction_status = "failed"
-            doc.extraction_error = exc.message
-            doc.extracted_text = None
-
-        session.add(doc)
-        await session.flush()
-        uploaded.append(
-            BrandSourceDocumentUploadItem(
-                id=doc.id,
-                filename=doc.filename,
-                status=doc.extraction_status,
-            )
-        )
-
-    await session.commit()
-    return BrandSourceDocumentsUploadResponse(documents=uploaded)
+    *,
+    batch_name: str | None = None,
+    source_type: str = "file_upload",
+    notes: str | None = None,
+):
+    return await upload_files_to_batch(
+        session,
+        project_id,
+        files,
+        batch_name=batch_name,
+        source_type=source_type,
+        notes=notes,
+    )
 
 
 async def list_extracted_facts(
@@ -103,6 +63,7 @@ async def list_extracted_facts(
     status_filter: str | None = None,
     target_section: str | None = None,
     source_document_id: UUID | None = None,
+    batch_id: UUID | None = None,
 ) -> list[BrandExtractedFact]:
     query = select(BrandExtractedFact).where(BrandExtractedFact.project_id == project_id)
     if status_filter:
@@ -111,6 +72,8 @@ async def list_extracted_facts(
         query = query.where(BrandExtractedFact.target_section == target_section)
     if source_document_id:
         query = query.where(BrandExtractedFact.source_document_id == source_document_id)
+    if batch_id:
+        query = query.where(BrandExtractedFact.batch_id == batch_id)
     query = query.order_by(BrandExtractedFact.created_at.desc())
     return list((await session.execute(query)).scalars().all())
 
@@ -146,8 +109,11 @@ async def apply_facts(
     session: AsyncSession,
     project_id: UUID,
     fact_ids: list[UUID],
+    batch_id: UUID | None = None,
 ) -> BrandApplyFactsResponse:
     result = await apply_approved_facts(session, project_id, fact_ids)
+    if batch_id:
+        await update_batch_after_apply(session, project_id, batch_id)
     return BrandApplyFactsResponse(
         saved=[
             BrandApplyFactsResultItem(

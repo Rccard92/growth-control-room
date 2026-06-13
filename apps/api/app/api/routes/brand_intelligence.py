@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -26,6 +26,9 @@ from app.schemas.brand_intelligence import (
     BrandExtractBatchRequest,
     BrandExtractedFactRead,
     BrandExtractedFactUpdate,
+    BrandImportBatchListItem,
+    BrandImportBatchStartResponse,
+    BrandImportBatchStatusResponse,
     BrandIntelligenceOverviewResponse,
     BrandKnowledgeScoreResponse,
     BrandProductKnowledgeCreate,
@@ -42,6 +45,12 @@ from app.schemas.brand_intelligence import (
 )
 from app.services.brand_intelligence import service as bi_service
 from app.services.brand_intelligence import sources_service
+from app.services.brand_intelligence.batch_processor import schedule_batch_processing
+from app.services.brand_intelligence.batch_service import (
+    get_batch_status,
+    list_batches,
+    mark_batch_started,
+)
 from app.services.brand_intelligence.document_extraction import run_ai_extraction
 from app.services.projects import get_project_in_default_workspace
 
@@ -536,10 +545,63 @@ async def delete_brand_asset(
 async def upload_brand_source_documents(
     project_id: UUID,
     files: list[UploadFile] = File(...),
+    batch_name: str | None = Form(default=None, alias="batchName"),
+    source_type: str = Form(default="file_upload", alias="sourceType"),
+    notes: str | None = Form(default=None),
     session: AsyncSession = Depends(get_db),
 ) -> BrandSourceDocumentsUploadResponse:
     await get_project_in_default_workspace(project_id, session)
-    return await sources_service.upload_source_documents(session, project_id, files)
+    return await sources_service.upload_source_documents(
+        session,
+        project_id,
+        files,
+        batch_name=batch_name,
+        source_type=source_type,
+        notes=notes,
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/start",
+    response_model=BrandImportBatchStartResponse,
+    response_model_by_alias=True,
+)
+async def start_brand_import_batch(
+    project_id: UUID,
+    batch_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandImportBatchStartResponse:
+    await get_project_in_default_workspace(project_id, session)
+    batch = await mark_batch_started(session, project_id, batch_id)
+    schedule_batch_processing(batch_id)
+    return BrandImportBatchStartResponse(batch_id=batch.id, status=batch.status)
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/import-batches/{batch_id}/status",
+    response_model=BrandImportBatchStatusResponse,
+    response_model_by_alias=True,
+)
+async def get_brand_import_batch_status(
+    project_id: UUID,
+    batch_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandImportBatchStatusResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await get_batch_status(session, project_id, batch_id)
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/import-batches",
+    response_model=list[BrandImportBatchListItem],
+    response_model_by_alias=True,
+)
+async def list_brand_import_batches(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> list[BrandImportBatchListItem]:
+    await get_project_in_default_workspace(project_id, session)
+    return await list_batches(session, project_id)
 
 
 @router.get(
@@ -577,6 +639,7 @@ async def extract_brand_source_batch(
     payload: BrandExtractBatchRequest,
     session: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Deprecato: preferire import-batches/{id}/start + polling status."""
     await get_project_in_default_workspace(project_id, session)
     return await sources_service.extract_document_batch(
         session, project_id, payload.document_ids
@@ -594,6 +657,7 @@ async def list_brand_extracted_facts(
     status: str | None = Query(default=None),
     target_section: str | None = Query(default=None, alias="targetSection"),
     source_document_id: UUID | None = Query(default=None, alias="sourceDocumentId"),
+    batch_id: UUID | None = Query(default=None, alias="batchId"),
 ) -> list[BrandExtractedFactRead]:
     await get_project_in_default_workspace(project_id, session)
     rows = await sources_service.list_extracted_facts(
@@ -602,6 +666,7 @@ async def list_brand_extracted_facts(
         status_filter=status,
         target_section=target_section,
         source_document_id=source_document_id,
+        batch_id=batch_id,
     )
     return [BrandExtractedFactRead.model_validate(r) for r in rows]
 
@@ -633,4 +698,6 @@ async def apply_brand_extracted_facts(
     session: AsyncSession = Depends(get_db),
 ) -> BrandApplyFactsResponse:
     await get_project_in_default_workspace(project_id, session)
-    return await sources_service.apply_facts(session, project_id, payload.fact_ids)
+    return await sources_service.apply_facts(
+        session, project_id, payload.fact_ids, batch_id=payload.batch_id
+    )

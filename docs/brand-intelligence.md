@@ -11,13 +11,22 @@ All'apertura di un progetto nuovo o con score basso, l'Overview propone due perc
 
 Le sezioni avanzate restano compilabili nelle tab dedicate per migliorare lo score.
 
-## AI File Import v1
+## AI File Import v1 (0.2.1) e Import Jobs v1 (0.2.2)
 
-### Flusso
+### Flusso batch (0.2.2)
+
+1. **Upload** — `POST .../sources/upload` crea un `BrandImportBatch` e collega i documenti (`batchId` in response)
+2. **Start job** — `POST .../import-batches/{batchId}/start` avvia elaborazione asincrona
+3. **Polling** — `GET .../import-batches/{batchId}/status` ogni ~2s; progress su DB (`progress_percent`, `current_step`)
+4. **Conflict detection** — confronto read-only con tabelle ufficiali; `update_mode`, `previous_value`, `conflict_status`
+5. **Review** — approva/modifica/rifiuta facts (inclusi conflitti evidenziati)
+6. **Apply** — `POST .../extracted-facts/apply` con `{ factIds, batchId? }` — solo `approved`, rispetta `update_mode`
+
+### Flusso legacy sincrono (deprecato)
 
 1. **Upload** — `POST .../sources/upload` (multipart, max 10 file, 15MB ciascuno)
-2. **Estrazione testo** — sincrona al upload (pypdf, python-docx); storage alpha: `text_only` (metadata + testo, no binario)
-3. **Estrazione AI** — `POST .../sources/{id}/extract` o batch; crea `BrandExtractedFact` con `status=suggested`
+2. **Estrazione testo** — sincrona al upload (pypdf, python-docx); storage alpha: `text_only`
+3. **Estrazione AI** — `POST .../sources/{id}/extract` o `extract-batch` (bloccante); crea `BrandExtractedFact` con `status=suggested`
 4. **Review umana** — approva, modifica, sposta sezione o rifiuta ogni fact
 5. **Apply** — `POST .../extracted-facts/apply` salva **solo** facts `approved` nelle tabelle ufficiali
 
@@ -62,15 +71,18 @@ Base path: `/api/projects/{project_id}/brand-intelligence`
 
 **CRUD ufficiale:** overview, score, context, profile, voice, products, audience, claims, seo-strategy, pillars, guardrails, assets
 
-**Import AI:**
+**Import AI (batch jobs v0.2.2):**
 
-- `POST /sources/upload` — multipart `files[]`
+- `POST /sources/upload` — multipart `files[]`, opzionale `batchName`, `notes` → `{ batchId, status, documents }`
+- `POST /import-batches/{batchId}/start` — avvia job async
+- `GET /import-batches/{batchId}/status` — polling progress + documenti
+- `GET /import-batches` — storico batch
 - `GET /sources` — lista documenti
-- `POST /sources/{document_id}/extract` — estrazione AI singola
-- `POST /sources/extract-batch` — `{ documentIds: [] }`
-- `GET /extracted-facts` — query: `status`, `targetSection`, `sourceDocumentId`
+- `POST /sources/{document_id}/extract` — estrazione AI singola (legacy)
+- `POST /sources/extract-batch` — deprecato, preferire start + poll
+- `GET /extracted-facts` — query: `status`, `targetSection`, `sourceDocumentId`, `batchId`
 - `PATCH /extracted-facts/{fact_id}` — review
-- `POST /extracted-facts/apply` — `{ factIds: [] }` solo approved
+- `POST /extracted-facts/apply` — `{ factIds, batchId? }` solo approved
 
 ## UI
 
@@ -78,8 +90,8 @@ Sidebar progetto → **Brand Intelligence** (dopo Control Room).
 
 - **Overview**: onboarding dual-path, score ring, sezioni
 - **Wizard**: minimo obbligatorio
-- **Import AI**: 3 step (carica → estrai → revisiona)
-- **Documenti**: elenco file caricati
+- **Import AI**: upload → elaborazione async con progress bar → revisione con conflitti; storico batch sotto il wizard
+- **Documenti**: elenco file caricati + link allo storico import
 - **Tab per sezione**: CRUD manuale
 
 Route import: `/projects/:id/brand-intelligence/import`
@@ -88,3 +100,4 @@ Route import: `/projects/:id/brand-intelligence/import`
 
 - `015_brand_intelligence_foundation` — 10 tabelle CRUD
 - `016_brand_intelligence_ai_import` — `brand_source_documents`, `brand_extracted_facts`
+- `017_brand_import_batches` — `brand_import_batches`, campi batch/progress/conflict su documents e facts

@@ -3,20 +3,26 @@ import type { BrandApplyFactsResponse } from "@gcr/shared";
 import { BrandExtractedFactsReview, BrandImportApplySummary } from "./BrandExtractedFactsReview";
 import { BrandFileDropzone } from "./BrandFileDropzone";
 import { BrandImportDocumentsList } from "./BrandImportDocumentsList";
+import { BrandImportHistoryPanel } from "./BrandImportHistoryPanel";
+import { BrandImportProgressBar } from "./BrandImportProgressBar";
 import {
   useApplyBrandExtractedFacts,
   useBrandExtractedFacts,
   useBrandSourceDocuments,
-  useExtractBrandSourcesBatch,
+  useImportBatchStatus,
+  useImportBatches,
   usePatchBrandExtractedFact,
+  useStartImportBatch,
   useUploadBrandSources,
 } from "../../hooks/useBrandIntelligence";
 
 const STEPS = [
   { id: 1, label: "Carica documenti" },
-  { id: 2, label: "Estrai con AI" },
+  { id: 2, label: "Elaborazione" },
   { id: 3, label: "Revisiona e approva" },
 ] as const;
+
+const READY_STATUSES = new Set(["review_ready", "partially_failed", "completed"]);
 
 interface BrandIntelligenceImportPanelProps {
   projectId: string;
@@ -24,51 +30,46 @@ interface BrandIntelligenceImportPanelProps {
 
 export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImportPanelProps) {
   const [step, setStep] = useState(1);
+  const [batchId, setBatchId] = useState<string | null>(null);
   const [applyResult, setApplyResult] = useState<BrandApplyFactsResponse | null>(null);
-  const [extractError, setExtractError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const { data: documents = [] } = useBrandSourceDocuments(projectId);
-  const { data: facts = [] } = useBrandExtractedFacts(projectId);
+  const { data: batches = [] } = useImportBatches(projectId);
+  const { data: batchStatus } = useImportBatchStatus(projectId, batchId ?? undefined, {
+    enabled: Boolean(batchId),
+    polling: step === 2,
+  });
+  const { data: facts = [] } = useBrandExtractedFacts(projectId, batchId ? { batchId } : undefined);
+
   const upload = useUploadBrandSources(projectId);
-  const extractBatch = useExtractBrandSourcesBatch(projectId);
+  const startBatch = useStartImportBatch(projectId);
   const patchFact = usePatchBrandExtractedFact(projectId);
   const applyFacts = useApplyBrandExtractedFacts(projectId);
 
-  const uploadableDocs = documents.filter(
-    (d) => d.extractionStatus === "uploaded" && !d.extractionError,
+  const isProcessing = Boolean(
+    batchStatus &&
+      !READY_STATUSES.has(batchStatus.status) &&
+      batchStatus.status !== "failed",
   );
-  const isExtracting = documents.some((d) => d.extractionStatus === "extracting");
 
   async function handleUpload(files: File[]) {
-    await upload.mutateAsync(files);
-    setStep(2);
+    setUploadError(null);
+    setApplyResult(null);
+    try {
+      const result = await upload.mutateAsync({ files });
+      setBatchId(result.batchId);
+      setStep(2);
+      await startBatch.mutateAsync(result.batchId);
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : "Caricamento non riuscito.");
+    }
   }
 
-  async function handleExtract() {
-    setExtractError(null);
-    const ids = uploadableDocs.map((d) => d.id);
-    if (ids.length === 0) {
-      const extractedIds = documents
-        .filter((d) => d.extractionStatus === "extracted")
-        .map((d) => d.id);
-      if (extractedIds.length) {
-        setStep(3);
-        return;
-      }
-      setExtractError("Nessun documento pronto per l'estrazione. Carica file validi prima.");
-      return;
-    }
-    try {
-      const result = await extractBatch.mutateAsync(ids);
-      const failed = result.results.filter((r) => r.status === "failed");
-      if (failed.length === result.results.length) {
-        setExtractError(failed[0]?.error ?? "Estrazione AI non riuscita.");
-      } else {
-        setStep(3);
-      }
-    } catch (e) {
-      setExtractError(e instanceof Error ? e.message : "Estrazione AI non riuscita.");
-    }
+  function openReviewForBatch(id: string) {
+    setBatchId(id);
+    setStep(3);
+    setApplyResult(null);
   }
 
   return (
@@ -90,45 +91,78 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
           <h3 className="bi-panel__title">Carica documenti</h3>
           <p className="bi-panel__subtitle">
             PDF, Word, cataloghi o schede prodotto. L&apos;AI estrarrà informazioni da revisionare prima del salvataggio.
+            Nessun dato ufficiale viene sovrascritto automaticamente.
           </p>
-          <BrandFileDropzone onFilesSelected={handleUpload} disabled={upload.isPending} />
-          {upload.isPending && <p className="bi-panel__subtitle">Caricamento…</p>}
-          <BrandImportDocumentsList documents={documents} />
+          <BrandFileDropzone onFilesSelected={handleUpload} disabled={upload.isPending || startBatch.isPending} />
+          {(upload.isPending || startBatch.isPending) && (
+            <p className="bi-panel__subtitle">Caricamento e avvio elaborazione…</p>
+          )}
+          {uploadError && (
+            <div className="gcr-alert gcr-alert--error" style={{ marginTop: "1rem" }}>
+              {uploadError}
+            </div>
+          )}
+          <BrandImportDocumentsList documents={documents.slice(0, 5)} />
         </div>
       )}
 
       {step === 2 && (
         <div className="bi-panel">
-          <h3 className="bi-panel__title">Estrai con AI</h3>
+          <h3 className="bi-panel__title">Elaborazione import</h3>
           <p className="bi-panel__subtitle">
-            Analizza il testo estratto e genera proposte organizzate per sezione. Nessun salvataggio automatico.
+            Estrazione testo, analisi AI e rilevamento conflitti con i dati ufficiali esistenti.
+            Puoi lasciare questa pagina aperta: il progresso si aggiorna automaticamente.
           </p>
-          <BrandImportDocumentsList documents={documents} />
-          {extractError && (
-            <div className="gcr-alert gcr-alert--error" style={{ marginTop: "1rem" }}>
-              {extractError}
-              {extractError.includes("OPENAI") && (
-                <span> Upload ed estrazione testo restano disponibili senza OpenAI.</span>
+
+          {batchStatus ? (
+            <>
+              <BrandImportProgressBar
+                percent={batchStatus.progressPercent}
+                currentStep={batchStatus.currentStep}
+                processedFiles={batchStatus.processedFiles}
+                totalFiles={batchStatus.totalFiles}
+                totalFacts={batchStatus.totalFacts}
+              />
+              <BrandImportDocumentsList
+                documents={batchStatus.documents.map((d) => ({
+                  id: d.id,
+                  filename: d.filename,
+                  extractionStatus: d.extractionStatus,
+                  progressPercent: d.progressPercent,
+                  currentStep: d.currentStep,
+                  extractionError: d.extractionError,
+                }))}
+              />
+              {batchStatus.status === "failed" && (
+                <div className="gcr-alert gcr-alert--error" style={{ marginTop: "1rem" }}>
+                  {batchStatus.errorMessage ?? "Elaborazione fallita."}
+                </div>
               )}
-            </div>
+              {READY_STATUSES.has(batchStatus.status) && (
+                <div className="bi-wizard__actions" style={{ marginTop: "1rem" }}>
+                  <button
+                    type="button"
+                    className="gcr-btn gcr-btn--primary"
+                    onClick={() => setStep(3)}
+                  >
+                    Revisiona informazioni estratte ({batchStatus.needsReviewFacts + batchStatus.approvedFacts})
+                  </button>
+                </div>
+              )}
+              {isProcessing && (
+                <p className="bi-panel__subtitle" style={{ marginTop: "1rem" }}>
+                  Elaborazione in corso… aggiornamento ogni 2 secondi.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="bi-panel__subtitle">In attesa dello stato batch…</p>
           )}
+
           <div className="bi-wizard__actions">
             <button type="button" className="gcr-btn gcr-btn--ghost" onClick={() => setStep(1)}>
-              Indietro
+              Nuovo upload
             </button>
-            <button
-              type="button"
-              className="gcr-btn gcr-btn--primary"
-              disabled={extractBatch.isPending || isExtracting}
-              onClick={handleExtract}
-            >
-              {extractBatch.isPending || isExtracting ? "Estrazione…" : "Estrai informazioni"}
-            </button>
-            {documents.some((d) => d.extractionStatus === "extracted") && (
-              <button type="button" className="gcr-btn gcr-btn--ghost" onClick={() => setStep(3)}>
-                Vai alla revisione
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -137,7 +171,8 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
         <div className="bi-panel">
           <h3 className="bi-panel__title">Revisiona e approva</h3>
           <p className="bi-panel__subtitle">
-            Approva, modifica o rifiuta ogni informazione. Solo i facts approvati verranno salvati nella Brand Intelligence ufficiale.
+            Approva, modifica o rifiuta ogni informazione. I conflitti con dati esistenti sono evidenziati.
+            Solo i facts approvati verranno salvati nella Brand Intelligence ufficiale.
           </p>
           <BrandExtractedFactsReview
             facts={facts.filter((f) => f.status !== "rejected")}
@@ -150,7 +185,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
               patchFact.mutate({ factId: id, data: { extractedValue: value } })
             }
             onApply={async (ids) => {
-              const result = await applyFacts.mutateAsync(ids);
+              const result = await applyFacts.mutateAsync({ factIds: ids, batchId: batchId ?? undefined });
               setApplyResult(result);
             }}
             applying={applyFacts.isPending}
@@ -163,6 +198,12 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
           </div>
         </div>
       )}
+
+      <BrandImportHistoryPanel
+        projectId={projectId}
+        batches={batches}
+        onOpenReview={openReviewForBatch}
+      />
     </div>
   );
 }

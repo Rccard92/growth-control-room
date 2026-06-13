@@ -8,6 +8,9 @@ import type {
   BrandContextBundle,
   BrandExtractBatchResponse,
   BrandExtractedFact,
+  BrandImportBatchListItem,
+  BrandImportBatchStartResponse,
+  BrandImportBatchStatusResponse,
   BrandIntelligenceOverview,
   BrandKnowledgeScore,
   BrandProductKnowledge,
@@ -234,14 +237,42 @@ export function listBrandSourceDocuments(projectId: string): Promise<BrandSource
 export function uploadBrandSourceDocuments(
   projectId: string,
   files: File[],
+  options?: { batchName?: string; notes?: string },
 ): Promise<BrandSourceDocumentsUploadResponse> {
   const form = new FormData();
   for (const file of files) {
     form.append("files", file);
   }
+  if (options?.batchName) form.append("batchName", options.batchName);
+  if (options?.notes) form.append("notes", options.notes);
   return apiUploadForm<BrandSourceDocumentsUploadResponse>(
     `/api/projects/${projectId}/brand-intelligence/sources/upload`,
     form,
+  );
+}
+
+export function startImportBatch(
+  projectId: string,
+  batchId: string,
+): Promise<BrandImportBatchStartResponse> {
+  return apiFetch<BrandImportBatchStartResponse>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/start`,
+    { method: "POST" },
+  );
+}
+
+export function getImportBatchStatus(
+  projectId: string,
+  batchId: string,
+): Promise<BrandImportBatchStatusResponse> {
+  return apiFetch<BrandImportBatchStatusResponse>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches/${batchId}/status`,
+  );
+}
+
+export function listImportBatches(projectId: string): Promise<BrandImportBatchListItem[]> {
+  return apiFetch<BrandImportBatchListItem[]>(
+    `/api/projects/${projectId}/brand-intelligence/import-batches`,
   );
 }
 
@@ -265,12 +296,14 @@ export function listBrandExtractedFacts(
     status?: FactStatus;
     targetSection?: TargetSection;
     sourceDocumentId?: string;
+    batchId?: string;
   },
 ): Promise<BrandExtractedFact[]> {
   const params = new URLSearchParams();
   if (filters?.status) params.set("status", filters.status);
   if (filters?.targetSection) params.set("targetSection", filters.targetSection);
   if (filters?.sourceDocumentId) params.set("sourceDocumentId", filters.sourceDocumentId);
+  if (filters?.batchId) params.set("batchId", filters.batchId);
   const qs = params.toString();
   return apiFetch<BrandExtractedFact[]>(
     `/api/projects/${projectId}/brand-intelligence/extracted-facts${qs ? `?${qs}` : ""}`,
@@ -300,13 +333,14 @@ export function patchBrandExtractedFact(
 export function applyBrandExtractedFacts(
   projectId: string,
   factIds: string[],
+  batchId?: string,
 ): Promise<BrandApplyFactsResponse> {
   return apiFetch<BrandApplyFactsResponse>(
     `/api/projects/${projectId}/brand-intelligence/extracted-facts/apply`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ factIds }),
+      body: JSON.stringify({ factIds, batchId }),
     },
   );
 }

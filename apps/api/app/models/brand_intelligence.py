@@ -193,12 +193,54 @@ class BrandAsset(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="brand_assets")
 
 
+class BrandImportBatch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_import_batches"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(50), default="file_upload")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    progress_percent: Mapped[int] = mapped_column(Integer, default=0)
+    current_step: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    total_files: Mapped[int] = mapped_column(Integer, default=0)
+    processed_files: Mapped[int] = mapped_column(Integer, default=0)
+    total_facts: Mapped[int] = mapped_column(Integer, default=0)
+    approved_facts: Mapped[int] = mapped_column(Integer, default=0)
+    rejected_facts: Mapped[int] = mapped_column(Integer, default=0)
+    needs_review_facts: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    warnings: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_import_batches")
+    documents: Mapped[list["BrandSourceDocument"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan",
+    )
+    extracted_facts: Mapped[list["BrandExtractedFact"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan",
+    )
+
+
 class BrandSourceDocument(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "brand_source_documents"
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("brand_import_batches.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     filename: Mapped[str] = mapped_column(String(500))
@@ -210,10 +252,18 @@ class BrandSourceDocument(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     document_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     extraction_status: Mapped[str] = mapped_column(String(50), default="uploaded")
     extraction_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processing_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    progress_percent: Mapped[int] = mapped_column(Integer, default=0)
+    current_step: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    extracted_facts_count: Mapped[int] = mapped_column(Integer, default=0)
+    needs_review_count: Mapped[int] = mapped_column(Integer, default=0)
+    approved_count: Mapped[int] = mapped_column(Integer, default=0)
+    rejected_count: Mapped[int] = mapped_column(Integer, default=0)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="brand_source_documents")
+    batch: Mapped["BrandImportBatch | None"] = relationship(back_populates="documents")
     extracted_facts: Mapped[list["BrandExtractedFact"]] = relationship(
         back_populates="source_document",
         cascade="all, delete-orphan",
@@ -234,6 +284,12 @@ class BrandExtractedFact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("brand_import_batches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     target_section: Mapped[str] = mapped_column(String(100))
     target_entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     field_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -242,9 +298,17 @@ class BrandExtractedFact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     status: Mapped[str] = mapped_column(String(50), default="suggested")
     ai_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_update_suggestion: Mapped[bool] = mapped_column(default=False, server_default="false")
+    existing_target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    update_mode: Mapped[str] = mapped_column(String(50), default="create")
+    previous_value: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
+    conflict_status: Mapped[str] = mapped_column(String(50), default="none")
+    source_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    import_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="brand_extracted_facts")
+    batch: Mapped["BrandImportBatch | None"] = relationship(back_populates="extracted_facts")
     source_document: Mapped["BrandSourceDocument | None"] = relationship(
         back_populates="extracted_facts",
     )
