@@ -13,6 +13,8 @@ interface SeoProposalFooterProps {
   loading?: boolean;
   saveLoading?: boolean;
   generateLoading?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledMessage?: string;
   onSaveDraft: () => void;
   onGenerateAi: () => void;
   onApprove: () => void;
@@ -28,6 +30,8 @@ export function SeoProposalFooter({
   loading,
   saveLoading,
   generateLoading,
+  saveDisabled,
+  saveDisabledMessage,
   onSaveDraft,
   onGenerateAi,
   onApprove,
@@ -49,10 +53,13 @@ export function SeoProposalFooter({
         </p>
       )}
       <div className="seo-proposal-footer__actions">
+        {saveDisabled && saveDisabledMessage && (
+          <p className="seo-proposal-footer__hint">{saveDisabledMessage}</p>
+        )}
         <button
           type="button"
           className="gcr-btn gcr-btn--secondary"
-          disabled={saveLoading || loading}
+          disabled={saveLoading || loading || saveDisabled}
           onClick={onSaveDraft}
         >
           {saveLoading ? "Salvataggio…" : "Salva come proposta"}

@@ -20,6 +20,8 @@ from app.schemas.seo_optimizer import (
     SeoOptimizerSyncResponse,
     SeoProductDetailResponse,
     SeoProductListResponse,
+    SeoProposalGenerateFieldRequest,
+    SeoProposalGenerateFieldResponse,
     SeoProposalGenerateRequest,
     SeoProposalListResponse,
     SeoProposalManualRequest,
@@ -57,6 +59,9 @@ from app.services.content.seo_proposal_manual_service import create_manual_propo
 from app.services.content.seo_skill_loader import skill_meta_for_detail_response
 from app.services.content.seo_proposal_preview_service import build_proposal_preview
 from app.services.content.seo_proposal_engine import generate_seo_proposal
+from app.services.content.seo_proposal_field_engine import generate_seo_proposal_field
+from app.services.content.seo_proposal_read import proposal_to_read_dict
+from app.services.content.seo_proposal_diff import proposal_changed_fields
 from app.services.projects import get_project_in_default_workspace
 from app.services.shopify.client import ShopifyAPIError
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
@@ -270,6 +275,11 @@ async def list_collections_seo(
 def _proposal_from_dict(data: dict | None) -> SeoProposalRead | None:
     if not data:
         return None
+    current = data.get("currentValues") or data.get("current_values")
+    proposed = data.get("proposedValues") or data.get("proposed_values")
+    changed = data.get("changedFields") or data.get("changed_fields")
+    if changed is None:
+        changed = proposal_changed_fields(current, proposed)
     return SeoProposalRead.model_validate(
         {
             "id": data["id"],
@@ -278,15 +288,20 @@ def _proposal_from_dict(data: dict | None) -> SeoProposalRead | None:
             "entity_gid": data.get("entityGid") or data.get("entity_gid"),
             "status": data["status"],
             "source": data["source"],
-            "current_values": data.get("currentValues") or data.get("current_values"),
-            "proposed_values": data.get("proposedValues") or data.get("proposed_values"),
+            "current_values": current,
+            "proposed_values": proposed,
             "reasoning": data.get("reasoning"),
             "risk_level": data.get("riskLevel") or data.get("risk_level"),
             "approved_at": data.get("approvedAt") or data.get("approved_at"),
             "applied_at": data.get("appliedAt") or data.get("applied_at"),
             "created_at": data.get("createdAt") or data.get("created_at"),
+            "changed_fields": changed,
         }
     )
+
+
+def _proposal_read(proposal) -> SeoProposalRead:
+    return SeoProposalRead.model_validate(proposal_to_read_dict(proposal))
 
 
 def _build_product_detail(data: dict) -> SeoProductDetailResponse:
@@ -462,7 +477,7 @@ async def list_seo_proposals(
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposals = await list_proposals(store, session, status=status_filter)
     return SeoProposalListResponse(
-        items=[SeoProposalRead.model_validate(p) for p in proposals]
+        items=[_proposal_read(p) for p in proposals]
     )
 
 
@@ -497,7 +512,42 @@ async def generate_proposal(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return SeoProposalRead.model_validate(proposal)
+    return _proposal_read(proposal)
+
+
+@router.post(
+    "/{project_id}/content/seo/proposals/generate-field",
+    response_model=SeoProposalGenerateFieldResponse,
+    response_model_by_alias=True,
+)
+async def generate_proposal_field(
+    project_id: UUID,
+    body: SeoProposalGenerateFieldRequest,
+    session: AsyncSession = Depends(get_db),
+) -> SeoProposalGenerateFieldResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+
+    if body.use_ai and not is_openai_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI non configurata. Aggiungi OPENAI_API_KEY per generare proposte automatiche.",
+        )
+
+    try:
+        result = await generate_seo_proposal_field(
+            store,
+            session,
+            entity_type=body.entity_type,
+            entity_id=body.entity_id,
+            field=body.field,
+            image_id=body.image_id,
+            use_ai=body.use_ai,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return SeoProposalGenerateFieldResponse.model_validate(result)
 
 
 @router.post(
@@ -522,7 +572,7 @@ async def create_manual_seo_proposal(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return SeoProposalRead.model_validate(proposal)
+    return _proposal_read(proposal)
 
 
 @router.post(
@@ -559,7 +609,7 @@ async def get_proposal(
     proposal = await get_proposal_for_store(store, session, proposal_id)
     if proposal is None:
         raise HTTPException(status_code=404, detail="Proposta non trovata")
-    return SeoProposalRead.model_validate(proposal)
+    return _proposal_read(proposal)
 
 
 @router.post(
@@ -581,7 +631,7 @@ async def approve_seo_proposal(
         proposal = await approve_proposal(proposal, session)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return SeoProposalRead.model_validate(proposal)
+    return _proposal_read(proposal)
 
 
 @router.post(
@@ -603,7 +653,7 @@ async def reject_seo_proposal(
         proposal = await reject_proposal(proposal, session)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return SeoProposalRead.model_validate(proposal)
+    return _proposal_read(proposal)
 
 
 @router.post(

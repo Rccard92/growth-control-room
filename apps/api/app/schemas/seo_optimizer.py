@@ -81,6 +81,28 @@ class SeoProposalManualRequest(BaseModel):
     entity_type: str = Field(validation_alias="entityType")
     entity_id: UUID = Field(validation_alias="entityId")
     proposed_values: dict[str, Any] = Field(validation_alias="proposedValues")
+    changed_fields: list[str] | None = Field(
+        default=None, validation_alias="changedFields"
+    )
+
+
+class SeoProposalGenerateFieldRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    entity_type: str = Field(validation_alias="entityType")
+    entity_id: UUID = Field(validation_alias="entityId")
+    field: str
+    image_id: str | None = Field(default=None, validation_alias="imageId")
+    use_ai: bool = Field(default=True, validation_alias="useAi")
+
+
+class SeoProposalGenerateFieldResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    field: str
+    value: Any
+    reasoning: str | None = None
+    risk_level: str = Field(serialization_alias="riskLevel")
 
 
 class SeoScoreBreakdownItem(BaseModel):
@@ -111,6 +133,9 @@ class SeoProposalRead(BaseModel):
     approved_at: datetime | None = Field(default=None, serialization_alias="approvedAt")
     applied_at: datetime | None = Field(default=None, serialization_alias="appliedAt")
     created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
+    changed_fields: list[str] = Field(
+        default_factory=list, serialization_alias="changedFields"
+    )
 
 
 class SeoProposalPreviewField(BaseModel):

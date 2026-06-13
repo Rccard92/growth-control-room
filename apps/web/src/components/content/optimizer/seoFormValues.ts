@@ -354,7 +354,7 @@ export function needsImageAltWarning(
   return imageAlts.length === 0;
 }
 
-export type FieldStatus = "ok" | "missing" | "improve" | "verify";
+export type FieldStatus = "ok" | "missing" | "improve" | "verify" | "ai_proposed" | "generating";
 
 const ISSUE_FIELD_MAP: Record<string, string[]> = {
   title: ["title", "product_title", "collection_title"],
@@ -470,13 +470,35 @@ export function getFieldStatus(
   issues?: Record<string, unknown>[] | null,
   scoreBreakdown?: SeoScoreBreakdown | null,
   aiFilledFields?: Set<string>,
+  fieldState?: {
+    generating?: boolean;
+    source?: string;
+    accepted?: boolean;
+    dirty?: boolean;
+    reasoning?: string;
+  },
 ): { status: FieldStatus; note?: string } {
+  if (fieldState?.generating) {
+    return { status: "generating", note: "Generazione AI in corso…" };
+  }
+
   if (isEmptyValue(value)) {
     return { status: "missing", note: "Campo non impostato su Shopify" };
   }
 
+  if (fieldState?.source === "ai" && fieldState.dirty && !fieldState.accepted) {
+    return {
+      status: "ai_proposed",
+      note: fieldState.reasoning || "Proposto da AI — verifica prima di salvare",
+    };
+  }
+
   if (aiFilledFields?.has(field)) {
     return { status: "verify", note: "Contenuto AI — verifica prima di salvare" };
+  }
+
+  if (fieldState?.source === "ai" && fieldState.accepted) {
+    return { status: "verify", note: "Contenuto AI accettato" };
   }
 
   const issue = findIssueForField(field, issues);

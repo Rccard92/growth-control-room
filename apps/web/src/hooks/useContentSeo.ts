@@ -5,6 +5,7 @@ import {
   applyProposal,
   approveProposal,
   generateProposal,
+  generateProposalField,
   getCollectionAnalysis,
   getCollectionSeoDetail,
   getCollectionsSeo,
@@ -113,6 +114,29 @@ export function useGenerateProposal(projectId: string) {
   });
 }
 
+export function useGenerateProposalField(projectId: string) {
+  return useMutation({
+    mutationFn: ({
+      entityType,
+      entityId,
+      field,
+      imageId,
+      useAi,
+    }: {
+      entityType: "product" | "collection";
+      entityId: string;
+      field: string;
+      imageId?: string;
+      useAi?: boolean;
+    }) =>
+      generateProposalField(projectId, entityType, entityId, {
+        field,
+        imageId,
+        useAi,
+      }),
+  });
+}
+
 export function useSaveManualProposal(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -120,11 +144,14 @@ export function useSaveManualProposal(projectId: string) {
       entityType,
       entityId,
       proposedValues,
+      changedFields,
     }: {
       entityType: "product" | "collection";
       entityId: string;
       proposedValues: Record<string, unknown>;
-    }) => saveManualProposal(projectId, entityType, entityId, proposedValues),
+      changedFields?: string[];
+    }) =>
+      saveManualProposal(projectId, entityType, entityId, proposedValues, changedFields),
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.proposals(projectId) });
       if (vars.entityType === "product") {

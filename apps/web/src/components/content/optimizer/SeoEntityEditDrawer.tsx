@@ -12,7 +12,23 @@ import { SeoScoreBadge } from "./SeoScoreBadge";
 import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
 import { SeoSkillAppliedPanel } from "./SeoSkillAppliedPanel";
 import {
-  collectAiFilledFields,
+  applyGlobalMergeToFieldState,
+  applyFieldValueToForm,
+  acceptFieldState,
+  applyAiFieldState,
+  buildChangedProposalValues,
+  collectChangedKeysFromMerge,
+  hasSaveableChanges,
+  imageAltFieldKey,
+  initFieldStateMap,
+  markFieldsFromGlobalAi,
+  restoreFieldOriginal,
+  setFieldGenerating,
+  updateFieldStateValue,
+  type FieldStateMap,
+  type SeoEditableField,
+} from "./seoFieldState";
+import {
   extractProposedValues,
   getEffectiveIssues,
   hasUsableProposalFields,
@@ -20,10 +36,10 @@ import {
   needsImageAltWarning,
   normalizeFormValues,
   resolveMediaFromProposal,
-  toProposalValues,
 } from "./seoFormValues";
 import {
   useGenerateProposal,
+  useGenerateProposalField,
   useProposalActions,
   useSaveManualProposal,
   useSyncCollectionSeo,
@@ -91,7 +107,7 @@ export function SeoEntityEditDrawer({
   const [aiToastVariant, setAiToastVariant] = useState<"success" | "error" | "warn">("success");
   const [aiReasoning, setAiReasoning] = useState<string[]>([]);
   const [aiRiskLevel, setAiRiskLevel] = useState<string | null>(null);
-  const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
+  const [fieldStateMap, setFieldStateMap] = useState<FieldStateMap>({});
   const initialFormRef = useRef<string>("");
   const lastInitKeyRef = useRef<string | null>(null);
 
@@ -109,6 +125,7 @@ export function SeoEntityEditDrawer({
 
   const saveManual = useSaveManualProposal(projectId);
   const generateAi = useGenerateProposal(projectId);
+  const generateField = useGenerateProposalField(projectId);
   const proposalActions = useProposalActions(projectId);
   const syncProduct = useSyncProductSeo(projectId);
   const syncCollection = useSyncCollectionSeo(projectId);
@@ -119,21 +136,21 @@ export function SeoEntityEditDrawer({
         detailSource.currentValues ??
         (detailSource as { current_values?: Record<string, unknown> }).current_values;
       const normalized = normalizeFormValues(raw, entityType, detailSource);
-      setFormValues(normalized);
-      initialFormRef.current = JSON.stringify(normalized);
-      setFormDirty(false);
-      setMediaImages(
+      const images =
         entityType === "product"
           ? (productDetail?.images ?? (normalized.images as Record<string, unknown>[]) ?? [])
           : collectionDetail?.image
             ? [collectionDetail.image]
-            : [],
-      );
+            : [];
+      setFormValues(normalized);
+      initialFormRef.current = JSON.stringify(normalized);
+      setFormDirty(false);
+      setMediaImages(images);
+      setFieldStateMap(initFieldStateMap(normalized, entityType, images));
       setActiveProposalId(detailSource.latestProposal?.id ?? null);
       setActiveProposal(detailSource.latestProposal ?? null);
       setAiReasoning([]);
       setAiRiskLevel(null);
-      setAiFilledFields(new Set());
       setAiToast(null);
       setTab("fields");
       if (detailSource.latestProposal?.status !== "applied") {
@@ -162,10 +179,14 @@ export function SeoEntityEditDrawer({
   ) => {
     if (!values) return;
     const normalized = normalizeFormValues(values, entityType, detailSource ?? detail);
+    const images =
+      entityType === "product" && Array.isArray(normalized.images)
+        ? (normalized.images as Record<string, unknown>[])
+        : mediaImages;
     setFormValues(normalized);
     initialFormRef.current = JSON.stringify(normalized);
     setFormDirty(false);
-    setAiFilledFields(new Set());
+    setFieldStateMap(initFieldStateMap(normalized, entityType, images));
     setAiReasoning([]);
     setAiRiskLevel(null);
     if (entityType === "product" && Array.isArray(normalized.images)) {
@@ -192,23 +213,22 @@ export function SeoEntityEditDrawer({
   };
 
   const handleFieldChange = (key: string, value: unknown) => {
+    const strVal = String(value ?? "");
     setFormValues((prev) => {
       const next = { ...prev, [key]: value };
       setFormDirty(JSON.stringify(next) !== initialFormRef.current);
       return next;
     });
-    setAiFilledFields((prev) => {
-      if (!prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
+    setFieldStateMap((prev) => updateFieldStateValue(prev, key, strVal, "manual"));
   };
 
   const handleImageAltChange = (index: number, alt: string) => {
     setMediaImages((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], altText: alt };
+      const imageId = String(next[index].id ?? index);
+      const fk = imageAltFieldKey(imageId);
+      setFieldStateMap((fsm) => updateFieldStateValue(fsm, fk, alt, "manual"));
       setFormValues((fv) => {
         const updated = { ...fv, images: next };
         setFormDirty(JSON.stringify(updated) !== initialFormRef.current);
@@ -216,16 +236,86 @@ export function SeoEntityEditDrawer({
       });
       return next;
     });
-    setAiFilledFields((prev) => {
-      if (!prev.has("imageAlt")) return prev;
-      const next = new Set(prev);
-      next.delete("imageAlt");
-      return next;
-    });
   };
 
-  const buildProposedValues = () =>
-    toProposalValues(formValues, entityType, mediaImages);
+  const handleRestoreField = (fieldKey: string) => {
+    const restored = restoreFieldOriginal(fieldStateMap, fieldKey);
+    const row = restored[fieldKey];
+    if (!row) return;
+    setFieldStateMap(restored);
+    if (fieldKey.startsWith("imageAlt:")) {
+      const imageId = fieldKey.slice("imageAlt:".length);
+      setMediaImages((prev) =>
+        prev.map((img) =>
+          String(img.id ?? "") === imageId ? { ...img, altText: row.originalValue } : img,
+        ),
+      );
+      setFormValues((fv) => {
+        const images = (fv.images as Record<string, unknown>[] | undefined)?.map((img) =>
+          String(img.id ?? "") === imageId ? { ...img, altText: row.originalValue } : img,
+        );
+        const next = { ...fv, images };
+        setFormDirty(JSON.stringify(next) !== initialFormRef.current);
+        return next;
+      });
+    } else {
+      setFormValues((prev) => {
+        const next = { ...prev, [fieldKey]: row.originalValue };
+        setFormDirty(JSON.stringify(next) !== initialFormRef.current);
+        return next;
+      });
+    }
+  };
+
+  const handleAcceptField = (fieldKey: string) => {
+    setFieldStateMap((prev) => acceptFieldState(prev, fieldKey));
+  };
+
+  const handleGenerateFieldAi = (field: SeoEditableField, imageId?: string) => {
+    const stateKey =
+      field === "imageAlt" && imageId ? imageAltFieldKey(imageId) : field;
+    setFieldStateMap((prev) => setFieldGenerating(prev, stateKey));
+    generateField.mutate(
+      { entityType, entityId, field, imageId, useAi: true },
+      {
+        onSuccess: (res) => {
+          const applied = applyFieldValueToForm(
+            formValues,
+            mediaImages,
+            field,
+            res.value,
+            entityType,
+          );
+          setFormValues(applied.formValues);
+          setMediaImages(applied.mediaImages);
+          let strValue = "";
+          if (field === "imageAlt" && entityType === "product" && imageId) {
+            const img = applied.mediaImages.find((m) => String(m.id ?? "") === imageId);
+            strValue = String(img?.altText ?? img?.alt ?? "");
+          } else if (field === "imageAlt") {
+            strValue = String(applied.formValues.imageAlt ?? "");
+          } else {
+            strValue = String(applied.formValues[field] ?? "");
+          }
+          setFieldStateMap((prev) =>
+            applyAiFieldState(prev, stateKey, strValue, res.reasoning ?? undefined, res.riskLevel),
+          );
+          setFormDirty(true);
+          setAiToastVariant("success");
+          setAiToast(`Campo aggiornato con AI. Controlla e salva come proposta.`);
+        },
+        onError: () => {
+          setFieldStateMap((prev) => {
+            const row = prev[stateKey];
+            if (!row) return prev;
+            return { ...prev, [stateKey]: { ...row, generating: false } };
+          });
+          setAiToastVariant("error");
+          setAiToast("Generazione AI del campo non riuscita.");
+        },
+      },
+    );
+  };
 
   const applyProposalToForm = (
     proposal: SeoOptimizationProposal,
@@ -238,12 +328,20 @@ export function SeoEntityEditDrawer({
       );
       if (!ok) return false;
     }
-    const merged = mergeProposedIntoForm(formValues, proposed, entityType);
-    let nextMedia = mediaImages;
+    const baselineRaw =
+      detail?.currentValues ??
+      (detail as { current_values?: Record<string, unknown> } | undefined)?.current_values;
+    const baseline = normalizeFormValues(baselineRaw, entityType, detail);
+    const baselineMedia =
+      entityType === "product"
+        ? (baseline.images as Record<string, unknown>[]) ?? mediaImages
+        : mediaImages;
+    const merged = mergeProposedIntoForm(baseline, proposed, entityType);
+    let nextMedia = baselineMedia;
     if (entityType === "product") {
       nextMedia = resolveMediaFromProposal(
         proposed,
-        mediaImages.length > 0 ? mediaImages : ((merged.images as Record<string, unknown>[]) ?? []),
+        baselineMedia.length > 0 ? baselineMedia : ((merged.images as Record<string, unknown>[]) ?? []),
       );
       setMediaImages(nextMedia);
     }
@@ -251,7 +349,26 @@ export function SeoEntityEditDrawer({
     setFormDirty(true);
     setActiveProposalId(proposal.id);
     setActiveProposal(proposal);
-    setAiFilledFields(collectAiFilledFields(formValues, merged, entityType, mediaImages, nextMedia));
+    const changed = collectChangedKeysFromMerge(
+      baseline,
+      merged,
+      entityType,
+      baselineMedia,
+      nextMedia,
+    );
+    let fsm = initFieldStateMap(baseline, entityType, baselineMedia);
+    for (const key of changed) {
+      let val = "";
+      if (key.startsWith("imageAlt:")) {
+        const imageId = key.slice("imageAlt:".length);
+        const img = nextMedia.find((m) => String(m.id ?? "") === imageId);
+        val = String(img?.altText ?? img?.alt ?? "");
+      } else {
+        val = String(merged[key] ?? "");
+      }
+      fsm = applyAiFieldState(fsm, key, val, normalizeReasoning(proposal.reasoning)[0], proposal.riskLevel);
+    }
+    setFieldStateMap(fsm);
     setAiReasoning(normalizeReasoning(proposal.reasoning));
     setAiRiskLevel(proposal.riskLevel ?? null);
     setTab("fields");
@@ -259,11 +376,23 @@ export function SeoEntityEditDrawer({
   };
 
   const handleSaveDraft = () => {
+    const { proposedValues, changedFields } = buildChangedProposalValues(
+      formValues,
+      entityType,
+      mediaImages,
+      fieldStateMap,
+    );
+    if (changedFields.length === 0) {
+      setAiToastVariant("warn");
+      setAiToast("Nessuna modifica da salvare.");
+      return;
+    }
     saveManual.mutate(
       {
         entityType,
         entityId,
-        proposedValues: buildProposedValues(),
+        proposedValues,
+        changedFields,
       },
       {
         onSuccess: (proposal) => {
@@ -271,7 +400,7 @@ export function SeoEntityEditDrawer({
           setActiveProposal(proposal);
           initialFormRef.current = JSON.stringify(formValues);
           setFormDirty(false);
-          setAiFilledFields(new Set());
+          setFieldStateMap(initFieldStateMap(formValues, entityType, mediaImages));
           onDetailRefresh?.();
         },
       },
@@ -316,8 +445,20 @@ export function SeoEntityEditDrawer({
           setFormDirty(true);
           setActiveProposalId(proposal.id);
           setActiveProposal(proposal);
-          setAiFilledFields(
-            collectAiFilledFields(formValues, merged, entityType, mediaImages, nextMedia),
+          const changed = collectChangedKeysFromMerge(
+            formValues,
+            merged,
+            entityType,
+            mediaImages,
+            nextMedia,
+          );
+          setFieldStateMap((prev) =>
+            markFieldsFromGlobalAi(
+              applyGlobalMergeToFieldState(prev, merged, nextMedia, changed),
+              changed,
+              normalizeReasoning(proposal.reasoning)[0],
+              proposal.riskLevel ?? undefined,
+            ),
           );
           setAiReasoning(normalizeReasoning(proposal.reasoning));
           setAiRiskLevel(proposal.riskLevel ?? null);
@@ -400,6 +541,7 @@ export function SeoEntityEditDrawer({
   const actionLoading =
     saveManual.isPending ||
     generateAi.isPending ||
+    generateField.isPending ||
     proposalActions.approve.isPending ||
     proposalActions.reject.isPending ||
     proposalActions.apply.isPending ||
@@ -419,6 +561,10 @@ export function SeoEntityEditDrawer({
       loading={actionLoading}
       saveLoading={saveManual.isPending}
       generateLoading={generateAi.isPending}
+      saveDisabled={!hasSaveableChanges(fieldStateMap)}
+      saveDisabledMessage={
+        !hasSaveableChanges(fieldStateMap) ? "Nessuna modifica da salvare." : undefined
+      }
       onSaveDraft={handleSaveDraft}
       onGenerateAi={handleGenerateAi}
       onApprove={() => {
@@ -559,8 +705,12 @@ export function SeoEntityEditDrawer({
                 values={formValues}
                 issues={effectiveIssues}
                 scoreBreakdown={scoreBreakdown}
-                aiFilledFields={aiFilledFields}
+                fieldStateMap={fieldStateMap}
+                openaiConfigured={openaiConfigured}
                 onChange={handleFieldChange}
+                onGenerateField={handleGenerateFieldAi}
+                onRestoreField={handleRestoreField}
+                onAcceptField={handleAcceptField}
               />
               {(aiReasoning.length > 0 || aiRiskLevel) && (
                 <div className="gcr-card seo-ai-reasoning-card">
@@ -599,9 +749,13 @@ export function SeoEntityEditDrawer({
               issues={effectiveIssues}
               scoreBreakdown={scoreBreakdown}
               mediaImages={mediaImages}
-              aiFilledFields={aiFilledFields}
+              fieldStateMap={fieldStateMap}
+              openaiConfigured={openaiConfigured}
               onChange={handleFieldChange}
               onImageAltChange={handleImageAltChange}
+              onGenerateField={handleGenerateFieldAi}
+              onRestoreField={handleRestoreField}
+              onAcceptField={handleAcceptField}
             />
           )}
 

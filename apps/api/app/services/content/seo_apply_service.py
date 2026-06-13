@@ -9,6 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.seo_optimizer import SeoChangeLog, SeoOptimizationProposal
 from app.models.shopify import ShopifyStore
 from app.services.content.seo_apply_local_update import apply_proposed_values_to_entity
+from app.services.content.seo_proposal_diff import (
+    compute_changed_proposed,
+    proposal_changed_fields,
+)
 from app.services.content.seo_entity_analyze_single import (
     analyze_single_collection,
     analyze_single_product,
@@ -139,6 +143,10 @@ def _proposal_payload(proposal: SeoOptimizationProposal) -> dict[str, Any]:
         "proposedValues": proposal.proposed_values,
         "reasoning": proposal.reasoning,
         "riskLevel": proposal.risk_level,
+        "changedFields": proposal_changed_fields(
+            proposal.current_values,
+            proposal.proposed_values,
+        ),
         "approvedAt": proposal.approved_at,
         "appliedAt": proposal.applied_at,
         "createdAt": proposal.created_at,
@@ -251,6 +259,12 @@ async def apply_proposal(
         )
 
     proposed = proposal.proposed_values or {}
+    effective_proposed, _ = compute_changed_proposed(
+        proposal.current_values,
+        proposed,
+    )
+    if not effective_proposed:
+        raise ValueError("Nessun campo da applicare nella proposta")
     applied_values: dict[str, Any] = {}
     shopify_response: dict[str, Any] = {}
 
@@ -266,38 +280,40 @@ async def apply_proposal(
             """
             input_data: dict[str, Any] = {"id": proposal.entity_gid}
             title = _get_proposed(
-                proposed, "product_title", "proposed_product_title"
+                effective_proposed, "product_title", "proposed_product_title"
             )
             if title:
                 input_data["title"] = title
-            handle = _get_proposed(proposed, "handle", "proposed_handle")
+            handle = _get_proposed(effective_proposed, "handle", "proposed_handle")
             if handle:
                 input_data["handle"] = handle
             seo_block: dict[str, str] = {}
-            seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
+            seo_title = _get_proposed(effective_proposed, "seo_title", "proposed_seo_title")
             if seo_title:
                 seo_block["title"] = seo_title
-            meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
+            meta = _get_proposed(
+                effective_proposed, "meta_description", "proposed_meta_description"
+            )
             if meta:
                 seo_block["description"] = meta
             if seo_block:
                 input_data["seo"] = seo_block
             desc_html = _get_proposed(
-                proposed, "description_html", "proposed_description_html"
+                effective_proposed, "description_html", "proposed_description_html"
             )
             if desc_html:
                 input_data["descriptionHtml"] = desc_html
 
             data = await client.execute(mutation, {"input": input_data})
             shopify_response = data
-            applied_values = proposed
+            applied_values = effective_proposed
             errors = (data.get("productUpdate") or {}).get("userErrors") or []
             if errors:
                 raise ShopifyAPIError(
                     "; ".join(e.get("message", "") for e in errors[:3])
                 )
             await _apply_product_media_alts(
-                client, proposal.entity_gid, proposed, shopify_response
+                client, proposal.entity_gid, effective_proposed, shopify_response
             )
         elif proposal.entity_type == "collection":
             mutation = """
@@ -310,25 +326,27 @@ async def apply_proposal(
             """
             input_data = {"id": proposal.entity_gid}
             title = _get_proposed(
-                proposed, "collection_title", "proposed_collection_title"
+                effective_proposed, "collection_title", "proposed_collection_title"
             )
             if title:
                 input_data["title"] = title
-            handle = _get_proposed(proposed, "handle", "proposed_handle")
+            handle = _get_proposed(effective_proposed, "handle", "proposed_handle")
             if handle:
                 input_data["handle"] = handle
             desc_html = _get_proposed(
-                proposed,
+                effective_proposed,
                 "description_html",
                 "proposed_description",
             )
             if desc_html:
                 input_data["descriptionHtml"] = desc_html
             seo_block = {}
-            seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
+            seo_title = _get_proposed(effective_proposed, "seo_title", "proposed_seo_title")
             if seo_title:
                 seo_block["title"] = seo_title
-            meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
+            meta = _get_proposed(
+                effective_proposed, "meta_description", "proposed_meta_description"
+            )
             if meta:
                 seo_block["description"] = meta
             if seo_block:
@@ -336,20 +354,20 @@ async def apply_proposal(
 
             data = await client.execute(mutation, {"input": input_data})
             shopify_response = data
-            applied_values = proposed
+            applied_values = effective_proposed
             errors = (data.get("collectionUpdate") or {}).get("userErrors") or []
             if errors:
                 raise ShopifyAPIError(
                     "; ".join(e.get("message", "") for e in errors[:3])
                 )
             await _apply_collection_image_alt(
-                client, proposal.entity_gid, proposed, shopify_response
+                client, proposal.entity_gid, effective_proposed, shopify_response
             )
         else:
             raise ValueError("entity_type non supportato per apply")
 
         local_ok = await _refresh_local_after_apply(
-            store, session, proposal, proposed, shopify_response
+            store, session, proposal, effective_proposed, shopify_response
         )
 
         proposal.status = "applied"

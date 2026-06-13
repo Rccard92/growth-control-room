@@ -219,6 +219,14 @@ export interface SeoOptimizationProposal {
   approvedAt?: string | null;
   appliedAt?: string | null;
   createdAt?: string | null;
+  changedFields?: string[];
+}
+
+export interface SeoProposalGenerateFieldResponse {
+  field: string;
+  value: unknown;
+  reasoning?: string | null;
+  riskLevel: "low" | "medium" | "high";
 }
 
 export interface SeoProposalPreviewField {

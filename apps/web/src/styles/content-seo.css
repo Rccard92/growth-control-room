@@ -453,6 +453,29 @@
   color: #64b5f6;
 }
 
+.seo-field-status-badge--ai_proposed {
+  background: rgba(156, 39, 176, 0.15);
+  color: #ce93d8;
+}
+
+.seo-field-status-badge--generating {
+  background: rgba(158, 158, 158, 0.15);
+  color: #bdbdbd;
+}
+
+.seo-field-editor__actions {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-left: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.seo-field-ai-btn {
+  min-width: 2.5rem;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
 .seo-ai-reasoning-card {
   margin-top: 1rem;
   padding: 0.75rem 1rem;

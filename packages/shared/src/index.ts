@@ -92,6 +92,7 @@ export type {
   SeoProductListResponse,
   SeoCollectionListResponse,
   SeoEntityAnalysis,
+  SeoProposalGenerateFieldResponse,
   SeoOptimizationProposal,
   SeoProposalListResponse,
   SeoApplyResponse,

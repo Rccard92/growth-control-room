@@ -15,6 +15,7 @@ from app.services.ai.openai_client import (
     is_openai_configured,
 )
 from app.services.content.seo_current_values import normalize_proposal_values
+from app.services.content.seo_proposal_diff import compute_changed_proposed
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 
@@ -293,6 +294,9 @@ async def generate_seo_proposal(
         reasoning = proposed.pop("reasoning", []) or []
 
     risk_level = str(proposed.pop("risk_level", "low"))
+    proposed_delta, _changed = compute_changed_proposed(current, proposed)
+    if not _changed:
+        raise ValueError("Nessun campo da proporre")
     proposal = SeoOptimizationProposal(
         project_id=store.project_id,
         shopify_store_id=store.id,
@@ -302,7 +306,7 @@ async def generate_seo_proposal(
         status="draft",
         source=source,
         current_values=current,
-        proposed_values=proposed,
+        proposed_values=proposed_delta,
         reasoning=reasoning if isinstance(reasoning, list) else [str(reasoning)],
         risk_level=risk_level if risk_level in ("low", "medium", "high") else "low",
     )

@@ -8,6 +8,7 @@ from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyStore
 from app.services.content.seo_current_values import normalize_proposal_values
+from app.services.content.seo_proposal_diff import compute_changed_proposed
 from app.services.content.seo_proposal_engine import (
     collection_current_values,
     product_current_values,
@@ -84,6 +85,9 @@ async def create_manual_proposal(
         entity_type,
         normalize_proposal_values(entity_type, proposed_values),
     )
+    proposed_delta, changed_fields = compute_changed_proposed(current, cleaned)
+    if not changed_fields:
+        raise ValueError("Nessuna modifica da salvare")
     proposal = SeoOptimizationProposal(
         project_id=store.project_id,
         shopify_store_id=store.id,
@@ -93,7 +97,7 @@ async def create_manual_proposal(
         status="draft",
         source="manual",
         current_values=current,
-        proposed_values=cleaned,
+        proposed_values=proposed_delta,
         reasoning=["Proposta creata manualmente dall'utente"],
         risk_level="low",
     )

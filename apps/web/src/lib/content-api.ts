@@ -11,6 +11,7 @@ import type {
   SeoProductDetailResponse,
   SeoProductListResponse,
   SeoProposalListResponse,
+  SeoProposalGenerateFieldResponse,
   SeoProposalPreviewResponse,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
@@ -113,18 +114,41 @@ export function generateProposal(
   );
 }
 
+export function generateProposalField(
+  projectId: string,
+  entityType: "product" | "collection",
+  entityId: string,
+  options: { field: string; imageId?: string; useAi?: boolean },
+): Promise<SeoProposalGenerateFieldResponse> {
+  return apiFetch<SeoProposalGenerateFieldResponse>(
+    `/api/projects/${projectId}/content/seo/proposals/generate-field`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entityType,
+        entityId,
+        field: options.field,
+        imageId: options.imageId,
+        useAi: options.useAi ?? true,
+      }),
+    },
+  );
+}
+
 export function saveManualProposal(
   projectId: string,
   entityType: "product" | "collection",
   entityId: string,
   proposedValues: Record<string, unknown>,
+  changedFields?: string[],
 ): Promise<SeoOptimizationProposal> {
   return apiFetch<SeoOptimizationProposal>(
     `/api/projects/${projectId}/content/seo/proposals/manual`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entityType, entityId, proposedValues }),
+      body: JSON.stringify({ entityType, entityId, proposedValues, changedFields }),
     },
   );
 }

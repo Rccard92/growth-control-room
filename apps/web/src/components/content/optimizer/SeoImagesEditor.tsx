@@ -1,5 +1,7 @@
 import type { SeoScoreBreakdown } from "@gcr/shared";
 import { SeoFieldStatusBadge } from "./SeoFieldStatusBadge";
+import type { FieldStateMap } from "./seoFieldState";
+import { imageAltFieldKey } from "./seoFieldState";
 import type { SeoFormValues } from "./seoFormValues";
 
 interface SeoImagesEditorProps {
@@ -8,9 +10,13 @@ interface SeoImagesEditorProps {
   issues?: Record<string, unknown>[] | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
   mediaImages?: Record<string, unknown>[];
-  aiFilledFields?: Set<string>;
+  fieldStateMap?: FieldStateMap;
+  openaiConfigured?: boolean;
   onChange: (key: string, value: unknown) => void;
   onImageAltChange?: (index: number, alt: string) => void;
+  onGenerateField?: (field: "imageAlt", imageId?: string) => void;
+  onRestoreField?: (field: string) => void;
+  onAcceptField?: (field: string) => void;
 }
 
 export function SeoImagesEditor({
@@ -19,9 +25,13 @@ export function SeoImagesEditor({
   issues,
   scoreBreakdown,
   mediaImages = [],
-  aiFilledFields,
+  fieldStateMap,
+  openaiConfigured,
   onChange,
   onImageAltChange,
+  onGenerateField,
+  onRestoreField,
+  onAcceptField,
 }: SeoImagesEditorProps) {
   return (
     <div className="seo-field-editor seo-images-editor">
@@ -34,44 +44,125 @@ export function SeoImagesEditor({
               value={values.imageAlt}
               issues={issues}
               scoreBreakdown={scoreBreakdown}
-              aiFilledFields={aiFilledFields}
+              fieldState={fieldStateMap?.imageAlt}
             />
+            <span className="seo-field-editor__actions">
+              {openaiConfigured && onGenerateField && (
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--secondary gcr-btn--sm seo-field-ai-btn"
+                  title="Genera solo questo campo"
+                  disabled={fieldStateMap?.imageAlt?.generating}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onGenerateField("imageAlt");
+                  }}
+                >
+                  {fieldStateMap?.imageAlt?.generating ? "…" : "✦ AI"}
+                </button>
+              )}
+              {fieldStateMap?.imageAlt?.dirty &&
+                fieldStateMap.imageAlt.value !== fieldStateMap.imageAlt.originalValue &&
+                onRestoreField && (
+                  <button
+                    type="button"
+                    className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onRestoreField("imageAlt");
+                    }}
+                  >
+                    Ripristina
+                  </button>
+                )}
+            </span>
           </span>
           <input
             className="seo-field-editor__input"
             type="text"
             value={String(values.imageAlt ?? "")}
+            disabled={fieldStateMap?.imageAlt?.generating}
             onChange={(e) => onChange("imageAlt", e.target.value)}
           />
         </label>
       ) : mediaImages.length === 0 ? (
         <p className="shopify-empty-copy">Nessuna immagine sincronizzata.</p>
       ) : (
-        mediaImages.map((img, idx) => (
-          <div key={idx} className="seo-images-tab__item">
-            {typeof img.url === "string" && (
-              <img src={img.url} alt="" className="seo-images-tab__thumb" />
-            )}
-            <label className="seo-field-editor__field">
-              <span className="seo-field-editor__label">
-                Alt text immagine {idx + 1}
-                <SeoFieldStatusBadge
-                  field="imageAlt"
-                  value={img.altText ?? img.alt}
-                  issues={issues}
-                  scoreBreakdown={scoreBreakdown}
-                  aiFilledFields={aiFilledFields}
+        mediaImages.map((img, idx) => {
+          const imageId = String(img.id ?? idx);
+          const fk = imageAltFieldKey(imageId);
+          const fs = fieldStateMap?.[fk];
+          const altVal = String(img.altText ?? img.alt ?? "");
+          return (
+            <div key={fk} className="seo-images-tab__item">
+              {typeof img.url === "string" && (
+                <img src={img.url} alt="" className="seo-images-tab__thumb" />
+              )}
+              <label className="seo-field-editor__field">
+                <span className="seo-field-editor__label">
+                  Alt text immagine {idx + 1}
+                  <SeoFieldStatusBadge
+                    field="imageAlt"
+                    value={altVal}
+                    issues={issues}
+                    scoreBreakdown={scoreBreakdown}
+                    fieldState={fs}
+                  />
+                  <span className="seo-field-editor__actions">
+                    {openaiConfigured && onGenerateField && (
+                      <button
+                        type="button"
+                        className="gcr-btn gcr-btn--secondary gcr-btn--sm seo-field-ai-btn"
+                        title="Genera solo questo campo"
+                        disabled={fs?.generating}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onGenerateField("imageAlt", imageId);
+                        }}
+                      >
+                        {fs?.generating ? "…" : "✦ AI"}
+                      </button>
+                    )}
+                    {fs?.dirty && fs.value !== fs.originalValue && onRestoreField && (
+                      <button
+                        type="button"
+                        className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onRestoreField(fk);
+                        }}
+                      >
+                        Ripristina
+                      </button>
+                    )}
+                    {fs?.source === "ai" && !fs.accepted && fs.dirty && onAcceptField && (
+                      <button
+                        type="button"
+                        className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onAcceptField(fk);
+                        }}
+                      >
+                        Accetta
+                      </button>
+                    )}
+                  </span>
+                </span>
+                <input
+                  className="seo-field-editor__input"
+                  type="text"
+                  value={altVal}
+                  disabled={fs?.generating}
+                  onChange={(e) => onImageAltChange?.(idx, e.target.value)}
                 />
-              </span>
-              <input
-                className="seo-field-editor__input"
-                type="text"
-                value={String(img.altText ?? img.alt ?? "")}
-                onChange={(e) => onImageAltChange?.(idx, e.target.value)}
-              />
-            </label>
-          </div>
-        ))
+                {fs?.reasoning && (
+                  <span className="seo-field-editor__note">{fs.reasoning}</span>
+                )}
+              </label>
+            </div>
+          );
+        })
       )}
     </div>
   );
