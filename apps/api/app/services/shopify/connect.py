@@ -48,6 +48,7 @@ async def persist_shopify_connection(
     session: AsyncSession,
     *,
     shop_info: dict | None = None,
+    granted_scopes: list[str] | None = None,
 ) -> ShopifyStore:
     normalized_domain = normalize_shop_domain(shop_domain)
     if shop_info is None:
@@ -121,6 +122,9 @@ async def persist_shopify_connection(
     store.currency = shop_info.get("currencyCode")
     store.timezone = shop_info.get("ianaTimezone")
     store.connection_status = "connected"
+    if granted_scopes is not None:
+        store.granted_scopes = granted_scopes
+        store.scopes_checked_at = datetime.now(UTC)
 
     await session.flush()
     await session.refresh(store)
@@ -136,10 +140,16 @@ async def connect_shopify(
     normalized_domain = normalize_shop_domain(shop_domain)
     client = ShopifyGraphQLClient(normalized_domain, admin_access_token)
     shop_info = await client.fetch_shop()
+    granted_scopes: list[str] = []
+    try:
+        granted_scopes = await client.fetch_access_scopes()
+    except ShopifyAPIError:
+        granted_scopes = []
     return await persist_shopify_connection(
         project_id,
         normalized_domain,
         admin_access_token,
         session,
         shop_info=shop_info,
+        granted_scopes=granted_scopes or None,
     )

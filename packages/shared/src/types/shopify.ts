@@ -21,6 +21,16 @@ export interface ShopifyStatus {
   lastSyncAt?: string | null;
 }
 
+export interface ShopifyScopesResponse {
+  shopDomain: string;
+  configuredScopes: string[];
+  grantedScopes: string[];
+  missingScopes: string[];
+  canWriteProducts: boolean;
+  requiresReconnect: boolean;
+  message: string;
+}
+
 export interface ShopifySyncResponse {
   productsSynced: number;
   variantsSynced?: number;

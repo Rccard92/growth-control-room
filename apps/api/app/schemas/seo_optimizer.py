@@ -220,6 +220,7 @@ class SeoApplyResponse(BaseModel):
 
     applied: bool
     requires_scope: str | None = Field(default=None, serialization_alias="requiresScope")
+    requires_reconnect: bool = Field(default=False, serialization_alias="requiresReconnect")
     message: str | None = None
     proposal_id: str | None = Field(default=None, serialization_alias="proposalId")
 

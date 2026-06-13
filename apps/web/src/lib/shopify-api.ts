@@ -7,6 +7,7 @@ import type {
   ShopifyOrder,
   ShopifyProduct,
   ShopifyStatus,
+  ShopifyScopesResponse,
   ShopifySyncResponse,
 } from "@gcr/shared";
 import { dateRangeToApiQueryString } from "./date-range";
@@ -41,6 +42,10 @@ export function connectShopify(
 
 export function getShopifyStatus(projectId: string): Promise<ShopifyStatus> {
   return apiFetch<ShopifyStatus>(`/api/projects/${projectId}/shopify/status`);
+}
+
+export function getShopifyScopes(projectId: string): Promise<ShopifyScopesResponse> {
+  return apiFetch<ShopifyScopesResponse>(`/api/projects/${projectId}/shopify/scopes`);
 }
 
 export function syncShopify(projectId: string): Promise<ShopifySyncResponse> {

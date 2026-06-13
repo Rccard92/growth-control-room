@@ -16,6 +16,7 @@ from app.schemas.shopify import (
     ShopifyOrderRead,
     ShopifyProductRead,
     ShopifyReconciliationDebugResponse,
+    ShopifyScopesResponse,
     ShopifyShopifyqlProbeResponse,
     ShopifyStatusResponse,
     ShopifySyncResponse,
@@ -31,6 +32,7 @@ from app.services.shopify.oauth import (
 from app.services.shopify.dashboard import build_dashboard
 from app.services.shopify.period import resolve_period_pair, resolve_shopify_period
 from app.services.shopify.reconciliation import build_reconciliation_debug
+from app.services.shopify.scopes import resolve_shopify_scopes
 from app.services.shopify.shopifyql import fetch_official_analytics, probe_shopifyql
 from app.services.shopify.sync import sync_shopify_store
 
@@ -118,6 +120,28 @@ async def shopify_status(
         shop_name=store.shop_name,
         last_sync_at=store.last_sync_at,
     )
+
+
+@router.get(
+    "/{project_id}/shopify/scopes",
+    response_model=ShopifyScopesResponse,
+    response_model_by_alias=True,
+)
+async def shopify_scopes(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ShopifyScopesResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = await get_shopify_store_for_project(project_id, session)
+
+    if store is None or store.connection_status != "connected":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify non connesso per questo progetto",
+        )
+
+    scope_info = await resolve_shopify_scopes(store, session, force_refresh=True)
+    return ShopifyScopesResponse.model_validate(scope_info)
 
 
 @router.post(

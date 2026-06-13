@@ -5,6 +5,7 @@ import {
   getShopifyDashboard,
   getShopifyOrders,
   getShopifyProducts,
+  getShopifyScopes,
   getShopifyStatus,
   syncShopify,
 } from "../lib/shopify-api";
@@ -16,6 +17,14 @@ export function useShopifyStatus(projectId: string | undefined) {
     queryKey: queryKeys.shopify.status(projectId ?? ""),
     queryFn: () => getShopifyStatus(projectId!),
     enabled: Boolean(projectId),
+  });
+}
+
+export function useShopifyScopes(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.shopify.scopes(projectId ?? ""),
+    queryFn: () => getShopifyScopes(projectId!),
+    enabled: Boolean(projectId) && enabled,
   });
 }
 

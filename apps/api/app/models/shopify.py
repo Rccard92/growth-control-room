@@ -39,6 +39,11 @@ class ShopifyStore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         DateTime(timezone=True),
         nullable=True,
     )
+    granted_scopes: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    scopes_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     project: Mapped["Project"] = relationship(back_populates="shopify_stores")
     integration: Mapped["Integration"] = relationship()

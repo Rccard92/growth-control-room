@@ -3,6 +3,7 @@ import type { SeoOptimizationProposal, SeoOptimizerTab } from "@gcr/shared";
 import { StatusBadge } from "../../StatusBadge";
 import { EntitySeoTable, type EntityFilter } from "./EntitySeoTable";
 import { SeoEntityEditDrawer } from "./SeoEntityEditDrawer";
+import { ShopifyScopesPanel } from "./ShopifyScopesPanel";
 import {
   useAnalyzeCollectionsSeo,
   useAnalyzeProductsSeo,
@@ -13,6 +14,7 @@ import {
   useProposalsSeo,
   useSeoOptimizerSync,
 } from "../../../hooks/useContentSeo";
+import { useShopifyScopes, useShopifyStatus } from "../../../hooks/useShopify";
 
 const TABS: { id: SeoOptimizerTab; label: string; comingSoon?: boolean }[] = [
   { id: "products", label: "Prodotti" },
@@ -42,6 +44,8 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
     connected,
   );
   const { data: proposalsData } = useProposalsSeo(projectId, connected);
+  const { data: shopifyStatus } = useShopifyStatus(projectId);
+  const shopifyScopesQuery = useShopifyScopes(projectId, connected);
 
   const syncMutation = useSeoOptimizerSync(projectId);
   const analyzeProductsMutation = useAnalyzeProductsSeo(projectId);
@@ -58,9 +62,14 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
 
   const openaiConfigured = productsData?.openaiConfigured ?? collectionsData?.openaiConfigured ?? false;
   const writeProductsAvailable =
-    productsData?.writeProductsAvailable ?? collectionsData?.writeProductsAvailable ?? false;
+    shopifyScopesQuery.data?.canWriteProducts ??
+    productsData?.writeProductsAvailable ??
+    collectionsData?.writeProductsAvailable ??
+    false;
+  const scopeBannerMessage = shopifyScopesQuery.data?.message;
 
   const handleOpenEdit = (entityType: "product" | "collection", entityId: string) => {
+    void shopifyScopesQuery.refetch();
     const title =
       entityType === "product"
         ? productsData?.items.find((p) => p.id === entityId)?.title
@@ -128,9 +137,16 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         </div>
       </div>
 
-      {!writeProductsAvailable && (
+      <ShopifyScopesPanel
+        scopes={shopifyScopesQuery.data}
+        loading={shopifyScopesQuery.isFetching}
+        shopDomain={shopifyStatus?.shopDomain ?? shopifyScopesQuery.data?.shopDomain}
+        onRefresh={() => void shopifyScopesQuery.refetch()}
+      />
+
+      {!writeProductsAvailable && scopeBannerMessage && (
         <div className="content-seo-banner content-seo-banner--warn">
-          Per applicare le modifiche su Shopify serve autorizzare write_products.
+          {scopeBannerMessage}
         </div>
       )}
 
@@ -241,6 +257,9 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         detailErrorMessage={detailErrorMessage}
         openaiConfigured={openaiConfigured}
         writeProductsAvailable={writeProductsAvailable}
+        shopifyScopes={shopifyScopesQuery.data}
+        shopDomain={shopifyStatus?.shopDomain ?? shopifyScopesQuery.data?.shopDomain}
+        onScopesRefresh={() => void shopifyScopesQuery.refetch()}
         onDetailRefresh={refreshDetail}
       />
     </>

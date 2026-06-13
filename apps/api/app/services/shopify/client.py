@@ -303,6 +303,53 @@ class ShopifyGraphQLClient:
             raise ShopifyAPIError("Risposta shop non valida da Shopify")
         return shop
 
+    async def fetch_access_scopes(self) -> list[str]:
+        query = """
+        query CurrentAppAccessScopes {
+          currentAppInstallation {
+            accessScopes {
+              handle
+            }
+          }
+        }
+        """
+        try:
+            data = await self.execute(query)
+            installation = data.get("currentAppInstallation") or {}
+            scopes = installation.get("accessScopes") or []
+            handles = [
+                s.get("handle")
+                for s in scopes
+                if isinstance(s, dict) and s.get("handle")
+            ]
+            if handles:
+                return sorted(handles)
+        except ShopifyAPIError:
+            pass
+        return await self._fetch_access_scopes_rest()
+
+    async def _fetch_access_scopes_rest(self) -> list[str]:
+        url = f"https://{self.shop_domain}/admin/oauth/access_scopes.json"
+        headers = {"X-Shopify-Access-Token": self.access_token}
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, headers=headers)
+        except httpx.RequestError as exc:
+            raise ShopifyAPIError(
+                "Impossibile verificare gli scope Shopify. Riprova più tardi."
+            ) from exc
+        if response.status_code >= 400:
+            raise ShopifyAPIError(
+                f"Verifica scope Shopify fallita (HTTP {response.status_code}).",
+                status_code=response.status_code,
+            )
+        payload = response.json()
+        scopes = payload.get("access_scopes") or []
+        handles = [
+            s.get("handle") for s in scopes if isinstance(s, dict) and s.get("handle")
+        ]
+        return sorted(handles)
+
     async def _paginate_connection(
         self,
         connection_name: str,

@@ -5,23 +5,24 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.models.seo_optimizer import SeoChangeLog, SeoOptimizationProposal
 from app.models.shopify import ShopifyStore
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
+from app.services.shopify.scopes import can_apply_with_write_products
 
 
-def has_write_products_scope() -> bool:
-    scopes = {s.strip() for s in settings.shopify_scopes.split(",") if s.strip()}
-    return "write_products" in scopes
-
-
-def write_products_required_response() -> dict[str, Any]:
+def write_products_required_response(
+    *,
+    message: str | None = None,
+    requires_reconnect: bool = True,
+) -> dict[str, Any]:
     return {
         "applied": False,
         "requires_scope": "write_products",
-        "message": (
-            "Per applicare modifiche su Shopify serve riconnettere l'app con write_products."
+        "requires_reconnect": requires_reconnect,
+        "message": message
+        or (
+            "Il token Shopify corrente non include write_products. Riconnetti Shopify."
         ),
     }
 
@@ -67,8 +68,12 @@ async def apply_proposal(
     if proposal.status != "approved":
         raise ValueError("La proposta deve essere approved prima dell'apply")
 
-    if not has_write_products_scope():
-        return write_products_required_response()
+    scope_check = await can_apply_with_write_products(store, session)
+    if not scope_check["allowed"]:
+        return write_products_required_response(
+            message=scope_check["message"],
+            requires_reconnect=scope_check["requires_reconnect"],
+        )
 
     proposed = proposal.proposed_values or {}
     applied_values: dict[str, Any] = {}

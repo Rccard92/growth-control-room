@@ -209,7 +209,7 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 
 **Flusso Modifica → Proposta → Approvazione** (nessuna modifica live senza conferma):
 
-1. UI: bottone **Modifica** in tabella apre **modal SEO** (portal, 760–960px, 90vh) con tab Campi SEO, Score, Proposta, Storico
+1. UI: bottone **Modifica** in tabella apre **SEO Edit Workspace** (portal, opaco, quasi full-screen) con tab Campi SEO, Score, Proposta, Storico
 2. Campi precompilati da `currentValues` (camelCase da Shopify sync): title, handle, seoTitle, metaDescription, descriptionHtml, tags, images, productType, vendor — con fallback `descriptionHtml` da `raw_payload` se assente in DB
 3. Badge per campo: **OK** / **Mancante** / **Da migliorare** (da analisi + valore)
 4. **Proposta manuale**: footer **Salva come proposta** → `POST .../proposals/manual` — non tocca Shopify
@@ -231,9 +231,16 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 - `OPENAI_API_KEY` (opzionale; se assente, modifica manuale OK, AI disabilitata in UI)
 - `OPENAI_MODEL` (default `gpt-4o-mini`)
 
-**Scope apply**: `write_products` — non incluso negli scope OAuth default. Messaggio apply senza scope: *"Per applicare modifiche su Shopify serve riconnettere l'app con write_products."*
+**Scope apply** (`write_products`):
 
-**Migrations**: `010_product_collection_seo_optimizer`, `011_seo_score_breakdown` (colonna `score_breakdown` JSONB)
+- **Scope configurati** (`SHOPIFY_SCOPES` su Railway): permessi richiesti dall'app al merchant durante OAuth
+- **Scope concessi** (token salvato): permessi realmente associati al token OAuth corrente
+- Dopo aver aggiunto `write_products` in app Shopify **e** in `SHOPIFY_SCOPES`, serve **riconnettere Shopify** (token vecchio non eredita nuovi permessi)
+- Verifica live: `GET /api/projects/{id}/shopify/scopes` — interroga Shopify (`currentAppInstallation.accessScopes` con fallback REST `access_scopes.json`) e aggiorna cache `shopify_stores.granted_scopes`
+- UI Content SEO mostra pannello **Shopify Permission Check** con configured/granted/missing scopes e CTA **Verifica permessi** / **Riconnetti Shopify**
+- Apply (`POST .../proposals/{id}/apply`) verifica scope reali del token, non solo env statica
+
+**Migrations**: `010_product_collection_seo_optimizer`, `011_seo_score_breakdown`, `012_shopify_granted_scopes`
 
 **Legacy**: `GET .../content/seo/dashboard` resta disponibile (fix empty-safe); UI usa endpoint optimizer.
 

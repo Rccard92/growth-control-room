@@ -281,6 +281,7 @@ export interface SeoProposalListResponse {
 export interface SeoApplyResponse {
   applied: boolean;
   requiresScope?: string | null;
+  requiresReconnect?: boolean;
   message?: string | null;
   proposalId?: string | null;
 }

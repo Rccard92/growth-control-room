@@ -20,6 +20,7 @@ export type {
   ShopifyConnectRequest,
   ShopifyConnectResponse,
   ShopifyStatus,
+  ShopifyScopesResponse,
   ShopifySyncResponse,
   ShopifyTopProduct,
   ShopifyProductSummary,

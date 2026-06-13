@@ -16,6 +16,7 @@ from app.services.shopify.oauth import (
     frontend_redirect_url,
     verify_shopify_hmac,
 )
+from app.services.shopify.scopes import fetch_granted_scopes, parse_scope_string
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,17 @@ async def shopify_oauth_callback(
 
     try:
         access_token = await exchange_code_for_access_token(shop_domain, code)
+        granted_scopes: list[str] = []
+        try:
+            granted_scopes = await fetch_granted_scopes(shop_domain, access_token)
+        except Exception:
+            granted_scopes = parse_scope_string(query_params.get("scope"))
         await persist_shopify_connection(
             project_id,
             shop_domain,
             access_token,
             session,
+            granted_scopes=granted_scopes or None,
         )
     except ShopifyAPIError:
         logger.exception(

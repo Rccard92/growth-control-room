@@ -3,10 +3,12 @@ import type {
   SeoCollectionDetailResponse,
   SeoOptimizationProposal,
   SeoProductDetailResponse,
+  ShopifyScopesResponse,
 } from "@gcr/shared";
 import { SeoEditModal } from "./SeoEditModal";
 import { SeoFieldEditor } from "./SeoFieldEditor";
 import { SeoProposalFooter } from "./SeoProposalFooter";
+import { ShopifyScopesPanel } from "./ShopifyScopesPanel";
 import { SeoProposalPreview } from "./SeoProposalPreview";
 import { SeoScoreBadge } from "./SeoScoreBadge";
 import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
@@ -46,6 +48,9 @@ interface SeoEntityEditDrawerProps {
   detailErrorMessage?: string;
   openaiConfigured: boolean;
   writeProductsAvailable: boolean;
+  shopifyScopes?: ShopifyScopesResponse;
+  shopDomain?: string | null;
+  onScopesRefresh?: () => void;
   onDetailRefresh?: () => void;
 }
 
@@ -63,6 +68,9 @@ export function SeoEntityEditDrawer({
   detailErrorMessage,
   openaiConfigured,
   writeProductsAvailable,
+  shopifyScopes,
+  shopDomain,
+  onScopesRefresh,
   onDetailRefresh,
 }: SeoEntityEditDrawerProps) {
   const [tab, setTab] = useState<DrawerTab>("fields");
@@ -233,6 +241,7 @@ export function SeoEntityEditDrawer({
     <SeoProposalFooter
       proposal={activeProposal}
       writeProductsAvailable={writeProductsAvailable}
+      shopifyScopes={shopifyScopes}
       openaiConfigured={openaiConfigured}
       loading={actionLoading}
       saveLoading={saveManual.isPending}
@@ -293,6 +302,13 @@ export function SeoEntityEditDrawer({
 
       {!detailLoading && detail && (
         <>
+          <ShopifyScopesPanel
+            scopes={shopifyScopes}
+            shopDomain={shopDomain}
+            onRefresh={onScopesRefresh}
+            compact
+          />
+
           {entityType === "product" && productDetail && (
             <p className="seo-edit-drawer__meta">
               Vendite: {productDetail.quantitySold} · Stock: {productDetail.stock ?? "—"} ·

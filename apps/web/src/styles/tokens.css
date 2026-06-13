@@ -3,6 +3,8 @@
   --gcr-bg-elevated: #0f1117;
   --gcr-surface: rgba(255, 255, 255, 0.03);
   --gcr-surface-hover: rgba(255, 255, 255, 0.06);
+  --gcr-surface-opaque: #090b10;
+  --gcr-surface-opaque-elevated: #11141b;
   --gcr-border: rgba(255, 255, 255, 0.08);
   --gcr-border-strong: rgba(255, 255, 255, 0.14);
   --gcr-text: #f4f4f5;

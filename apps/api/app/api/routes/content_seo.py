@@ -33,7 +33,6 @@ from app.services.content.seo_apply_service import (
     apply_proposal,
     approve_proposal,
     get_proposal_for_store,
-    has_write_products_scope,
     reject_proposal,
 )
 from app.services.content.seo_entity_detail_service import (
@@ -55,6 +54,7 @@ from app.services.projects import get_project_in_default_workspace
 from app.services.shopify.client import ShopifyAPIError
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
 from app.services.shopify.content_sync import sync_shopify_collections_only
+from app.services.shopify.scopes import resolve_shopify_scopes
 from app.services.shopify.sync import sync_shopify_store
 
 router = APIRouter(prefix="/projects", tags=["content-seo"])
@@ -207,10 +207,11 @@ async def list_products_seo(
     await get_project_in_default_workspace(project_id, session)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     items = await list_product_seo_items(store, session)
+    scope_info = await resolve_shopify_scopes(store, session)
     return SeoProductListResponse(
         items=items,
         openai_configured=is_openai_configured(),
-        write_products_available=has_write_products_scope(),
+        write_products_available=scope_info["can_write_products"],
     )
 
 
@@ -226,10 +227,11 @@ async def list_collections_seo(
     await get_project_in_default_workspace(project_id, session)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     items = await list_collection_seo_items(store, session)
+    scope_info = await resolve_shopify_scopes(store, session)
     return SeoCollectionListResponse(
         items=items,
         openai_configured=is_openai_configured(),
-        write_products_available=has_write_products_scope(),
+        write_products_available=scope_info["can_write_products"],
     )
 
 
@@ -533,11 +535,6 @@ async def apply_seo_proposal(
     proposal = await get_proposal_for_store(store, session, proposal_id)
     if proposal is None:
         raise HTTPException(status_code=404, detail="Proposta non trovata")
-
-    if not has_write_products_scope():
-        from app.services.content.seo_apply_service import write_products_required_response
-
-        return SeoApplyResponse.model_validate(write_products_required_response())
 
     try:
         client = await get_shopify_client_for_store(store)

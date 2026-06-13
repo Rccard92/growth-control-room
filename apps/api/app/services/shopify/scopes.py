@@ -1,0 +1,172 @@
+"""Shopify OAuth scope verification against saved access tokens."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.models.shopify import ShopifyStore
+from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
+
+REQUIRED_FOR_APPLY = ["write_products"]
+SCOPES_CACHE_TTL = timedelta(hours=1)
+
+
+def configured_scopes() -> list[str]:
+    return sorted(
+        {s.strip() for s in settings.shopify_scopes.split(",") if s.strip()}
+    )
+
+
+def parse_scope_string(scope_value: str | None) -> list[str]:
+    if not scope_value:
+        return []
+    return sorted({s.strip() for s in scope_value.split(",") if s.strip()})
+
+
+async def fetch_granted_scopes(shop_domain: str, access_token: str) -> list[str]:
+    client = ShopifyGraphQLClient(shop_domain, access_token)
+    return await client.fetch_access_scopes()
+
+
+def _scope_message(
+    *,
+    configured: list[str],
+    granted: list[str],
+    missing: list[str],
+    verify_failed: bool,
+) -> str:
+    if verify_failed:
+        return "Verifica permessi Shopify non riuscita. Riprova o riconnetti lo shop."
+    if "write_products" in granted:
+        return "write_products autorizzato sul token Shopify corrente."
+    if "write_products" in configured:
+        return (
+            "Il token Shopify corrente non include write_products. "
+            "Riconnetti Shopify per autorizzare i nuovi permessi."
+        )
+    return (
+        "write_products non è configurato in SHOPIFY_SCOPES. "
+        "Aggiorna la variabile su Railway e redeploy, poi riconnetti Shopify."
+    )
+
+
+def build_scope_result(
+    *,
+    shop_domain: str,
+    configured: list[str],
+    granted: list[str],
+    verify_failed: bool = False,
+) -> dict[str, Any]:
+    missing = [s for s in REQUIRED_FOR_APPLY if s not in granted]
+    can_write = "write_products" in granted and not verify_failed
+    requires_reconnect = (
+        not verify_failed
+        and "write_products" in configured
+        and "write_products" not in granted
+    )
+    return {
+        "shop_domain": shop_domain,
+        "configured_scopes": configured,
+        "granted_scopes": granted,
+        "required_for_apply": list(REQUIRED_FOR_APPLY),
+        "missing_scopes": missing,
+        "can_write_products": can_write,
+        "requires_reconnect": requires_reconnect,
+        "message": _scope_message(
+            configured=configured,
+            granted=granted,
+            missing=missing,
+            verify_failed=verify_failed,
+        ),
+    }
+
+
+async def _load_access_token(store: ShopifyStore) -> tuple[str, str]:
+    credential = store.integration.credential
+    if credential is None or not credential.encrypted_payload:
+        raise ShopifyAPIError("Credenziali Shopify non trovate per questo progetto")
+    import json
+
+    from app.services.encryption import decrypt_secret
+
+    payload = json.loads(decrypt_secret(credential.encrypted_payload))
+    shop_domain = payload["shop_domain"]
+    access_token = payload["admin_access_token"]
+    return shop_domain, access_token
+
+
+def _cache_fresh(store: ShopifyStore) -> bool:
+    if not store.scopes_checked_at or not store.granted_scopes:
+        return False
+    checked = store.scopes_checked_at
+    if checked.tzinfo is None:
+        checked = checked.replace(tzinfo=UTC)
+    return datetime.now(UTC) - checked < SCOPES_CACHE_TTL
+
+
+async def resolve_shopify_scopes(
+    store: ShopifyStore,
+    session: AsyncSession,
+    *,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    configured = configured_scopes()
+    if (
+        not force_refresh
+        and _cache_fresh(store)
+        and store.granted_scopes is not None
+    ):
+        return build_scope_result(
+            shop_domain=store.shop_domain,
+            configured=configured,
+            granted=sorted(store.granted_scopes),
+        )
+
+    try:
+        shop_domain, access_token = await _load_access_token(store)
+        granted = await fetch_granted_scopes(shop_domain, access_token)
+        store.granted_scopes = granted
+        store.scopes_checked_at = datetime.now(UTC)
+        await session.flush()
+        return build_scope_result(
+            shop_domain=shop_domain,
+            configured=configured,
+            granted=granted,
+        )
+    except (ShopifyAPIError, httpx.HTTPError, KeyError, ValueError):
+        cached = sorted(store.granted_scopes or [])
+        if cached:
+            return build_scope_result(
+                shop_domain=store.shop_domain,
+                configured=configured,
+                granted=cached,
+                verify_failed=True,
+            )
+        return build_scope_result(
+            shop_domain=store.shop_domain,
+            configured=configured,
+            granted=[],
+            verify_failed=True,
+        )
+
+
+async def can_apply_with_write_products(
+    store: ShopifyStore,
+    session: AsyncSession,
+) -> dict[str, Any]:
+    result = await resolve_shopify_scopes(store, session, force_refresh=True)
+    if result["can_write_products"]:
+        return {"allowed": True, **result}
+    return {
+        "allowed": False,
+        "applied": False,
+        "requires_scope": "write_products",
+        "requires_reconnect": result["requires_reconnect"],
+        "message": result["message"],
+        **result,
+    }

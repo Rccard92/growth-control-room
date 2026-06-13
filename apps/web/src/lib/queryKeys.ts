@@ -8,6 +8,7 @@ export const queryKeys = {
   },
   shopify: {
     status: (projectId: string) => ["shopify", projectId, "status"] as const,
+    scopes: (projectId: string) => ["shopify", projectId, "scopes"] as const,
     dashboard: (projectId: string, dateRange?: DateRangeParams) =>
       [
         "shopify",

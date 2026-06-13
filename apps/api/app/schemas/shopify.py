@@ -33,6 +33,18 @@ class ShopifyStatusResponse(BaseModel):
     last_sync_at: datetime | None = Field(default=None, serialization_alias="lastSyncAt")
 
 
+class ShopifyScopesResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    shop_domain: str = Field(serialization_alias="shopDomain")
+    configured_scopes: list[str] = Field(serialization_alias="configuredScopes")
+    granted_scopes: list[str] = Field(serialization_alias="grantedScopes")
+    missing_scopes: list[str] = Field(serialization_alias="missingScopes")
+    can_write_products: bool = Field(serialization_alias="canWriteProducts")
+    requires_reconnect: bool = Field(serialization_alias="requiresReconnect")
+    message: str
+
+
 class ShopifySyncResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
