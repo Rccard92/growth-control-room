@@ -242,16 +242,6 @@ def score_product(
                 }
             )
 
-    if not (product_type or "").strip():
-        issues.append(
-            {
-                "code": "missing_product_type",
-                "severity": "info",
-                "message": "Product type non impostato",
-                "field": "product_type",
-            }
-        )
-
     component_scores = {
         "score_title": score_title,
         "score_seo_title": score_seo_title,

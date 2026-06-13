@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { SeoScoreBreakdown } from "@gcr/shared";
 import { SeoFieldStatusBadge, fieldStatusNote } from "./SeoFieldStatusBadge";
+import { SeoImagesEditor } from "./SeoImagesEditor";
 import type { FieldState, FieldStateMap, SeoEditableField } from "./seoFieldState";
 import type { SeoFormValues } from "./seoFormValues";
 
@@ -10,9 +11,11 @@ interface SeoFieldEditorProps {
   issues?: Record<string, unknown>[] | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
   fieldStateMap?: FieldStateMap;
+  mediaImages?: Record<string, unknown>[];
   openaiConfigured?: boolean;
   onChange: (key: string, value: unknown) => void;
-  onGenerateField?: (field: SeoEditableField) => void;
+  onImageAltChange?: (index: number, alt: string) => void;
+  onGenerateField?: (field: SeoEditableField, imageId?: string) => void;
   onRestoreField?: (field: string) => void;
   onAcceptField?: (field: string) => void;
 }
@@ -119,17 +122,15 @@ function FieldRow({
         />
       )}
       {note && <span className="seo-field-editor__note">{note}</span>}
+      {fieldState?.reasoning && (
+        <span className="seo-field-editor__note">{fieldState.reasoning}</span>
+      )}
     </label>
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="seo-field-section">
-      <h4 className="seo-field-section__title">{title}</h4>
-      <div className="seo-field-section__fields">{children}</div>
-    </section>
-  );
+function FlatSection({ children }: { children: ReactNode }) {
+  return <div className="seo-field-section__fields">{children}</div>;
 }
 
 export function SeoFieldEditor({
@@ -138,15 +139,17 @@ export function SeoFieldEditor({
   issues,
   scoreBreakdown,
   fieldStateMap,
+  mediaImages = [],
   openaiConfigured,
   onChange,
+  onImageAltChange,
   onGenerateField,
   onRestoreField,
   onAcceptField,
 }: SeoFieldEditorProps) {
   return (
     <div className="seo-field-editor">
-      <Section title="Identità prodotto/categoria">
+      <FlatSection>
         <FieldRow
           label={entityType === "product" ? "Titolo prodotto" : "Titolo collection"}
           field="title"
@@ -161,37 +164,33 @@ export function SeoFieldEditor({
           onAcceptField={onAcceptField}
         />
         <FieldRow
-          label="Handle"
-          field="handle"
-          value={String(values.handle ?? "")}
+          label="Descrizione (HTML)"
+          field="descriptionHtml"
+          value={String(values.descriptionHtml ?? "")}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
-          fieldState={fieldStateMap?.handle}
+          fieldState={fieldStateMap?.descriptionHtml}
           openaiConfigured={openaiConfigured}
           onChange={onChange}
           onGenerateField={onGenerateField}
           onRestoreField={onRestoreField}
           onAcceptField={onAcceptField}
+          multiline
         />
-        {entityType === "product" && (
-          <>
-            <div className="seo-field-editor__readonly">
-              <span className="seo-field-editor__label">Product type</span>
-              <span className="seo-field-editor__readonly-value">
-                {String(values.productType ?? "—")}
-              </span>
-            </div>
-            <div className="seo-field-editor__readonly">
-              <span className="seo-field-editor__label">Vendor</span>
-              <span className="seo-field-editor__readonly-value">
-                {String(values.vendor ?? "—")}
-              </span>
-            </div>
-          </>
-        )}
-      </Section>
-
-      <Section title="Metadata SEO">
+        <SeoImagesEditor
+          entityType={entityType}
+          values={values}
+          issues={issues}
+          scoreBreakdown={scoreBreakdown}
+          mediaImages={mediaImages}
+          fieldStateMap={fieldStateMap}
+          openaiConfigured={openaiConfigured}
+          onChange={onChange}
+          onImageAltChange={onImageAltChange}
+          onGenerateField={onGenerateField}
+          onRestoreField={onRestoreField}
+          onAcceptField={onAcceptField}
+        />
         <FieldRow
           label="SEO title"
           field="seoTitle"
@@ -219,24 +218,20 @@ export function SeoFieldEditor({
           onAcceptField={onAcceptField}
           multiline
         />
-      </Section>
-
-      <Section title="Contenuto">
         <FieldRow
-          label="Descrizione (HTML)"
-          field="descriptionHtml"
-          value={String(values.descriptionHtml ?? "")}
+          label="Handle URL"
+          field="handle"
+          value={String(values.handle ?? "")}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
-          fieldState={fieldStateMap?.descriptionHtml}
+          fieldState={fieldStateMap?.handle}
           openaiConfigured={openaiConfigured}
           onChange={onChange}
           onGenerateField={onGenerateField}
           onRestoreField={onRestoreField}
           onAcceptField={onAcceptField}
-          multiline
         />
-      </Section>
+      </FlatSection>
     </div>
   );
 }

@@ -104,6 +104,17 @@ PRODUCT_FIELDS = """
                   }
                 }
                 seo { title description }
+                metafields(first: 100) {
+                  nodes {
+                    id
+                    namespace
+                    key
+                    type
+                    value
+                    updatedAt
+                    definition { name description }
+                  }
+                }
                 variants(first: 100) {
                   nodes {
                     id
@@ -685,3 +696,49 @@ class ShopifyGraphQLClient:
         """Backward-compatible wrapper for legacy callers."""
         nodes = await self.fetch_all_orders(page_size=min(limit, DEFAULT_PAGE_SIZE))
         return nodes[:limit]
+
+    async def metafields_set(self, inputs: list[dict[str, Any]]) -> dict[str, Any]:
+        if not inputs:
+            return {"metafieldsSet": {"metafields": [], "userErrors": []}}
+        mutation = """
+        mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            metafields { id namespace key type value updatedAt }
+            userErrors { field message code }
+          }
+        }
+        """
+        return await self.execute(mutation, {"metafields": inputs})
+
+
+def parse_product_metafields(node: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract metafield nodes from a Shopify product GraphQL node."""
+    metafields_block = node.get("metafields") or {}
+    nodes = metafields_block.get("nodes") or []
+    parsed: list[dict[str, Any]] = []
+    for item in nodes:
+        if not isinstance(item, dict):
+            continue
+        gid = item.get("id")
+        namespace = item.get("namespace")
+        key = item.get("key")
+        type_name = item.get("type")
+        if not gid or not namespace or not key or not type_name:
+            continue
+        definition = item.get("definition") or {}
+        parsed.append(
+            {
+                "id": gid,
+                "namespace": namespace,
+                "key": key,
+                "type": type_name,
+                "value": item.get("value"),
+                "updatedAt": item.get("updatedAt"),
+                "definition": {
+                    "name": definition.get("name"),
+                    "description": definition.get("description"),
+                },
+                "raw": item,
+            }
+        )
+    return parsed

@@ -6,13 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoChangeLog, SeoEntityAnalysis, SeoOptimizationProposal
-from app.models.shopify import ShopifyProduct, ShopifyStore
+from app.models.shopify import ShopifyProduct, ShopifyProductMetafield, ShopifyStore
 from app.services.content.seo_current_values import (
     collection_api_current_values,
     product_api_current_values,
 )
 from app.services.content.seo_scoring_engine import rebuild_score_breakdown_from_analysis
 from app.services.shopify.analytics import compute_best_sellers, product_lookup
+from app.services.shopify.metafield_utils import metafield_snapshot_item
 
 
 async def _latest_proposal(
@@ -197,6 +198,32 @@ async def get_product_seo_detail(
     )
     missing_images = not images
 
+    metafield_rows = list(
+        (
+            await session.execute(
+                select(ShopifyProductMetafield)
+                .where(
+                    ShopifyProductMetafield.shopify_store_id == store.id,
+                    ShopifyProductMetafield.product_id == product_id,
+                )
+                .order_by(ShopifyProductMetafield.namespace, ShopifyProductMetafield.key)
+            )
+        ).scalars().all()
+    )
+    metafields = [
+        metafield_snapshot_item(
+            id=str(row.id),
+            namespace=row.namespace,
+            key=row.key,
+            type_name=row.type,
+            value=row.value,
+            definition_name=row.definition_name,
+            definition_description=row.definition_description,
+            updated_at=row.updated_at,
+        )
+        for row in metafield_rows
+    ]
+
     return {
         "product": {
             "id": str(product.id),
@@ -218,6 +245,7 @@ async def get_product_seo_detail(
         ),
         "current_values": current_values,
         "images": images,
+        "metafields": metafields,
         "quantity_sold": int(sales.get("quantity_sold") or 0),
         "revenue": float(sales.get("revenue") or 0),
         "stock": product.total_inventory,

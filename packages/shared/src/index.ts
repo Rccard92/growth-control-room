@@ -102,6 +102,7 @@ export type {
   SeoProposalSource,
   SeoProposalPreviewField,
   SeoProposalPreviewResponse,
+  SeoProductMetafieldItem,
   SeoProductDetailResponse,
   SeoCollectionDetailResponse,
   SeoSkillMeta,

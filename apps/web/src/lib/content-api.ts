@@ -118,7 +118,7 @@ export function generateProposalField(
   projectId: string,
   entityType: "product" | "collection",
   entityId: string,
-  options: { field: string; imageId?: string; useAi?: boolean },
+  options: { field: string; imageId?: string; metafieldId?: string; useAi?: boolean },
 ): Promise<SeoProposalGenerateFieldResponse> {
   return apiFetch<SeoProposalGenerateFieldResponse>(
     `/api/projects/${projectId}/content/seo/proposals/generate-field`,
@@ -130,6 +130,7 @@ export function generateProposalField(
         entityId,
         field: options.field,
         imageId: options.imageId,
+        metafieldId: options.metafieldId,
         useAi: options.useAi ?? true,
       }),
     },

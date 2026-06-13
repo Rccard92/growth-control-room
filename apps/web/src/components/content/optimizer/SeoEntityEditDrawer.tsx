@@ -3,17 +3,17 @@ import type {
   SeoCollectionDetailResponse,
   SeoOptimizationProposal,
   SeoProductDetailResponse,
+  SeoProductMetafieldItem,
 } from "@gcr/shared";
 import { SeoEditModal } from "./SeoEditModal";
 import { SeoFieldEditor } from "./SeoFieldEditor";
-import { SeoImagesEditor } from "./SeoImagesEditor";
+import { SeoMetafieldsEditor } from "./SeoMetafieldsEditor";
 import { SeoProposalFooter } from "./SeoProposalFooter";
 import { SeoScoreBadge } from "./SeoScoreBadge";
-import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
-import { SeoSkillAppliedPanel } from "./SeoSkillAppliedPanel";
 import {
   applyGlobalMergeToFieldState,
   applyFieldValueToForm,
+  applyMetafieldValue,
   acceptFieldState,
   applyAiFieldState,
   buildChangedProposalValues,
@@ -22,6 +22,7 @@ import {
   imageAltFieldKey,
   initFieldStateMap,
   markFieldsFromGlobalAi,
+  metafieldFieldKey,
   restoreFieldOriginal,
   setFieldGenerating,
   updateFieldStateValue,
@@ -46,14 +47,15 @@ import {
   useSyncProductSeo,
 } from "../../../hooks/useContentSeo";
 
-type DrawerTab = "fields" | "score" | "images" | "history";
+type DrawerTab = "main" | "metafields";
 
-const TABS: { id: DrawerTab; label: string }[] = [
-  { id: "fields", label: "Campi SEO" },
-  { id: "score", label: "Score" },
-  { id: "images", label: "Immagini" },
-  { id: "history", label: "Storico" },
-];
+function buildMetafieldValues(metafields: SeoProductMetafieldItem[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const mf of metafields) {
+    map[mf.id] = mf.value ?? "";
+  }
+  return map;
+}
 
 function normalizeReasoning(reasoning: unknown[] | null | undefined): string[] {
   if (!reasoning) return [];
@@ -93,11 +95,13 @@ export function SeoEntityEditDrawer({
   writeProductsAvailable,
   onDetailRefresh,
 }: SeoEntityEditDrawerProps) {
-  const [tab, setTab] = useState<DrawerTab>("fields");
+  const [tab, setTab] = useState<DrawerTab>("main");
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [activeProposalId, setActiveProposalId] = useState<string | null>(null);
   const [activeProposal, setActiveProposal] = useState<SeoOptimizationProposal | null>(null);
   const [mediaImages, setMediaImages] = useState<Record<string, unknown>[]>([]);
+  const [metafields, setMetafields] = useState<SeoProductMetafieldItem[]>([]);
+  const [metafieldValues, setMetafieldValues] = useState<Record<string, string>>({});
   const [formDirty, setFormDirty] = useState(false);
   const [appliedAt, setAppliedAt] = useState<string | null>(null);
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
@@ -123,6 +127,14 @@ export function SeoEntityEditDrawer({
   const scoreTotal = (analysis?.scoreTotal ?? analysis?.score_total) as number | undefined;
   const severity = (analysis?.severity as string | undefined) ?? undefined;
 
+  const tabs: { id: DrawerTab; label: string }[] =
+    entityType === "product"
+      ? [
+          { id: "main", label: "Principale" },
+          { id: "metafields", label: "Metafield" },
+        ]
+      : [{ id: "main", label: "Principale" }];
+
   const saveManual = useSaveManualProposal(projectId);
   const generateAi = useGenerateProposal(projectId);
   const generateField = useGenerateProposalField(projectId);
@@ -142,17 +154,24 @@ export function SeoEntityEditDrawer({
           : collectionDetail?.image
             ? [collectionDetail.image]
             : [];
+      const productMetafields =
+        entityType === "product"
+          ? ((detailSource as SeoProductDetailResponse).metafields ?? [])
+          : [];
+      const mfValues = buildMetafieldValues(productMetafields);
       setFormValues(normalized);
-      initialFormRef.current = JSON.stringify(normalized);
+      initialFormRef.current = JSON.stringify({ form: normalized, metafields: mfValues });
       setFormDirty(false);
       setMediaImages(images);
-      setFieldStateMap(initFieldStateMap(normalized, entityType, images));
+      setMetafields(productMetafields);
+      setMetafieldValues(mfValues);
+      setFieldStateMap(initFieldStateMap(normalized, entityType, images, productMetafields, mfValues));
       setActiveProposalId(detailSource.latestProposal?.id ?? null);
       setActiveProposal(detailSource.latestProposal ?? null);
       setAiReasoning([]);
       setAiRiskLevel(null);
       setAiToast(null);
-      setTab("fields");
+      setTab("main");
       if (detailSource.latestProposal?.status !== "applied") {
         setAppliedAt(null);
         setApplyMessage(null);
@@ -173,6 +192,11 @@ export function SeoEntityEditDrawer({
     lastInitKeyRef.current = entityKey;
   }, [open, entityKey, detail, formDirty, initFormFromDetail]);
 
+  const markDirty = (nextForm: Record<string, unknown>, nextMf: Record<string, string>) => {
+    const snapshot = JSON.stringify({ form: nextForm, metafields: nextMf });
+    setFormDirty(snapshot !== initialFormRef.current);
+  };
+
   const refreshFormFromValues = (
     values: Record<string, unknown> | null | undefined,
     detailSource?: SeoProductDetailResponse | SeoCollectionDetailResponse,
@@ -183,10 +207,17 @@ export function SeoEntityEditDrawer({
       entityType === "product" && Array.isArray(normalized.images)
         ? (normalized.images as Record<string, unknown>[])
         : mediaImages;
+    const productMetafields =
+      entityType === "product" && detailSource
+        ? ((detailSource as SeoProductDetailResponse).metafields ?? metafields)
+        : [];
+    const mfValues = buildMetafieldValues(productMetafields);
     setFormValues(normalized);
-    initialFormRef.current = JSON.stringify(normalized);
+    initialFormRef.current = JSON.stringify({ form: normalized, metafields: mfValues });
     setFormDirty(false);
-    setFieldStateMap(initFieldStateMap(normalized, entityType, images));
+    setMetafields(productMetafields);
+    setMetafieldValues(mfValues);
+    setFieldStateMap(initFieldStateMap(normalized, entityType, images, productMetafields, mfValues));
     setAiReasoning([]);
     setAiRiskLevel(null);
     if (entityType === "product" && Array.isArray(normalized.images)) {
@@ -216,10 +247,20 @@ export function SeoEntityEditDrawer({
     const strVal = String(value ?? "");
     setFormValues((prev) => {
       const next = { ...prev, [key]: value };
-      setFormDirty(JSON.stringify(next) !== initialFormRef.current);
+      markDirty(next, metafieldValues);
       return next;
     });
     setFieldStateMap((prev) => updateFieldStateValue(prev, key, strVal, "manual"));
+  };
+
+  const handleMetafieldChange = (metafieldId: string, value: string) => {
+    const fk = metafieldFieldKey(metafieldId);
+    setMetafieldValues((prev) => {
+      const next = applyMetafieldValue(prev, metafieldId, value);
+      markDirty(formValues, next);
+      return next;
+    });
+    setFieldStateMap((prev) => updateFieldStateValue(prev, fk, value, "manual"));
   };
 
   const handleImageAltChange = (index: number, alt: string) => {
@@ -231,7 +272,7 @@ export function SeoEntityEditDrawer({
       setFieldStateMap((fsm) => updateFieldStateValue(fsm, fk, alt, "manual"));
       setFormValues((fv) => {
         const updated = { ...fv, images: next };
-        setFormDirty(JSON.stringify(updated) !== initialFormRef.current);
+        markDirty(updated, metafieldValues);
         return updated;
       });
       return next;
@@ -255,13 +296,20 @@ export function SeoEntityEditDrawer({
           String(img.id ?? "") === imageId ? { ...img, altText: row.originalValue } : img,
         );
         const next = { ...fv, images };
-        setFormDirty(JSON.stringify(next) !== initialFormRef.current);
+        markDirty(next, metafieldValues);
+        return next;
+      });
+    } else if (fieldKey.startsWith("metafield:")) {
+      const metafieldId = fieldKey.slice("metafield:".length);
+      setMetafieldValues((prev) => {
+        const next = applyMetafieldValue(prev, metafieldId, row.originalValue);
+        markDirty(formValues, next);
         return next;
       });
     } else {
       setFormValues((prev) => {
         const next = { ...prev, [fieldKey]: row.originalValue };
-        setFormDirty(JSON.stringify(next) !== initialFormRef.current);
+        markDirty(next, metafieldValues);
         return next;
       });
     }
@@ -300,7 +348,7 @@ export function SeoEntityEditDrawer({
           setFieldStateMap((prev) =>
             applyAiFieldState(prev, stateKey, strValue, res.reasoning ?? undefined, res.riskLevel),
           );
-          setFormDirty(true);
+          markDirty(applied.formValues, metafieldValues);
           setAiToastVariant("success");
           setAiToast(`Campo aggiornato con AI. Controlla e salva come proposta.`);
         },
@@ -317,62 +365,36 @@ export function SeoEntityEditDrawer({
     );
   };
 
-  const applyProposalToForm = (
-    proposal: SeoOptimizationProposal,
-    options?: { confirmIfDirty?: boolean },
-  ) => {
-    const proposed = extractProposedValues(proposal);
-    if (options?.confirmIfDirty && formDirty) {
-      const ok = window.confirm(
-        "Caricare questa proposta nel form? Le modifiche non salvate andranno perse.",
-      );
-      if (!ok) return false;
-    }
-    const baselineRaw =
-      detail?.currentValues ??
-      (detail as { current_values?: Record<string, unknown> } | undefined)?.current_values;
-    const baseline = normalizeFormValues(baselineRaw, entityType, detail);
-    const baselineMedia =
-      entityType === "product"
-        ? (baseline.images as Record<string, unknown>[]) ?? mediaImages
-        : mediaImages;
-    const merged = mergeProposedIntoForm(baseline, proposed, entityType);
-    let nextMedia = baselineMedia;
-    if (entityType === "product") {
-      nextMedia = resolveMediaFromProposal(
-        proposed,
-        baselineMedia.length > 0 ? baselineMedia : ((merged.images as Record<string, unknown>[]) ?? []),
-      );
-      setMediaImages(nextMedia);
-    }
-    setFormValues(merged);
-    setFormDirty(true);
-    setActiveProposalId(proposal.id);
-    setActiveProposal(proposal);
-    const changed = collectChangedKeysFromMerge(
-      baseline,
-      merged,
-      entityType,
-      baselineMedia,
-      nextMedia,
+  const handleGenerateMetafieldAi = (metafieldId: string) => {
+    const stateKey = metafieldFieldKey(metafieldId);
+    setFieldStateMap((prev) => setFieldGenerating(prev, stateKey));
+    generateField.mutate(
+      { entityType, entityId, field: "metafield", metafieldId, useAi: true },
+      {
+        onSuccess: (res) => {
+          const strValue = String(res.value ?? "");
+          setMetafieldValues((prev) => {
+            const next = applyMetafieldValue(prev, metafieldId, strValue);
+            markDirty(formValues, next);
+            return next;
+          });
+          setFieldStateMap((prev) =>
+            applyAiFieldState(prev, stateKey, strValue, res.reasoning ?? undefined, res.riskLevel),
+          );
+          setAiToastVariant("success");
+          setAiToast("Metafield aggiornato con AI. Controlla e salva come proposta.");
+        },
+        onError: () => {
+          setFieldStateMap((prev) => {
+            const row = prev[stateKey];
+            if (!row) return prev;
+            return { ...prev, [stateKey]: { ...row, generating: false } };
+          });
+          setAiToastVariant("error");
+          setAiToast("Generazione AI del metafield non riuscita.");
+        },
+      },
     );
-    let fsm = initFieldStateMap(baseline, entityType, baselineMedia);
-    for (const key of changed) {
-      let val = "";
-      if (key.startsWith("imageAlt:")) {
-        const imageId = key.slice("imageAlt:".length);
-        const img = nextMedia.find((m) => String(m.id ?? "") === imageId);
-        val = String(img?.altText ?? img?.alt ?? "");
-      } else {
-        val = String(merged[key] ?? "");
-      }
-      fsm = applyAiFieldState(fsm, key, val, normalizeReasoning(proposal.reasoning)[0], proposal.riskLevel);
-    }
-    setFieldStateMap(fsm);
-    setAiReasoning(normalizeReasoning(proposal.reasoning));
-    setAiRiskLevel(proposal.riskLevel ?? null);
-    setTab("fields");
-    return true;
   };
 
   const handleSaveDraft = () => {
@@ -381,6 +403,7 @@ export function SeoEntityEditDrawer({
       entityType,
       mediaImages,
       fieldStateMap,
+      metafields,
     );
     if (changedFields.length === 0) {
       setAiToastVariant("warn");
@@ -398,9 +421,11 @@ export function SeoEntityEditDrawer({
         onSuccess: (proposal) => {
           setActiveProposalId(proposal.id);
           setActiveProposal(proposal);
-          initialFormRef.current = JSON.stringify(formValues);
+          initialFormRef.current = JSON.stringify({ form: formValues, metafields: metafieldValues });
           setFormDirty(false);
-          setFieldStateMap(initFieldStateMap(formValues, entityType, mediaImages));
+          setFieldStateMap(
+            initFieldStateMap(formValues, entityType, mediaImages, metafields, metafieldValues),
+          );
           onDetailRefresh?.();
         },
       },
@@ -442,7 +467,7 @@ export function SeoEntityEditDrawer({
             return;
           }
           setFormValues(merged);
-          setFormDirty(true);
+          markDirty(merged, metafieldValues);
           setActiveProposalId(proposal.id);
           setActiveProposal(proposal);
           const changed = collectChangedKeysFromMerge(
@@ -462,7 +487,7 @@ export function SeoEntityEditDrawer({
           );
           setAiReasoning(normalizeReasoning(proposal.reasoning));
           setAiRiskLevel(proposal.riskLevel ?? null);
-          setTab("fields");
+          setTab("main");
           if (needsImageAltWarning(entityType, nextMedia, proposed)) {
             setAiToastVariant("warn");
             setAiToast(
@@ -477,10 +502,6 @@ export function SeoEntityEditDrawer({
         },
       },
     );
-  };
-
-  const handleOpenHistoryProposal = (p: SeoOptimizationProposal) => {
-    applyProposalToForm(p, { confirmIfDirty: true });
   };
 
   const handleApply = () => {
@@ -501,11 +522,14 @@ export function SeoEntityEditDrawer({
             setAppliedAt(res.proposal?.appliedAt ?? new Date().toISOString());
             setApplyMessage(res.message ?? "Applicato su Shopify.");
             setLocalUpdateFailed(Boolean(res.localUpdateFailed));
+            const detailPayload = res.detail as
+              | SeoProductDetailResponse
+              | SeoCollectionDetailResponse
+              | undefined;
             refreshFormFromValues(
               res.updatedEntity ??
-                (res.detail as { currentValues?: Record<string, unknown> } | undefined)
-                  ?.currentValues,
-              res.detail as SeoProductDetailResponse | SeoCollectionDetailResponse | undefined,
+                detailPayload?.currentValues,
+              detailPayload,
             );
             if (res.proposal) {
               setActiveProposal(res.proposal);
@@ -678,15 +702,8 @@ export function SeoEntityEditDrawer({
 
           {aiToast && <div className={aiBannerClass}>{aiToast}</div>}
 
-          {entityType === "product" && productDetail && (
-            <p className="seo-edit-drawer__meta">
-              Vendite: {productDetail.quantitySold} · Stock: {productDetail.stock ?? "—"} ·
-              Revenue: {productDetail.revenue.toFixed(2)}
-            </p>
-          )}
-
           <div className="seo-edit-drawer__tabs">
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -698,7 +715,7 @@ export function SeoEntityEditDrawer({
             ))}
           </div>
 
-          {tab === "fields" && (
+          {tab === "main" && (
             <>
               <SeoFieldEditor
                 entityType={entityType}
@@ -706,8 +723,10 @@ export function SeoEntityEditDrawer({
                 issues={effectiveIssues}
                 scoreBreakdown={scoreBreakdown}
                 fieldStateMap={fieldStateMap}
+                mediaImages={mediaImages}
                 openaiConfigured={openaiConfigured}
                 onChange={handleFieldChange}
+                onImageAltChange={handleImageAltChange}
                 onGenerateField={handleGenerateFieldAi}
                 onRestoreField={handleRestoreField}
                 onAcceptField={handleAcceptField}
@@ -731,80 +750,18 @@ export function SeoEntityEditDrawer({
             </>
           )}
 
-          {tab === "score" && (
-            <>
-              <SeoSkillAppliedPanel skillMeta={detail.skillMeta} />
-              <SeoScoreBreakdown
-                scoreTotal={scoreTotal}
-                scoreBreakdown={scoreBreakdown}
-                skillMeta={detail.skillMeta}
-              />
-            </>
-          )}
-
-          {tab === "images" && (
-            <SeoImagesEditor
-              entityType={entityType}
-              values={formValues}
-              issues={effectiveIssues}
-              scoreBreakdown={scoreBreakdown}
-              mediaImages={mediaImages}
+          {tab === "metafields" && entityType === "product" && (
+            <SeoMetafieldsEditor
+              metafields={metafields}
               fieldStateMap={fieldStateMap}
               openaiConfigured={openaiConfigured}
-              onChange={handleFieldChange}
-              onImageAltChange={handleImageAltChange}
-              onGenerateField={handleGenerateFieldAi}
+              syncLoading={syncLoading}
+              onMetafieldChange={handleMetafieldChange}
+              onGenerateMetafield={handleGenerateMetafieldAi}
               onRestoreField={handleRestoreField}
               onAcceptField={handleAcceptField}
+              onSyncMetafields={handleSyncFromShopify}
             />
-          )}
-
-          {tab === "history" && (
-            <div className="seo-history-tab">
-              <h4>Proposte</h4>
-              {(detail.proposalHistory ?? []).length === 0 ? (
-                <p className="shopify-empty-copy">Nessuna proposta precedente.</p>
-              ) : (
-                <ul className="shopify-seo-list">
-                  {(detail.proposalHistory ?? []).map((p) => (
-                    <li key={p.id} className="shopify-seo-list__item seo-history-item">
-                      <div className="seo-history-item__main">
-                        <span>
-                          {p.status} · {p.source} · {p.riskLevel}
-                        </span>
-                        {p.reasoning && p.reasoning.length > 0 && (
-                          <p className="seo-history-item__reasoning">
-                            {normalizeReasoning(p.reasoning)[0]}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-                        onClick={() => handleOpenHistoryProposal(p)}
-                      >
-                        Carica nel form
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <h4>Change log</h4>
-              {(detail.changeLogs ?? []).length === 0 ? (
-                <p className="shopify-empty-copy">Nessuna modifica applicata.</p>
-              ) : (
-                <ul className="shopify-seo-list">
-                  {(detail.changeLogs ?? []).map((log) => (
-                    <li key={log.id} className="shopify-seo-list__item">
-                      <span>
-                        {log.status}
-                        {log.errorMessage ? ` · ${log.errorMessage}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           )}
         </>
       )}

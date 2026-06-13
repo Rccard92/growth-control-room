@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_seo import ShopifyCollection
-from app.models.shopify import ShopifyProduct
+from app.models.shopify import ShopifyProduct, ShopifyProductMetafield
 from app.services.shopify.html_utils import html_to_text
 
 
@@ -119,6 +119,29 @@ async def apply_proposed_values_to_product(
         media = _get_proposed(proposed, "media_images", "images")
         if media is not None:
             product.media_images = media
+
+        metafields = proposed.get("metafields")
+        if isinstance(metafields, list):
+            for entry in metafields:
+                if not isinstance(entry, dict):
+                    continue
+                mid = entry.get("id")
+                if not mid:
+                    continue
+                try:
+                    mf_uuid = UUID(str(mid))
+                except ValueError:
+                    continue
+                row = (
+                    await session.execute(
+                        select(ShopifyProductMetafield).where(
+                            ShopifyProductMetafield.id == mf_uuid,
+                            ShopifyProductMetafield.product_id == product_id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if row is not None and entry.get("value") is not None:
+                    row.value = str(entry.get("value"))
 
         product.raw_payload = _merge_raw_payload(
             product.raw_payload,

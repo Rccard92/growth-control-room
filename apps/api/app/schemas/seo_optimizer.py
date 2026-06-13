@@ -93,6 +93,7 @@ class SeoProposalGenerateFieldRequest(BaseModel):
     entity_id: UUID = Field(validation_alias="entityId")
     field: str
     image_id: str | None = Field(default=None, validation_alias="imageId")
+    metafield_id: str | None = Field(default=None, validation_alias="metafieldId")
     use_ai: bool = Field(default=True, validation_alias="useAi")
 
 
@@ -103,6 +104,7 @@ class SeoProposalGenerateFieldResponse(BaseModel):
     value: Any
     reasoning: str | None = None
     risk_level: str = Field(serialization_alias="riskLevel")
+    metafield_id: str | None = Field(default=None, serialization_alias="metafieldId")
 
 
 class SeoScoreBreakdownItem(BaseModel):
@@ -169,6 +171,23 @@ class SeoProposalPreviewResponse(BaseModel):
     )
 
 
+class SeoProductMetafieldItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    namespace: str
+    key: str
+    type: str
+    value: str = ""
+    definition_name: str | None = Field(default=None, serialization_alias="definitionName")
+    definition_description: str | None = Field(
+        default=None, serialization_alias="definitionDescription"
+    )
+    editable: bool = False
+    ai_generatable: bool = Field(default=False, serialization_alias="aiGeneratable")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+
+
 class SeoSkillMetaRead(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -194,6 +213,7 @@ class SeoProductDetailResponse(BaseModel):
     )
     current_values: dict[str, Any] = Field(serialization_alias="currentValues")
     images: list[dict[str, Any]] = Field(default_factory=list)
+    metafields: list[SeoProductMetafieldItem] = Field(default_factory=list)
     quantity_sold: int = Field(default=0, serialization_alias="quantitySold")
     revenue: float = 0
     stock: int | None = None

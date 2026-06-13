@@ -22,6 +22,7 @@ from app.services.content.seo_entity_detail_service import (
     get_product_seo_detail,
 )
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
+from app.services.shopify.metafield_apply import apply_product_metafields
 from app.services.shopify.scopes import can_apply_with_write_products
 
 logger = logging.getLogger(__name__)
@@ -315,6 +316,20 @@ async def apply_proposal(
             await _apply_product_media_alts(
                 client, proposal.entity_gid, effective_proposed, shopify_response
             )
+            metafield_entries = effective_proposed.get("metafields")
+            if isinstance(metafield_entries, list) and metafield_entries:
+                mf_warnings = await apply_product_metafields(
+                    client,
+                    proposal.entity_gid,
+                    metafield_entries,
+                    shopify_response,
+                )
+                if mf_warnings:
+                    logger.warning(
+                        "metafield apply warnings proposal=%s: %s",
+                        proposal.id,
+                        "; ".join(mf_warnings[:3]),
+                    )
         elif proposal.entity_type == "collection":
             mutation = """
             mutation CollectionUpdate($input: CollectionInput!) {

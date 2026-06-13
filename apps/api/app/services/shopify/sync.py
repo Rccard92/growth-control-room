@@ -15,11 +15,12 @@ from app.models.shopify import (
     ShopifyOrderLineItem,
     ShopifyOrderRefund,
     ShopifyProduct,
+    ShopifyProductMetafield,
     ShopifyProductVariant,
     ShopifyStore,
 )
 from app.services.shopify.attribution import extract_order_attribution
-from app.services.shopify.client import ShopifyGraphQLClient
+from app.services.shopify.client import ShopifyGraphQLClient, parse_product_metafields
 from app.services.shopify.html_utils import html_to_text
 
 logger = logging.getLogger(__name__)
@@ -149,7 +150,74 @@ async def _upsert_product(
             setattr(product, key, val)
 
     await session.flush()
+    await _upsert_product_metafields(session, store_id, product.id, node)
     return product
+
+
+async def _upsert_product_metafields(
+    session: AsyncSession,
+    store_id: UUID,
+    product_id: UUID,
+    node: dict[str, Any],
+) -> int:
+    metafield_nodes = parse_product_metafields(node)
+    synced_gids: set[str] = set()
+    count = 0
+
+    for mf_node in metafield_nodes:
+        gid = mf_node["id"]
+        synced_gids.add(gid)
+        definition = mf_node.get("definition") or {}
+        fields = {
+            "namespace": mf_node["namespace"],
+            "key": mf_node["key"],
+            "type": mf_node["type"],
+            "value": mf_node.get("value"),
+            "definition_name": definition.get("name"),
+            "definition_description": definition.get("description"),
+            "raw_payload": mf_node.get("raw") or mf_node,
+        }
+
+        result = await session.execute(
+            select(ShopifyProductMetafield).where(
+                ShopifyProductMetafield.shopify_store_id == store_id,
+                ShopifyProductMetafield.shopify_metafield_gid == gid,
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            session.add(
+                ShopifyProductMetafield(
+                    shopify_store_id=store_id,
+                    product_id=product_id,
+                    shopify_metafield_gid=gid,
+                    **fields,
+                )
+            )
+        else:
+            row.product_id = product_id
+            for key, val in fields.items():
+                setattr(row, key, val)
+        count += 1
+
+    if synced_gids:
+        await session.execute(
+            delete(ShopifyProductMetafield).where(
+                ShopifyProductMetafield.shopify_store_id == store_id,
+                ShopifyProductMetafield.product_id == product_id,
+                ShopifyProductMetafield.shopify_metafield_gid.notin_(synced_gids),
+            )
+        )
+    else:
+        await session.execute(
+            delete(ShopifyProductMetafield).where(
+                ShopifyProductMetafield.shopify_store_id == store_id,
+                ShopifyProductMetafield.product_id == product_id,
+            )
+        )
+
+    await session.flush()
+    return count
 
 
 async def _upsert_variants(

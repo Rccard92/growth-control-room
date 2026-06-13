@@ -313,6 +313,7 @@ def _build_product_detail(data: dict) -> SeoProductDetailResponse:
         skill_meta=skill_meta_for_detail_response("product"),
         current_values=data["current_values"],
         images=data.get("images") or [],
+        metafields=data.get("metafields") or [],
         quantity_sold=data.get("quantity_sold", 0),
         revenue=data.get("revenue", 0),
         stock=data.get("stock"),
@@ -542,6 +543,7 @@ async def generate_proposal_field(
             entity_id=body.entity_id,
             field=body.field,
             image_id=body.image_id,
+            metafield_id=body.metafield_id,
             use_ai=body.use_ai,
         )
     except ValueError as exc:

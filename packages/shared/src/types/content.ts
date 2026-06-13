@@ -227,6 +227,7 @@ export interface SeoProposalGenerateFieldResponse {
   value: unknown;
   reasoning?: string | null;
   riskLevel: "low" | "medium" | "high";
+  metafieldId?: string | null;
 }
 
 export interface SeoProposalPreviewField {
@@ -269,6 +270,19 @@ export interface SeoSkillMeta {
   externalSkills?: string[];
 }
 
+export interface SeoProductMetafieldItem {
+  id: string;
+  namespace: string;
+  key: string;
+  type: string;
+  value: string;
+  definitionName?: string | null;
+  definitionDescription?: string | null;
+  editable: boolean;
+  aiGeneratable: boolean;
+  updatedAt?: string | null;
+}
+
 export interface SeoProductDetailResponse {
   product: Record<string, unknown>;
   analysis?: Record<string, unknown> | null;
@@ -276,6 +290,7 @@ export interface SeoProductDetailResponse {
   skillMeta?: SeoSkillMeta | null;
   currentValues: Record<string, unknown>;
   images: Record<string, unknown>[];
+  metafields?: SeoProductMetafieldItem[];
   quantitySold: number;
   revenue: number;
   stock?: number | null;

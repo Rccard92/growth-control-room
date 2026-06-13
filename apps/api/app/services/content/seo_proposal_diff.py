@@ -136,7 +136,52 @@ def compute_changed_proposed(
             if "media_images" not in changed_fields:
                 changed_fields.append("media_images")
 
+    changed_metafields = _diff_metafields(current, proposed)
+    if changed_metafields:
+        delta["metafields"] = changed_metafields
+        changed_fields.append("metafields")
+
     return delta, changed_fields
+
+
+def _diff_metafields(
+    current: dict[str, Any],
+    proposed: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    proposed_list = proposed.get("metafields")
+    if not proposed_list or not isinstance(proposed_list, list):
+        return None
+
+    current_list = current.get("metafields") or []
+    current_by_id: dict[str, dict[str, Any]] = {}
+    for item in current_list:
+        if isinstance(item, dict) and item.get("id"):
+            current_by_id[str(item["id"])] = item
+
+    changed: list[dict[str, Any]] = []
+    for entry in proposed_list:
+        if not isinstance(entry, dict):
+            continue
+        mid = str(entry.get("id") or "")
+        if not mid:
+            continue
+        cur = current_by_id.get(mid)
+        if cur is None:
+            continue
+        prop_val = str(entry.get("value") or "").strip()
+        cur_val = str(cur.get("value") or "").strip()
+        if prop_val == cur_val:
+            continue
+        changed.append(
+            {
+                "id": mid,
+                "namespace": entry.get("namespace") or cur.get("namespace"),
+                "key": entry.get("key") or cur.get("key"),
+                "type": entry.get("type") or cur.get("type"),
+                "value": prop_val,
+            }
+        )
+    return changed or None
 
 
 def proposal_changed_fields(

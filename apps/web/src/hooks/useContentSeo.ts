@@ -121,17 +121,20 @@ export function useGenerateProposalField(projectId: string) {
       entityId,
       field,
       imageId,
+      metafieldId,
       useAi,
     }: {
       entityType: "product" | "collection";
       entityId: string;
       field: string;
       imageId?: string;
+      metafieldId?: string;
       useAi?: boolean;
     }) =>
       generateProposalField(projectId, entityType, entityId, {
         field,
         imageId,
+        metafieldId,
         useAi,
       }),
   });

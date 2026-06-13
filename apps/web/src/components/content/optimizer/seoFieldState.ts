@@ -1,4 +1,5 @@
 import type { SeoFormValues } from "./seoFormValues";
+import type { SeoProductMetafieldItem } from "@gcr/shared";
 import { toProposalValues } from "./seoFormValues";
 
 export type FieldSource = "original" | "manual" | "ai";
@@ -36,6 +37,15 @@ export function imageAltFieldKey(imageId: string | number): string {
   return `imageAlt:${imageId}`;
 }
 
+export function metafieldFieldKey(metafieldId: string): string {
+  return `metafield:${metafieldId}`;
+}
+
+export function parseMetafieldFieldKey(key: string): string | null {
+  if (!key.startsWith("metafield:")) return null;
+  return key.slice("metafield:".length);
+}
+
 export function parseImageAltFieldKey(key: string): string | null {
   if (!key.startsWith("imageAlt:")) return null;
   return key.slice("imageAlt:".length);
@@ -55,7 +65,12 @@ function fieldValueFromForm(
   key: string,
   formValues: SeoFormValues,
   mediaImages: Record<string, unknown>[],
+  metafieldValues?: Record<string, string>,
 ): string {
+  const metafieldId = parseMetafieldFieldKey(key);
+  if (metafieldId && metafieldValues) {
+    return metafieldValues[metafieldId] ?? "";
+  }
   if (key === "imageAlt") {
     return String(formValues.imageAlt ?? "");
   }
@@ -71,14 +86,16 @@ export function initFieldStateMap(
   formValues: SeoFormValues,
   entityType: "product" | "collection",
   mediaImages: Record<string, unknown>[] = [],
+  metafields: SeoProductMetafieldItem[] = [],
+  metafieldValues: Record<string, string> = {},
 ): FieldStateMap {
   const map: FieldStateMap = {};
   for (const key of TEXT_FIELD_KEYS) {
-    const value = fieldValueFromForm(key, formValues, mediaImages);
+    const value = fieldValueFromForm(key, formValues, mediaImages, metafieldValues);
     map[key] = emptyFieldState(value);
   }
   if (entityType === "collection") {
-    const alt = fieldValueFromForm("imageAlt", formValues, mediaImages);
+    const alt = fieldValueFromForm("imageAlt", formValues, mediaImages, metafieldValues);
     map.imageAlt = emptyFieldState(alt);
   } else {
     for (const img of mediaImages) {
@@ -86,6 +103,11 @@ export function initFieldStateMap(
       if (!id) continue;
       const fk = imageAltFieldKey(id);
       map[fk] = emptyFieldState(String(img.altText ?? img.alt ?? ""));
+    }
+    for (const mf of metafields) {
+      const fk = metafieldFieldKey(mf.id);
+      const val = metafieldValues[mf.id] ?? mf.value ?? "";
+      map[fk] = emptyFieldState(val);
     }
   }
   return map;
@@ -256,6 +278,7 @@ export function buildChangedProposalValues(
   entityType: "product" | "collection",
   mediaImages: Record<string, unknown>[],
   fieldStateMap: FieldStateMap,
+  metafields: SeoProductMetafieldItem[] = [],
 ): { proposedValues: Record<string, unknown>; changedFields: string[] } {
   const full = toProposalValues(formValues, entityType, mediaImages);
   const changedKeys = getChangedFieldKeys(fieldStateMap);
@@ -290,6 +313,26 @@ export function buildChangedProposalValues(
           }
         }
       }
+      continue;
+    }
+    if (key.startsWith("metafield:")) {
+      if (entityType !== "product") continue;
+      const metafieldId = parseMetafieldFieldKey(key);
+      if (!metafieldId) continue;
+      const mf = metafields.find((m) => m.id === metafieldId);
+      const row = fieldStateMap[key];
+      if (!mf || !row) continue;
+      if (!proposedValues.metafields) {
+        proposedValues.metafields = [];
+      }
+      (proposedValues.metafields as Record<string, unknown>[]).push({
+        id: mf.id,
+        namespace: mf.namespace,
+        key: mf.key,
+        type: mf.type,
+        value: row.value,
+      });
+      if (!changedFields.includes("metafields")) changedFields.push("metafields");
       continue;
     }
     const snake = snakeMap[key];
@@ -334,6 +377,14 @@ export function applyFieldValueToForm(
   }
 
   return { formValues: nextForm, mediaImages: nextMedia };
+}
+
+export function applyMetafieldValue(
+  metafieldValues: Record<string, string>,
+  metafieldId: string,
+  value: unknown,
+): Record<string, string> {
+  return { ...metafieldValues, [metafieldId]: String(value ?? "") };
 }
 
 export function applyGlobalMergeToFieldState(

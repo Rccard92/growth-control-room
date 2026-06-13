@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoEntityAnalysis
-from app.models.shopify import ShopifyProduct, ShopifyStore
+from app.models.shopify import ShopifyProduct, ShopifyProductMetafield, ShopifyStore
 from app.services.ai.openai_client import (
     OpenAINotConfiguredError,
     OpenAIRequestError,
@@ -25,6 +25,10 @@ from app.services.content.seo_proposal_engine import (
     product_current_values,
 )
 from app.services.content.seo_skill_loader import load_seo_skill_context
+from app.services.shopify.metafield_utils import (
+    is_ai_generatable_metafield_type,
+    rules_metafield_fallback,
+)
 
 FIELD_MAP: dict[str, tuple[str | None, str | None]] = {
     "title": ("product_title", "collection_title"),
@@ -33,6 +37,7 @@ FIELD_MAP: dict[str, tuple[str | None, str | None]] = {
     "metaDescription": ("meta_description", "meta_description"),
     "descriptionHtml": ("description_html", "description_html"),
     "imageAlt": ("image_alts", "image_alt"),
+    "metafield": (None, None),
 }
 
 FIELD_PROMPTS: dict[str, str] = {
@@ -47,10 +52,13 @@ FIELD_PROMPTS: dict[str, str] = {
         "Genera solo una descrizione HTML per ecommerce (paragrafi semplici). Non cambiare altri campi."
     ),
     "imageAlt": "Genera solo alt text descrittivo per l'immagine (10-125 caratteri). Non cambiare altri campi.",
+    "metafield": "Genera SOLO il valore di questo metafield. Non cambiare altri campi.",
 }
 
 
 def _resolve_snake_field(entity_type: str, field: str) -> str:
+    if field == "metafield":
+        return "metafield"
     mapping = FIELD_MAP.get(field)
     if not mapping:
         raise ValueError(f"Campo non supportato: {field}")
@@ -105,6 +113,44 @@ def _rules_single_field(
     return value, reasoning, risk
 
 
+async def _load_metafield_row(
+    store: ShopifyStore,
+    session: AsyncSession,
+    product_id: UUID,
+    metafield_id: str,
+) -> ShopifyProductMetafield:
+    try:
+        mf_uuid = UUID(metafield_id)
+    except ValueError as exc:
+        raise ValueError("metafield_id non valido") from exc
+    row = (
+        await session.execute(
+            select(ShopifyProductMetafield).where(
+                ShopifyProductMetafield.id == mf_uuid,
+                ShopifyProductMetafield.shopify_store_id == store.id,
+                ShopifyProductMetafield.product_id == product_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError("Metafield non trovato")
+    return row
+
+
+def _rules_metafield(
+    metafield: ShopifyProductMetafield,
+    entity: ShopifyProduct,
+) -> tuple[str, str, str]:
+    return rules_metafield_fallback(
+        value=metafield.value,
+        namespace=metafield.namespace,
+        key=metafield.key,
+        type_name=metafield.type,
+        definition_name=metafield.definition_name,
+        product_title=entity.title,
+    )
+
+
 def _ai_field_user_prompt(
     *,
     entity_type: str,
@@ -113,6 +159,7 @@ def _ai_field_user_prompt(
     current: dict[str, Any],
     analysis: SeoEntityAnalysis,
     image_id: str | None,
+    metafield: ShopifyProductMetafield | None = None,
 ) -> str:
     extra = ""
     if field == "imageAlt" and entity_type == "product":
@@ -120,6 +167,14 @@ def _ai_field_user_prompt(
             f'\nimage_id target="{image_id}". '
             'Rispondi con value come oggetto: '
             '{"image_id":"...","proposed_alt":"...","reason":"..."}'
+        )
+    if field == "metafield" and metafield is not None:
+        extra = (
+            f"\nmetafield namespace={metafield.namespace} key={metafield.key} "
+            f"type={metafield.type} current_value={metafield.value or ''}\n"
+            f"definition_name={metafield.definition_name or ''}\n"
+            f"definition_description={metafield.definition_description or ''}\n"
+            "Rispondi con value come stringa (solo il valore del metafield)."
         )
     return (
         f"entity_type={entity_type}\n"
@@ -143,10 +198,15 @@ async def generate_seo_proposal_field(
     entity_id: UUID,
     field: str,
     image_id: str | None = None,
+    metafield_id: str | None = None,
     use_ai: bool = True,
 ) -> dict[str, Any]:
     if field not in FIELD_MAP:
         raise ValueError(f"Campo non supportato: {field}")
+    if field == "metafield" and entity_type != "product":
+        raise ValueError("I metafield sono supportati solo per i prodotti")
+    if field == "metafield" and not metafield_id:
+        raise ValueError("metafield_id richiesto per field=metafield")
 
     analysis = (
         await session.execute(
@@ -161,6 +221,7 @@ async def generate_seo_proposal_field(
     if analysis is None:
         raise ValueError("Esegui prima l'analisi SEO su questa entità")
 
+    metafield_row: ShopifyProductMetafield | None = None
     if entity_type == "product":
         entity = (
             await session.execute(
@@ -173,6 +234,12 @@ async def generate_seo_proposal_field(
         if entity is None:
             raise ValueError("Prodotto non trovato")
         current = product_current_values(entity)
+        if field == "metafield":
+            metafield_row = await _load_metafield_row(store, session, entity_id, metafield_id or "")
+            if not is_ai_generatable_metafield_type(metafield_row.type, metafield_row.value or ""):
+                raise ValueError(
+                    "Questo tipo di metafield non è ancora modificabile da Growth Control Room."
+                )
     elif entity_type == "collection":
         entity = (
             await session.execute(
@@ -196,6 +263,46 @@ async def generate_seo_proposal_field(
     value: Any
     reasoning: str
     risk_level: str
+
+    if field == "metafield" and metafield_row is not None:
+        if use_ai and is_openai_configured():
+            system_prompt = _ai_system_prompt(skill_ctx.as_proposal_prompt_context())
+            user_prompt = _ai_field_user_prompt(
+                entity_type=entity_type,
+                field=field,
+                snake_field=snake_field,
+                current=current,
+                analysis=analysis,
+                image_id=image_id,
+                metafield=metafield_row,
+            )
+            try:
+                result = await generate_structured_json(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                )
+                value = result.get("value")
+                reasoning = str(result.get("reasoning") or "")
+                risk_level = str(result.get("risk_level") or "low")
+                if value is None or (isinstance(value, str) and not str(value).strip()):
+                    raise OpenAIRequestError("Risposta AI senza valore utilizzabile")
+                value = str(value)
+                if risk_level not in ("low", "medium", "high"):
+                    risk_level = "low"
+            except (OpenAINotConfiguredError, OpenAIRequestError):
+                value, reasoning, risk_level = _rules_metafield(metafield_row, entity)
+        else:
+            if use_ai and not is_openai_configured():
+                raise ValueError("AI non configurata")
+            value, reasoning, risk_level = _rules_metafield(metafield_row, entity)
+
+        return {
+            "field": field,
+            "value": value,
+            "reasoning": reasoning,
+            "risk_level": risk_level,
+            "metafield_id": str(metafield_row.id),
+        }
 
     if use_ai and is_openai_configured():
         system_prompt = _ai_system_prompt(skill_ctx.as_proposal_prompt_context())
