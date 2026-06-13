@@ -15,6 +15,8 @@ from app.models.brand_intelligence import (
     BrandExtractedFact,
     BrandIdentity,
     BrandProductKnowledge,
+    BrandProductKnowledgeGeneral,
+    BrandProductKnowledgeItem,
     BrandProfile,
     BrandSafeClaims,
     BrandSeoStrategy,
@@ -55,9 +57,12 @@ from app.services.brand_intelligence.visual_identity_service import (
     visual_missing_fields,
 )
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
+from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
 from app.services.brand_intelligence.score import (
     SECTION_LABELS,
     compute_brand_knowledge_score,
+    product_knowledge_missing_fields,
+    product_knowledge_module_completion,
     profile_has_minimum,
     profile_is_complete,
     profile_missing_context,
@@ -437,6 +442,22 @@ async def build_overview(
             select(BrandSafeClaims).where(BrandSafeClaims.project_id == project_id)
         )
     ).scalar_one_or_none()
+    pk_general = (
+        await session.execute(
+            select(BrandProductKnowledgeGeneral).where(
+                BrandProductKnowledgeGeneral.project_id == project_id
+            )
+        )
+    ).scalar_one_or_none()
+    pk_items = list(
+        (
+            await session.execute(
+                select(BrandProductKnowledgeItem).where(
+                    BrandProductKnowledgeItem.project_id == project_id
+                )
+            )
+        ).scalars().all()
+    )
 
     sections = [
         BrandModuleStatus(
@@ -471,6 +492,17 @@ async def build_overview(
             missing_fields=safe_claims_missing_fields(safe_claims),
             updated_at=safe_claims.updated_at if safe_claims else None,
         ),
+        BrandModuleStatus(
+            key="productKnowledge",
+            label=SECTION_LABELS["productKnowledge"],
+            status=product_knowledge_module_completion(pk_general, len(pk_items)),
+            missing_fields=product_knowledge_missing_fields(pk_general, len(pk_items)),
+            updated_at=(
+                pk_general.updated_at
+                if pk_general and general_has_content(pk_general)
+                else (pk_items[0].updated_at if pk_items else None)
+            ),
+        ),
     ]
 
     return BrandIntelligenceOverviewResponse(
@@ -484,7 +516,7 @@ async def build_overview(
         enrichment_confidence=profile.enrichment_confidence if profile else None,
         enrichment_warnings=profile.enrichment_warnings if profile else None,
         has_voice=False,
-        products_count=0,
+        products_count=len(pk_items),
         audience_count=0,
         claims_count=0,
         guardrails_count=0,

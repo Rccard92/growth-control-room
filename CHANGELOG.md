@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.4-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added modular Product Knowledge (general rules + Shopify-linked product items)
+- Migration `024`: tables `brand_product_knowledge_general` and `brand_product_knowledge_items`
+- Scoped general import from single file; apply-proposal merge without wipe
+- BrandContextBuilder exposes `productKnowledge`; Product SEO uses per-product lookup + general fallback
+- Overview 6th card; knowledge score averaged over 5 modules
+
 ## [0.3.3-alpha] - 2026-06-13
 
 Tipo: Alpha minor

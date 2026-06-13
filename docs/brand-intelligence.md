@@ -1,16 +1,66 @@
 # Brand Intelligence
 
-Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.3** aggiunge Safe Claims & Red Flags come quarto modulo ufficiale, con import scoped e guardrail per i moduli AI.
+Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.4** aggiunge Product Knowledge modulare: regole generali + schede prodotto collegate a Shopify.
+
+## Strategia v0.3.4 — Product Knowledge
+
+La UI espone sei tab:
+
+1. **Overview** — sei card di stato (Profile, Identity, Visual, Safe Claims, Product Knowledge)
+2. **Brand Profile** — fonti URL, proposta AI, profilo ufficiale
+3. **Brand Identity** — form manuale + import da 1 file
+4. **Visual Identity** — logo, palette, font + estrazione da sito
+5. **Safe Claims & Red Flags** — claim consentiti/vietati, red flags
+6. **Product Knowledge** — regole generali + schede prodotto Shopify
+
+### Due livelli
+
+| Livello | Tabella | Uso |
+|---------|---------|-----|
+| **Generale** | `brand_product_knowledge_general` | Principi validi per tutti i prodotti |
+| **Specifico** | `brand_product_knowledge_items` | Scheda per prodotto Shopify (FK `shopify_products`) |
+
+### Import file (solo generale)
+
+1. Carica **un solo file** (catalogo, scheda tecnica, linee guida)
+2. L'AI estrae **solo** regole generali; dettagli di singoli prodotti (es. "Miele di Limone") → principi comuni, **non** schede specifiche
+3. Applica proposta → `brand_product_knowledge_general`
+4. Nessun auto-save
+
+### Schede prodotto da Shopify
+
+1. CTA "Aggiungi prodotto da Shopify" → lista prodotti sincronizzati
+2. `POST .../items/from-shopify` crea scheda precompilata (nome, handle, GID, product line)
+3. Compilazione manuale accordion; salvataggio per item
+4. Import file per singolo prodotto: **non in v1**
+
+**Completion modulo:** generale presente **e** ≥1 item = completo; generale **oppure** ≥1 item = parziale.
+
+**Legacy:** `brand_product_knowledge` + route `.../products` restano deprecati.
+
+### Endpoint Product Knowledge (v0.3.4)
+
+| Metodo | Path |
+|--------|------|
+| GET/PUT | `/brand-intelligence/product-knowledge/general` |
+| POST | `/brand-intelligence/product-knowledge/general/import-file` |
+| POST | `/brand-intelligence/product-knowledge/general/apply-proposal` |
+| GET | `/brand-intelligence/product-knowledge/shopify-products` |
+| GET/POST | `/brand-intelligence/product-knowledge/items` |
+| POST | `/brand-intelligence/product-knowledge/items/from-shopify` |
+| GET/PUT/DELETE | `/brand-intelligence/product-knowledge/items/{item_id}` |
+
+### Context machine-ready
+
+`GET /context` espone `productKnowledge.generalRules` + `productKnowledge.specificProducts[]`.
+`promptContext.productKnowledge` include blocchi `PRODUCT KNOWLEDGE — GENERAL` e `SPECIFIC PRODUCTS`.
+Product SEO: lookup per `shopify_product_id` + fallback solo generale se item assente.
+
+---
 
 ## Strategia v0.3.3 — Safe Claims & Red Flags
 
-La UI espone cinque tab:
-
-1. **Overview** — cinque card di stato (Profile, Identity, Visual Identity, Safe Claims)
-2. **Brand Profile** — fonti URL, proposta AI, profilo ufficiale
-3. **Brand Identity** — form manuale + import da 1 file con proposta AI
-4. **Visual Identity** — logo, palette, font + estrazione da sito
-5. **Safe Claims & Red Flags** — claim consentiti/vietati, disclaimer, regole salute/competitor, process secrets
+La UI (v0.3.3) ha introdotto Safe Claims come quarto modulo.
 
 ### Flusso Safe Claims da file
 

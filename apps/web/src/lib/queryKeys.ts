@@ -48,6 +48,12 @@ export const queryKeys = {
     visualIdentity: (projectId: string) =>
       ["brandIntelligence", projectId, "visualIdentity"] as const,
     safeClaims: (projectId: string) => ["brandIntelligence", projectId, "safeClaims"] as const,
+    productKnowledgeGeneral: (projectId: string) =>
+      ["brandIntelligence", projectId, "productKnowledgeGeneral"] as const,
+    productKnowledgeItems: (projectId: string) =>
+      ["brandIntelligence", projectId, "productKnowledgeItems"] as const,
+    productKnowledgeShopifyProducts: (projectId: string) =>
+      ["brandIntelligence", projectId, "productKnowledgeShopifyProducts"] as const,
     voice: (projectId: string) => ["brandIntelligence", projectId, "voice"] as const,
     products: (projectId: string) => ["brandIntelligence", projectId, "products"] as const,
     audience: (projectId: string) => ["brandIntelligence", projectId, "audience"] as const,

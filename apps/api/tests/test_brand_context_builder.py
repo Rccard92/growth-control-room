@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
+from app.schemas.brand_product_knowledge import BrandProductKnowledgeContext, BrandProductKnowledgeGeneralRulesContext
 from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
     BrandContextBundleResponse,
@@ -207,3 +208,38 @@ def test_build_prompt_context_includes_safe_claims_fallback() -> None:
     assert "SAFE CLAIMS" in prompt_ctx.safe_claims
     assert "fallback prudenza" in prompt_ctx.safe_claims.lower() or "prudenza" in prompt_ctx.safe_claims.lower()
     assert "SAFE CLAIMS" in (prompt_ctx.full_text or "")
+
+
+def test_build_prompt_context_includes_product_knowledge() -> None:
+    bundle = BrandContextBundleResponse(
+        brand_context_version="v1",
+        primary_source="brand_profile",
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Artisan brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        product_knowledge=BrandProductKnowledgeContext(
+            general_rules=BrandProductKnowledgeGeneralRulesContext(
+                general_principles=["Artigianale"],
+                common_strengths=["Qualità"],
+            ),
+            specific_products=[],
+        ),
+        products=[],
+        categories=[],
+        audience=[],
+        claims=[],
+        content_pillars=[],
+        guardrails=[],
+        assets=[],
+        knowledge_score=_score(80),
+    )
+    prompt_ctx = BrandIntelligenceContextBuilder.build_prompt_context(bundle)
+    assert prompt_ctx is not None
+    assert prompt_ctx.product_knowledge is not None
+    assert "PRODUCT KNOWLEDGE" in prompt_ctx.product_knowledge
+    assert "Artigianale" in prompt_ctx.product_knowledge

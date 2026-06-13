@@ -21,6 +21,8 @@ if TYPE_CHECKING:
         BrandImportBatch,
         BrandIntelligenceBrief,
         BrandProductKnowledge,
+        BrandProductKnowledgeGeneral,
+        BrandProductKnowledgeItem,
         BrandProfile,
         BrandSafeClaims,
         BrandSectionDraft,
@@ -93,6 +95,17 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         uselist=False,
     )
     brand_product_knowledge: Mapped[list["BrandProductKnowledge"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    brand_product_knowledge_general: Mapped["BrandProductKnowledgeGeneral | None"] = (
+        relationship(
+            back_populates="project",
+            cascade="all, delete-orphan",
+            uselist=False,
+        )
+    )
+    brand_product_knowledge_items: Mapped[list["BrandProductKnowledgeItem"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

@@ -3,14 +3,22 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.brand_intelligence import BrandIdentity, BrandProfile, BrandSafeClaims, BrandVisualIdentity
+from app.models.brand_intelligence import (
+    BrandIdentity,
+    BrandProductKnowledgeGeneral,
+    BrandProductKnowledgeItem,
+    BrandProfile,
+    BrandSafeClaims,
+    BrandVisualIdentity,
+)
 from app.services.brand_intelligence.identity_service import (
     identity_completion,
     identity_missing_fields,
 )
+from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
 from app.services.brand_intelligence.safe_claims_service import (
     safe_claims_completion,
     safe_claims_missing_fields,
@@ -25,6 +33,7 @@ SECTION_LABELS = {
     "brandIdentity": "Brand Identity",
     "visualIdentity": "Visual Identity",
     "safeClaims": "Safe Claims & Red Flags",
+    "productKnowledge": "Product Knowledge",
 }
 
 
@@ -93,6 +102,31 @@ def safe_claims_missing_context(safe_claims: BrandSafeClaims | None) -> list[str
     return [f"safe_claims.{f}" for f in safe_claims_missing_fields(safe_claims)]
 
 
+def product_knowledge_module_completion(
+    general: BrandProductKnowledgeGeneral | None,
+    items_count: int,
+) -> str:
+    has_general = general_has_content(general)
+    has_items = items_count > 0
+    if has_general and has_items:
+        return "complete"
+    if has_general or has_items:
+        return "partial"
+    return "empty"
+
+
+def product_knowledge_missing_fields(
+    general: BrandProductKnowledgeGeneral | None,
+    items_count: int,
+) -> list[str]:
+    missing: list[str] = []
+    if not general_has_content(general):
+        missing.append("general_knowledge")
+    if items_count == 0:
+        missing.append("specific_products")
+    return missing
+
+
 def _completion_to_score(status: str) -> int:
     if status == "complete":
         return 100
@@ -158,17 +192,34 @@ async def compute_brand_knowledge_score(
             select(BrandSafeClaims).where(BrandSafeClaims.project_id == project_id)
         )
     ).scalar_one_or_none()
+    pk_general = (
+        await session.execute(
+            select(BrandProductKnowledgeGeneral).where(
+                BrandProductKnowledgeGeneral.project_id == project_id
+            )
+        )
+    ).scalar_one_or_none()
+    pk_items_count = (
+        await session.execute(
+            select(func.count()).select_from(BrandProductKnowledgeItem).where(
+                BrandProductKnowledgeItem.project_id == project_id
+            )
+        )
+    ).scalar_one()
+    items_count = int(pk_items_count or 0)
 
     profile_score, profile_missing, profile_recs = _score_brand_profile(profile)
     identity_status = identity_completion(identity)
     visual_status = visual_completion(visual)
     safe_claims_status = safe_claims_completion(safe_claims)
+    pk_status = product_knowledge_module_completion(pk_general, items_count)
 
     section_scores = {
         "brandProfile": profile_score,
         "brandIdentity": _completion_to_score(identity_status),
         "visualIdentity": _completion_to_score(visual_status),
         "safeClaims": _completion_to_score(safe_claims_status),
+        "productKnowledge": _completion_to_score(pk_status),
     }
     overall = round(sum(section_scores.values()) / len(section_scores))
 
@@ -177,6 +228,7 @@ async def compute_brand_knowledge_score(
         + identity_missing_fields(identity)
         + visual_missing_fields(visual)
         + safe_claims_missing_fields(safe_claims)
+        + product_knowledge_missing_fields(pk_general, items_count)
     )
     recs = list(profile_recs)
     if identity_status == "empty":
@@ -185,6 +237,8 @@ async def compute_brand_knowledge_score(
         recs.append("Definisci la Visual Identity con logo e palette colori.")
     if safe_claims_status == "empty":
         recs.append("Compila Safe Claims con claim consentiti e vietati.")
+    if pk_status == "empty":
+        recs.append("Compila Product Knowledge generale e aggiungi almeno un prodotto Shopify.")
 
     return BrandKnowledgeScore(
         overall_score=overall,

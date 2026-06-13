@@ -10,6 +10,7 @@ from app.services.brand_intelligence.score import (
     SECTION_LABELS,
     _overall_status,
     _score_brand_profile,
+    product_knowledge_module_completion,
     profile_has_minimum,
     profile_is_complete,
     profile_missing_context,
@@ -88,12 +89,13 @@ def test_overall_status_thresholds() -> None:
     assert _overall_status(85) == "ready"
 
 
-def test_section_labels_four_modules() -> None:
+def test_section_labels_five_modules() -> None:
     assert set(SECTION_LABELS.keys()) == {
         "brandProfile",
         "brandIdentity",
         "visualIdentity",
         "safeClaims",
+        "productKnowledge",
     }
 
 
@@ -123,6 +125,25 @@ def test_safe_claims_completion() -> None:
     )
     assert safe_claims_has_minimum(row) is True
     assert safe_claims_completion(row) == "complete"
+
+
+def test_product_knowledge_module_completion() -> None:
+    general = SimpleNamespace(
+        general_principles=["p"],
+        common_strengths=None,
+        common_quality_rules=None,
+        common_production_notes=None,
+        common_usage_notes=None,
+        common_objections=None,
+        common_faq=None,
+        communication_rules=None,
+        product_storytelling_rules=None,
+        notes=None,
+    )
+    assert product_knowledge_module_completion(None, 0) == "empty"
+    assert product_knowledge_module_completion(general, 0) == "partial"
+    assert product_knowledge_module_completion(general, 1) == "complete"
+    assert product_knowledge_module_completion(None, 2) == "partial"
 
 
 def test_visual_has_minimum() -> None:

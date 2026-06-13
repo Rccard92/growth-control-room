@@ -4,7 +4,10 @@ import {
   applyBrandIdentityProposal,
   applyBrandProfileProposal,
   applyBrandSafeClaimsProposal,
+  applyProductKnowledgeGeneralProposal,
   applyVisualProposal,
+  createProductKnowledgeItemFromShopify,
+  deleteProductKnowledgeItem,
   enrichBrandProfile,
   extractVisualFromWebsite,
   getBrandContext,
@@ -13,12 +16,18 @@ import {
   getBrandProfile,
   getBrandSafeClaims,
   getBrandVisualIdentity,
+  getProductKnowledgeGeneral,
+  getProductKnowledgeItems,
+  getProductKnowledgeShopifyProducts,
   importBrandIdentityFromFile,
   importBrandSafeClaimsFromFile,
+  importProductKnowledgeGeneralFromFile,
   updateBrandIdentity,
   updateBrandProfile,
   updateBrandSafeClaims,
   updateBrandVisualIdentity,
+  updateProductKnowledgeGeneral,
+  updateProductKnowledgeItem,
 } from "../lib/brand-intelligence-api";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -33,6 +42,15 @@ function invalidateBrand(projectId: string, qc: ReturnType<typeof useQueryClient
   });
   void qc.invalidateQueries({
     queryKey: queryKeys.brandIntelligence.safeClaims(projectId),
+  });
+  void qc.invalidateQueries({
+    queryKey: queryKeys.brandIntelligence.productKnowledgeGeneral(projectId),
+  });
+  void qc.invalidateQueries({
+    queryKey: queryKeys.brandIntelligence.productKnowledgeItems(projectId),
+  });
+  void qc.invalidateQueries({
+    queryKey: queryKeys.brandIntelligence.productKnowledgeShopifyProducts(projectId),
   });
 }
 
@@ -190,5 +208,93 @@ export function useApplyBrandSafeClaimsProposal(projectId: string) {
       qc.setQueryData(queryKeys.brandIntelligence.safeClaims(projectId), data.safeClaims);
       invalidateBrand(projectId, qc);
     },
+  });
+}
+
+export function useProductKnowledgeGeneral(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.productKnowledgeGeneral(projectId ?? ""),
+    queryFn: () => getProductKnowledgeGeneral(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useUpdateProductKnowledgeGeneral(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateProductKnowledgeGeneral>[1]) =>
+      updateProductKnowledgeGeneral(projectId, data),
+    onSuccess: () => invalidateBrand(projectId, qc),
+  });
+}
+
+export function useImportProductKnowledgeGeneralFromFile(projectId: string) {
+  return useMutation({
+    mutationFn: (file: File) => importProductKnowledgeGeneralFromFile(projectId, file),
+  });
+}
+
+export function useApplyProductKnowledgeGeneralProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof applyProductKnowledgeGeneralProposal>[1]) =>
+      applyProductKnowledgeGeneralProposal(projectId, data),
+    onSuccess: (data) => {
+      qc.setQueryData(
+        queryKeys.brandIntelligence.productKnowledgeGeneral(projectId),
+        data.general,
+      );
+      invalidateBrand(projectId, qc);
+    },
+  });
+}
+
+export function useProductKnowledgeItems(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.productKnowledgeItems(projectId ?? ""),
+    queryFn: () => getProductKnowledgeItems(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useProductKnowledgeShopifyProducts(
+  projectId: string | undefined,
+  enabled = false,
+) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.productKnowledgeShopifyProducts(projectId ?? ""),
+    queryFn: () => getProductKnowledgeShopifyProducts(projectId!),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useCreateProductKnowledgeItemFromShopify(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof createProductKnowledgeItemFromShopify>[1]) =>
+      createProductKnowledgeItemFromShopify(projectId, data),
+    onSuccess: () => invalidateBrand(projectId, qc),
+  });
+}
+
+export function useUpdateProductKnowledgeItem(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      data,
+    }: {
+      itemId: string;
+      data: Parameters<typeof updateProductKnowledgeItem>[2];
+    }) => updateProductKnowledgeItem(projectId, itemId, data),
+    onSuccess: () => invalidateBrand(projectId, qc),
+  });
+}
+
+export function useDeleteProductKnowledgeItem(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => deleteProductKnowledgeItem(projectId, itemId),
+    onSuccess: () => invalidateBrand(projectId, qc),
   });
 }

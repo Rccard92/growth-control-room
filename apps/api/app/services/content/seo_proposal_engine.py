@@ -274,6 +274,16 @@ async def generate_seo_proposal(
 
     skill_ctx = load_seo_skill_context()
     brand_ctx = await BrandIntelligenceContextBuilder.get_prompt_context(session, store.project_id)
+    if entity_type == "product":
+        from app.services.brand_intelligence.product_knowledge_context import (
+            get_product_knowledge_prompt_for_entity,
+        )
+
+        product_ctx = await get_product_knowledge_prompt_for_entity(
+            session, store.project_id, shopify_product_id=entity_id
+        )
+        if product_ctx:
+            brand_ctx = f"{brand_ctx}\n\n{product_ctx}" if brand_ctx else product_ctx
 
     if use_ai and is_openai_configured():
         system_prompt = _ai_system_prompt(

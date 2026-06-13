@@ -14,6 +14,13 @@ import type {
   BrandSafeClaimsApplyProposalRequest,
   BrandSafeClaimsApplyProposalResponse,
   BrandSafeClaimsImportResponse,
+  BrandProductKnowledgeGeneral,
+  BrandProductKnowledgeGeneralApplyProposalRequest,
+  BrandProductKnowledgeGeneralApplyProposalResponse,
+  BrandProductKnowledgeGeneralImportResponse,
+  BrandProductKnowledgeItem,
+  BrandProductKnowledgeItemFromShopifyRequest,
+  BrandProductKnowledgeShopifyProductsResponse,
   BrandVisualIdentity,
   VisualApplyProposalRequest,
   VisualApplyProposalResponse,
@@ -212,5 +219,108 @@ export function applyBrandSafeClaimsProposal(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     },
+  );
+}
+
+export function getProductKnowledgeGeneral(
+  projectId: string,
+): Promise<BrandProductKnowledgeGeneral> {
+  return apiFetch<BrandProductKnowledgeGeneral>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/general`,
+  );
+}
+
+export function updateProductKnowledgeGeneral(
+  projectId: string,
+  data: Partial<BrandProductKnowledgeGeneral>,
+): Promise<BrandProductKnowledgeGeneral> {
+  return apiFetch<BrandProductKnowledgeGeneral>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/general`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function importProductKnowledgeGeneralFromFile(
+  projectId: string,
+  file: File,
+): Promise<BrandProductKnowledgeGeneralImportResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiUploadForm<BrandProductKnowledgeGeneralImportResponse>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/general/import-file`,
+    formData,
+  );
+}
+
+export function applyProductKnowledgeGeneralProposal(
+  projectId: string,
+  data: BrandProductKnowledgeGeneralApplyProposalRequest,
+): Promise<BrandProductKnowledgeGeneralApplyProposalResponse> {
+  return apiFetch<BrandProductKnowledgeGeneralApplyProposalResponse>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/general/apply-proposal`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function getProductKnowledgeShopifyProducts(
+  projectId: string,
+): Promise<BrandProductKnowledgeShopifyProductsResponse> {
+  return apiFetch<BrandProductKnowledgeShopifyProductsResponse>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/shopify-products`,
+  );
+}
+
+export function getProductKnowledgeItems(
+  projectId: string,
+): Promise<BrandProductKnowledgeItem[]> {
+  return apiFetch<BrandProductKnowledgeItem[]>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/items`,
+  );
+}
+
+export function createProductKnowledgeItemFromShopify(
+  projectId: string,
+  data: BrandProductKnowledgeItemFromShopifyRequest,
+): Promise<BrandProductKnowledgeItem> {
+  return apiFetch<BrandProductKnowledgeItem>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/items/from-shopify`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function updateProductKnowledgeItem(
+  projectId: string,
+  itemId: string,
+  data: Partial<BrandProductKnowledgeItem>,
+): Promise<BrandProductKnowledgeItem> {
+  return apiFetch<BrandProductKnowledgeItem>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/items/${itemId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function deleteProductKnowledgeItem(
+  projectId: string,
+  itemId: string,
+): Promise<void> {
+  return apiFetch<void>(
+    `/api/projects/${projectId}/brand-intelligence/product-knowledge/items/${itemId}`,
+    { method: "DELETE" },
   );
 }

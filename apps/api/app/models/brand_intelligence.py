@@ -130,6 +130,86 @@ class BrandSafeClaims(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="brand_safe_claims")
 
 
+class BrandProductKnowledgeGeneral(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_product_knowledge_general"
+    __table_args__ = (
+        UniqueConstraint("project_id", name="uq_brand_product_knowledge_general_project_id"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    general_principles: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    common_strengths: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    common_quality_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    common_production_notes: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    common_usage_notes: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    common_objections: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    common_faq: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    communication_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    product_storytelling_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_import_source: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warnings: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_product_knowledge_general")
+
+
+class BrandProductKnowledgeItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_product_knowledge_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "shopify_product_id",
+            name="uq_brand_product_knowledge_items_project_shopify",
+        ),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    shopify_product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shopify_products.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
+    shopify_product_gid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    shopify_handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    shopify_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    product_name: Mapped[str] = mapped_column(String(500))
+    product_line: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    strategic_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    origin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ingredients: Mapped[str | None] = mapped_column(Text, nullable=True)
+    production_process: Mapped[str | None] = mapped_column(Text, nullable=True)
+    taste_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    color_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    texture_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    usage_suggestions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    conservation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_audience: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objections: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    faq: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    allowed_claims: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    forbidden_claims: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    seo_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ads_social_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    related_products: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_synced_from_shopify_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    project: Mapped["Project"] = relationship(back_populates="brand_product_knowledge_items")
+
+
 class BrandVoice(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "brand_voices"
     __table_args__ = (UniqueConstraint("project_id", name="uq_brand_voices_project_id"),)

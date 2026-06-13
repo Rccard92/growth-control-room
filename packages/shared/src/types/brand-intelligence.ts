@@ -312,6 +312,144 @@ export interface BrandSafeClaimsApplyProposalResponse {
   message: string;
 }
 
+export interface BrandProductKnowledgeGeneral {
+  id: string;
+  projectId: string;
+  generalPrinciples?: string[] | null;
+  commonStrengths?: string[] | null;
+  commonQualityRules?: string[] | null;
+  commonProductionNotes?: string[] | null;
+  commonUsageNotes?: string[] | null;
+  commonObjections?: string[] | null;
+  commonFaq?: Array<{ question: string; answer: string }> | null;
+  communicationRules?: string[] | null;
+  productStorytellingRules?: string[] | null;
+  notes?: string | null;
+  lastImportSource?: string | null;
+  lastConfidence?: number | null;
+  warnings?: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandProductKnowledgeGeneralProposal {
+  generalPrinciples?: string[] | null;
+  commonStrengths?: string[] | null;
+  commonQualityRules?: string[] | null;
+  commonProductionNotes?: string[] | null;
+  commonUsageNotes?: string[] | null;
+  commonObjections?: string[] | null;
+  commonFaq?: Array<{ question: string; answer: string }> | null;
+  communicationRules?: string[] | null;
+  productStorytellingRules?: string[] | null;
+  notes?: string | null;
+}
+
+export interface BrandProductKnowledgeGeneralImportResponse {
+  proposal: BrandProductKnowledgeGeneralProposal;
+  confidence: number;
+  warnings: string[];
+  sourceSummary: string;
+}
+
+export interface BrandProductKnowledgeGeneralApplyProposalRequest {
+  proposal: BrandProductKnowledgeGeneralProposal;
+}
+
+export interface BrandProductKnowledgeGeneralApplyProposalResponse {
+  general: BrandProductKnowledgeGeneral;
+  message: string;
+}
+
+export interface BrandProductKnowledgeItem {
+  id: string;
+  projectId: string;
+  shopifyProductId?: string | null;
+  shopifyProductGid?: string | null;
+  shopifyHandle?: string | null;
+  shopifyTitle?: string | null;
+  productName: string;
+  productLine?: string | null;
+  priority?: string | null;
+  strategicDescription?: string | null;
+  origin?: string | null;
+  ingredients?: string | null;
+  productionProcess?: string | null;
+  tasteNotes?: string | null;
+  colorNotes?: string | null;
+  textureNotes?: string | null;
+  usageSuggestions?: string | null;
+  conservation?: string | null;
+  targetAudience?: string | null;
+  objections?: string[] | null;
+  faq?: Array<{ question: string; answer: string }> | null;
+  allowedClaims?: string[] | null;
+  forbiddenClaims?: string[] | null;
+  seoNotes?: string | null;
+  adsSocialNotes?: string | null;
+  relatedProducts?: string[] | null;
+  sourceType?: string | null;
+  lastSyncedFromShopifyAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completionStatus?: ModuleCompletionStatus | null;
+}
+
+export interface BrandProductKnowledgeItemFromShopifyRequest {
+  shopifyProductId: string;
+}
+
+export interface BrandProductKnowledgeShopifyProductOption {
+  id: string;
+  shopifyGid: string;
+  title: string;
+  handle: string;
+  status?: string | null;
+  vendor?: string | null;
+  productType?: string | null;
+  featuredImageUrl?: string | null;
+  hasKnowledgeItem: boolean;
+}
+
+export interface BrandProductKnowledgeShopifyProductsResponse {
+  shopifyConnected: boolean;
+  message?: string | null;
+  products: BrandProductKnowledgeShopifyProductOption[];
+}
+
+export interface BrandProductKnowledgeGeneralRulesContext {
+  generalPrinciples: string[];
+  commonStrengths: string[];
+  qualityRules: string[];
+  productionNotes: string[];
+  usageNotes: string[];
+  commonObjections: string[];
+  commonFaq: Array<{ question: string; answer: string }>;
+  communicationRules: string[];
+  storytellingRules: string[];
+}
+
+export interface BrandProductKnowledgeSpecificProductContext {
+  shopifyProductId?: string | null;
+  shopifyGid?: string | null;
+  title?: string | null;
+  handle?: string | null;
+  productLine?: string | null;
+  strategicDescription?: string | null;
+  origin?: string | null;
+  ingredients?: string | null;
+  usageSuggestions?: string | null;
+  faq: Array<{ question: string; answer: string }>;
+  allowedClaims: string[];
+  forbiddenClaims: string[];
+  seoNotes?: string | null;
+}
+
+export interface BrandProductKnowledgeContext {
+  generalRules?: BrandProductKnowledgeGeneralRulesContext | null;
+  specificProducts: BrandProductKnowledgeSpecificProductContext[];
+}
+
 export interface VisualColorSwatch {
   hex: string;
   role?: string | null;
@@ -761,6 +899,7 @@ export interface BrandPromptContext {
   brandIdentity?: string | null;
   visualIdentity?: string | null;
   safeClaims?: string | null;
+  productKnowledge?: string | null;
   fullText?: string | null;
 }
 
@@ -776,6 +915,7 @@ export interface BrandContextBundle {
   brandIdentity?: BrandIdentity | null;
   visualIdentity?: BrandVisualIdentity | null;
   safeClaims?: BrandSafeClaims | null;
+  productKnowledge?: BrandProductKnowledgeContext | null;
   voice?: BrandVoice | null;
   products: BrandProductKnowledge[];
   categories: BrandProductKnowledge[];
@@ -793,4 +933,5 @@ export type BrandIntelligenceTab =
   | "profile"
   | "identity"
   | "visualIdentity"
-  | "safeClaims";
+  | "safeClaims"
+  | "productKnowledge";

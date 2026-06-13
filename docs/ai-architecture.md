@@ -12,28 +12,26 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 # bundle.primary_source == "brand_profile" se profilo ufficiale sufficiente
 ```
 
-**Priorità context (0.3.3 machine-ready):**
+**Priorità context (0.3.4 machine-ready):**
 
 1. `brand_profiles` ufficiale → `primarySource=brand_profile` se profilo minimo presente
-2. Profilo incompleto → `primarySource=minimal`, `missingContext` unificato (profile + identity + visual + safe claims)
+2. Profilo incompleto → `primarySource=minimal`, `missingContext` unificato
 3. Bundle include `brandContextVersion: v1` e `promptContext` con blocchi testuali separati
-4. `brand_identities`, `brand_visual_identities` e `brand_safe_claims` aggiunti al bundle e al prompt se compilati
-5. Safe Claims vuota → blocco fallback prudenza in `fullText`; Product SEO riceve istruzioni guardrail esplicite
+4. Moduli ufficiali: Profile, Identity, Visual, Safe Claims, **Product Knowledge**
+5. Product SEO: contesto brand + lookup `productKnowledge` per `shopify_product_id`; fallback generale se item assente
 
-Moduli futuri (PED, Ads, Email) partono dal **Brand Profile** come contesto minimo; Identity, Visual e Safe Claims arricchiscono il prompt.
+Content SEO e Product SEO usano `get_prompt_context()` — beneficiano automaticamente di tutti i moduli ufficiali.
 
-Content SEO e Product SEO usano `get_prompt_context()` — beneficiano automaticamente dei quattro moduli ufficiali.
+### Product SEO e Product Knowledge
 
-### Safe Claims — priorità massima
+Per ogni prodotto Shopify in ottimizzazione SEO:
 
-I **forbidden claims** e le regole red flag hanno priorità su tono e SEO copy. I moduli brand-facing (Product SEO, Content SEO, futuri PED/Ads) devono:
+1. Carica contesto brand (`profile` + `identity` + `safeClaims` + knowledge generale)
+2. Se esiste `BrandProductKnowledgeItem` per quel `shopify_product_id` → include blocco specifico
+3. Se item assente → usa solo knowledge generale + dati Shopify
+4. Se Product Knowledge vuota → comportamento invariato (solo brand context + Shopify)
 
-- Non usare claim vietati
-- Evitare claim medici/terapeutici non verificabili
-- Non attaccare competitor
-- Non divulgare process secrets
-
-### promptContext (v0.3.3)
+### promptContext (v0.3.4)
 
 `GET /brand-intelligence/context` restituisce sempre `promptContext` quando il profilo è sufficiente:
 
@@ -45,6 +43,7 @@ I **forbidden claims** e le regole red flag hanno priorità su tono e SEO copy. 
     "brandIdentity": "BRAND IDENTITY\n- Posizionamento: ...",
     "visualIdentity": "VISUAL IDENTITY\n- Colori: ...",
     "safeClaims": "SAFE CLAIMS & RED FLAGS\n- ...",
+    "productKnowledge": "PRODUCT KNOWLEDGE — GENERAL\n- ...",
     "fullText": "..."
   }
 }
@@ -74,7 +73,10 @@ Esempi di blocchi richiesti per modulo (futuro):
 | **Apply proposal (visual)** | Scrittura ufficiale su `brand_visual_identities` |
 | **Safe Claims import-file** | Proposta AI da 1 file in memoria (no save) |
 | **Apply proposal (safe claims)** | Scrittura ufficiale su `brand_safe_claims` |
-| **PUT safe-claims** | Scrittura manuale su `brand_safe_claims` |
+| **Product Knowledge general import** | Proposta AI generale da 1 file (no save, no item) |
+| **Apply proposal (PK general)** | Scrittura su `brand_product_knowledge_general` |
+| **Items from-shopify** | Crea scheda precompilata su `brand_product_knowledge_items` |
+| **PUT item** | Salvataggio manuale scheda prodotto |
 | **Salvataggio manuale** | Via `PUT` su ciascun modulo |
 
 ### Flussi deprecati (non in UI)

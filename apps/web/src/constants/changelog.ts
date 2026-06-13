@@ -7,9 +7,20 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.3.3-alpha";
+export const GCR_VERSION = "0.3.4-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.4-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Product Knowledge: regole generali + schede prodotto Shopify",
+      "Import file scoped solo per knowledge generale",
+      "BrandContextBuilder espone productKnowledge machine-ready",
+      "Product SEO usa knowledge generale + item specifico per prodotto",
+    ],
+  },
   {
     version: "0.3.3-alpha",
     date: "2026-06-13",

@@ -23,6 +23,18 @@ from app.schemas.brand_identity_visual import (
     VisualExtractRequest,
     VisualExtractResponse,
 )
+from app.schemas.brand_product_knowledge import (
+    BrandProductKnowledgeGeneralApplyProposalRequest,
+    BrandProductKnowledgeGeneralApplyProposalResponse,
+    BrandProductKnowledgeGeneralImportResponse,
+    BrandProductKnowledgeGeneralRead,
+    BrandProductKnowledgeGeneralUpdate,
+    BrandProductKnowledgeItemFromShopifyRequest,
+    BrandProductKnowledgeItemRead,
+    BrandProductKnowledgeItemUpdate,
+    BrandProductKnowledgeShopifyProductOption,
+    BrandProductKnowledgeShopifyProductsResponse,
+)
 from app.schemas.brand_safe_claims import (
     BrandSafeClaimsApplyProposalRequest,
     BrandSafeClaimsApplyProposalResponse,
@@ -136,6 +148,21 @@ from app.services.brand_intelligence.identity_service import (
 from app.services.brand_intelligence.profile_enrichment import (
     apply_brand_profile_proposal,
     enrich_brand_profile,
+)
+from app.services.brand_intelligence.product_knowledge_general_import import import_general_from_file
+from app.services.brand_intelligence.product_knowledge_general_service import (
+    apply_general_proposal,
+    get_general,
+    upsert_general,
+)
+from app.services.brand_intelligence.product_knowledge_item_service import (
+    create_item_from_shopify,
+    delete_item,
+    get_item,
+    item_completion,
+    list_items,
+    list_shopify_products_for_picker,
+    update_item,
 )
 from app.services.brand_intelligence.safe_claims_import import import_safe_claims_from_file
 from app.services.brand_intelligence.safe_claims_service import (
@@ -447,6 +474,194 @@ async def apply_brand_safe_claims_proposal(
         safe_claims=BrandSafeClaimsRead.model_validate(row),
         message="Safe Claims aggiornati.",
     )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/product-knowledge/general",
+    response_model=BrandProductKnowledgeGeneralRead,
+    response_model_by_alias=True,
+)
+async def get_product_knowledge_general(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeGeneralRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_general(session, project_id)
+    return BrandProductKnowledgeGeneralRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/brand-intelligence/product-knowledge/general",
+    response_model=BrandProductKnowledgeGeneralRead,
+    response_model_by_alias=True,
+)
+async def update_product_knowledge_general(
+    project_id: UUID,
+    payload: BrandProductKnowledgeGeneralUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeGeneralRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await upsert_general(session, project_id, payload)
+    return BrandProductKnowledgeGeneralRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/product-knowledge/general/import-file",
+    response_model=BrandProductKnowledgeGeneralImportResponse,
+    response_model_by_alias=True,
+)
+async def import_product_knowledge_general_file(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeGeneralImportResponse:
+    await get_project_in_default_workspace(project_id, session)
+    data = await file.read()
+    return await import_general_from_file(
+        session,
+        project_id,
+        filename=file.filename or "document",
+        content_type=file.content_type,
+        data=data,
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/product-knowledge/general/apply-proposal",
+    response_model=BrandProductKnowledgeGeneralApplyProposalResponse,
+    response_model_by_alias=True,
+)
+async def apply_product_knowledge_general_proposal(
+    project_id: UUID,
+    payload: BrandProductKnowledgeGeneralApplyProposalRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeGeneralApplyProposalResponse:
+    await get_project_in_default_workspace(project_id, session)
+    row = await apply_general_proposal(session, project_id, payload.proposal)
+    return BrandProductKnowledgeGeneralApplyProposalResponse(
+        general=BrandProductKnowledgeGeneralRead.model_validate(row),
+        message="Product Knowledge generale aggiornata.",
+    )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/product-knowledge/shopify-products",
+    response_model=BrandProductKnowledgeShopifyProductsResponse,
+    response_model_by_alias=True,
+)
+async def list_product_knowledge_shopify_products(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeShopifyProductsResponse:
+    await get_project_in_default_workspace(project_id, session)
+    connected, products = await list_shopify_products_for_picker(session, project_id)
+    if not connected:
+        return BrandProductKnowledgeShopifyProductsResponse(
+            shopify_connected=False,
+            message="Collega e sincronizza Shopify per selezionare prodotti reali.",
+            products=[],
+        )
+    return BrandProductKnowledgeShopifyProductsResponse(
+        shopify_connected=True,
+        products=[
+            BrandProductKnowledgeShopifyProductOption(
+                id=p.id,
+                shopify_gid=p.shopify_gid,
+                title=p.title,
+                handle=p.handle,
+                status=p.status,
+                vendor=p.vendor,
+                product_type=p.product_type,
+                featured_image_url=p.featured_image_url,
+                has_knowledge_item=has_item,
+            )
+            for p, has_item in products
+        ],
+    )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/product-knowledge/items",
+    response_model=list[BrandProductKnowledgeItemRead],
+    response_model_by_alias=True,
+)
+async def list_product_knowledge_items(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> list[BrandProductKnowledgeItemRead]:
+    await get_project_in_default_workspace(project_id, session)
+    rows = await list_items(session, project_id)
+    result: list[BrandProductKnowledgeItemRead] = []
+    for row in rows:
+        read = BrandProductKnowledgeItemRead.model_validate(row)
+        read.completion_status = item_completion(row)
+        result.append(read)
+    return result
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/product-knowledge/items/from-shopify",
+    response_model=BrandProductKnowledgeItemRead,
+    response_model_by_alias=True,
+)
+async def create_product_knowledge_item_from_shopify(
+    project_id: UUID,
+    payload: BrandProductKnowledgeItemFromShopifyRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await create_item_from_shopify(session, project_id, payload.shopify_product_id)
+    read = BrandProductKnowledgeItemRead.model_validate(row)
+    read.completion_status = item_completion(row)
+    return read
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/product-knowledge/items/{item_id}",
+    response_model=BrandProductKnowledgeItemRead,
+    response_model_by_alias=True,
+)
+async def get_product_knowledge_item(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_item(session, project_id, item_id)
+    read = BrandProductKnowledgeItemRead.model_validate(row)
+    read.completion_status = item_completion(row)
+    return read
+
+
+@router.put(
+    "/{project_id}/brand-intelligence/product-knowledge/items/{item_id}",
+    response_model=BrandProductKnowledgeItemRead,
+    response_model_by_alias=True,
+)
+async def update_product_knowledge_item(
+    project_id: UUID,
+    item_id: UUID,
+    payload: BrandProductKnowledgeItemUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProductKnowledgeItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await update_item(session, project_id, item_id, payload)
+    read = BrandProductKnowledgeItemRead.model_validate(row)
+    read.completion_status = item_completion(row)
+    return read
+
+
+@router.delete(
+    "/{project_id}/brand-intelligence/product-knowledge/items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_product_knowledge_item(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    await get_project_in_default_workspace(project_id, session)
+    await delete_item(session, project_id, item_id)
 
 
 @router.get(

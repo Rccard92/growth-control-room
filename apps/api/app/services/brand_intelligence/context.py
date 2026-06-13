@@ -10,7 +10,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.brand_intelligence import BrandIdentity, BrandProfile, BrandSafeClaims, BrandVisualIdentity
+from app.models.brand_intelligence import (
+    BrandIdentity,
+    BrandProductKnowledgeGeneral,
+    BrandProductKnowledgeItem,
+    BrandProfile,
+    BrandSafeClaims,
+    BrandVisualIdentity,
+)
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
 from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
@@ -19,6 +26,8 @@ from app.schemas.brand_intelligence import (
     BrandProfileRead,
     BrandPromptContext,
 )
+from app.services.brand_intelligence.product_knowledge_context import build_product_knowledge_context
+from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
 from app.services.brand_intelligence.safe_claims_service import safe_claims_completion
 from app.services.brand_intelligence.score import (
     compute_brand_knowledge_score,
@@ -61,6 +70,22 @@ class BrandIntelligenceContextBuilder:
                 select(BrandSafeClaims).where(BrandSafeClaims.project_id == project_id)
             )
         ).scalar_one_or_none()
+        pk_general = (
+            await session.execute(
+                select(BrandProductKnowledgeGeneral).where(
+                    BrandProductKnowledgeGeneral.project_id == project_id
+                )
+            )
+        ).scalar_one_or_none()
+        pk_items = list(
+            (
+                await session.execute(
+                    select(BrandProductKnowledgeItem)
+                    .where(BrandProductKnowledgeItem.project_id == project_id)
+                    .order_by(BrandProductKnowledgeItem.product_name.asc())
+                )
+            ).scalars().all()
+        )
 
         score = await compute_brand_knowledge_score(session, project_id)
         missing = (
@@ -73,6 +98,10 @@ class BrandIntelligenceContextBuilder:
             missing.append(
                 "Safe Claims non compilata: i moduli AI devono evitare claim sensibili."
             )
+        if not general_has_content(pk_general) and not pk_items:
+            missing.append(
+                "Product Knowledge non compilata: i moduli AI useranno solo dati Shopify."
+            )
 
         primary_source = "brand_profile" if profile and profile_has_minimum(profile) else "minimal"
 
@@ -82,6 +111,7 @@ class BrandIntelligenceContextBuilder:
         safe_claims_read = (
             BrandSafeClaimsRead.model_validate(safe_claims) if safe_claims else None
         )
+        pk_context = build_product_knowledge_context(pk_general, pk_items)
 
         bundle = BrandContextBundleResponse(
             brand_context_version="v1",
@@ -94,6 +124,7 @@ class BrandIntelligenceContextBuilder:
             brand_identity=identity_read,
             visual_identity=visual_read,
             safe_claims=safe_claims_read,
+            product_knowledge=pk_context,
             voice=None,
             products=[],
             categories=[],
@@ -245,6 +276,56 @@ class BrandIntelligenceContextBuilder:
         else:
             safe_claims_text = SAFE_CLAIMS_PRUDENCE_FALLBACK
 
+        product_knowledge_text = None
+        if bundle.product_knowledge:
+            pk_blocks: list[str] = []
+            rules = bundle.product_knowledge.general_rules
+            if rules and (
+                rules.general_principles
+                or rules.common_strengths
+                or rules.quality_rules
+                or rules.production_notes
+                or rules.usage_notes
+                or rules.common_objections
+                or rules.common_faq
+                or rules.communication_rules
+                or rules.storytelling_rules
+            ):
+                general_parts = ["PRODUCT KNOWLEDGE — GENERAL"]
+                if rules.general_principles:
+                    general_parts.append("Principi generali:")
+                    general_parts.extend(f"- {p}" for p in rules.general_principles[:10])
+                if rules.common_strengths:
+                    general_parts.append("Punti di forza comuni:")
+                    general_parts.extend(f"- {s}" for s in rules.common_strengths[:8])
+                if rules.quality_rules:
+                    general_parts.append("Regole qualità:")
+                    general_parts.extend(f"- {r}" for r in rules.quality_rules[:8])
+                if rules.common_objections:
+                    general_parts.append("Obiezioni comuni:")
+                    general_parts.extend(f"- {o}" for o in rules.common_objections[:6])
+                if len(general_parts) > 1:
+                    pk_blocks.append("\n".join(general_parts))
+            if bundle.product_knowledge.specific_products:
+                specific_parts = ["PRODUCT KNOWLEDGE — SPECIFIC PRODUCTS"]
+                for sp in bundle.product_knowledge.specific_products[:15]:
+                    title = sp.title or "Prodotto"
+                    lines = [f"Prodotto: {title}"]
+                    if sp.handle:
+                        lines.append(f"- Handle: {sp.handle}")
+                    if sp.strategic_description:
+                        lines.append(f"- Descrizione: {sp.strategic_description[:400]}")
+                    if sp.ingredients:
+                        lines.append(f"- Ingredienti: {sp.ingredients[:300]}")
+                    if sp.allowed_claims:
+                        lines.append(f"- Claim consentiti: {', '.join(sp.allowed_claims[:6])}")
+                    if len(lines) > 1:
+                        specific_parts.append("\n".join(lines))
+                if len(specific_parts) > 1:
+                    pk_blocks.append("\n\n".join(specific_parts))
+            if pk_blocks:
+                product_knowledge_text = "\n\n".join(pk_blocks)
+
         blocks = [profile_text]
         if identity_text and len(identity_text.splitlines()) > 1:
             blocks.append(identity_text)
@@ -252,6 +333,8 @@ class BrandIntelligenceContextBuilder:
             blocks.append(visual_text)
         if safe_claims_text:
             blocks.append(safe_claims_text)
+        if product_knowledge_text:
+            blocks.append(product_knowledge_text)
 
         full_text = "\n\n".join(blocks)
         return BrandPromptContext(
@@ -259,6 +342,7 @@ class BrandIntelligenceContextBuilder:
             brand_identity=identity_text,
             visual_identity=visual_text,
             safe_claims=safe_claims_text,
+            product_knowledge=product_knowledge_text,
             full_text=full_text,
         )
 
@@ -283,6 +367,8 @@ class BrandIntelligenceContextBuilder:
             )
         elif bundle.prompt_context and bundle.prompt_context.safe_claims:
             blocks.append(bundle.prompt_context.safe_claims)
+        if bundle.prompt_context and bundle.prompt_context.product_knowledge:
+            blocks.append(bundle.prompt_context.product_knowledge)
         return "\n\n".join(blocks)
 
     @staticmethod
