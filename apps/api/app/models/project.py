@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         BrandContentPillar,
         BrandExtractedFact,
         BrandExternalSource,
+        BrandIdentity,
         BrandImportBatch,
         BrandIntelligenceBrief,
         BrandProductKnowledge,
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
         BrandSectionDraft,
         BrandSeoStrategy,
         BrandSourceDocument,
+        BrandVisualIdentity,
         BrandVoice,
     )
     from app.models.integration import Integration
@@ -65,6 +67,16 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     brand_profile: Mapped["BrandProfile | None"] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    brand_identity: Mapped["BrandIdentity | None"] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    brand_visual_identity: Mapped["BrandVisualIdentity | None"] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         uselist=False,

@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
 from app.schemas.brand_intelligence import (
     BrandContextBundleResponse,
     BrandKnowledgeScoreResponse,
@@ -69,5 +70,49 @@ def test_format_for_prompt_uses_profile_v1() -> None:
     assert "Test Brand" in text
     assert "Premium artisan products" in text
     assert "Qualità artigianale" in text
-    assert "tradizione" in text
-    assert "Caldo e autentico" in text
+
+
+def test_format_for_prompt_includes_identity_and_visual() -> None:
+    bundle = BrandContextBundleResponse(
+        primary_source="brand_profile",
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Artisan brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        brand_identity=BrandIdentityRead(
+            id=uuid4(),
+            project_id=_PID,
+            positioning="Premium niche",
+            brand_values=["quality", "craft"],
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        visual_identity=BrandVisualIdentityRead(
+            id=uuid4(),
+            project_id=_PID,
+            primary_color="#112233",
+            primary_logo_url="https://acme.test/logo.png",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        products=[],
+        categories=[],
+        audience=[],
+        claims=[],
+        content_pillars=[],
+        guardrails=[],
+        assets=[],
+        knowledge_score=_score(80),
+    )
+
+    text = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
+    assert text is not None
+    assert "# Brand Profile" in text
+    assert "# Brand Identity" in text
+    assert "Premium niche" in text
+    assert "# Visual Identity" in text
+    assert "#112233" in text

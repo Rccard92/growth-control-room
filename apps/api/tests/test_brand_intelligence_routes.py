@@ -13,6 +13,8 @@ def test_brand_intelligence_routes_registered() -> None:
     assert "/projects/{project_id}/brand-intelligence/score" in paths
     assert "/projects/{project_id}/brand-intelligence/context" in paths
     assert "/projects/{project_id}/brand-intelligence/profile" in paths
+    assert "/projects/{project_id}/brand-intelligence/identity" in paths
+    assert "/projects/{project_id}/brand-intelligence/visual-identity" in paths
     assert "/projects/{project_id}/brand-intelligence/voice" in paths
     assert "/projects/{project_id}/brand-intelligence/products" in paths
     assert "/projects/{project_id}/brand-intelligence/audience" in paths

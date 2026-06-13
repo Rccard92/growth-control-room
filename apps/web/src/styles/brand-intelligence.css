@@ -1082,3 +1082,104 @@
   font-size: 0.8125rem;
   color: var(--gcr-text-muted);
 }
+
+/* Brand Identity & Visual Identity v0.3.1 */
+.bi-modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.bi-module-card {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.bi-module-card--complete {
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.bi-module-card--partial {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.bi-module-card--empty {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.bi-module-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.bi-module-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.bi-module-badge--complete {
+  background: rgba(52, 211, 153, 0.18);
+  color: #6ee7b7;
+}
+
+.bi-module-badge--partial {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fcd34d;
+}
+
+.bi-module-badge--empty {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gcr-text-muted);
+}
+
+.bi-color-swatch {
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.bi-color-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bi-color-field input {
+  flex: 1;
+}
+
+.bi-palette-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.bi-color-swatch-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bi-color-swatch__meta {
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.bi-visual-proposal {
+  border-color: rgba(167, 139, 250, 0.35);
+}

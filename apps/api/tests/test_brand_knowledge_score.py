@@ -2,12 +2,21 @@
 
 from types import SimpleNamespace
 
+from app.services.brand_intelligence.identity_service import (
+    identity_completion,
+    identity_has_minimum,
+)
 from app.services.brand_intelligence.score import (
+    SECTION_LABELS,
     _overall_status,
     _score_brand_profile,
     profile_has_minimum,
     profile_is_complete,
     profile_missing_context,
+)
+from app.services.brand_intelligence.visual_identity_service import (
+    visual_completion,
+    visual_has_minimum,
 )
 
 
@@ -65,11 +74,39 @@ def test_profile_missing_context() -> None:
         values=None,
     )
     missing = profile_missing_context(profile)
-    assert "short_description" in missing
-    assert "website_url" in missing
+    assert "brand_profile.short_description" in missing
+    assert "brand_profile.website_url" in missing
 
 
 def test_overall_status_thresholds() -> None:
     assert _overall_status(30) == "incomplete"
     assert _overall_status(65) == "developing"
     assert _overall_status(85) == "ready"
+
+
+def test_section_labels_three_modules() -> None:
+    assert set(SECTION_LABELS.keys()) == {"brandProfile", "brandIdentity", "visualIdentity"}
+
+
+def test_identity_has_minimum() -> None:
+    identity = SimpleNamespace(
+        positioning="Premium",
+        brand_values=None,
+        differentiators=None,
+        what_brand_is=None,
+        what_brand_is_not=None,
+    )
+    assert identity_has_minimum(identity) is True
+    assert identity_completion(identity) == "partial"
+
+
+def test_visual_has_minimum() -> None:
+    visual = SimpleNamespace(
+        primary_logo_url="https://x.test/logo.png",
+        primary_color=None,
+        secondary_color=None,
+        accent_color=None,
+        color_palette=None,
+    )
+    assert visual_has_minimum(visual) is True
+    assert visual_completion(visual) == "partial"

@@ -12,26 +12,30 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 # bundle.primary_source == "brand_profile" se profilo ufficiale sufficiente
 ```
 
-**Priorità context (0.3.0 Brand Profile v1):**
+**Priorità context (0.3.1 modulare):**
 
-1. `brand_profiles` ufficiale (dopo apply-proposal o salvataggio manuale) → `primarySource=brand_profile`
-2. Profilo incompleto → `primarySource=minimal`, `missingContext` elenca campi mancanti
+1. `brand_profiles` ufficiale → `primarySource=brand_profile` se profilo minimo presente
+2. Profilo incompleto → `primarySource=minimal`, `missingContext` unificato (profile + identity + visual)
+3. `brand_identities` e `brand_visual_identities` aggiunti al bundle e al prompt se compilati
 
-Moduli futuri (PED, Ads, Email) devono partire dal **Brand Profile v1** come primo contesto. Le sezioni avanzate (voice, claims, SEO strategy, ecc.) saranno reintrodotte una alla volta quando stabili.
+Moduli futuri (PED, Ads, Email) partono dal **Brand Profile** come contesto minimo; Identity e Visual arricchiscono il prompt.
 
-Content SEO e Product SEO usano `get_prompt_context()` — beneficiano automaticamente del profilo ufficiale.
+Content SEO e Product SEO usano `get_prompt_context()` — beneficiano automaticamente dei tre moduli ufficiali.
 
 Se `prompt_block` è `None`, il modulo decide se bloccare (futuro) o procedere con fallback (SEO v1).
 
 **Nessun modulo AI brand-facing deve generare contenuti ignorando Brand Profile ufficiale.**
 
-## Popolamento Brand Intelligence (v0.3.0)
+## Popolamento Brand Intelligence (v0.3.1)
 
 | Percorso | Salvataggio |
 |----------|-------------|
 | **Brand Profile enrich** | Proposta in memoria; metadata fonti su profilo |
-| **Apply proposal** | Campi contenuto ufficiali su `brand_profiles` |
-| **Salvataggio manuale** | URL fonti e/o contenuto via `PUT .../profile` |
+| **Apply proposal (profile)** | Campi contenuto ufficiali su `brand_profiles` |
+| **PUT identity** | Scrittura ufficiale su `brand_identities` |
+| **Visual extract** | Proposta palette/logo/font in memoria |
+| **Apply proposal (visual)** | Scrittura ufficiale su `brand_visual_identities` |
+| **Salvataggio manuale** | URL fonti e/o contenuto via `PUT` su ciascun modulo |
 
 ### Flussi deprecati (non in UI)
 

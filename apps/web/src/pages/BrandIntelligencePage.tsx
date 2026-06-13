@@ -3,8 +3,10 @@ import { motion } from "framer-motion";
 import { useParams } from "react-router-dom";
 import type { BrandIntelligenceTab } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
+import { BrandIdentityPanel } from "../components/brand-intelligence/BrandIdentityPanel";
 import { BrandIntelligenceOverviewPanel } from "../components/brand-intelligence/BrandIntelligenceOverview";
 import { BrandProfilePanel } from "../components/brand-intelligence/BrandProfilePanel";
+import { BrandVisualIdentityPanel } from "../components/brand-intelligence/BrandVisualIdentityPanel";
 import { useBrandIntelligenceOverview } from "../hooks/useBrandIntelligence";
 import { useProject } from "../hooks/useProjects";
 import { APP_ROUTES } from "../routes/config";
@@ -12,6 +14,8 @@ import { APP_ROUTES } from "../routes/config";
 const TABS: { id: BrandIntelligenceTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "profile", label: "Brand Profile" },
+  { id: "identity", label: "Brand Identity" },
+  { id: "visualIdentity", label: "Visual Identity" },
 ];
 
 export function BrandIntelligencePage() {
@@ -55,13 +59,12 @@ export function BrandIntelligencePage() {
       )}
 
       {tab === "overview" && overview && (
-        <BrandIntelligenceOverviewPanel
-          overview={overview}
-          onGoToProfile={() => setTab("profile")}
-        />
+        <BrandIntelligenceOverviewPanel overview={overview} onOpenSection={setTab} />
       )}
 
       {tab === "profile" && <BrandProfilePanel projectId={projectId} />}
+      {tab === "identity" && <BrandIdentityPanel projectId={projectId} />}
+      {tab === "visualIdentity" && <BrandVisualIdentityPanel projectId={projectId} />}
     </motion.div>
   );
 }

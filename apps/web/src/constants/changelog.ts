@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.3.0-alpha";
+export const GCR_VERSION = "0.3.1-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.1-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Brand Identity: posizionamento, valori, principi (salvataggio manuale)",
+      "Visual Identity: logo, palette, font + estrazione da sito con apply-proposal",
+      "Overview con 3 card di stato (Profile, Identity, Visual)",
+      "BrandContextBuilder include i 3 moduli nel contesto AI",
+      "Migration 022 brand_identities e brand_visual_identities",
+    ],
+  },
   {
     version: "0.3.0-alpha",
     date: "2026-06-13",

@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.1-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added modular Brand Identity and Visual Identity sections to Brand Intelligence
+- 4-tab UI: Overview, Brand Profile, Brand Identity, Visual Identity
+- Migration `022`: tables `brand_identities` and `brand_visual_identities`
+- API: GET/PUT identity, GET/PUT visual-identity, extract-from-website, apply-proposal
+- `BrandContextBuilder` includes Profile + Identity + Visual in context bundle and prompt
+- Overview shows 3 module status cards (complete / partial / empty)
+
 ## [0.3.0-alpha] - 2026-06-13
 
 Tipo: Alpha minor / reset controllato

@@ -13,12 +13,15 @@ from app.models.brand_intelligence import (
     BrandClaimRule,
     BrandContentPillar,
     BrandExtractedFact,
+    BrandIdentity,
     BrandProductKnowledge,
     BrandProfile,
     BrandSeoStrategy,
     BrandSourceDocument,
+    BrandVisualIdentity,
     BrandVoice,
 )
+from app.schemas.brand_identity_visual import BrandModuleStatus
 from app.schemas.brand_intelligence import (
     BrandAiGuardrailCreate,
     BrandAiGuardrailUpdate,
@@ -35,15 +38,25 @@ from app.schemas.brand_intelligence import (
     BrandProductKnowledgeCreate,
     BrandProductKnowledgeUpdate,
     BrandProfileUpdate,
-    BrandSectionStatus,
     BrandSeoStrategyUpdate,
     BrandVoiceUpdate,
+)
+from app.services.brand_intelligence.identity_service import (
+    identity_completion,
+    identity_missing_fields,
+)
+from app.services.brand_intelligence.visual_identity_service import (
+    visual_completion,
+    visual_missing_fields,
 )
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.brand_intelligence.score import (
     SECTION_LABELS,
     compute_brand_knowledge_score,
+    profile_has_minimum,
     profile_is_complete,
+    profile_missing_context,
+    profile_missing_fields,
     score_to_response,
 )
 
@@ -406,15 +419,41 @@ async def build_overview(
     profile = (
         await session.execute(select(BrandProfile).where(BrandProfile.project_id == project_id))
     ).scalar_one_or_none()
+    identity = (
+        await session.execute(select(BrandIdentity).where(BrandIdentity.project_id == project_id))
+    ).scalar_one_or_none()
+    visual = (
+        await session.execute(
+            select(BrandVisualIdentity).where(BrandVisualIdentity.project_id == project_id)
+        )
+    ).scalar_one_or_none()
 
     sections = [
-        BrandSectionStatus(
-            key=key,
-            label=SECTION_LABELS[key],
-            complete=score.section_scores.get(key, 0) >= 60,
-            score=score.section_scores.get(key, 0),
-        )
-        for key in SECTION_LABELS
+        BrandModuleStatus(
+            key="brandProfile",
+            label=SECTION_LABELS["brandProfile"],
+            status="complete"
+            if profile_is_complete(profile)
+            else "partial"
+            if profile_has_minimum(profile)
+            else "empty",
+            missing_fields=profile_missing_fields(profile),
+            updated_at=profile.updated_at if profile else None,
+        ),
+        BrandModuleStatus(
+            key="brandIdentity",
+            label=SECTION_LABELS["brandIdentity"],
+            status=identity_completion(identity),
+            missing_fields=identity_missing_fields(identity),
+            updated_at=identity.updated_at if identity else None,
+        ),
+        BrandModuleStatus(
+            key="visualIdentity",
+            label=SECTION_LABELS["visualIdentity"],
+            status=visual_completion(visual),
+            missing_fields=visual_missing_fields(visual),
+            updated_at=visual.updated_at if visual else None,
+        ),
     ]
 
     return BrandIntelligenceOverviewResponse(

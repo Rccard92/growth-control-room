@@ -4,6 +4,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.brand_identity_visual import (
+    BrandIdentityRead,
+    BrandModuleStatus,
+    BrandVisualIdentityRead,
+)
+
 
 class BrandProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -359,7 +365,7 @@ class BrandIntelligenceOverviewResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     score: BrandKnowledgeScoreResponse
-    sections: list[BrandSectionStatus]
+    sections: list[BrandModuleStatus]
     has_profile: bool = Field(serialization_alias="hasProfile")
     profile_complete: bool = Field(default=False, serialization_alias="profileComplete")
     brand_name: str | None = Field(default=None, serialization_alias="brandName")
@@ -812,6 +818,12 @@ class BrandContextBundleResponse(BaseModel):
     brief_version: int | None = Field(default=None, serialization_alias="briefVersion")
     brand_brief: Any | None = Field(default=None, serialization_alias="brandBrief")
     profile: BrandProfileRead | None = None
+    brand_identity: BrandIdentityRead | None = Field(
+        default=None, serialization_alias="brandIdentity"
+    )
+    visual_identity: BrandVisualIdentityRead | None = Field(
+        default=None, serialization_alias="visualIdentity"
+    )
     voice: BrandVoiceRead | None = None
     products: list[BrandProductKnowledgeRead] = []
     categories: list[BrandProductKnowledgeRead] = []

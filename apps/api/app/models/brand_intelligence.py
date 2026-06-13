@@ -51,6 +51,60 @@ class BrandProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="brand_profile")
 
 
+class BrandIdentity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_identities"
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_identities_project_id"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    positioning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    brand_values: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    differentiators: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    production_principles: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    quality_principles: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    trust_elements: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    what_brand_is: Mapped[str | None] = mapped_column(Text, nullable=True)
+    what_brand_is_not: Mapped[str | None] = mapped_column(Text, nullable=True)
+    storytelling_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_identity")
+
+
+class BrandVisualIdentity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_visual_identities"
+    __table_args__ = (
+        UniqueConstraint("project_id", name="uq_brand_visual_identities_project_id"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    primary_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    secondary_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    favicon_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    primary_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    secondary_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    accent_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    background_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    text_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    color_palette: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    fonts: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    visual_style_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_style_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    do_show: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    do_not_show: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    website_extracted_palette: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+
+    project: Mapped["Project"] = relationship(back_populates="brand_visual_identity")
+
+
 class BrandVoice(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "brand_voices"
     __table_args__ = (UniqueConstraint("project_id", name="uq_brand_voices_project_id"),)

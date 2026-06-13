@@ -10,6 +10,15 @@ from app.schemas.brand_brief import (
     BrandIntelligenceBriefUpdate,
     GenerateBriefResponse,
 )
+from app.schemas.brand_identity_visual import (
+    BrandIdentityRead,
+    BrandIdentityUpdate,
+    BrandVisualIdentityRead,
+    BrandVisualIdentityUpdate,
+    VisualApplyProposalRequest,
+    VisualExtractRequest,
+    VisualExtractResponse,
+)
 from app.schemas.brand_profile_v1 import (
     BrandProfileApplyProposalRequest,
     BrandProfileEnrichRequest,
@@ -107,9 +116,16 @@ from app.services.brand_intelligence.section_drafts_service import (
     patch_section_draft,
     regenerate_section_draft,
 )
+from app.services.brand_intelligence.identity_service import get_identity, upsert_identity
 from app.services.brand_intelligence.profile_enrichment import (
     apply_brand_profile_proposal,
     enrich_brand_profile,
+)
+from app.services.brand_intelligence.visual_extraction import extract_visual_from_website
+from app.services.brand_intelligence.visual_identity_service import (
+    apply_visual_proposal,
+    get_visual_identity,
+    upsert_visual_identity,
 )
 from app.services.brand_intelligence.synthesis import synthesize_batch
 from app.services.projects import get_project_in_default_workspace
@@ -212,6 +228,93 @@ async def apply_profile_proposal(
     await get_project_in_default_workspace(project_id, session)
     row = await apply_brand_profile_proposal(session, project_id, payload)
     return BrandProfileRead.model_validate(row)
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/identity",
+    response_model=BrandIdentityRead,
+    response_model_by_alias=True,
+)
+async def get_brand_identity(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandIdentityRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_identity(session, project_id)
+    return BrandIdentityRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/brand-intelligence/identity",
+    response_model=BrandIdentityRead,
+    response_model_by_alias=True,
+)
+async def update_brand_identity(
+    project_id: UUID,
+    payload: BrandIdentityUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandIdentityRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await upsert_identity(session, project_id, payload)
+    return BrandIdentityRead.model_validate(row)
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/visual-identity",
+    response_model=BrandVisualIdentityRead,
+    response_model_by_alias=True,
+)
+async def get_brand_visual_identity(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandVisualIdentityRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_visual_identity(session, project_id)
+    return BrandVisualIdentityRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/brand-intelligence/visual-identity",
+    response_model=BrandVisualIdentityRead,
+    response_model_by_alias=True,
+)
+async def update_brand_visual_identity(
+    project_id: UUID,
+    payload: BrandVisualIdentityUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandVisualIdentityRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await upsert_visual_identity(session, project_id, payload)
+    return BrandVisualIdentityRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/visual-identity/extract-from-website",
+    response_model=VisualExtractResponse,
+    response_model_by_alias=True,
+)
+async def extract_visual_identity_from_website(
+    project_id: UUID,
+    payload: VisualExtractRequest,
+    session: AsyncSession = Depends(get_db),
+) -> VisualExtractResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await extract_visual_from_website(payload.website_url)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/visual-identity/apply-proposal",
+    response_model=BrandVisualIdentityRead,
+    response_model_by_alias=True,
+)
+async def apply_visual_identity_proposal(
+    project_id: UUID,
+    payload: VisualApplyProposalRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandVisualIdentityRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await apply_visual_proposal(session, project_id, payload.proposal)
+    return BrandVisualIdentityRead.model_validate(row)
 
 
 @router.get(

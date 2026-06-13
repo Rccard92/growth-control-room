@@ -211,9 +211,91 @@ export interface BrandSectionStatus {
   score: number;
 }
 
+export type ModuleCompletionStatus = "complete" | "partial" | "empty";
+
+export interface BrandModuleStatus {
+  key: string;
+  label: string;
+  status: ModuleCompletionStatus;
+  missingFields: string[];
+  updatedAt?: string | null;
+}
+
+export interface BrandIdentity {
+  id: string;
+  projectId: string;
+  positioning?: string | null;
+  brandValues?: string[] | null;
+  differentiators?: string[] | null;
+  productionPrinciples?: string[] | null;
+  qualityPrinciples?: string[] | null;
+  trustElements?: string[] | null;
+  whatBrandIs?: string | null;
+  whatBrandIsNot?: string | null;
+  storytellingNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VisualColorSwatch {
+  hex: string;
+  role?: string | null;
+  label?: string | null;
+  confidence?: number | null;
+}
+
+export interface VisualFontEntry {
+  name: string;
+  role?: string | null;
+  usage?: string | null;
+}
+
+export interface BrandVisualIdentity {
+  id: string;
+  projectId: string;
+  primaryLogoUrl?: string | null;
+  secondaryLogoUrl?: string | null;
+  faviconUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+  backgroundColor?: string | null;
+  textColor?: string | null;
+  colorPalette?: VisualColorSwatch[] | null;
+  fonts?: VisualFontEntry[] | null;
+  visualStyleNotes?: string | null;
+  imageStyleNotes?: string | null;
+  doShow?: string[] | null;
+  doNotShow?: string[] | null;
+  websiteExtractedPalette?: VisualColorSwatch[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VisualExtractRequest {
+  websiteUrl: string;
+}
+
+export interface VisualExtractProposal {
+  primaryLogoUrl?: string | null;
+  faviconUrl?: string | null;
+  colorPalette?: VisualColorSwatch[];
+  fonts?: VisualFontEntry[];
+  visualStyleNotes?: string | null;
+}
+
+export interface VisualExtractResponse {
+  proposal: VisualExtractProposal;
+  warnings: string[];
+}
+
+export interface VisualApplyProposalRequest {
+  proposal: VisualExtractProposal;
+}
+
 export interface BrandIntelligenceOverview {
   score: BrandKnowledgeScore;
-  sections: BrandSectionStatus[];
+  sections: BrandModuleStatus[];
   hasProfile: boolean;
   profileComplete?: boolean;
   brandName?: string | null;
@@ -591,6 +673,8 @@ export interface BrandContextBundle {
   briefVersion?: number | null;
   brandBrief?: BrandBriefPayload | null;
   profile?: BrandProfile | null;
+  brandIdentity?: BrandIdentity | null;
+  visualIdentity?: BrandVisualIdentity | null;
   voice?: BrandVoice | null;
   products: BrandProductKnowledge[];
   categories: BrandProductKnowledge[];
@@ -603,4 +687,4 @@ export interface BrandContextBundle {
   knowledgeScore: BrandKnowledgeScore;
 }
 
-export type BrandIntelligenceTab = "overview" | "profile";
+export type BrandIntelligenceTab = "overview" | "profile" | "identity" | "visualIdentity";

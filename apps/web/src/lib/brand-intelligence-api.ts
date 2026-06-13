@@ -1,11 +1,16 @@
 import type {
   BrandContextBundle,
+  BrandIdentity,
   BrandIntelligenceOverview,
   BrandKnowledgeScore,
   BrandProfile,
   BrandProfileApplyProposalRequest,
   BrandProfileEnrichRequest,
   BrandProfileEnrichResponse,
+  BrandVisualIdentity,
+  VisualApplyProposalRequest,
+  VisualExtractRequest,
+  VisualExtractResponse,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
 
@@ -64,6 +69,69 @@ export function applyBrandProfileProposal(
 ): Promise<BrandProfile> {
   return apiFetch<BrandProfile>(
     `/api/projects/${projectId}/brand-intelligence/profile/apply-proposal`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function getBrandIdentity(projectId: string): Promise<BrandIdentity> {
+  return apiFetch<BrandIdentity>(`/api/projects/${projectId}/brand-intelligence/identity`);
+}
+
+export function updateBrandIdentity(
+  projectId: string,
+  data: Partial<BrandIdentity>,
+): Promise<BrandIdentity> {
+  return apiFetch<BrandIdentity>(`/api/projects/${projectId}/brand-intelligence/identity`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function getBrandVisualIdentity(projectId: string): Promise<BrandVisualIdentity> {
+  return apiFetch<BrandVisualIdentity>(
+    `/api/projects/${projectId}/brand-intelligence/visual-identity`,
+  );
+}
+
+export function updateBrandVisualIdentity(
+  projectId: string,
+  data: Partial<BrandVisualIdentity>,
+): Promise<BrandVisualIdentity> {
+  return apiFetch<BrandVisualIdentity>(
+    `/api/projects/${projectId}/brand-intelligence/visual-identity`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function extractVisualFromWebsite(
+  projectId: string,
+  data: VisualExtractRequest,
+): Promise<VisualExtractResponse> {
+  return apiFetch<VisualExtractResponse>(
+    `/api/projects/${projectId}/brand-intelligence/visual-identity/extract-from-website`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function applyVisualProposal(
+  projectId: string,
+  data: VisualApplyProposalRequest,
+): Promise<BrandVisualIdentity> {
+  return apiFetch<BrandVisualIdentity>(
+    `/api/projects/${projectId}/brand-intelligence/visual-identity/apply-proposal`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

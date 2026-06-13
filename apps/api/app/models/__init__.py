@@ -8,6 +8,7 @@ from app.models.brand_intelligence import (
     BrandContentPillar,
     BrandExtractedFact,
     BrandExternalSource,
+    BrandIdentity,
     BrandImportBatch,
     BrandIntelligenceBrief,
     BrandProductKnowledge,
@@ -15,6 +16,7 @@ from app.models.brand_intelligence import (
     BrandSectionDraft,
     BrandSeoStrategy,
     BrandSourceDocument,
+    BrandVisualIdentity,
     BrandVoice,
 )
 from app.models.integration import Integration
@@ -52,6 +54,7 @@ __all__ = [
     "BrandContentPillar",
     "BrandExtractedFact",
     "BrandExternalSource",
+    "BrandIdentity",
     "BrandImportBatch",
     "BrandIntelligenceBrief",
     "BrandSectionDraft",
@@ -59,6 +62,7 @@ __all__ = [
     "BrandProfile",
     "BrandSeoStrategy",
     "BrandSourceDocument",
+    "BrandVisualIdentity",
     "BrandVoice",
     "Integration",
     "IntegrationCredential",

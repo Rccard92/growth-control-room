@@ -1,4 +1,4 @@
-"""Brand Knowledge Score computation — v0.3.0 profile-centric."""
+"""Brand Knowledge Score computation — v0.3.1 modular."""
 
 from dataclasses import dataclass
 from uuid import UUID
@@ -6,10 +6,20 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.brand_intelligence import BrandProfile
+from app.models.brand_intelligence import BrandIdentity, BrandProfile, BrandVisualIdentity
+from app.services.brand_intelligence.identity_service import (
+    identity_completion,
+    identity_missing_fields,
+)
+from app.services.brand_intelligence.visual_identity_service import (
+    visual_completion,
+    visual_missing_fields,
+)
 
 SECTION_LABELS = {
     "brandProfile": "Brand Profile",
+    "brandIdentity": "Brand Identity",
+    "visualIdentity": "Visual Identity",
 }
 
 
@@ -33,10 +43,9 @@ def _has_list(value: list | None) -> bool:
 def profile_has_minimum(profile: BrandProfile | None) -> bool:
     if not profile:
         return False
-    has_identity = _has_text(profile.brand_name) and (
+    return _has_text(profile.brand_name) and (
         _has_text(profile.short_description) or _has_text(profile.story)
     )
-    return has_identity
 
 
 def profile_is_complete(profile: BrandProfile | None) -> bool:
@@ -50,7 +59,7 @@ def profile_is_complete(profile: BrandProfile | None) -> bool:
     )
 
 
-def profile_missing_context(profile: BrandProfile | None) -> list[str]:
+def profile_missing_fields(profile: BrandProfile | None) -> list[str]:
     if not profile:
         return ["brand_name", "short_description", "website_url"]
     missing: list[str] = []
@@ -60,55 +69,55 @@ def profile_missing_context(profile: BrandProfile | None) -> list[str]:
         missing.append("short_description")
     if not _has_text(profile.website_url):
         missing.append("website_url")
-    if not _has_text(profile.mission):
-        missing.append("mission")
-    if not _has_list(profile.values):
-        missing.append("values")
     return missing
+
+
+def profile_missing_context(profile: BrandProfile | None) -> list[str]:
+    return [f"brand_profile.{f}" for f in profile_missing_fields(profile)]
+
+
+def identity_missing_context(identity: BrandIdentity | None) -> list[str]:
+    return [f"brand_identity.{f}" for f in identity_missing_fields(identity)]
+
+
+def visual_missing_context(visual: BrandVisualIdentity | None) -> list[str]:
+    return [f"visual_identity.{f}" for f in visual_missing_fields(visual)]
+
+
+def _completion_to_score(status: str) -> int:
+    if status == "complete":
+        return 100
+    if status == "partial":
+        return 55
+    return 0
 
 
 def _score_brand_profile(profile: BrandProfile | None) -> tuple[int, list[str], list[str]]:
     missing: list[str] = []
     recs: list[str] = []
     if not profile:
-        return 0, ["brand_name", "short_description", "website_url"], [
-            "Crea il Brand Profile con nome, sito e descrizione."
-        ]
+        return 0, ["brand_name"], ["Crea il Brand Profile con nome, sito e descrizione."]
 
     points = 0
     if _has_text(profile.brand_name):
-        points += 20
+        points += 25
     else:
         missing.append("brand_name")
-
     if _has_text(profile.website_url):
-        points += 15
-    else:
-        missing.append("website_url")
-
-    if _has_text(profile.short_description) or _has_text(profile.story):
         points += 20
     else:
+        missing.append("website_url")
+    if _has_text(profile.short_description) or _has_text(profile.story):
+        points += 25
+    else:
         missing.append("short_description")
-
     if _has_text(profile.mission):
-        points += 10
+        points += 15
     if _has_list(profile.values):
-        points += 10
-    if _has_list(profile.differentiators):
-        points += 10
-    if _has_text(profile.origin_notes) or _has_text(profile.production_notes):
-        points += 5
-    if _has_text(profile.tone_notes):
-        points += 5
-    if _has_text(profile.ai_summary):
-        points += 5
+        points += 15
 
-    if points < 60:
-        recs.append("Completa il Brand Profile: usa Recupera informazioni o compila manualmente.")
-    elif points < 80:
-        recs.append("Arricchisci missione, valori e note tono/clienti per un profilo più completo.")
-
+    if points < 50:
+        recs.append("Completa il Brand Profile con nome, sito e descrizione.")
     return min(points, 100), missing, recs
 
 
@@ -127,15 +136,40 @@ async def compute_brand_knowledge_score(
     profile = (
         await session.execute(select(BrandProfile).where(BrandProfile.project_id == project_id))
     ).scalar_one_or_none()
+    identity = (
+        await session.execute(select(BrandIdentity).where(BrandIdentity.project_id == project_id))
+    ).scalar_one_or_none()
+    visual = (
+        await session.execute(
+            select(BrandVisualIdentity).where(BrandVisualIdentity.project_id == project_id)
+        )
+    ).scalar_one_or_none()
 
-    section_score, missing, recs = _score_brand_profile(profile)
-    section_scores = {"brandProfile": section_score}
+    profile_score, profile_missing, profile_recs = _score_brand_profile(profile)
+    identity_status = identity_completion(identity)
+    visual_status = visual_completion(visual)
+
+    section_scores = {
+        "brandProfile": profile_score,
+        "brandIdentity": _completion_to_score(identity_status),
+        "visualIdentity": _completion_to_score(visual_status),
+    }
+    overall = round(sum(section_scores.values()) / len(section_scores))
+
+    missing_required = profile_missing + identity_missing_fields(identity) + visual_missing_fields(
+        visual
+    )
+    recs = list(profile_recs)
+    if identity_status == "empty":
+        recs.append("Compila la Brand Identity con posizionamento e valori.")
+    if visual_status == "empty":
+        recs.append("Definisci la Visual Identity con logo e palette colori.")
 
     return BrandKnowledgeScore(
-        overall_score=section_score,
-        status=_overall_status(section_score),
+        overall_score=overall,
+        status=_overall_status(overall),
         section_scores=section_scores,
-        missing_required=missing,
+        missing_required=missing_required,
         recommendations=recs[:6],
     )
 
