@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import datetime, timezone
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
@@ -30,6 +31,23 @@ INACCESSIBLE_MESSAGE = (
     "Fonte non accessibile automaticamente. Puoi caricare screenshot/report o testo esportato."
 )
 
+SourceFetchStatus = Literal["fetched", "blocked", "failed"]
+SourceQuality = Literal["high", "medium", "low"]
+
+_TRACKING_PATTERNS = [
+    re.compile(r"<script[^>]*>[\s\S]*?dataLayer[\s\S]*?</script>", re.I),
+    re.compile(r"<script[^>]*>[\s\S]*?gtag\s*\([\s\S]*?</script>", re.I),
+    re.compile(r"<script[^>]*>[\s\S]*?fbq\s*\([\s\S]*?</script>", re.I),
+    re.compile(r"<!--\s*BEGIN\s+shopify[\s\S]*?END\s+shopify\s*-->", re.I),
+]
+
+
+def _preclean_html(html: str) -> str:
+    cleaned = html
+    for pattern in _TRACKING_PATTERNS:
+        cleaned = pattern.sub("", cleaned)
+    return cleaned
+
 
 class _MetadataParser(HTMLParser):
     def __init__(self) -> None:
@@ -42,10 +60,16 @@ class _MetadataParser(HTMLParser):
         self._text_parts: list[str] = []
         self._in_title = False
         self._in_heading = False
+        self._skip_depth = 0
         self._skip_tags = frozenset({"script", "style", "noscript"})
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
+        if tag in self._skip_tags:
+            self._skip_depth += 1
+            return
+        if self._skip_depth > 0:
+            return
         attr_map = {k: (v or "") for k, v in attrs}
         if tag == "title":
             self._in_title = True
@@ -65,12 +89,19 @@ class _MetadataParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if tag in self._skip_tags:
+            self._skip_depth = max(0, self._skip_depth - 1)
+            return
+        if self._skip_depth > 0:
+            return
         if tag == "title":
             self._in_title = False
         elif tag in ("h1", "h2", "h3"):
             self._in_heading = False
 
     def handle_data(self, data: str) -> None:
+        if self._skip_depth > 0:
+            return
         text = data.strip()
         if not text:
             return
@@ -117,7 +148,7 @@ def _build_summary(
 def _parse_html_metadata(html: str) -> dict[str, Any]:
     parser = _MetadataParser()
     try:
-        parser.feed(html)
+        parser.feed(_preclean_html(html))
         parser.close()
     except Exception:
         return {"title": None, "meta_description": None, "headings": [], "text": None}
@@ -154,11 +185,39 @@ async def _http_get(url: str) -> tuple[int, str | None, str | None]:
         return 0, None, str(exc)
 
 
+def map_fetch_result_to_source_status(
+    http_code: int,
+    raw_status: str,
+) -> SourceFetchStatus:
+    if http_code in (403, 429):
+        return "blocked"
+    if raw_status == "fetched":
+        return "fetched"
+    return "failed"
+
+
+def _infer_quality(source_type: str, parsed: dict[str, Any], raw_status: str) -> SourceQuality | None:
+    if raw_status != "fetched":
+        return None
+    text = parsed.get("text") or ""
+    if source_type == "website" and len(text) >= 200:
+        return "high"
+    if source_type in SOCIAL_TYPES and (parsed.get("title") or parsed.get("meta_description")):
+        return "medium"
+    if source_type in REVIEW_TYPES and len(text) >= 80:
+        return "low"
+    if text:
+        return "medium"
+    return "low"
+
+
 async def _fetch_website(url: str) -> dict[str, Any]:
     status_code, html, error = await _http_get(url)
     if error or not html:
+        status = map_fetch_result_to_source_status(status_code, "failed")
         return {
-            "status": "failed",
+            "status": status,
+            "http_code": status_code,
             "fetch_error": error or INACCESSIBLE_MESSAGE,
             "fetched_title": None,
             "fetched_text": None,
@@ -173,7 +232,8 @@ async def _fetch_website(url: str) -> dict[str, Any]:
     )
     if not summary and not parsed.get("text"):
         return {
-            "status": "skipped",
+            "status": "failed",
+            "http_code": status_code,
             "fetch_error": INACCESSIBLE_MESSAGE,
             "fetched_title": parsed.get("title"),
             "fetched_text": None,
@@ -181,18 +241,22 @@ async def _fetch_website(url: str) -> dict[str, Any]:
         }
     return {
         "status": "fetched",
+        "http_code": status_code,
         "fetch_error": None,
         "fetched_title": parsed.get("title"),
         "fetched_text": parsed.get("text"),
         "fetched_summary": summary,
+        "parsed": parsed,
     }
 
 
 async def _fetch_social_metadata(url: str) -> dict[str, Any]:
     status_code, html, error = await _http_get(url)
     if error or not html:
+        status = map_fetch_result_to_source_status(status_code, "failed")
         return {
-            "status": "skipped",
+            "status": status,
+            "http_code": status_code,
             "fetch_error": error or INACCESSIBLE_MESSAGE,
             "fetched_title": None,
             "fetched_text": None,
@@ -202,28 +266,35 @@ async def _fetch_social_metadata(url: str) -> dict[str, Any]:
     title = parsed.get("title")
     meta = parsed.get("meta_description")
     if not title and not meta:
+        status = map_fetch_result_to_source_status(status_code, "failed")
         return {
-            "status": "skipped",
+            "status": status,
+            "http_code": status_code,
             "fetch_error": INACCESSIBLE_MESSAGE,
             "fetched_title": None,
             "fetched_text": None,
             "fetched_summary": None,
+            "parsed": parsed,
         }
     summary = _build_summary(title, meta, [], None)
     return {
         "status": "fetched",
+        "http_code": status_code,
         "fetch_error": None,
         "fetched_title": title,
         "fetched_text": _truncate(meta, 2000),
         "fetched_summary": summary,
+        "parsed": parsed,
     }
 
 
 async def _fetch_review_platform(url: str) -> dict[str, Any]:
     status_code, html, error = await _http_get(url)
     if error or not html:
+        status = map_fetch_result_to_source_status(status_code, "failed")
         return {
-            "status": "failed",
+            "status": status,
+            "http_code": status_code,
             "fetch_error": error or INACCESSIBLE_MESSAGE,
             "fetched_title": None,
             "fetched_text": None,
@@ -232,12 +303,15 @@ async def _fetch_review_platform(url: str) -> dict[str, Any]:
     parsed = _parse_html_metadata(html)
     text = parsed.get("text")
     if not text or len(text) < 80:
+        status = map_fetch_result_to_source_status(status_code, "failed")
         return {
-            "status": "skipped",
+            "status": status,
+            "http_code": status_code,
             "fetch_error": INACCESSIBLE_MESSAGE,
             "fetched_title": parsed.get("title"),
             "fetched_text": None,
             "fetched_summary": None,
+            "parsed": parsed,
         }
     summary = _build_summary(
         parsed.get("title"),
@@ -247,10 +321,12 @@ async def _fetch_review_platform(url: str) -> dict[str, Any]:
     )
     return {
         "status": "fetched",
+        "http_code": status_code,
         "fetch_error": None,
         "fetched_title": parsed.get("title"),
         "fetched_text": _truncate(text, MAX_TEXT_LENGTH),
         "fetched_summary": summary,
+        "parsed": parsed,
     }
 
 
@@ -265,6 +341,58 @@ async def fetch_url_content(source_type: str, url: str) -> dict[str, Any]:
     return await _fetch_website(url)
 
 
+def _source_has_usable_content(result: dict[str, Any]) -> bool:
+    return bool(
+        result.get("fetched_summary")
+        or result.get("fetched_text")
+        or result.get("fetched_title")
+    )
+
+
+async def fetch_profile_sources(
+    sources: list[tuple[str, str]],
+) -> list[dict[str, Any]]:
+    """Fetch multiple profile sources in parallel. Returns BrandProfileSourceResult-shaped dicts."""
+
+    async def _fetch_one(source_type: str, url: str) -> dict[str, Any]:
+        try:
+            raw = await fetch_url_content(source_type, url)
+        except Exception as exc:
+            logger.warning("fetch_profile_sources error %s %s: %s", source_type, url, exc)
+            return {
+                "type": source_type,
+                "url": url,
+                "status": "failed",
+                "quality": None,
+                "warning": str(exc),
+                "raw": {"status": "failed", "fetch_error": str(exc)},
+            }
+
+        status = raw.get("status", "failed")
+        if status not in ("fetched", "blocked", "failed"):
+            status = map_fetch_result_to_source_status(
+                raw.get("http_code", 0), status
+            )
+
+        parsed = raw.get("parsed") or {}
+        quality = _infer_quality(source_type, parsed, status if status == "fetched" else "failed")
+        warning = raw.get("fetch_error") if status != "fetched" else None
+
+        return {
+            "type": source_type,
+            "url": url,
+            "status": status,
+            "quality": quality,
+            "warning": warning,
+            "raw": raw,
+        }
+
+    tasks = [_fetch_one(st, url) for st, url in sources if url and url.strip()]
+    if not tasks:
+        return []
+    return list(await asyncio.gather(*tasks))
+
+
 def format_external_source_for_prompt(source: Any, *, excerpt_limit: int = 2000) -> str:
     """Format a BrandExternalSource row for AI prompts."""
     lines = [
@@ -276,4 +404,17 @@ def format_external_source_for_prompt(source: Any, *, excerpt_limit: int = 2000)
         lines.append(f"  excerpt: {source.fetched_text[:excerpt_limit]}")
     if source.fetch_error and source.status in ("failed", "skipped"):
         lines.append(f"  note: {source.fetch_error}")
+    return "\n".join(lines)
+
+
+def format_fetched_source_for_prompt(item: dict[str, Any]) -> str:
+    """Format a fetch_profile_sources result for AI prompts."""
+    raw = item.get("raw") or {}
+    lines = [f"- type={item['type']} url={item['url']} status={item['status']}"]
+    if raw.get("fetched_summary"):
+        lines.append(f"  summary: {raw['fetched_summary'][:2000]}")
+    elif raw.get("fetched_text"):
+        lines.append(f"  excerpt: {raw['fetched_text'][:2000]}")
+    elif raw.get("fetched_title"):
+        lines.append(f"  title: {raw['fetched_title'][:500]}")
     return "\n".join(lines)

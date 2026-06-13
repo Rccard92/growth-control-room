@@ -996,3 +996,89 @@
   gap: 0.75rem;
   margin-bottom: 0.5rem;
 }
+
+/* Brand Profile v1 */
+.bi-profile-v1 {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.bi-profile-block {
+  padding: 1.25rem;
+}
+
+.bi-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.bi-overview-score {
+  display: flex;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  align-items: flex-start;
+}
+
+.bi-overview-score__meta {
+  flex: 1;
+}
+
+.bi-overview-field {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+}
+
+.bi-overview-field__label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.bi-recommendations {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+}
+
+.bi-source-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.bi-source-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.bi-source-badge--fetched {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.bi-source-badge--blocked {
+  background: rgba(234, 179, 8, 0.15);
+}
+
+.bi-source-badge--failed {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.bi-source-confidence {
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+  align-self: center;
+}
+
+.bi-warnings-list {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--gcr-text-muted);
+}

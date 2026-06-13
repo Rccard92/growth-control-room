@@ -5,13 +5,78 @@ export interface BrandProfile {
   websiteUrl?: string | null;
   industry?: string | null;
   country?: string | null;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
+  tiktokUrl?: string | null;
+  youtubeUrl?: string | null;
+  linkedinUrl?: string | null;
+  trustpilotUrl?: string | null;
+  googleBusinessUrl?: string | null;
+  otherSources?: Array<{ label?: string; url?: string }> | null;
   shortDescription?: string | null;
   story?: string | null;
   mission?: string | null;
   values?: string[] | null;
   differentiators?: string[] | null;
+  originNotes?: string | null;
+  productionNotes?: string | null;
+  toneNotes?: string | null;
+  customerNotes?: string | null;
+  aiSummary?: string | null;
+  sourceStatus?: BrandProfileSourceResult[] | null;
+  lastEnrichedAt?: string | null;
+  enrichmentConfidence?: number | null;
+  enrichmentWarnings?: string[] | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BrandProfileProposal {
+  brandName?: string | null;
+  shortDescription?: string | null;
+  story?: string | null;
+  mission?: string | null;
+  values?: string[];
+  differentiators?: string[];
+  originNotes?: string | null;
+  productionNotes?: string | null;
+  toneNotes?: string | null;
+  customerNotes?: string | null;
+  aiSummary?: string | null;
+}
+
+export interface BrandProfileSourceResult {
+  type: string;
+  url: string;
+  status: "fetched" | "blocked" | "failed";
+  quality?: "high" | "medium" | "low" | null;
+  warning?: string | null;
+}
+
+export interface BrandProfileEnrichRequest {
+  brandName: string;
+  websiteUrl?: string | null;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
+  tiktokUrl?: string | null;
+  youtubeUrl?: string | null;
+  linkedinUrl?: string | null;
+  trustpilotUrl?: string | null;
+  googleBusinessUrl?: string | null;
+  otherSources?: Array<{ label?: string; url?: string }>;
+}
+
+export interface BrandProfileEnrichResponse {
+  proposal: BrandProfileProposal;
+  sources: BrandProfileSourceResult[];
+  confidence: number;
+  warnings: string[];
+}
+
+export interface BrandProfileApplyProposalRequest {
+  proposal: BrandProfileProposal;
+  confidence?: number | null;
+  warnings?: string[] | null;
 }
 
 export interface BrandVoice {
@@ -150,6 +215,12 @@ export interface BrandIntelligenceOverview {
   score: BrandKnowledgeScore;
   sections: BrandSectionStatus[];
   hasProfile: boolean;
+  profileComplete?: boolean;
+  brandName?: string | null;
+  websiteUrl?: string | null;
+  lastUpdated?: string | null;
+  enrichmentConfidence?: number | null;
+  enrichmentWarnings?: string[] | null;
   hasVoice: boolean;
   productsCount: number;
   audienceCount: number;
@@ -514,7 +585,8 @@ export interface BrandApplyFactsResponse {
 }
 
 export interface BrandContextBundle {
-  primarySource?: "brand_intelligence_brief" | "structured_tables" | "minimal";
+  primarySource?: "brand_profile" | "brand_intelligence_brief" | "structured_tables" | "minimal";
+  missingContext?: string[];
   approvedBriefId?: string | null;
   briefVersion?: number | null;
   brandBrief?: BrandBriefPayload | null;
@@ -531,17 +603,4 @@ export interface BrandContextBundle {
   knowledgeScore: BrandKnowledgeScore;
 }
 
-export type BrandIntelligenceTab =
-  | "overview"
-  | "wizard"
-  | "import"
-  | "profile"
-  | "voice"
-  | "products"
-  | "audience"
-  | "claims"
-  | "seo"
-  | "pillars"
-  | "guardrails"
-  | "assets"
-  | "sources";
+export type BrandIntelligenceTab = "overview" | "profile";

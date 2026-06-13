@@ -14,11 +14,36 @@ class BrandProfileRead(BaseModel):
     website_url: str | None = Field(default=None, serialization_alias="websiteUrl")
     industry: str | None = None
     country: str | None = None
+    instagram_url: str | None = Field(default=None, serialization_alias="instagramUrl")
+    facebook_url: str | None = Field(default=None, serialization_alias="facebookUrl")
+    tiktok_url: str | None = Field(default=None, serialization_alias="tiktokUrl")
+    youtube_url: str | None = Field(default=None, serialization_alias="youtubeUrl")
+    linkedin_url: str | None = Field(default=None, serialization_alias="linkedinUrl")
+    trustpilot_url: str | None = Field(default=None, serialization_alias="trustpilotUrl")
+    google_business_url: str | None = Field(default=None, serialization_alias="googleBusinessUrl")
+    other_sources: list[dict[str, Any]] | None = Field(
+        default=None, serialization_alias="otherSources"
+    )
     short_description: str | None = Field(default=None, serialization_alias="shortDescription")
     story: str | None = None
     mission: str | None = None
     values: list[str] | None = None
     differentiators: list[str] | None = None
+    origin_notes: str | None = Field(default=None, serialization_alias="originNotes")
+    production_notes: str | None = Field(default=None, serialization_alias="productionNotes")
+    tone_notes: str | None = Field(default=None, serialization_alias="toneNotes")
+    customer_notes: str | None = Field(default=None, serialization_alias="customerNotes")
+    ai_summary: str | None = Field(default=None, serialization_alias="aiSummary")
+    source_status: list[dict[str, Any]] | None = Field(
+        default=None, serialization_alias="sourceStatus"
+    )
+    last_enriched_at: datetime | None = Field(default=None, serialization_alias="lastEnrichedAt")
+    enrichment_confidence: float | None = Field(
+        default=None, serialization_alias="enrichmentConfidence"
+    )
+    enrichment_warnings: list[str] | None = Field(
+        default=None, serialization_alias="enrichmentWarnings"
+    )
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
@@ -30,11 +55,24 @@ class BrandProfileUpdate(BaseModel):
     website_url: str | None = Field(default=None, validation_alias="websiteUrl")
     industry: str | None = None
     country: str | None = None
+    instagram_url: str | None = Field(default=None, validation_alias="instagramUrl")
+    facebook_url: str | None = Field(default=None, validation_alias="facebookUrl")
+    tiktok_url: str | None = Field(default=None, validation_alias="tiktokUrl")
+    youtube_url: str | None = Field(default=None, validation_alias="youtubeUrl")
+    linkedin_url: str | None = Field(default=None, validation_alias="linkedinUrl")
+    trustpilot_url: str | None = Field(default=None, validation_alias="trustpilotUrl")
+    google_business_url: str | None = Field(default=None, validation_alias="googleBusinessUrl")
+    other_sources: list[dict[str, Any]] | None = Field(default=None, validation_alias="otherSources")
     short_description: str | None = Field(default=None, validation_alias="shortDescription")
     story: str | None = None
     mission: str | None = None
     values: list[str] | None = None
     differentiators: list[str] | None = None
+    origin_notes: str | None = Field(default=None, validation_alias="originNotes")
+    production_notes: str | None = Field(default=None, validation_alias="productionNotes")
+    tone_notes: str | None = Field(default=None, validation_alias="toneNotes")
+    customer_notes: str | None = Field(default=None, validation_alias="customerNotes")
+    ai_summary: str | None = Field(default=None, validation_alias="aiSummary")
 
 
 class BrandVoiceRead(BaseModel):
@@ -323,13 +361,23 @@ class BrandIntelligenceOverviewResponse(BaseModel):
     score: BrandKnowledgeScoreResponse
     sections: list[BrandSectionStatus]
     has_profile: bool = Field(serialization_alias="hasProfile")
-    has_voice: bool = Field(serialization_alias="hasVoice")
-    products_count: int = Field(serialization_alias="productsCount")
-    audience_count: int = Field(serialization_alias="audienceCount")
-    claims_count: int = Field(serialization_alias="claimsCount")
-    guardrails_count: int = Field(serialization_alias="guardrailsCount")
-    pillars_count: int = Field(serialization_alias="pillarsCount")
-    assets_count: int = Field(serialization_alias="assetsCount")
+    profile_complete: bool = Field(default=False, serialization_alias="profileComplete")
+    brand_name: str | None = Field(default=None, serialization_alias="brandName")
+    website_url: str | None = Field(default=None, serialization_alias="websiteUrl")
+    last_updated: datetime | None = Field(default=None, serialization_alias="lastUpdated")
+    enrichment_confidence: float | None = Field(
+        default=None, serialization_alias="enrichmentConfidence"
+    )
+    enrichment_warnings: list[str] | None = Field(
+        default=None, serialization_alias="enrichmentWarnings"
+    )
+    has_voice: bool = Field(default=False, serialization_alias="hasVoice")
+    products_count: int = Field(default=0, serialization_alias="productsCount")
+    audience_count: int = Field(default=0, serialization_alias="audienceCount")
+    claims_count: int = Field(default=0, serialization_alias="claimsCount")
+    guardrails_count: int = Field(default=0, serialization_alias="guardrailsCount")
+    pillars_count: int = Field(default=0, serialization_alias="pillarsCount")
+    assets_count: int = Field(default=0, serialization_alias="assetsCount")
     source_documents_count: int = Field(default=0, serialization_alias="sourceDocumentsCount")
     pending_facts_count: int = Field(default=0, serialization_alias="pendingFactsCount")
     pending_section_drafts_count: int = Field(
@@ -759,6 +807,7 @@ class BrandContextBundleResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     primary_source: str = Field(default="minimal", serialization_alias="primarySource")
+    missing_context: list[str] = Field(default_factory=list, serialization_alias="missingContext")
     approved_brief_id: UUID | None = Field(default=None, serialization_alias="approvedBriefId")
     brief_version: int | None = Field(default=None, serialization_alias="briefVersion")
     brand_brief: Any | None = Field(default=None, serialization_alias="brandBrief")

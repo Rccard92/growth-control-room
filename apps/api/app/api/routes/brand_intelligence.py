@@ -10,6 +10,11 @@ from app.schemas.brand_brief import (
     BrandIntelligenceBriefUpdate,
     GenerateBriefResponse,
 )
+from app.schemas.brand_profile_v1 import (
+    BrandProfileApplyProposalRequest,
+    BrandProfileEnrichRequest,
+    BrandProfileEnrichResponse,
+)
 from app.schemas.brand_intelligence import (
     BrandAiGuardrailCreate,
     BrandAiGuardrailRead,
@@ -102,6 +107,10 @@ from app.services.brand_intelligence.section_drafts_service import (
     patch_section_draft,
     regenerate_section_draft,
 )
+from app.services.brand_intelligence.profile_enrichment import (
+    apply_brand_profile_proposal,
+    enrich_brand_profile,
+)
 from app.services.brand_intelligence.synthesis import synthesize_batch
 from app.services.projects import get_project_in_default_workspace
 
@@ -176,10 +185,40 @@ async def update_brand_profile(
     return BrandProfileRead.model_validate(row)
 
 
+@router.post(
+    "/{project_id}/brand-intelligence/profile/enrich",
+    response_model=BrandProfileEnrichResponse,
+    response_model_by_alias=True,
+)
+async def enrich_profile(
+    project_id: UUID,
+    payload: BrandProfileEnrichRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProfileEnrichResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await enrich_brand_profile(session, project_id, payload)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/profile/apply-proposal",
+    response_model=BrandProfileRead,
+    response_model_by_alias=True,
+)
+async def apply_profile_proposal(
+    project_id: UUID,
+    payload: BrandProfileApplyProposalRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandProfileRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await apply_brand_profile_proposal(session, project_id, payload)
+    return BrandProfileRead.model_validate(row)
+
+
 @router.get(
     "/{project_id}/brand-intelligence/voice",
     response_model=BrandVoiceRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def get_brand_voice(
     project_id: UUID,
@@ -194,6 +233,7 @@ async def get_brand_voice(
     "/{project_id}/brand-intelligence/voice",
     response_model=BrandVoiceRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_voice(
     project_id: UUID,
@@ -209,6 +249,7 @@ async def update_brand_voice(
     "/{project_id}/brand-intelligence/products",
     response_model=list[BrandProductKnowledgeRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_products(
     project_id: UUID,
@@ -224,6 +265,7 @@ async def list_brand_products(
     response_model=BrandProductKnowledgeRead,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def create_brand_product(
     project_id: UUID,
@@ -239,6 +281,7 @@ async def create_brand_product(
     "/{project_id}/brand-intelligence/products/{item_id}",
     response_model=BrandProductKnowledgeRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_product(
     project_id: UUID,
@@ -254,6 +297,7 @@ async def update_brand_product(
 @router.delete(
     "/{project_id}/brand-intelligence/products/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    deprecated=True,
 )
 async def delete_brand_product(
     project_id: UUID,
@@ -268,6 +312,7 @@ async def delete_brand_product(
     "/{project_id}/brand-intelligence/audience",
     response_model=list[BrandAudienceInsightRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_audience(
     project_id: UUID,
@@ -283,6 +328,7 @@ async def list_brand_audience(
     response_model=BrandAudienceInsightRead,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def create_brand_audience(
     project_id: UUID,
@@ -298,6 +344,7 @@ async def create_brand_audience(
     "/{project_id}/brand-intelligence/audience/{item_id}",
     response_model=BrandAudienceInsightRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_audience(
     project_id: UUID,
@@ -313,6 +360,7 @@ async def update_brand_audience(
 @router.delete(
     "/{project_id}/brand-intelligence/audience/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    deprecated=True,
 )
 async def delete_brand_audience(
     project_id: UUID,
@@ -327,6 +375,7 @@ async def delete_brand_audience(
     "/{project_id}/brand-intelligence/claims",
     response_model=list[BrandClaimRuleRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_claims(
     project_id: UUID,
@@ -342,6 +391,7 @@ async def list_brand_claims(
     response_model=BrandClaimRuleRead,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def create_brand_claim(
     project_id: UUID,
@@ -357,6 +407,7 @@ async def create_brand_claim(
     "/{project_id}/brand-intelligence/claims/{item_id}",
     response_model=BrandClaimRuleRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_claim(
     project_id: UUID,
@@ -372,6 +423,7 @@ async def update_brand_claim(
 @router.delete(
     "/{project_id}/brand-intelligence/claims/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    deprecated=True,
 )
 async def delete_brand_claim(
     project_id: UUID,
@@ -386,6 +438,7 @@ async def delete_brand_claim(
     "/{project_id}/brand-intelligence/seo-strategy",
     response_model=BrandSeoStrategyRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def get_brand_seo_strategy(
     project_id: UUID,
@@ -400,6 +453,7 @@ async def get_brand_seo_strategy(
     "/{project_id}/brand-intelligence/seo-strategy",
     response_model=BrandSeoStrategyRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_seo_strategy(
     project_id: UUID,
@@ -415,6 +469,7 @@ async def update_brand_seo_strategy(
     "/{project_id}/brand-intelligence/content-pillars",
     response_model=list[BrandContentPillarRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_pillars(
     project_id: UUID,
@@ -430,6 +485,7 @@ async def list_brand_pillars(
     response_model=BrandContentPillarRead,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def create_brand_pillar(
     project_id: UUID,
@@ -445,6 +501,7 @@ async def create_brand_pillar(
     "/{project_id}/brand-intelligence/content-pillars/{item_id}",
     response_model=BrandContentPillarRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_pillar(
     project_id: UUID,
@@ -460,6 +517,7 @@ async def update_brand_pillar(
 @router.delete(
     "/{project_id}/brand-intelligence/content-pillars/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    deprecated=True,
 )
 async def delete_brand_pillar(
     project_id: UUID,
@@ -474,6 +532,7 @@ async def delete_brand_pillar(
     "/{project_id}/brand-intelligence/guardrails",
     response_model=list[BrandAiGuardrailRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_guardrails(
     project_id: UUID,
@@ -489,6 +548,7 @@ async def list_brand_guardrails(
     response_model=BrandAiGuardrailRead,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def create_brand_guardrail(
     project_id: UUID,
@@ -504,6 +564,7 @@ async def create_brand_guardrail(
     "/{project_id}/brand-intelligence/guardrails/{item_id}",
     response_model=BrandAiGuardrailRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_guardrail(
     project_id: UUID,
@@ -519,6 +580,7 @@ async def update_brand_guardrail(
 @router.delete(
     "/{project_id}/brand-intelligence/guardrails/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    deprecated=True,
 )
 async def delete_brand_guardrail(
     project_id: UUID,
@@ -533,6 +595,7 @@ async def delete_brand_guardrail(
     "/{project_id}/brand-intelligence/assets",
     response_model=list[BrandAssetRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_assets(
     project_id: UUID,
@@ -548,6 +611,7 @@ async def list_brand_assets(
     response_model=BrandAssetRead,
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def create_brand_asset(
     project_id: UUID,
@@ -563,6 +627,7 @@ async def create_brand_asset(
     "/{project_id}/brand-intelligence/assets/{item_id}",
     response_model=BrandAssetRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_brand_asset(
     project_id: UUID,
@@ -578,6 +643,7 @@ async def update_brand_asset(
 @router.delete(
     "/{project_id}/brand-intelligence/assets/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    deprecated=True,
 )
 async def delete_brand_asset(
     project_id: UUID,
@@ -614,6 +680,7 @@ async def create_brand_import_batch(
     "/{project_id}/brand-intelligence/sources/upload",
     response_model=BrandSourceDocumentsUploadResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def upload_brand_source_documents(
     project_id: UUID,
@@ -647,6 +714,7 @@ async def upload_brand_source_documents(
     "/{project_id}/brand-intelligence/import-batches/{batch_id}/start",
     response_model=BrandImportBatchStartResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def start_brand_import_batch(
     project_id: UUID,
@@ -663,6 +731,7 @@ async def start_brand_import_batch(
     "/{project_id}/brand-intelligence/import-batches/{batch_id}/status",
     response_model=BrandImportBatchStatusResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def get_brand_import_batch_status(
     project_id: UUID,
@@ -677,6 +746,7 @@ async def get_brand_import_batch_status(
     "/{project_id}/brand-intelligence/import-batches",
     response_model=list[BrandImportBatchListItem],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_import_batches(
     project_id: UUID,
@@ -690,6 +760,7 @@ async def list_brand_import_batches(
     "/{project_id}/brand-intelligence/import-batches/{batch_id}/external-sources",
     response_model=list[BrandExternalSourceRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_batch_external_sources(
     project_id: UUID,
@@ -723,6 +794,7 @@ async def add_batch_external_sources(
     "/{project_id}/brand-intelligence/import-batches/{batch_id}/fetch-sources",
     response_model=BrandExternalSourcesFetchResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def fetch_batch_external_sources_route(
     project_id: UUID,
@@ -744,6 +816,7 @@ async def fetch_batch_external_sources_route(
     "/{project_id}/brand-intelligence/import-batches/{batch_id}/sources",
     response_model=BrandImportBatchSourcesUpdateResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def update_import_batch_sources(
     project_id: UUID,
@@ -793,6 +866,7 @@ async def refresh_import_batch_context(
     "/{project_id}/brand-intelligence/sources",
     response_model=list[BrandSourceDocumentRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_source_documents(
     project_id: UUID,
@@ -807,6 +881,7 @@ async def list_brand_source_documents(
     "/{project_id}/brand-intelligence/sources/{document_id}/extract",
     response_model=list[BrandExtractedFactRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def extract_brand_source_document(
     project_id: UUID,
@@ -835,6 +910,7 @@ async def extract_brand_source_batch(
     "/{project_id}/brand-intelligence/extracted-facts",
     response_model=list[BrandExtractedFactRead],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_extracted_facts(
     project_id: UUID,
@@ -860,6 +936,7 @@ async def list_brand_extracted_facts(
     "/{project_id}/brand-intelligence/extracted-facts/{fact_id}",
     response_model=BrandExtractedFactRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def patch_brand_extracted_fact(
     project_id: UUID,
@@ -876,6 +953,7 @@ async def patch_brand_extracted_fact(
     "/{project_id}/brand-intelligence/extracted-facts/apply",
     response_model=BrandApplyFactsResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def apply_brand_extracted_facts(
     project_id: UUID,
@@ -892,6 +970,7 @@ async def apply_brand_extracted_facts(
     "/{project_id}/brand-intelligence/import-batches/{batch_id}/synthesize",
     response_model=BrandSectionDraftSynthesizeResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def synthesize_brand_import_batch(
     project_id: UUID,
@@ -906,6 +985,7 @@ async def synthesize_brand_import_batch(
     "/{project_id}/brand-intelligence/section-drafts",
     response_model=list[BrandSectionDraftListItem],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_section_drafts(
     project_id: UUID,
@@ -931,6 +1011,7 @@ async def list_brand_section_drafts(
     "/{project_id}/brand-intelligence/section-drafts/{draft_id}",
     response_model=BrandSectionDraftRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def get_brand_section_draft(
     project_id: UUID,
@@ -946,6 +1027,7 @@ async def get_brand_section_draft(
     "/{project_id}/brand-intelligence/section-drafts/{draft_id}",
     response_model=BrandSectionDraftRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def patch_brand_section_draft(
     project_id: UUID,
@@ -962,6 +1044,7 @@ async def patch_brand_section_draft(
     "/{project_id}/brand-intelligence/section-drafts/{draft_id}/apply",
     response_model=BrandSectionDraftApplyResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def apply_brand_section_draft(
     project_id: UUID,
@@ -976,6 +1059,7 @@ async def apply_brand_section_draft(
     "/{project_id}/brand-intelligence/section-drafts/apply-batch",
     response_model=BrandSectionDraftApplyResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def apply_brand_section_drafts_batch(
     project_id: UUID,
@@ -990,6 +1074,7 @@ async def apply_brand_section_drafts_batch(
     "/{project_id}/brand-intelligence/section-drafts/{draft_id}/regenerate",
     response_model=BrandSectionDraftRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def regenerate_brand_section_draft(
     project_id: UUID,
@@ -1013,6 +1098,7 @@ async def regenerate_brand_section_draft(
     "/{project_id}/brand-intelligence/import-batches/{batch_id}/generate-brief",
     response_model=GenerateBriefResponse,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def generate_brand_intelligence_brief(
     project_id: UUID,
@@ -1033,6 +1119,7 @@ async def generate_brand_intelligence_brief(
     "/{project_id}/brand-intelligence/briefs",
     response_model=list[BrandIntelligenceBriefListItem],
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def list_brand_intelligence_briefs(
     project_id: UUID,
@@ -1047,6 +1134,7 @@ async def list_brand_intelligence_briefs(
     "/{project_id}/brand-intelligence/briefs/{brief_id}",
     response_model=BrandIntelligenceBriefRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def get_brand_intelligence_brief(
     project_id: UUID,
@@ -1062,6 +1150,7 @@ async def get_brand_intelligence_brief(
     "/{project_id}/brand-intelligence/briefs/{brief_id}",
     response_model=BrandIntelligenceBriefRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def patch_brand_intelligence_brief(
     project_id: UUID,
@@ -1078,6 +1167,7 @@ async def patch_brand_intelligence_brief(
     "/{project_id}/brand-intelligence/briefs/{brief_id}/approve",
     response_model=BrandIntelligenceBriefRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def approve_brand_intelligence_brief(
     project_id: UUID,
@@ -1093,6 +1183,7 @@ async def approve_brand_intelligence_brief(
     "/{project_id}/brand-intelligence/briefs/{brief_id}/archive",
     response_model=BrandIntelligenceBriefRead,
     response_model_by_alias=True,
+    deprecated=True,
 )
 async def archive_brand_intelligence_brief(
     project_id: UUID,

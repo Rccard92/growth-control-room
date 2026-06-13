@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.0-alpha] - 2026-06-13
+
+Tipo: Alpha minor / reset controllato
+
+- Simplified Brand Intelligence into Brand Profile v1 (Overview + Brand Profile tab only)
+- Removed complex import AI workflow from UI (wizard, brief, facts, section drafts, CRUD tabs)
+- Added source-based profile enrichment (`POST .../profile/enrich`) and apply-proposal flow
+- `BrandContextBuilder` now uses official Brand Profile as primary context (`primarySource=brand_profile`)
+- Migration `021_brand_profile_v1`: social URLs, content notes, enrichment metadata on `brand_profiles`
+- Legacy BI endpoints marked deprecated in API; DB migrations 015–020 unchanged
+
 ## [0.2.7-alpha] - 2026-06-13
 
 Tipo: Alpha patch

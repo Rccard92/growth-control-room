@@ -1,9 +1,13 @@
-"""BrandContextBuilder brief priority tests."""
+"""BrandContextBuilder profile v1 priority tests."""
 
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas.brand_intelligence import BrandContextBundleResponse, BrandKnowledgeScoreResponse
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
+
+_NOW = datetime.now(timezone.utc)
+_PID = uuid4()
 
 
 def _minimal_score() -> BrandKnowledgeScoreResponse:
@@ -18,27 +22,30 @@ def _minimal_score() -> BrandKnowledgeScoreResponse:
     )
 
 
-def test_format_for_prompt_uses_brief_when_primary() -> None:
+def test_format_for_prompt_uses_brand_profile_primary() -> None:
+    from app.schemas.brand_intelligence import BrandProfileRead
+
     bundle = BrandContextBundleResponse(
-        primary_source="brand_intelligence_brief",
-        approved_brief_id=uuid4(),
-        brief_version=1,
-        brand_brief={
-            "brand_identity": {"brand_name": "Acme", "short_description": "Test brand"},
-            "voice_and_tone": {"tone": "friendly"},
-            "missing_information": ["Certificazioni"],
-        },
+        primary_source="brand_profile",
+        missing_context=[],
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Test brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
         knowledge_score=_minimal_score(),
     )
     text = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
     assert text is not None
-    assert "Brand Intelligence Brief" in text
+    assert "# Brand Profile" in text
     assert "Acme" in text
-    assert "friendly" in text
-    assert "Missing information" in text
+    assert "Test brand" in text
 
 
-def test_context_bundle_primary_source_field() -> None:
+def test_context_bundle_has_missing_context_field() -> None:
     fields = BrandContextBundleResponse.model_fields
+    assert "missing_context" in fields
     assert "primary_source" in fields
-    assert "brand_brief" in fields

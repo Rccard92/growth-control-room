@@ -7,9 +7,22 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.2.7-alpha";
+export const GCR_VERSION = "0.3.0-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.0-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Brand Intelligence semplificata: solo Overview + Brand Profile v1",
+      "Enrich da fonti pubbliche con proposta AI revisionabile",
+      "Apply-proposal: salvataggio esplicito profilo ufficiale",
+      "BrandContextBuilder usa Brand Profile come contesto primario",
+      "Rimossi da UI: wizard, import AI, brief, facts, section drafts",
+      "Migration 021 brand_profile_v1",
+    ],
+  },
   {
     version: "0.2.7-alpha",
     date: "2026-06-13",

@@ -125,6 +125,11 @@ export type {
 } from "./types/content";
 export type {
   BrandProfile,
+  BrandProfileProposal,
+  BrandProfileSourceResult,
+  BrandProfileEnrichRequest,
+  BrandProfileEnrichResponse,
+  BrandProfileApplyProposalRequest,
   BrandVoice,
   BrandProductKnowledge,
   BrandAudienceInsight,
