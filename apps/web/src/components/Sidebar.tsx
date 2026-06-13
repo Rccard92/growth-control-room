@@ -1,4 +1,5 @@
 import { NavLink, useParams } from "react-router-dom";
+import { BrandLogo } from "./BrandLogo";
 import { useProject } from "../hooks/useProjects";
 import { PROJECT_NAV } from "../routes/config";
 
@@ -10,6 +11,9 @@ export function Sidebar() {
 
   return (
     <aside className="gcr-sidebar">
+      <div className="gcr-sidebar__brand">
+        <BrandLogo variant="mark" size="sm" />
+      </div>
       <p className="gcr-sidebar__title">Progetto</p>
       <p className="gcr-sidebar__project-name">{project?.name ?? id.slice(0, 8)}</p>
       <nav>

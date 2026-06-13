@@ -1,5 +1,6 @@
 ﻿import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { BrandLogo } from "../components/BrandLogo";
 import { APP_ROUTES } from "../routes/config";
 
 const CONTACT_EMAIL = "antonioriccardi92@hotmail.it";
@@ -14,7 +15,9 @@ export function PrivacyPolicyPage() {
         transition={{ duration: 0.5 }}
       >
         <header className="gcr-legal__header">
-          <div className="gcr-login__logo">G</div>
+          <div className="gcr-login__logo">
+            <BrandLogo variant="mark" size="md" />
+          </div>
           <p className="gcr-legal__brand">Growth Control Room</p>
           <h1 className="gcr-legal__title">Privacy Policy</h1>
           <p className="gcr-legal__updated">Last updated: June 10, 2026</p>

@@ -1,5 +1,6 @@
 ﻿import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
+import { BrandLogo } from "../components/BrandLogo";
 import { APP_ROUTES } from "../routes/config";
 
 export function LoginPage() {
@@ -13,7 +14,9 @@ export function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="gcr-login__logo">G</div>
+        <div className="gcr-login__brand">
+          <BrandLogo variant="full" size="lg" />
+        </div>
         <h1 className="gcr-login__title">Growth Control Room</h1>
         <p className="gcr-login__claim">
           La control room AI per governare crescita, dati e contenuti dei tuoi brand.

@@ -22,6 +22,41 @@
   padding: 0;
 }
 
+/* Brand logo */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.brand-logo__image {
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-logo--sm .brand-logo__image {
+  height: 28px;
+}
+
+.brand-logo--md .brand-logo__image {
+  height: 40px;
+}
+
+.brand-logo--lg .brand-logo__image {
+  height: 72px;
+}
+
+.gcr-login__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.gcr-sidebar__brand {
+  margin-bottom: 1rem;
+}
+
 /* Topbar */
 .gcr-topbar {
   display: flex;
@@ -40,25 +75,7 @@
 .gcr-topbar__logo {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  letter-spacing: -0.02em;
-  color: var(--gcr-text);
   text-decoration: none;
-}
-
-.gcr-topbar__logo-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--gcr-accent-violet), var(--gcr-accent-cyan));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #fff;
 }
 
 .gcr-topbar__nav {
@@ -538,18 +555,9 @@
 }
 
 .gcr-login__logo {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 1.5rem;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--gcr-accent-violet), var(--gcr-accent-cyan));
   display: flex;
-  align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #fff;
-  box-shadow: var(--gcr-glow-violet);
+  margin: 0 auto 1.5rem;
 }
 
 .gcr-login__title {

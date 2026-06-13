@@ -1,0 +1,14 @@
+{
+  "name": "Growth Control Room",
+  "short_name": "GCR",
+  "icons": [
+    {
+      "src": "/brand/gcr-favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#070A12",
+  "background_color": "#070A12",
+  "display": "standalone"
+}
