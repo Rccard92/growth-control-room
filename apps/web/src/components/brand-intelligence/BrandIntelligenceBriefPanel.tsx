@@ -12,6 +12,7 @@ interface BrandIntelligenceBriefPanelProps {
   projectId: string;
   batchId: string | null;
   brief: BrandIntelligenceBrief | undefined;
+  briefLoadFailed?: boolean;
   onBriefGenerated: (briefId: string) => void;
   onRegenerate?: () => void;
 }
@@ -20,6 +21,7 @@ export function BrandIntelligenceBriefPanel({
   projectId,
   batchId,
   brief,
+  briefLoadFailed = false,
   onBriefGenerated,
 }: BrandIntelligenceBriefPanelProps) {
   const [editing, setEditing] = useState(false);
@@ -51,6 +53,27 @@ export function BrandIntelligenceBriefPanel({
       data: { briefPayload: editPayload },
     });
     setEditing(false);
+  }
+
+  if (briefLoadFailed) {
+    return (
+      <div className="bi-brief-panel gcr-card">
+        <div className="gcr-alert gcr-alert--error">
+          Impossibile aprire il Brand Intelligence Brief. Riprova.
+        </div>
+        {batchId && (
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--primary"
+            style={{ marginTop: "1rem" }}
+            disabled={generate.isPending}
+            onClick={() => void handleGenerate()}
+          >
+            {generate.isPending ? "Generazione in corso…" : "Rigenera Brand Intelligence Brief"}
+          </button>
+        )}
+      </div>
+    );
   }
 
   if (!brief) {

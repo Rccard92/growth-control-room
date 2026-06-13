@@ -278,9 +278,9 @@ async def generate_brief_from_batch(
         markdown_summary=build_markdown_summary(brief_payload),
         confidence=confidence,
         warnings={"messages": sanitize_warnings} if sanitize_warnings else None,
-        source_document_ids=doc_ids or None,
-        source_external_ids=ext_ids or None,
-        source_fact_ids=fact_ids or None,
+        source_document_ids=doc_ids,
+        source_external_ids=ext_ids,
+        source_fact_ids=fact_ids,
     )
     session.add(brief)
     await session.commit()

@@ -58,7 +58,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
   });
   const { data: sectionDrafts = [] } = useSectionDrafts(projectId, batchId ? { batchId } : undefined);
   const { data: facts = [] } = useBrandExtractedFacts(projectId, batchId ? { batchId } : undefined);
-  const { data: brief } = useBrandBrief(projectId, briefId ?? undefined);
+  const { data: brief, isError: briefLoadFailed } = useBrandBrief(projectId, briefId ?? undefined);
 
   const upload = useUploadBrandSources(projectId);
   const startBatch = useStartImportBatch(projectId);
@@ -363,6 +363,7 @@ export function BrandIntelligenceImportPanel({ projectId }: BrandIntelligenceImp
             projectId={projectId}
             batchId={batchId}
             brief={brief}
+            briefLoadFailed={briefId ? briefLoadFailed : false}
             onBriefGenerated={setBriefId}
           />
 

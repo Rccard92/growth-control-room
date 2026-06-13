@@ -639,6 +639,15 @@ class BrandImportBatchRead(BaseModel):
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
+    @field_validator("warnings", mode="before")
+    @classmethod
+    def _coerce_warnings_list(cls, v: object) -> list[str]:
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return [str(x) for x in v]
+        return []
+
 
 class BrandImportBatchStatusResponse(BrandImportBatchRead):
     documents: list[BrandImportBatchDocumentStatus] = Field(default_factory=list)

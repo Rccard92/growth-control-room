@@ -70,6 +70,7 @@ from app.services.brand_intelligence import sources_service
 from app.services.brand_intelligence.brief_service import (
     approve_brief,
     archive_brief,
+    build_brand_intelligence_brief_read,
     get_brief,
     list_briefs,
     patch_brief,
@@ -1054,7 +1055,7 @@ async def get_brand_intelligence_brief(
 ) -> BrandIntelligenceBriefRead:
     await get_project_in_default_workspace(project_id, session)
     row = await get_brief(session, project_id, brief_id)
-    return BrandIntelligenceBriefRead.model_validate(row)
+    return build_brand_intelligence_brief_read(row)
 
 
 @router.patch(
@@ -1070,7 +1071,7 @@ async def patch_brand_intelligence_brief(
 ) -> BrandIntelligenceBriefRead:
     await get_project_in_default_workspace(project_id, session)
     row = await patch_brief(session, project_id, brief_id, body)
-    return BrandIntelligenceBriefRead.model_validate(row)
+    return build_brand_intelligence_brief_read(row)
 
 
 @router.post(
@@ -1085,7 +1086,7 @@ async def approve_brand_intelligence_brief(
 ) -> BrandIntelligenceBriefRead:
     await get_project_in_default_workspace(project_id, session)
     row = await approve_brief(session, project_id, brief_id)
-    return BrandIntelligenceBriefRead.model_validate(row)
+    return build_brand_intelligence_brief_read(row)
 
 
 @router.post(
@@ -1100,5 +1101,5 @@ async def archive_brand_intelligence_brief(
 ) -> BrandIntelligenceBriefRead:
     await get_project_in_default_workspace(project_id, session)
     row = await archive_brief(session, project_id, brief_id)
-    return BrandIntelligenceBriefRead.model_validate(row)
+    return build_brand_intelligence_brief_read(row)
 

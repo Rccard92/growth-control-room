@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 BriefPayload = dict[str, Any]
 
@@ -383,6 +383,31 @@ class BrandIntelligenceBriefRead(BaseModel):
     updated_at: datetime = Field(serialization_alias="updatedAt")
     approved_at: datetime | None = Field(default=None, serialization_alias="approvedAt")
     archived_at: datetime | None = Field(default=None, serialization_alias="archivedAt")
+
+    @field_validator("source_fact_ids", "source_document_ids", "source_external_ids", mode="before")
+    @classmethod
+    def _coerce_id_lists(cls, v: object) -> list[str]:
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return [str(x) for x in v]
+        return []
+
+    @field_validator("brief_payload", mode="before")
+    @classmethod
+    def _coerce_brief_payload(cls, v: object) -> dict[str, Any]:
+        if v is None:
+            return copy.deepcopy(DEFAULT_BRIEF_PAYLOAD)
+        if isinstance(v, dict):
+            return v
+        return copy.deepcopy(DEFAULT_BRIEF_PAYLOAD)
+
+    @field_validator("warnings", mode="before")
+    @classmethod
+    def _coerce_warnings(cls, v: object) -> object | None:
+        if v is None:
+            return None
+        return v
 
 
 class BrandIntelligenceBriefUpdate(BaseModel):

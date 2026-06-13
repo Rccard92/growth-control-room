@@ -11,12 +11,39 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import BrandIntelligenceBrief
 from app.schemas.brand_brief import (
+    BrandIntelligenceBriefRead,
     BrandIntelligenceBriefUpdate,
+    DEFAULT_BRIEF_PAYLOAD,
     build_markdown_summary,
     sanitize_brief_payload,
 )
 
 PENDING_BRIEF_STATUSES = frozenset({"draft"})
+
+
+def build_brand_intelligence_brief_read(row: BrandIntelligenceBrief) -> BrandIntelligenceBriefRead:
+    """Normalize nullable JSON/list columns before Pydantic serialization."""
+    return BrandIntelligenceBriefRead.model_validate(
+        {
+            "id": row.id,
+            "project_id": row.project_id,
+            "source_batch_id": row.source_batch_id,
+            "version": row.version,
+            "status": row.status,
+            "title": row.title,
+            "brief_payload": row.brief_payload if row.brief_payload is not None else DEFAULT_BRIEF_PAYLOAD,
+            "markdown_summary": row.markdown_summary,
+            "confidence": row.confidence,
+            "warnings": row.warnings,
+            "source_document_ids": row.source_document_ids or [],
+            "source_external_ids": row.source_external_ids or [],
+            "source_fact_ids": row.source_fact_ids or [],
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+            "approved_at": row.approved_at,
+            "archived_at": row.archived_at,
+        }
+    )
 
 
 async def list_briefs(

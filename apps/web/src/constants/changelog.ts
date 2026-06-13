@@ -7,9 +7,19 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.2.6-alpha";
+export const GCR_VERSION = "0.2.7-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.2.7-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fix GET brief: campi nullable sourceFactIds/sourceDocumentIds normalizzati",
+      "Mapper API brief read robusto contro NULL da JSONB",
+      "Messaggio errore UI leggibile su apertura brief fallita",
+    ],
+  },
   {
     version: "0.2.6-alpha",
     date: "2026-06-13",
