@@ -15,6 +15,7 @@ import type {
   SeoProposalGenerateFieldResponse,
   SeoMetafieldDefinitionsSyncResponse,
   SeoProposalPreviewResponse,
+  ContentSeoDashboard,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
 
@@ -47,6 +48,10 @@ export function getCollectionsSeo(projectId: string): Promise<SeoCollectionListR
   return apiFetch<SeoCollectionListResponse>(
     `/api/projects/${projectId}/content/seo/collections`,
   );
+}
+
+export function getContentSeoDashboard(projectId: string): Promise<ContentSeoDashboard> {
+  return apiFetch<ContentSeoDashboard>(`/api/projects/${projectId}/content/seo/dashboard`);
 }
 
 export function getProductSeoDetail(

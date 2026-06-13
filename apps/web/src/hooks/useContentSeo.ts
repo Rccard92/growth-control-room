@@ -10,6 +10,7 @@ import {
   getCollectionAnalysis,
   getCollectionSeoDetail,
   getCollectionsSeo,
+  getContentSeoDashboard,
   getProductAnalysis,
   getProductSeoDetail,
   getProductsSeo,
@@ -37,6 +38,14 @@ export function useCollectionsSeo(projectId: string | undefined, enabled = true)
   return useQuery({
     queryKey: queryKeys.contentSeo.collections(projectId ?? ""),
     queryFn: () => getCollectionsSeo(projectId!),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useContentSeoDashboard(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.contentSeo.dashboard(projectId ?? ""),
+    queryFn: () => getContentSeoDashboard(projectId!),
     enabled: Boolean(projectId) && enabled,
   });
 }
@@ -72,6 +81,7 @@ export function useSeoOptimizerSync(projectId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
       void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.collections(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.dashboard(projectId) });
     },
   });
 }
@@ -82,6 +92,7 @@ export function useAnalyzeProductsSeo(projectId: string) {
     mutationFn: () => analyzeProductsSeo(projectId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.dashboard(projectId) });
     },
   });
 }
@@ -92,6 +103,7 @@ export function useAnalyzeCollectionsSeo(projectId: string) {
     mutationFn: () => analyzeCollectionsSeo(projectId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.collections(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.dashboard(projectId) });
     },
   });
 }

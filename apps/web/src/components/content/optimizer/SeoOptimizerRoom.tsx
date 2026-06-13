@@ -1,33 +1,39 @@
 import { useState } from "react";
-import type { SeoOptimizationProposal, SeoOptimizerTab } from "@gcr/shared";
+import type { SeoOptimizerTab } from "@gcr/shared";
 import { StatusBadge } from "../../StatusBadge";
 import { EntitySeoTable, type EntityFilter } from "./EntitySeoTable";
 import { SeoEntityEditDrawer } from "./SeoEntityEditDrawer";
+import { ContentSeoOptimizerKpi, averageScore } from "./ContentSeoOptimizerKpi";
+import { ContentSeoToast } from "./ContentSeoToast";
+import type { ContentSeoFeedback } from "./ContentSeoActionBar";
 import {
-  useAnalyzeCollectionsSeo,
-  useAnalyzeProductsSeo,
   useCollectionSeoDetail,
   useCollectionsSeo,
+  useContentSeoDashboard,
   useProductSeoDetail,
   useProductsSeo,
-  useProposalsSeo,
-  useSeoOptimizerSync,
 } from "../../../hooks/useContentSeo";
 import { useShopifyScopes } from "../../../hooks/useShopify";
 
 const TABS: { id: SeoOptimizerTab; label: string; comingSoon?: boolean }[] = [
   { id: "products", label: "Prodotti" },
   { id: "collections", label: "Categorie" },
-  { id: "proposals", label: "Proposte" },
   { id: "editorial", label: "Blog & Ricette", comingSoon: true },
 ];
 
 interface SeoOptimizerRoomProps {
   projectId: string;
   connected: boolean;
+  feedback: ContentSeoFeedback | null;
+  onDismissFeedback: () => void;
 }
 
-export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps) {
+export function SeoOptimizerRoom({
+  projectId,
+  connected,
+  feedback,
+  onDismissFeedback,
+}: SeoOptimizerRoomProps) {
   const [tab, setTab] = useState<SeoOptimizerTab>("products");
   const [productFilter, setProductFilter] = useState<EntityFilter>("all");
   const [collectionFilter, setCollectionFilter] = useState<EntityFilter>("all");
@@ -42,12 +48,11 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
     projectId,
     connected,
   );
-  const { data: proposalsData } = useProposalsSeo(projectId, connected);
+  const { data: dashboardData, isLoading: dashboardLoading } = useContentSeoDashboard(
+    projectId,
+    connected,
+  );
   const shopifyScopesQuery = useShopifyScopes(projectId, connected);
-
-  const syncMutation = useSeoOptimizerSync(projectId);
-  const analyzeProductsMutation = useAnalyzeProductsSeo(projectId);
-  const analyzeCollectionsMutation = useAnalyzeCollectionsSeo(projectId);
 
   const productDetail = useProductSeoDetail(
     projectId,
@@ -65,11 +70,15 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
     collectionsData?.writeProductsAvailable ??
     false;
 
+  const products = productsData?.items ?? [];
+  const collections = collectionsData?.items ?? [];
+  const summary = dashboardData?.summary;
+
   const handleOpenEdit = (entityType: "product" | "collection", entityId: string) => {
     const title =
       entityType === "product"
-        ? productsData?.items.find((p) => p.id === entityId)?.title
-        : collectionsData?.items.find((c) => c.id === entityId)?.title;
+        ? products.find((p) => p.id === entityId)?.title
+        : collections.find((c) => c.id === entityId)?.title;
     setEditEntity({
       type: entityType,
       id: entityId,
@@ -96,63 +105,19 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
 
   return (
     <>
-      <div className="seo-optimizer-header">
-        <div>
-          <p className="gcr-card__label">SEO Optimizer</p>
-          <h2 className="content-seo-header__title">Product & Collection SEO Optimizer</h2>
-          <p className="content-seo-header__subtitle">
-            Migliora titoli, SEO title, meta description, handle e alt immagini prima della
-            pubblicazione.
-          </p>
-        </div>
-        <div className="content-seo-header__actions">
-          <button
-            type="button"
-            className="gcr-btn gcr-btn--secondary"
-            disabled={syncMutation.isPending}
-            onClick={() => syncMutation.mutate()}
-          >
-            {syncMutation.isPending ? "Sync…" : "Sincronizza contenuti Shopify"}
-          </button>
-          <button
-            type="button"
-            className="gcr-btn gcr-btn--secondary"
-            disabled={analyzeProductsMutation.isPending}
-            onClick={() => analyzeProductsMutation.mutate()}
-          >
-            {analyzeProductsMutation.isPending ? "Analisi…" : "Analizza prodotti"}
-          </button>
-          <button
-            type="button"
-            className="gcr-btn gcr-btn--primary"
-            disabled={analyzeCollectionsMutation.isPending}
-            onClick={() => analyzeCollectionsMutation.mutate()}
-          >
-            {analyzeCollectionsMutation.isPending ? "Analisi…" : "Analizza categorie"}
-          </button>
-        </div>
-      </div>
+      <ContentSeoOptimizerKpi
+        productsCount={products.length}
+        averageProductScore={averageScore(products)}
+        collectionsCount={collections.length}
+        averageCollectionScore={averageScore(collections)}
+        criticalIssues={summary?.criticalIssues ?? 0}
+        missingFieldsCount={
+          (summary?.productsWithoutMeta ?? 0) + (summary?.collectionsWeak ?? 0)
+        }
+        loading={productsLoading || collectionsLoading || dashboardLoading}
+      />
 
-      {(syncMutation.isSuccess ||
-        analyzeProductsMutation.isSuccess ||
-        analyzeCollectionsMutation.isSuccess) && (
-        <div className="content-seo-banner content-seo-banner--success">
-          {syncMutation.isSuccess &&
-            `Sync: ${syncMutation.data.productsSynced} prodotti, ${syncMutation.data.collectionsSynced} categorie.`}
-          {analyzeProductsMutation.isSuccess &&
-            ` Prodotti analizzati: ${analyzeProductsMutation.data.productsAnalyzed}.`}
-          {analyzeCollectionsMutation.isSuccess &&
-            (analyzeCollectionsMutation.data.message ??
-              ` Categorie analizzate: ${analyzeCollectionsMutation.data.collectionsAnalyzed}.`)}
-        </div>
-      )}
-
-      {syncMutation.isSuccess && (syncMutation.data.warnings?.length ?? 0) > 0 && (
-        <div className="content-seo-banner content-seo-banner--warn">
-          {syncMutation.data.warnings?.join(" ")}
-          {syncMutation.data.message ? ` ${syncMutation.data.message}` : ""}
-        </div>
-      )}
+      <ContentSeoToast feedback={feedback} onDismiss={onDismissFeedback} />
 
       <div className="seo-optimizer-tabs">
         {TABS.map((t) => (
@@ -170,12 +135,12 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
       </div>
 
       {tab === "products" && (
-        <div className="gcr-card content-seo-panel">
+        <div className="gcr-card content-seo-panel content-seo-panel--compact">
           {productsLoading ? (
             <div className="gcr-skeleton seo-skeleton-row" />
           ) : (
             <EntitySeoTable
-              items={productsData?.items ?? []}
+              items={products}
               mode="product"
               filter={productFilter}
               onFilterChange={setProductFilter}
@@ -191,15 +156,15 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
       )}
 
       {tab === "collections" && (
-        <div className="gcr-card content-seo-panel">
-          <p className="content-seo-header__subtitle content-seo-collections-hint">
+        <div className="gcr-card content-seo-panel content-seo-panel--compact">
+          <p className="content-seo-collections-hint">
             Categorie Shopify = Collections (non tag prodotto né product type).
           </p>
           {collectionsLoading ? (
             <div className="gcr-skeleton seo-skeleton-row" />
           ) : (
             <EntitySeoTable
-              items={collectionsData?.items ?? []}
+              items={collections}
               mode="collection"
               filter={collectionFilter}
               onFilterChange={setCollectionFilter}
@@ -209,29 +174,14 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
                   ? editEntity.id
                   : null
               }
-              emptyMessage="Nessuna collection Shopify sincronizzata. Clicca 'Sincronizza contenuti Shopify'."
+              emptyMessage="Nessuna collection Shopify sincronizzata. Clicca 'Sincronizza Shopify'."
             />
           )}
         </div>
       )}
 
-      {tab === "proposals" && (
-        <div className="gcr-card content-seo-panel">
-          <ProposalList
-            proposals={proposalsData?.items ?? []}
-            onOpen={(p) =>
-              setEditEntity({
-                type: p.entityType,
-                id: p.entityId,
-                title: p.entityGid,
-              })
-            }
-          />
-        </div>
-      )}
-
       {tab === "editorial" && (
-        <div className="gcr-card content-seo-empty">
+        <div className="gcr-card content-seo-empty content-seo-empty--compact">
           <h3 className="gcr-card__title">Blog & Ricette</h3>
           <p className="gcr-card__description">Modulo Editorial SEO in arrivo.</p>
           <StatusBadge variant="coming_soon" />
@@ -255,39 +205,5 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
         onDetailRefresh={refreshDetail}
       />
     </>
-  );
-}
-
-function ProposalList({
-  proposals,
-  onOpen,
-}: {
-  proposals: SeoOptimizationProposal[];
-  onOpen: (p: SeoOptimizationProposal) => void;
-}) {
-  if (proposals.length === 0) {
-    return (
-      <p className="shopify-empty-copy">
-        Nessuna proposta. Apri Modifica da tab Prodotti o Categorie.
-      </p>
-    );
-  }
-  return (
-    <ul className="shopify-seo-list">
-      {proposals.slice(0, 10).map((p) => (
-        <li key={p.id} className="shopify-seo-list__item">
-          <span>
-            {p.entityType} · {p.status} · {p.riskLevel}
-          </span>
-          <button
-            type="button"
-            className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-            onClick={() => onOpen(p)}
-          >
-            Apri
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }

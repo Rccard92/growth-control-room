@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import type { SeoCollectionListItem, SeoProductListItem } from "@gcr/shared";
 import { ShowMoreToggle } from "../../shopify/ShowMoreToggle";
 import { CONTENT_SEO_ROW_LIMIT, sliceContentRows } from "../../../lib/content-seo-blocks";
@@ -98,41 +99,54 @@ export function EntitySeoTable({
             {mode === "collection" && <span>Prodotti</span>}
             <span>Azioni</span>
           </div>
-          {visible.map((item) => (
-            <div key={item.id} className="seo-entity-table__row">
-              <div>
-                <strong>{item.title}</strong>
-                {item.handle && (
-                  <span className="seo-entity-table__handle">/{item.handle}</span>
+          {visible.map((item) => {
+            const titleLine = item.title;
+            const handleLine = item.handle ? `/${item.handle}` : "";
+            const titleTooltip = handleLine ? `${titleLine} ${handleLine}` : titleLine;
+
+            return (
+              <motion.div
+                key={item.id}
+                className="seo-entity-table__row"
+                whileHover={{ backgroundColor: "rgba(255, 255, 255, 0.03)" }}
+                transition={{ duration: 0.15 }}
+              >
+                <div className="seo-entity-table__title-cell" title={titleTooltip}>
+                  <strong className="seo-entity-table__title-text">{titleLine}</strong>
+                  {item.handle && (
+                    <span className="seo-entity-table__handle">/{item.handle}</span>
+                  )}
+                </div>
+                <SeoScoreBadge score={item.score} severity={item.severity} />
+                <ul className="seo-entity-table__issues">
+                  {item.mainIssues.slice(0, 2).map((issue) => (
+                    <li key={issue} title={issue}>
+                      {issue}
+                    </li>
+                  ))}
+                  {item.mainIssues.length === 0 && <li>—</li>}
+                </ul>
+                {mode === "product" && "quantitySold" in item && (
+                  <span className="seo-entity-table__metric">
+                    {item.quantitySold} / {item.stock ?? "—"}
+                  </span>
                 )}
-              </div>
-              <SeoScoreBadge score={item.score} severity={item.severity} />
-              <ul className="seo-entity-table__issues">
-                {item.mainIssues.slice(0, 2).map((issue) => (
-                  <li key={issue}>{issue}</li>
-                ))}
-                {item.mainIssues.length === 0 && <li>—</li>}
-              </ul>
-              {mode === "product" && "quantitySold" in item && (
-                <span>
-                  {item.quantitySold} / {item.stock ?? "—"}
-                </span>
-              )}
-              {mode === "collection" && "productsCount" in item && (
-                <span>{item.productsCount ?? "—"}</span>
-              )}
-              <div className="seo-entity-table__actions">
-                <button
-                  type="button"
-                  className="gcr-btn gcr-btn--primary gcr-btn--sm"
-                  disabled={editLoadingId === item.id}
-                  onClick={() => onEdit(item.id)}
-                >
-                  {editLoadingId === item.id ? "…" : "Modifica"}
-                </button>
-              </div>
-            </div>
-          ))}
+                {mode === "collection" && "productsCount" in item && (
+                  <span className="seo-entity-table__metric">{item.productsCount ?? "—"}</span>
+                )}
+                <div className="seo-entity-table__actions">
+                  <button
+                    type="button"
+                    className="gcr-btn gcr-btn--primary gcr-btn--sm"
+                    disabled={editLoadingId === item.id}
+                    onClick={() => onEdit(item.id)}
+                  >
+                    {editLoadingId === item.id ? "…" : "Modifica"}
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
           <ShowMoreToggle
             total={filtered.length}
             limit={CONTENT_SEO_ROW_LIMIT}

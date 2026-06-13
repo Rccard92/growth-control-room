@@ -7,9 +7,21 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.1.1-alpha";
+export const GCR_VERSION = "0.1.2-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.1.2-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "UX compatta Content SEO Optimizer",
+      "KPI summary prodotti/categorie con score medio",
+      "Rimozione tab Proposte dalla pagina principale",
+      "Feedback sync/analyze dismissible (toast auto-dismiss)",
+      "Miglioramenti visuali tabelle e header Product & Collection SEO",
+    ],
+  },
   {
     version: "0.1.1-alpha",
     date: "2026-06-13",
