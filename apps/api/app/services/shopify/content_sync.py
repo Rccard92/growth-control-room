@@ -1,6 +1,6 @@
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -20,6 +20,27 @@ from app.services.shopify.html_utils import html_to_text
 
 logger = logging.getLogger(__name__)
 
+# Ultimi errori sync collections per store (debug/supporto, non sensibile)
+_last_collection_sync_errors: dict[str, list[str]] = {}
+
+
+def parse_products_count(node: dict[str, Any]) -> int | None:
+    raw = node.get("productsCount")
+    if isinstance(raw, dict):
+        count = raw.get("count")
+        return int(count) if count is not None else None
+    if raw is None:
+        return None
+    return int(raw)
+
+
+def get_last_collection_sync_errors(store_id: UUID) -> list[str]:
+    return list(_last_collection_sync_errors.get(str(store_id), []))
+
+
+def _record_collection_sync_errors(store_id: UUID, errors: list[str]) -> None:
+    _last_collection_sync_errors[str(store_id)] = errors
+
 
 def _parse_datetime(value: str | None) -> datetime | None:
     if not value:
@@ -38,6 +59,8 @@ class ContentSyncResult:
     blogs_synced: int = 0
     articles_synced: int = 0
     duration_seconds: float = 0.0
+    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 async def _upsert_collection(
@@ -69,13 +92,33 @@ async def _upsert_collection(
     row.seo_description = seo.get("description")
     row.image_url = image.get("url")
     row.image_alt = image.get("altText")
-    products_count_raw = node.get("productsCount")
-    if isinstance(products_count_raw, dict):
-        row.products_count = products_count_raw.get("count")
-    else:
-        row.products_count = products_count_raw
+    row.products_count = parse_products_count(node)
     row.raw_payload = node
     return row
+
+
+async def _sync_collection_nodes(
+    session: AsyncSession,
+    store: ShopifyStore,
+    client: ShopifyGraphQLClient,
+    result: ContentSyncResult,
+) -> None:
+    try:
+        collection_nodes = await client.fetch_all_collections()
+        for node in collection_nodes:
+            await _upsert_collection(session, store.id, node)
+            result.collections_synced += 1
+        _record_collection_sync_errors(store.id, [])
+    except ShopifyAPIError as exc:
+        msg = f"Collections sync failed: {exc.message}"
+        logger.warning(
+            "Shopify collections sync failed for store %s: %s",
+            store.shop_domain,
+            exc.message,
+        )
+        result.errors.append(msg)
+        result.warnings.append(msg)
+        _record_collection_sync_errors(store.id, [msg])
 
 
 async def _upsert_page(
@@ -185,17 +228,7 @@ async def sync_shopify_collections_only(
     """Sync only collections for Product & Collection SEO Optimizer v1."""
     started = time.perf_counter()
     result = ContentSyncResult()
-    try:
-        collection_nodes = await client.fetch_all_collections()
-        for node in collection_nodes:
-            await _upsert_collection(session, store.id, node)
-            result.collections_synced += 1
-    except ShopifyAPIError as exc:
-        logger.warning(
-            "Shopify collections sync failed for store %s: %s",
-            store.shop_domain,
-            exc.message,
-        )
+    await _sync_collection_nodes(session, store, client, result)
     await session.commit()
     result.duration_seconds = round(time.perf_counter() - started, 2)
     return result
@@ -209,17 +242,7 @@ async def sync_shopify_content(
     started = time.perf_counter()
     result = ContentSyncResult()
 
-    try:
-        collection_nodes = await client.fetch_all_collections()
-        for node in collection_nodes:
-            await _upsert_collection(session, store.id, node)
-            result.collections_synced += 1
-    except ShopifyAPIError as exc:
-        logger.warning(
-            "Shopify content sync: collections failed for store %s: %s",
-            store.shop_domain,
-            exc.message,
-        )
+    await _sync_collection_nodes(session, store, client, result)
 
     try:
         page_nodes = await client.fetch_all_pages()
@@ -227,11 +250,13 @@ async def sync_shopify_content(
             await _upsert_page(session, store.id, node)
             result.pages_synced += 1
     except ShopifyAPIError as exc:
+        msg = f"Pages sync failed: {exc.message}"
         logger.warning(
             "Shopify content sync: pages failed for store %s: %s",
             store.shop_domain,
             exc.message,
         )
+        result.warnings.append(msg)
 
     blog_by_gid: dict[str, ShopifyBlog] = {}
     try:
@@ -242,11 +267,13 @@ async def sync_shopify_content(
             result.blogs_synced += 1
         await session.flush()
     except ShopifyAPIError as exc:
+        msg = f"Blogs sync failed: {exc.message}"
         logger.warning(
             "Shopify content sync: blogs failed for store %s: %s",
             store.shop_domain,
             exc.message,
         )
+        result.warnings.append(msg)
 
     if not blog_by_gid:
         existing = await session.execute(
@@ -261,11 +288,13 @@ async def sync_shopify_content(
             await _upsert_article(session, store.id, node, blog_by_gid)
             result.articles_synced += 1
     except ShopifyAPIError as exc:
+        msg = f"Articles sync failed: {exc.message}"
         logger.warning(
             "Shopify content sync: articles failed for store %s: %s",
             store.shop_domain,
             exc.message,
         )
+        result.warnings.append(msg)
 
     await session.commit()
     result.duration_seconds = round(time.perf_counter() - started, 2)

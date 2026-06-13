@@ -110,7 +110,12 @@ export type SeoOptimizerTab = "products" | "collections" | "proposals" | "editor
 export interface SeoOptimizerSyncResponse {
   productsSynced: number;
   collectionsSynced: number;
+  pagesSynced?: number;
+  blogsSynced?: number;
+  articlesSynced?: number;
   durationSeconds: number;
+  warnings?: string[];
+  message?: string | null;
 }
 
 export interface SeoAnalyzeCountResponse {
@@ -119,6 +124,15 @@ export interface SeoAnalyzeCountResponse {
   critical: number;
   warnings: number;
   opportunities: number;
+  message?: string | null;
+}
+
+export interface SeoContentDebugResponse {
+  productsCount: number;
+  collectionsCount: number;
+  collectionAnalysesCount: number;
+  lastContentSync?: string | null;
+  lastErrors: string[];
 }
 
 export interface SeoProductListItem {

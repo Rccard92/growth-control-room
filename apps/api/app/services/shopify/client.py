@@ -122,9 +122,19 @@ COLLECTION_FIELDS = """
                 title
                 handle
                 descriptionHtml
+                updatedAt
                 seo { title description }
                 image { url altText }
                 productsCount { count }"""
+
+COLLECTION_FIELDS_NO_COUNT = """
+                id
+                title
+                handle
+                descriptionHtml
+                updatedAt
+                seo { title description }
+                image { url altText }"""
 
 PAGE_FIELDS = """
                 id
@@ -445,11 +455,24 @@ class ShopifyGraphQLClient:
         self,
         page_size: int = DEFAULT_PAGE_SIZE,
     ) -> list[dict[str, Any]]:
-        return await self._paginate_connection(
-            "collections",
-            COLLECTION_FIELDS,
-            page_size=page_size,
-        )
+        try:
+            return await self._paginate_connection(
+                "collections",
+                COLLECTION_FIELDS,
+                page_size=page_size,
+            )
+        except ShopifyAPIError as exc:
+            if "productsCount" not in exc.message:
+                raise
+            logger.warning(
+                "collections query without productsCount fallback: %s",
+                exc.message,
+            )
+            return await self._paginate_connection(
+                "collections",
+                COLLECTION_FIELDS_NO_COUNT,
+                page_size=page_size,
+            )
 
     async def fetch_all_pages(
         self,

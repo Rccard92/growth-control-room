@@ -20,6 +20,7 @@ class CollectionAnalyzeResult:
     critical: int = 0
     warnings: int = 0
     opportunities: int = 0
+    message: str | None = None
 
 
 async def analyze_collections_for_store(
@@ -33,6 +34,11 @@ async def analyze_collections_for_store(
             )
         )
     ).scalars().all()
+
+    if not collections:
+        return CollectionAnalyzeResult(
+            message="Nessuna collection sincronizzata. Esegui prima Sincronizza contenuti Shopify.",
+        )
 
     load_seo_skill_context()
     skill_meta = skill_recommendation_metadata()

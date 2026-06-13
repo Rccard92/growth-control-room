@@ -1,8 +1,8 @@
-def parse_products_count(node: dict) -> int | None:
-    raw = node.get("productsCount")
-    if isinstance(raw, dict):
-        return raw.get("count")
-    return raw
+import os
+
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
+
+from app.services.shopify.content_sync import parse_products_count
 
 
 def test_parse_products_count_object() -> None:

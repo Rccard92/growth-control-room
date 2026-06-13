@@ -193,12 +193,15 @@ Modulo **Product & Collection SEO Optimizer** su `/projects/:id/content` — sep
 **Sync** (`POST /api/projects/{id}/content/seo/sync-shopify`):
 
 - Prodotti via Shopify Sync v2 (descriptionHtml, media alt)
-- Solo **collections** via content sync (no blog/pages/articles in v1 UI)
+- **Collections** (categorie Shopify, non tag prodotto) via content sync GraphQL
+- Query collections: `updatedAt`, `seo`, `image`, `productsCount { count }` (API 2026-04); fallback senza `productsCount` se lo shop restituisce errore sul campo Count
+- Response arricchita: `collectionsSynced`, `warnings`, `message` — sync collections **non silenzioso** (errori visibili in UI anche con HTTP 200)
+- Debug supporto: `GET .../content/seo/debug` — count prodotti/collections/analisi, `lastContentSync`, ultimi errori sync collections
 
 **Analisi**:
 
 - `POST .../content/seo/products/analyze`
-- `POST .../content/seo/collections/analyze`
+- `POST .../content/seo/collections/analyze` — se nessuna collection in DB, `message` esplicito: eseguire prima sync Shopify
 
 **Liste e dettaglio**:
 

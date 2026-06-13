@@ -15,6 +15,7 @@ class SeoAnalyzeCountResponse(BaseModel):
     critical: int = 0
     warnings: int = 0
     opportunities: int = 0
+    message: str | None = None
 
 
 class SeoProductListItem(BaseModel):
@@ -274,4 +275,21 @@ class SeoOptimizerSyncResponse(BaseModel):
 
     products_synced: int = Field(default=0, serialization_alias="productsSynced")
     collections_synced: int = Field(default=0, serialization_alias="collectionsSynced")
+    pages_synced: int = Field(default=0, serialization_alias="pagesSynced")
+    blogs_synced: int = Field(default=0, serialization_alias="blogsSynced")
+    articles_synced: int = Field(default=0, serialization_alias="articlesSynced")
     duration_seconds: float = Field(default=0.0, serialization_alias="durationSeconds")
+    warnings: list[str] = Field(default_factory=list)
+    message: str | None = None
+
+
+class SeoContentDebugResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    products_count: int = Field(serialization_alias="productsCount")
+    collections_count: int = Field(serialization_alias="collectionsCount")
+    collection_analyses_count: int = Field(serialization_alias="collectionAnalysesCount")
+    last_content_sync: datetime | None = Field(
+        default=None, serialization_alias="lastContentSync"
+    )
+    last_errors: list[str] = Field(default_factory=list, serialization_alias="lastErrors")

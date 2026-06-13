@@ -85,6 +85,7 @@ export type {
   ContentSeoSyncResponse,
   ContentSeoAnalyzeResponse,
   SeoOptimizerSyncResponse,
+  SeoContentDebugResponse,
   SeoAnalyzeCountResponse,
   SeoProductListItem,
   SeoCollectionListItem,

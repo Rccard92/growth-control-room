@@ -19,6 +19,7 @@ interface EntitySeoTableProps {
   onFilterChange: (f: EntityFilter) => void;
   onEdit: (id: string) => void;
   editLoadingId?: string | null;
+  emptyMessage?: string;
 }
 
 function matchesFilter(
@@ -47,6 +48,7 @@ export function EntitySeoTable({
   onFilterChange,
   onEdit,
   editLoadingId,
+  emptyMessage,
 }: EntitySeoTableProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -81,7 +83,11 @@ export function EntitySeoTable({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="shopify-empty-copy">Nessun elemento per questo filtro. Esegui analisi dopo sync.</p>
+        <p className="shopify-empty-copy">
+          {items.length === 0 && emptyMessage
+            ? emptyMessage
+            : "Nessun elemento per questo filtro. Esegui analisi dopo sync."}
+        </p>
       ) : (
         <>
           <div className="seo-entity-table__head">

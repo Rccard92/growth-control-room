@@ -14,6 +14,7 @@ from app.schemas.seo_optimizer import (
     SeoApplyResponse,
     SeoCollectionDetailResponse,
     SeoCollectionListResponse,
+    SeoContentDebugResponse,
     SeoEntityAnalysisRead,
     SeoEntitySyncResponse,
     SeoOptimizerSyncResponse,
@@ -51,6 +52,7 @@ from app.services.content.seo_optimizer_list import (
     list_product_seo_items,
     list_proposals,
 )
+from app.services.content.seo_content_debug_service import build_content_seo_debug
 from app.services.content.seo_proposal_manual_service import create_manual_proposal
 from app.services.content.seo_skill_loader import skill_meta_for_detail_response
 from app.services.content.seo_proposal_preview_service import build_proposal_preview
@@ -119,6 +121,8 @@ async def content_seo_sync_shopify(
     products_synced = 0
     collections_synced = 0
     duration = 0.0
+    warnings: list[str] = []
+    message: str | None = None
 
     try:
         client = await get_shopify_client_for_store(store)
@@ -129,6 +133,11 @@ async def content_seo_sync_shopify(
         collection_result = await sync_shopify_collections_only(store, client, session)
         collections_synced = collection_result.collections_synced
         duration += collection_result.duration_seconds
+        warnings.extend(collection_result.warnings)
+        if collection_result.errors and collections_synced == 0:
+            message = collection_result.errors[0]
+        elif collection_result.warnings:
+            message = collection_result.warnings[0]
     except ShopifyAPIError as exc:
         raise _map_shopify_error(exc) from exc
 
@@ -136,6 +145,8 @@ async def content_seo_sync_shopify(
         products_synced=products_synced,
         collections_synced=collections_synced,
         duration_seconds=round(duration, 2),
+        warnings=warnings,
+        message=message,
     )
 
 
@@ -197,7 +208,23 @@ async def analyze_collections(
         critical=result.critical,
         warnings=result.warnings,
         opportunities=result.opportunities,
+        message=result.message,
     )
+
+
+@router.get(
+    "/{project_id}/content/seo/debug",
+    response_model=SeoContentDebugResponse,
+    response_model_by_alias=True,
+)
+async def content_seo_debug(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> SeoContentDebugResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+    data = await build_content_seo_debug(store, session)
+    return SeoContentDebugResponse.model_validate(data)
 
 
 @router.get(

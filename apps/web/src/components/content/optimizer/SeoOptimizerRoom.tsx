@@ -142,7 +142,15 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
           {analyzeProductsMutation.isSuccess &&
             ` Prodotti analizzati: ${analyzeProductsMutation.data.productsAnalyzed}.`}
           {analyzeCollectionsMutation.isSuccess &&
-            ` Categorie analizzate: ${analyzeCollectionsMutation.data.collectionsAnalyzed}.`}
+            (analyzeCollectionsMutation.data.message ??
+              ` Categorie analizzate: ${analyzeCollectionsMutation.data.collectionsAnalyzed}.`)}
+        </div>
+      )}
+
+      {syncMutation.isSuccess && (syncMutation.data.warnings?.length ?? 0) > 0 && (
+        <div className="content-seo-banner content-seo-banner--warn">
+          {syncMutation.data.warnings?.join(" ")}
+          {syncMutation.data.message ? ` ${syncMutation.data.message}` : ""}
         </div>
       )}
 
@@ -184,6 +192,9 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
 
       {tab === "collections" && (
         <div className="gcr-card content-seo-panel">
+          <p className="content-seo-header__subtitle content-seo-collections-hint">
+            Categorie Shopify = Collections (non tag prodotto né product type).
+          </p>
           {collectionsLoading ? (
             <div className="gcr-skeleton seo-skeleton-row" />
           ) : (
@@ -198,6 +209,7 @@ export function SeoOptimizerRoom({ projectId, connected }: SeoOptimizerRoomProps
                   ? editEntity.id
                   : null
               }
+              emptyMessage="Nessuna collection Shopify sincronizzata. Clicca 'Sincronizza contenuti Shopify'."
             />
           )}
         </div>

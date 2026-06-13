@@ -3,6 +3,7 @@ import type {
   SeoApplyResponse,
   SeoCollectionDetailResponse,
   SeoCollectionListResponse,
+  SeoContentDebugResponse,
   SeoEntityAnalysis,
   SeoEntitySyncResponse,
   SeoOptimizationProposal,
@@ -194,5 +195,11 @@ export function syncCollectionSeo(
   return apiFetch<SeoEntitySyncResponse>(
     `/api/projects/${projectId}/content/seo/collections/${collectionId}/sync-shopify`,
     { method: "POST" },
+  );
+}
+
+export function getContentSeoDebug(projectId: string): Promise<SeoContentDebugResponse> {
+  return apiFetch<SeoContentDebugResponse>(
+    `/api/projects/${projectId}/content/seo/debug`,
   );
 }
