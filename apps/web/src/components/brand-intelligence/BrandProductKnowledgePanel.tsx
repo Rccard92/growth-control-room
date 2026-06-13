@@ -359,6 +359,30 @@ function ProductItemAccordion({
 
 type ProposalWithKey = BrandProductKnowledgeItemProposal & { clientKey: string };
 
+function normalizeProposalKey(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "product"
+  );
+}
+
+function ensureProposalClientKey(
+  item: BrandProductKnowledgeItemProposal,
+  index: number,
+): ProposalWithKey {
+  const clientKey =
+    item.clientKey?.trim()
+    || item.shopifyProductId
+    || item.suggestedShopifyProductId
+    || `${normalizeProposalKey(item.productName || "product")}-${index}`;
+
+  return { ...item, clientKey };
+}
+
 function ItemProposalAccordion({
   proposal,
   expanded,
@@ -389,6 +413,7 @@ function ItemProposalAccordion({
     if (!productId) {
       onChange({
         ...proposal,
+        clientKey: proposal.clientKey,
         shopifyProductId: null,
         suggestedShopifyProductId: null,
         suggestedShopifyTitle: null,
@@ -400,6 +425,7 @@ function ItemProposalAccordion({
     const product = shopifyProducts.find((p) => p.id === productId);
     onChange({
       ...proposal,
+      clientKey: proposal.clientKey,
       shopifyProductId: productId,
       suggestedShopifyProductId: productId,
       suggestedShopifyTitle: product?.title ?? null,
@@ -493,7 +519,11 @@ function ItemProposalAccordion({
             </div>
           )}
           <div className="bi-form-grid">
-            {renderItemFields(proposal, (next) => onChange({ ...proposal, ...next }), `prop-${proposal.clientKey}`)}
+            {renderItemFields(
+              proposal,
+              (next) => onChange({ ...proposal, ...next, clientKey: proposal.clientKey }),
+              `prop-${proposal.clientKey}`,
+            )}
           </div>
         </div>
       )}
@@ -645,14 +675,10 @@ export function BrandProductKnowledgePanel({ projectId }: BrandProductKnowledgeP
     importItemsFile.mutate(itemsSelectedFile, {
       onSuccess: (res) => {
         setItemsImportResult(res);
-        setItemProposals(
-          res.proposal.items.map((item, index) => ({
-            ...item,
-            clientKey: `proposal-${index}-${item.productName}`,
-          })),
-        );
-        if (res.proposal.items.length > 0) {
-          setExpandedProposalKey(`proposal-0-${res.proposal.items[0].productName}`);
+        const normalized = res.proposal.items.map(ensureProposalClientKey);
+        setItemProposals(normalized);
+        if (normalized.length > 0) {
+          setExpandedProposalKey(normalized[0].clientKey);
         }
       },
       onError: (err: Error) => setError(err.message),
