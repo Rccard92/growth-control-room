@@ -1,5 +1,6 @@
 import type {
   SeoAnalyzeCountResponse,
+  SeoApplyFieldsResponse,
   SeoApplyResponse,
   SeoCollectionDetailResponse,
   SeoCollectionListResponse,
@@ -200,6 +201,25 @@ export function applyProposal(
   return apiFetch<SeoApplyResponse>(
     `/api/projects/${projectId}/content/seo/proposals/${proposalId}/apply`,
     { method: "POST" },
+  );
+}
+
+export function applyEntityFields(
+  projectId: string,
+  body: {
+    entityType: "product" | "collection";
+    entityId: string;
+    fields: Record<string, unknown>;
+    changedFields: string[];
+  },
+): Promise<SeoApplyFieldsResponse> {
+  return apiFetch<SeoApplyFieldsResponse>(
+    `/api/projects/${projectId}/content/seo/entities/apply-fields`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
   );
 }
 

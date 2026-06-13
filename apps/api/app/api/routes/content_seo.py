@@ -11,6 +11,8 @@ from app.schemas.content_seo import (
 )
 from app.schemas.seo_optimizer import (
     SeoAnalyzeCountResponse,
+    SeoApplyFieldsRequest,
+    SeoApplyFieldsResponse,
     SeoApplyResponse,
     SeoCollectionDetailResponse,
     SeoCollectionListResponse,
@@ -39,6 +41,7 @@ from app.services.content.seo_apply_service import (
     get_proposal_for_store,
     reject_proposal,
 )
+from app.services.content.seo_apply_fields_service import apply_entity_fields
 from app.services.content.seo_entity_detail_service import (
     get_collection_seo_detail,
     get_product_seo_detail,
@@ -571,6 +574,7 @@ async def create_manual_seo_proposal(
             entity_type=body.entity_type,
             entity_id=body.entity_id,
             proposed_values=body.proposed_values,
+            changed_fields=body.changed_fields,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -681,3 +685,33 @@ async def apply_seo_proposal(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return SeoApplyResponse.model_validate(result)
+
+
+@router.post(
+    "/{project_id}/content/seo/entities/apply-fields",
+    response_model=SeoApplyFieldsResponse,
+    response_model_by_alias=True,
+)
+async def apply_seo_entity_fields(
+    project_id: UUID,
+    body: SeoApplyFieldsRequest,
+    session: AsyncSession = Depends(get_db),
+) -> SeoApplyFieldsResponse:
+    await get_project_in_default_workspace(project_id, session)
+    store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
+
+    try:
+        client = await get_shopify_client_for_store(store)
+        result = await apply_entity_fields(
+            store,
+            client,
+            session,
+            entity_type=body.entity_type,
+            entity_id=body.entity_id,
+            fields=body.fields,
+            changed_fields=body.changed_fields,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return SeoApplyFieldsResponse.model_validate(result)

@@ -315,6 +315,17 @@ export interface SeoProposalListResponse {
   items: SeoOptimizationProposal[];
 }
 
+export interface SeoApplyFieldsRequest {
+  entityType: "product" | "collection";
+  entityId: string;
+  fields: Record<string, unknown>;
+  changedFields: string[];
+}
+
+export interface SeoApplyFieldsResponse extends SeoApplyResponse {
+  appliedFields?: string[];
+}
+
 export interface SeoApplyResponse {
   applied: boolean;
   requiresScope?: string | null;
@@ -328,6 +339,7 @@ export interface SeoApplyResponse {
   proposal?: SeoOptimizationProposal | null;
   message?: string | null;
   proposalId?: string | null;
+  appliedFields?: string[];
 }
 
 export interface SeoEntitySyncResponse {

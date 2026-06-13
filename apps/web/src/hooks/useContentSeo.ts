@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   analyzeCollectionsSeo,
   analyzeProductsSeo,
+  applyEntityFields,
   applyProposal,
   approveProposal,
   generateProposal,
@@ -218,6 +219,32 @@ export function useProposalActions(projectId: string) {
       },
     }),
   };
+}
+
+export function useApplyEntityFields(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      entityType: "product" | "collection";
+      entityId: string;
+      fields: Record<string, unknown>;
+      changedFields: string[];
+    }) => applyEntityFields(projectId, body),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.proposals(projectId) });
+      if (vars.entityType === "product") {
+        void qc.invalidateQueries({
+          queryKey: queryKeys.contentSeo.productDetail(projectId, vars.entityId),
+        });
+      } else {
+        void qc.invalidateQueries({
+          queryKey: queryKeys.contentSeo.collectionDetail(projectId, vars.entityId),
+        });
+      }
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.collections(projectId) });
+    },
+  });
 }
 
 export function useSyncProductSeo(projectId: string) {

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   SeoCollectionDetailResponse,
-  SeoOptimizationProposal,
   SeoProductDetailResponse,
   SeoProductMetafieldItem,
 } from "@gcr/shared";
@@ -16,9 +15,13 @@ import {
   applyMetafieldValue,
   acceptFieldState,
   applyAiFieldState,
+  buildApplyFieldsPayload,
   buildChangedProposalValues,
   collectChangedKeysFromMerge,
-  hasSaveableChanges,
+  commitFieldStateAsOriginal,
+  formatApplicableFieldLabels,
+  getApplicableFieldKeys,
+  hasApplicableChanges,
   imageAltFieldKey,
   initFieldStateMap,
   markFieldsFromGlobalAi,
@@ -39,9 +42,9 @@ import {
   resolveMediaFromProposal,
 } from "./seoFormValues";
 import {
+  useApplyEntityFields,
   useGenerateProposal,
   useGenerateProposalField,
-  useProposalActions,
   useSaveManualProposal,
   useSyncCollectionSeo,
   useSyncProductSeo,
@@ -97,8 +100,6 @@ export function SeoEntityEditDrawer({
 }: SeoEntityEditDrawerProps) {
   const [tab, setTab] = useState<DrawerTab>("main");
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
-  const [activeProposalId, setActiveProposalId] = useState<string | null>(null);
-  const [activeProposal, setActiveProposal] = useState<SeoOptimizationProposal | null>(null);
   const [mediaImages, setMediaImages] = useState<Record<string, unknown>[]>([]);
   const [metafields, setMetafields] = useState<SeoProductMetafieldItem[]>([]);
   const [metafieldValues, setMetafieldValues] = useState<Record<string, string>>({});
@@ -136,9 +137,9 @@ export function SeoEntityEditDrawer({
       : [{ id: "main", label: "Principale" }];
 
   const saveManual = useSaveManualProposal(projectId);
+  const applyFields = useApplyEntityFields(projectId);
   const generateAi = useGenerateProposal(projectId);
   const generateField = useGenerateProposalField(projectId);
-  const proposalActions = useProposalActions(projectId);
   const syncProduct = useSyncProductSeo(projectId);
   const syncCollection = useSyncCollectionSeo(projectId);
 
@@ -166,17 +167,13 @@ export function SeoEntityEditDrawer({
       setMetafields(productMetafields);
       setMetafieldValues(mfValues);
       setFieldStateMap(initFieldStateMap(normalized, entityType, images, productMetafields, mfValues));
-      setActiveProposalId(detailSource.latestProposal?.id ?? null);
-      setActiveProposal(detailSource.latestProposal ?? null);
       setAiReasoning([]);
       setAiRiskLevel(null);
       setAiToast(null);
       setTab("main");
-      if (detailSource.latestProposal?.status !== "applied") {
-        setAppliedAt(null);
-        setApplyMessage(null);
-        setLocalUpdateFailed(false);
-      }
+      setAppliedAt(null);
+      setApplyMessage(null);
+      setLocalUpdateFailed(false);
     },
     [entityType, productDetail?.images, collectionDetail?.image],
   );
@@ -350,7 +347,7 @@ export function SeoEntityEditDrawer({
           );
           markDirty(applied.formValues, metafieldValues);
           setAiToastVariant("success");
-          setAiToast(`Campo aggiornato con AI. Controlla e salva come proposta.`);
+          setAiToast(`Campo aggiornato con AI. Accetta il campo e applica le modifiche selezionate.`);
         },
         onError: () => {
           setFieldStateMap((prev) => {
@@ -382,7 +379,7 @@ export function SeoEntityEditDrawer({
             applyAiFieldState(prev, stateKey, strValue, res.reasoning ?? undefined, res.riskLevel),
           );
           setAiToastVariant("success");
-          setAiToast("Metafield aggiornato con AI. Controlla e salva come proposta.");
+          setAiToast("Metafield aggiornato con AI. Accetta il campo e applica le modifiche selezionate.");
         },
         onError: () => {
           setFieldStateMap((prev) => {
@@ -418,14 +415,12 @@ export function SeoEntityEditDrawer({
         changedFields,
       },
       {
-        onSuccess: (proposal) => {
-          setActiveProposalId(proposal.id);
-          setActiveProposal(proposal);
+        onSuccess: () => {
           initialFormRef.current = JSON.stringify({ form: formValues, metafields: metafieldValues });
           setFormDirty(false);
-          setFieldStateMap(
-            initFieldStateMap(formValues, entityType, mediaImages, metafields, metafieldValues),
-          );
+          setFieldStateMap(commitFieldStateAsOriginal(fieldStateMap));
+          setAiToastVariant("success");
+          setAiToast("Bozza salvata.");
           onDetailRefresh?.();
         },
       },
@@ -468,8 +463,6 @@ export function SeoEntityEditDrawer({
           }
           setFormValues(merged);
           markDirty(merged, metafieldValues);
-          setActiveProposalId(proposal.id);
-          setActiveProposal(proposal);
           const changed = collectChangedKeysFromMerge(
             formValues,
             merged,
@@ -496,7 +489,7 @@ export function SeoEntityEditDrawer({
           } else {
             setAiToastVariant("success");
             setAiToast(
-              "Proposta AI inserita nei campi. Controlla, modifica se serve e salva come proposta.",
+              "Proposta AI inserita nei campi. Accetta i campi desiderati e applica le modifiche selezionate.",
             );
           }
         },
@@ -504,14 +497,34 @@ export function SeoEntityEditDrawer({
     );
   };
 
-  const handleApply = () => {
-    if (!activeProposalId) return;
+  const handleApplySelectedFields = () => {
+    const applicableKeys = getApplicableFieldKeys(fieldStateMap);
+    if (applicableKeys.length === 0) {
+      setAiToastVariant("warn");
+      setAiToast("Nessuna modifica selezionata da applicare. Accetta i campi AI o modifica manualmente.");
+      return;
+    }
+    const { fields, changedFields } = buildApplyFieldsPayload(
+      formValues,
+      entityType,
+      mediaImages,
+      fieldStateMap,
+      metafields,
+      metafieldValues,
+    );
+    if (changedFields.length === 0) {
+      setAiToastVariant("warn");
+      setAiToast("Nessuna modifica selezionata da applicare.");
+      return;
+    }
+    const labels = formatApplicableFieldLabels(applicableKeys, entityType);
     const confirmed = window.confirm(
-      "Confermi di applicare le modifiche approvate su Shopify? Questa azione modifica il negozio live.",
+      `Stai applicando: ${labels.join(", ")}.\n\nConfermi di applicare su Shopify? Questa azione modifica il negozio live.`,
     );
     if (!confirmed) return;
-    proposalActions.apply.mutate(
-      { proposalId: activeProposalId, entityType, entityId },
+
+    applyFields.mutate(
+      { entityType, entityId, fields, changedFields },
       {
         onSuccess: (res) => {
           if (res.message && !res.applied) {
@@ -519,24 +532,30 @@ export function SeoEntityEditDrawer({
             return;
           }
           if (res.applied) {
-            setAppliedAt(res.proposal?.appliedAt ?? new Date().toISOString());
+            setAppliedAt(new Date().toISOString());
             setApplyMessage(res.message ?? "Applicato su Shopify.");
             setLocalUpdateFailed(Boolean(res.localUpdateFailed));
             const detailPayload = res.detail as
               | SeoProductDetailResponse
               | SeoCollectionDetailResponse
               | undefined;
-            refreshFormFromValues(
-              res.updatedEntity ??
-                detailPayload?.currentValues,
-              detailPayload,
-            );
-            if (res.proposal) {
-              setActiveProposal(res.proposal);
-              setActiveProposalId(res.proposal.id);
+            if (detailPayload?.currentValues) {
+              refreshFormFromValues(detailPayload.currentValues, detailPayload);
+            } else if (res.updatedEntity) {
+              refreshFormFromValues(res.updatedEntity, detailPayload);
+            } else {
+              setFieldStateMap(commitFieldStateAsOriginal(fieldStateMap));
+              initialFormRef.current = JSON.stringify({ form: formValues, metafields: metafieldValues });
+              setFormDirty(false);
             }
+            setAiToastVariant("success");
+            setAiToast(res.message ?? "Modifiche applicate su Shopify.");
           }
           onDetailRefresh?.();
+        },
+        onError: () => {
+          setAiToastVariant("error");
+          setAiToast("Applicazione su Shopify non riuscita.");
         },
       },
     );
@@ -564,54 +583,36 @@ export function SeoEntityEditDrawer({
 
   const actionLoading =
     saveManual.isPending ||
+    applyFields.isPending ||
     generateAi.isPending ||
     generateField.isPending ||
-    proposalActions.approve.isPending ||
-    proposalActions.reject.isPending ||
-    proposalActions.apply.isPending ||
     syncLoading;
 
   const headerExtra = scoreTotal != null && (
     <SeoScoreBadge score={scoreTotal} severity={severity as never} />
   );
 
-  const footerProposal = activeProposal ?? detail?.latestProposal;
-
   const footer = (
     <SeoProposalFooter
-      proposal={footerProposal}
       writeProductsAvailable={writeProductsAvailable}
       openaiConfigured={openaiConfigured}
       loading={actionLoading}
       saveLoading={saveManual.isPending}
+      applyLoading={applyFields.isPending}
       generateLoading={generateAi.isPending}
-      saveDisabled={!hasSaveableChanges(fieldStateMap)}
-      saveDisabledMessage={
-        !hasSaveableChanges(fieldStateMap) ? "Nessuna modifica da salvare." : undefined
+      applyDisabled={!hasApplicableChanges(fieldStateMap)}
+      saveDisabled={!hasApplicableChanges(fieldStateMap)}
+      applyDisabledMessage={
+        !hasApplicableChanges(fieldStateMap)
+          ? "Nessuna modifica selezionata. Accetta i campi AI o modifica manualmente."
+          : undefined
       }
+      saveDisabledMessage={
+        !hasApplicableChanges(fieldStateMap) ? "Nessuna modifica da salvare." : undefined
+      }
+      onApplySelected={handleApplySelectedFields}
       onSaveDraft={handleSaveDraft}
       onGenerateAi={handleGenerateAi}
-      onApprove={() => {
-        if (activeProposalId) {
-          proposalActions.approve.mutate(activeProposalId, {
-            onSuccess: (p) => {
-              setActiveProposal(p);
-              onDetailRefresh?.();
-            },
-          });
-        }
-      }}
-      onReject={() => {
-        if (activeProposalId) {
-          proposalActions.reject.mutate(activeProposalId, {
-            onSuccess: (p) => {
-              setActiveProposal(p);
-              onDetailRefresh?.();
-            },
-          });
-        }
-      }}
-      onApply={handleApply}
       onCancel={handleClose}
     />
   );

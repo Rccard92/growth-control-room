@@ -354,7 +354,14 @@ export function needsImageAltWarning(
   return imageAlts.length === 0;
 }
 
-export type FieldStatus = "ok" | "missing" | "improve" | "verify" | "ai_proposed" | "generating";
+export type FieldStatus =
+  | "ok"
+  | "missing"
+  | "improve"
+  | "verify"
+  | "ai_proposed"
+  | "accepted"
+  | "generating";
 
 const ISSUE_FIELD_MAP: Record<string, string[]> = {
   title: ["title", "product_title", "collection_title"],
@@ -484,6 +491,10 @@ export function getFieldStatus(
 
   if (isEmptyValue(value)) {
     return { status: "missing", note: "Campo non impostato su Shopify" };
+  }
+
+  if (fieldState?.source === "ai" && fieldState.accepted && fieldState.dirty) {
+    return { status: "accepted", note: "Contenuto AI accettato — pronto per l'apply" };
   }
 
   if (fieldState?.source === "ai" && fieldState.dirty && !fieldState.accepted) {

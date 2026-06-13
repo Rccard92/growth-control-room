@@ -21,6 +21,12 @@ from app.services.content.seo_entity_detail_service import (
     get_collection_seo_detail,
     get_product_seo_detail,
 )
+from app.services.content.seo_apply_shopify import (
+    apply_collection_image_alt,
+    apply_collection_scalar_update,
+    apply_product_media_alts,
+    apply_product_scalar_update,
+)
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 from app.services.shopify.metafield_apply import apply_product_metafields
 from app.services.shopify.scopes import can_apply_with_write_products
@@ -42,94 +48,6 @@ def write_products_required_response(
             "Il token Shopify corrente non include write_products. Riconnetti Shopify."
         ),
     }
-
-
-def _get_proposed(proposed: dict[str, Any], *keys: str) -> Any:
-    for key in keys:
-        if key in proposed and proposed[key] is not None:
-            return proposed[key]
-    return None
-
-
-async def _apply_product_media_alts(
-    client: ShopifyGraphQLClient,
-    product_gid: str,
-    proposed: dict[str, Any],
-    shopify_response: dict[str, Any],
-) -> None:
-    media_updates: list[dict[str, str]] = []
-    image_alts = _get_proposed(proposed, "image_alts", "imageAlts") or []
-    alt_by_id = {
-        str(item.get("image_id") or item.get("imageId") or ""): str(
-            item.get("proposed_alt") or item.get("proposedAlt") or ""
-        )
-        for item in image_alts
-        if isinstance(item, dict)
-    }
-    media_images = _get_proposed(proposed, "media_images", "mediaImages") or []
-    for image in media_images:
-        if not isinstance(image, dict):
-            continue
-        image_id = str(image.get("id") or "")
-        alt = (
-            alt_by_id.get(image_id)
-            or str(image.get("altText") or image.get("alt") or "").strip()
-        )
-        if image_id and alt:
-            media_updates.append({"id": image_id, "alt": alt})
-
-    if not media_updates:
-        return
-
-    mutation = """
-    mutation ProductUpdateMedia($productId: ID!, $media: [UpdateMediaInput!]!) {
-      productUpdateMedia(productId: $productId, media: $media) {
-        media { id alt }
-        mediaUserErrors { field message }
-      }
-    }
-    """
-    try:
-        data = await client.execute(
-            mutation,
-            {"productId": product_gid, "media": media_updates},
-        )
-        shopify_response["productUpdateMedia"] = data.get("productUpdateMedia")
-        errors = (data.get("productUpdateMedia") or {}).get("mediaUserErrors") or []
-        if errors:
-            logger.warning(
-                "productUpdateMedia userErrors: %s",
-                "; ".join(e.get("message", "") for e in errors[:3]),
-            )
-    except ShopifyAPIError:
-        logger.exception("productUpdateMedia failed for product=%s", product_gid)
-
-
-async def _apply_collection_image_alt(
-    client: ShopifyGraphQLClient,
-    collection_gid: str,
-    proposed: dict[str, Any],
-    shopify_response: dict[str, Any],
-) -> None:
-    image_alt = _get_proposed(proposed, "image_alt", "proposed_image_alt")
-    if not image_alt:
-        return
-    mutation = """
-    mutation CollectionUpdateImageAlt($input: CollectionInput!) {
-      collectionUpdate(input: $input) {
-        collection { id image { altText } }
-        userErrors { field message }
-      }
-    }
-    """
-    try:
-        data = await client.execute(
-            mutation,
-            {"input": {"id": collection_gid, "image": {"altText": image_alt}}},
-        )
-        shopify_response["collectionImageAltUpdate"] = data.get("collectionUpdate")
-    except ShopifyAPIError:
-        logger.exception("collection image alt update failed for %s", collection_gid)
 
 
 def _proposal_payload(proposal: SeoOptimizationProposal) -> dict[str, Any]:
@@ -271,51 +189,23 @@ async def apply_proposal(
 
     try:
         if proposal.entity_type == "product":
-            mutation = """
-            mutation ProductUpdate($input: ProductInput!) {
-              productUpdate(input: $input) {
-                product { id title handle seo { title description } descriptionHtml }
-                userErrors { field message }
-              }
+            scalar_keys = {
+                "product_title",
+                "handle",
+                "seo_title",
+                "meta_description",
+                "description_html",
             }
-            """
-            input_data: dict[str, Any] = {"id": proposal.entity_gid}
-            title = _get_proposed(
-                effective_proposed, "product_title", "proposed_product_title"
-            )
-            if title:
-                input_data["title"] = title
-            handle = _get_proposed(effective_proposed, "handle", "proposed_handle")
-            if handle:
-                input_data["handle"] = handle
-            seo_block: dict[str, str] = {}
-            seo_title = _get_proposed(effective_proposed, "seo_title", "proposed_seo_title")
-            if seo_title:
-                seo_block["title"] = seo_title
-            meta = _get_proposed(
-                effective_proposed, "meta_description", "proposed_meta_description"
-            )
-            if meta:
-                seo_block["description"] = meta
-            if seo_block:
-                input_data["seo"] = seo_block
-            desc_html = _get_proposed(
-                effective_proposed, "description_html", "proposed_description_html"
-            )
-            if desc_html:
-                input_data["descriptionHtml"] = desc_html
-
-            data = await client.execute(mutation, {"input": input_data})
-            shopify_response = data
-            applied_values = effective_proposed
-            errors = (data.get("productUpdate") or {}).get("userErrors") or []
-            if errors:
-                raise ShopifyAPIError(
-                    "; ".join(e.get("message", "") for e in errors[:3])
+            scalar_delta = {k: v for k, v in effective_proposed.items() if k in scalar_keys}
+            if scalar_delta:
+                await apply_product_scalar_update(
+                    client, proposal.entity_gid, scalar_delta, shopify_response
                 )
-            await _apply_product_media_alts(
-                client, proposal.entity_gid, effective_proposed, shopify_response
-            )
+            applied_values = effective_proposed
+            if "image_alts" in effective_proposed:
+                await apply_product_media_alts(
+                    client, proposal.entity_gid, effective_proposed, shopify_response
+                )
             metafield_entries = effective_proposed.get("metafields")
             if isinstance(metafield_entries, list) and metafield_entries:
                 mf_warnings = await apply_product_metafields(
@@ -331,53 +221,23 @@ async def apply_proposal(
                         "; ".join(mf_warnings[:3]),
                     )
         elif proposal.entity_type == "collection":
-            mutation = """
-            mutation CollectionUpdate($input: CollectionInput!) {
-              collectionUpdate(input: $input) {
-                collection { id title handle seo { title description } descriptionHtml }
-                userErrors { field message }
-              }
-            }
-            """
-            input_data = {"id": proposal.entity_gid}
-            title = _get_proposed(
-                effective_proposed, "collection_title", "proposed_collection_title"
-            )
-            if title:
-                input_data["title"] = title
-            handle = _get_proposed(effective_proposed, "handle", "proposed_handle")
-            if handle:
-                input_data["handle"] = handle
-            desc_html = _get_proposed(
-                effective_proposed,
+            scalar_keys = {
+                "collection_title",
+                "handle",
+                "seo_title",
+                "meta_description",
                 "description_html",
-                "proposed_description",
-            )
-            if desc_html:
-                input_data["descriptionHtml"] = desc_html
-            seo_block = {}
-            seo_title = _get_proposed(effective_proposed, "seo_title", "proposed_seo_title")
-            if seo_title:
-                seo_block["title"] = seo_title
-            meta = _get_proposed(
-                effective_proposed, "meta_description", "proposed_meta_description"
-            )
-            if meta:
-                seo_block["description"] = meta
-            if seo_block:
-                input_data["seo"] = seo_block
-
-            data = await client.execute(mutation, {"input": input_data})
-            shopify_response = data
-            applied_values = effective_proposed
-            errors = (data.get("collectionUpdate") or {}).get("userErrors") or []
-            if errors:
-                raise ShopifyAPIError(
-                    "; ".join(e.get("message", "") for e in errors[:3])
+            }
+            scalar_delta = {k: v for k, v in effective_proposed.items() if k in scalar_keys}
+            if scalar_delta:
+                await apply_collection_scalar_update(
+                    client, proposal.entity_gid, scalar_delta, shopify_response
                 )
-            await _apply_collection_image_alt(
-                client, proposal.entity_gid, effective_proposed, shopify_response
-            )
+            applied_values = effective_proposed
+            if "image_alt" in effective_proposed:
+                await apply_collection_image_alt(
+                    client, proposal.entity_gid, effective_proposed, shopify_response
+                )
         else:
             raise ValueError("entity_type non supportato per apply")
 

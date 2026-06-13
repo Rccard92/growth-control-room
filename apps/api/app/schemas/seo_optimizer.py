@@ -280,6 +280,20 @@ class SeoApplyResponse(BaseModel):
     proposal: dict[str, Any] | None = None
     message: str | None = None
     proposal_id: str | None = Field(default=None, serialization_alias="proposalId")
+    applied_fields: list[str] = Field(default_factory=list, serialization_alias="appliedFields")
+
+
+class SeoApplyFieldsRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    entity_type: str = Field(validation_alias="entityType")
+    entity_id: UUID = Field(validation_alias="entityId")
+    fields: dict[str, Any] = Field(default_factory=dict)
+    changed_fields: list[str] = Field(default_factory=list, validation_alias="changedFields")
+
+
+class SeoApplyFieldsResponse(SeoApplyResponse):
+    pass
 
 
 class SeoEntitySyncResponse(BaseModel):

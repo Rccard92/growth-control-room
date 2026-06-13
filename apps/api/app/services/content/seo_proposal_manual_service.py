@@ -8,6 +8,7 @@ from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyProductMetafield, ShopifyStore
 from app.services.content.seo_current_values import normalize_proposal_values
+from app.services.content.seo_field_keys import whitelist_changed_fields
 from app.services.content.seo_proposal_diff import compute_changed_proposed
 from app.services.content.seo_proposal_engine import (
     collection_current_values,
@@ -112,6 +113,7 @@ async def create_manual_proposal(
     entity_type: str,
     entity_id: UUID,
     proposed_values: dict[str, Any],
+    changed_fields: list[str] | None = None,
 ) -> SeoOptimizationProposal:
     if entity_type == "product":
         entity = (
@@ -146,8 +148,11 @@ async def create_manual_proposal(
         entity_type,
         normalize_proposal_values(entity_type, proposed_values),
     )
-    proposed_delta, changed_fields = compute_changed_proposed(current, cleaned)
-    if not changed_fields:
+    if changed_fields:
+        whitelist = whitelist_changed_fields(entity_type, changed_fields)
+        cleaned = {k: v for k, v in cleaned.items() if k in whitelist or (k == "media_images" and "image_alts" in whitelist)}
+    proposed_delta, computed_fields = compute_changed_proposed(current, cleaned)
+    if not computed_fields:
         raise ValueError("Nessuna modifica da salvare")
     proposal = SeoOptimizationProposal(
         project_id=store.project_id,

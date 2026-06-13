@@ -8,6 +8,7 @@ const LABELS: Record<FieldStatus, string> = {
   improve: "Da migliorare",
   verify: "Da verificare",
   ai_proposed: "Proposto da AI",
+  accepted: "Accettato",
   generating: "AI…",
 };
 

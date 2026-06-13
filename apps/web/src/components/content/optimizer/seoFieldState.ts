@@ -235,14 +235,142 @@ export function markFieldsFromGlobalAi(
   return next;
 }
 
-export function getChangedFieldKeys(map: FieldStateMap): string[] {
+export function isApplicableField(row: FieldState): boolean {
+  if (!row.dirty || row.value === row.originalValue) return false;
+  return row.accepted || row.source === "manual";
+}
+
+export function getApplicableFieldKeys(map: FieldStateMap): string[] {
   return Object.entries(map)
-    .filter(([, row]) => row.dirty && row.value !== row.originalValue)
+    .filter(([, row]) => isApplicableField(row))
     .map(([key]) => key);
 }
 
+export function getChangedFieldKeys(map: FieldStateMap): string[] {
+  return getApplicableFieldKeys(map);
+}
+
+export function hasApplicableChanges(map: FieldStateMap): boolean {
+  return getApplicableFieldKeys(map).length > 0;
+}
+
 export function hasSaveableChanges(map: FieldStateMap): boolean {
-  return getChangedFieldKeys(map).length > 0;
+  return hasApplicableChanges(map);
+}
+
+const API_FIELD_LABELS: Record<string, string> = {
+  title: "Titolo",
+  handle: "Handle URL",
+  seoTitle: "SEO title",
+  metaDescription: "Meta description",
+  descriptionHtml: "Descrizione",
+  imageAlt: "Alt immagine",
+  imageAlts: "Alt immagini",
+  metafields: "Metafield",
+};
+
+export function fieldLabelForKey(key: string): string {
+  if (key.startsWith("imageAlt:")) return "Alt immagine";
+  if (key.startsWith("metafield:")) return "Metafield";
+  return API_FIELD_LABELS[key] ?? key;
+}
+
+export function toApiChangedFields(
+  keys: string[],
+  entityType: "product" | "collection",
+): string[] {
+  const apiFields = new Set<string>();
+  for (const key of keys) {
+    if (key.startsWith("imageAlt:")) {
+      apiFields.add(entityType === "product" ? "imageAlts" : "imageAlt");
+      continue;
+    }
+    if (key.startsWith("metafield:")) {
+      apiFields.add("metafields");
+      continue;
+    }
+    if (TEXT_FIELD_KEYS.includes(key as SeoEditableField) || key === "imageAlt") {
+      apiFields.add(key);
+    }
+  }
+  return Array.from(apiFields);
+}
+
+export function buildApplyFieldsPayload(
+  formValues: SeoFormValues,
+  entityType: "product" | "collection",
+  mediaImages: Record<string, unknown>[],
+  fieldStateMap: FieldStateMap,
+  metafields: SeoProductMetafieldItem[] = [],
+  metafieldValues: Record<string, string> = {},
+): { fields: Record<string, unknown>; changedFields: string[] } {
+  const applicableKeys = getApplicableFieldKeys(fieldStateMap);
+  const { proposedValues } = buildChangedProposalValues(
+    formValues,
+    entityType,
+    mediaImages,
+    fieldStateMap,
+    metafields,
+  );
+
+  const fields: Record<string, unknown> = {
+    title: formValues.title,
+    handle: formValues.handle,
+    seoTitle: formValues.seoTitle,
+    metaDescription: formValues.metaDescription,
+    descriptionHtml: formValues.descriptionHtml,
+  };
+
+  if (entityType === "collection") {
+    fields.imageAlt = formValues.imageAlt;
+  } else {
+    const changedImageIds = applicableKeys
+      .filter((k) => k.startsWith("imageAlt:"))
+      .map((k) => parseImageAltFieldKey(k))
+      .filter((id): id is string => Boolean(id));
+    if (changedImageIds.length > 0) {
+      fields.imageAlts = (proposedValues.image_alts as Record<string, unknown>[]) ?? [];
+      fields.mediaImages = mediaImages;
+    }
+    const changedMetafieldIds = applicableKeys
+      .filter((k) => k.startsWith("metafield:"))
+      .map((k) => parseMetafieldFieldKey(k))
+      .filter((id): id is string => Boolean(id));
+    if (changedMetafieldIds.length > 0 && proposedValues.metafields) {
+      fields.metafields = proposedValues.metafields;
+    }
+    void metafieldValues;
+  }
+
+  return {
+    fields,
+    changedFields: toApiChangedFields(applicableKeys, entityType),
+  };
+}
+
+export function formatApplicableFieldLabels(
+  keys: string[],
+  entityType: "product" | "collection",
+): string[] {
+  const apiFields = toApiChangedFields(keys, entityType);
+  return apiFields.map((f) => API_FIELD_LABELS[f] ?? f);
+}
+
+export function commitFieldStateAsOriginal(map: FieldStateMap): FieldStateMap {
+  const next: FieldStateMap = {};
+  for (const [key, row] of Object.entries(map)) {
+    next[key] = {
+      ...row,
+      originalValue: row.value,
+      dirty: false,
+      accepted: true,
+      source: "original",
+      reasoning: undefined,
+      riskLevel: undefined,
+      generating: false,
+    };
+  }
+  return next;
 }
 
 export function formValuesFromFieldState(
