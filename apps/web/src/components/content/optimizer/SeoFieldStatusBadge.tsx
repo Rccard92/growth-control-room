@@ -5,6 +5,7 @@ const LABELS: Record<FieldStatus, string> = {
   ok: "OK",
   missing: "Mancante",
   improve: "Da migliorare",
+  verify: "Da verificare",
 };
 
 interface SeoFieldStatusBadgeProps {
@@ -12,6 +13,7 @@ interface SeoFieldStatusBadgeProps {
   value: unknown;
   issues?: Record<string, unknown>[] | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
+  aiFilledFields?: Set<string>;
 }
 
 export function SeoFieldStatusBadge({
@@ -19,8 +21,9 @@ export function SeoFieldStatusBadge({
   value,
   issues,
   scoreBreakdown,
+  aiFilledFields,
 }: SeoFieldStatusBadgeProps) {
-  const { status } = getFieldStatus(field, value, issues, scoreBreakdown);
+  const { status } = getFieldStatus(field, value, issues, scoreBreakdown, aiFilledFields);
   return (
     <span className={`seo-field-status-badge seo-field-status-badge--${status}`}>
       {LABELS[status]}
@@ -33,7 +36,8 @@ export function fieldStatusNote(
   value: unknown,
   issues?: Record<string, unknown>[] | null,
   scoreBreakdown?: SeoScoreBreakdown | null,
+  aiFilledFields?: Set<string>,
 ): string | undefined {
-  const { note, status } = getFieldStatus(field, value, issues, scoreBreakdown);
+  const { note, status } = getFieldStatus(field, value, issues, scoreBreakdown, aiFilledFields);
   return status !== "ok" ? note : undefined;
 }

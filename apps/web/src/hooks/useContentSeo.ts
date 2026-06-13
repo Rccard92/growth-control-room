@@ -95,20 +95,6 @@ export function useAnalyzeCollectionsSeo(projectId: string) {
 
 export function useGenerateProposal(projectId: string) {
   const qc = useQueryClient();
-  const invalidate = (entityId: string, entityType: "product" | "collection") => {
-    void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.proposals(projectId) });
-    void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.products(projectId) });
-    void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.collections(projectId) });
-    if (entityType === "product") {
-      void qc.invalidateQueries({
-        queryKey: queryKeys.contentSeo.productDetail(projectId, entityId),
-      });
-    } else {
-      void qc.invalidateQueries({
-        queryKey: queryKeys.contentSeo.collectionDetail(projectId, entityId),
-      });
-    }
-  };
   return useMutation({
     mutationFn: ({
       entityType,
@@ -121,7 +107,9 @@ export function useGenerateProposal(projectId: string) {
       useAi?: boolean;
       mode?: string;
     }) => generateProposal(projectId, entityType, entityId, { useAi, mode }),
-    onSuccess: (_data, vars) => invalidate(vars.entityId, vars.entityType),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.proposals(projectId) });
+    },
   });
 }
 

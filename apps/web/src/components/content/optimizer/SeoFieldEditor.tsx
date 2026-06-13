@@ -8,9 +8,8 @@ interface SeoFieldEditorProps {
   values: SeoFormValues;
   issues?: Record<string, unknown>[] | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
-  mediaImages?: Record<string, unknown>[];
+  aiFilledFields?: Set<string>;
   onChange: (key: string, value: unknown) => void;
-  onImageAltChange?: (index: number, alt: string) => void;
 }
 
 function FieldRow({
@@ -19,6 +18,7 @@ function FieldRow({
   value,
   issues,
   scoreBreakdown,
+  aiFilledFields,
   onChange,
   multiline,
 }: {
@@ -27,10 +27,11 @@ function FieldRow({
   value: string;
   issues?: Record<string, unknown>[] | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
+  aiFilledFields?: Set<string>;
   onChange: (key: string, value: string) => void;
   multiline?: boolean;
 }) {
-  const note = fieldStatusNote(field, value, issues, scoreBreakdown);
+  const note = fieldStatusNote(field, value, issues, scoreBreakdown, aiFilledFields);
 
   return (
     <label className="seo-field-editor__field">
@@ -41,6 +42,7 @@ function FieldRow({
           value={value}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
+          aiFilledFields={aiFilledFields}
         />
       </span>
       {multiline ? (
@@ -77,9 +79,8 @@ export function SeoFieldEditor({
   values,
   issues,
   scoreBreakdown,
-  mediaImages = [],
+  aiFilledFields,
   onChange,
-  onImageAltChange,
 }: SeoFieldEditorProps) {
   return (
     <div className="seo-field-editor">
@@ -90,6 +91,7 @@ export function SeoFieldEditor({
           value={String(values.title ?? "")}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
+          aiFilledFields={aiFilledFields}
           onChange={onChange}
         />
         <FieldRow
@@ -98,6 +100,7 @@ export function SeoFieldEditor({
           value={String(values.handle ?? "")}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
+          aiFilledFields={aiFilledFields}
           onChange={onChange}
         />
         {entityType === "product" && (
@@ -125,6 +128,7 @@ export function SeoFieldEditor({
           value={String(values.seoTitle ?? "")}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
+          aiFilledFields={aiFilledFields}
           onChange={onChange}
         />
         <FieldRow
@@ -133,6 +137,7 @@ export function SeoFieldEditor({
           value={String(values.metaDescription ?? "")}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
+          aiFilledFields={aiFilledFields}
           onChange={onChange}
           multiline
         />
@@ -145,49 +150,10 @@ export function SeoFieldEditor({
           value={String(values.descriptionHtml ?? "")}
           issues={issues}
           scoreBreakdown={scoreBreakdown}
+          aiFilledFields={aiFilledFields}
           onChange={onChange}
           multiline
         />
-      </Section>
-
-      <Section title="Immagini">
-        {entityType === "collection" ? (
-          <FieldRow
-            label="Alt immagine collection"
-            field="imageAlt"
-            value={String(values.imageAlt ?? "")}
-            issues={issues}
-            scoreBreakdown={scoreBreakdown}
-            onChange={onChange}
-          />
-        ) : mediaImages.length === 0 ? (
-          <p className="shopify-empty-copy">Nessuna immagine sincronizzata.</p>
-        ) : (
-          mediaImages.map((img, idx) => (
-            <div key={idx} className="seo-images-tab__item">
-              {typeof img.url === "string" && (
-                <img src={img.url} alt="" className="seo-images-tab__thumb" />
-              )}
-              <label className="seo-field-editor__field">
-                <span className="seo-field-editor__label">
-                  Alt text immagine {idx + 1}
-                  <SeoFieldStatusBadge
-                    field="imageAlt"
-                    value={img.altText ?? img.alt}
-                    issues={issues}
-                    scoreBreakdown={scoreBreakdown}
-                  />
-                </span>
-                <input
-                  className="seo-field-editor__input"
-                  type="text"
-                  value={String(img.altText ?? img.alt ?? "")}
-                  onChange={(e) => onImageAltChange?.(idx, e.target.value)}
-                />
-              </label>
-            </div>
-          ))
-        )}
       </Section>
     </div>
   );

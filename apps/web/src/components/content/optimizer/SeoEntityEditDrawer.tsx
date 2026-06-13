@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   SeoCollectionDetailResponse,
   SeoOptimizationProposal,
@@ -6,35 +6,43 @@ import type {
 } from "@gcr/shared";
 import { SeoEditModal } from "./SeoEditModal";
 import { SeoFieldEditor } from "./SeoFieldEditor";
+import { SeoImagesEditor } from "./SeoImagesEditor";
 import { SeoProposalFooter } from "./SeoProposalFooter";
-import { SeoProposalPreview } from "./SeoProposalPreview";
 import { SeoScoreBadge } from "./SeoScoreBadge";
 import { SeoScoreBreakdown } from "./SeoScoreBreakdown";
 import { SeoSkillAppliedPanel } from "./SeoSkillAppliedPanel";
 import {
+  collectAiFilledFields,
+  extractProposedValues,
   getEffectiveIssues,
+  hasUsableProposalFields,
   mergeProposedIntoForm,
+  needsImageAltWarning,
   normalizeFormValues,
   resolveMediaFromProposal,
   toProposalValues,
 } from "./seoFormValues";
 import {
   useGenerateProposal,
-  usePreviewProposal,
   useProposalActions,
   useSaveManualProposal,
   useSyncCollectionSeo,
   useSyncProductSeo,
 } from "../../../hooks/useContentSeo";
 
-type DrawerTab = "fields" | "score" | "proposal" | "history";
+type DrawerTab = "fields" | "score" | "images" | "history";
 
 const TABS: { id: DrawerTab; label: string }[] = [
   { id: "fields", label: "Campi SEO" },
   { id: "score", label: "Score" },
-  { id: "proposal", label: "Proposta" },
+  { id: "images", label: "Immagini" },
   { id: "history", label: "Storico" },
 ];
+
+function normalizeReasoning(reasoning: unknown[] | null | undefined): string[] {
+  if (!reasoning) return [];
+  return reasoning.map((r) => (typeof r === "string" ? r : String(r)));
+}
 
 interface SeoEntityEditDrawerProps {
   open: boolean;
@@ -72,6 +80,7 @@ export function SeoEntityEditDrawer({
   const [tab, setTab] = useState<DrawerTab>("fields");
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [activeProposalId, setActiveProposalId] = useState<string | null>(null);
+  const [activeProposal, setActiveProposal] = useState<SeoOptimizationProposal | null>(null);
   const [mediaImages, setMediaImages] = useState<Record<string, unknown>[]>([]);
   const [formDirty, setFormDirty] = useState(false);
   const [appliedAt, setAppliedAt] = useState<string | null>(null);
@@ -79,8 +88,14 @@ export function SeoEntityEditDrawer({
   const [localUpdateFailed, setLocalUpdateFailed] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [aiToast, setAiToast] = useState<string | null>(null);
+  const [aiToastVariant, setAiToastVariant] = useState<"success" | "error" | "warn">("success");
+  const [aiReasoning, setAiReasoning] = useState<string[]>([]);
+  const [aiRiskLevel, setAiRiskLevel] = useState<string | null>(null);
+  const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
   const initialFormRef = useRef<string>("");
+  const lastInitKeyRef = useRef<string | null>(null);
 
+  const entityKey = `${entityType}:${entityId}`;
   const detail = entityType === "product" ? productDetail : collectionDetail;
   const analysis = detail?.analysis as Record<string, unknown> | null | undefined;
   const scoreBreakdown = detail?.scoreBreakdown;
@@ -95,34 +110,51 @@ export function SeoEntityEditDrawer({
   const saveManual = useSaveManualProposal(projectId);
   const generateAi = useGenerateProposal(projectId);
   const proposalActions = useProposalActions(projectId);
-  const preview = usePreviewProposal(projectId, activeProposalId);
   const syncProduct = useSyncProductSeo(projectId);
   const syncCollection = useSyncCollectionSeo(projectId);
 
+  const initFormFromDetail = useCallback(
+    (detailSource: SeoProductDetailResponse | SeoCollectionDetailResponse) => {
+      const raw =
+        detailSource.currentValues ??
+        (detailSource as { current_values?: Record<string, unknown> }).current_values;
+      const normalized = normalizeFormValues(raw, entityType, detailSource);
+      setFormValues(normalized);
+      initialFormRef.current = JSON.stringify(normalized);
+      setFormDirty(false);
+      setMediaImages(
+        entityType === "product"
+          ? (productDetail?.images ?? (normalized.images as Record<string, unknown>[]) ?? [])
+          : collectionDetail?.image
+            ? [collectionDetail.image]
+            : [],
+      );
+      setActiveProposalId(detailSource.latestProposal?.id ?? null);
+      setActiveProposal(detailSource.latestProposal ?? null);
+      setAiReasoning([]);
+      setAiRiskLevel(null);
+      setAiFilledFields(new Set());
+      setAiToast(null);
+      setTab("fields");
+      if (detailSource.latestProposal?.status !== "applied") {
+        setAppliedAt(null);
+        setApplyMessage(null);
+        setLocalUpdateFailed(false);
+      }
+    },
+    [entityType, productDetail?.images, collectionDetail?.image],
+  );
+
   useEffect(() => {
-    if (!open || !detail) return;
-    const raw =
-      detail.currentValues ??
-      (detail as { current_values?: Record<string, unknown> }).current_values;
-    const normalized = normalizeFormValues(raw, entityType, detail);
-    setFormValues(normalized);
-    initialFormRef.current = JSON.stringify(normalized);
-    setFormDirty(false);
-    setMediaImages(
-      entityType === "product"
-        ? (productDetail?.images ?? (normalized.images as Record<string, unknown>[]) ?? [])
-        : collectionDetail?.image
-          ? [collectionDetail.image]
-          : [],
-    );
-    setActiveProposalId(detail.latestProposal?.id ?? null);
-    setTab("fields");
-    if (detail.latestProposal?.status !== "applied") {
-      setAppliedAt(null);
-      setApplyMessage(null);
-      setLocalUpdateFailed(false);
+    if (!open) {
+      lastInitKeyRef.current = null;
+      return;
     }
-  }, [open, detail, entityType, productDetail, collectionDetail]);
+    if (!detail || formDirty) return;
+    if (lastInitKeyRef.current === entityKey) return;
+    initFormFromDetail(detail);
+    lastInitKeyRef.current = entityKey;
+  }, [open, entityKey, detail, formDirty, initFormFromDetail]);
 
   const refreshFormFromValues = (
     values: Record<string, unknown> | null | undefined,
@@ -133,28 +165,23 @@ export function SeoEntityEditDrawer({
     setFormValues(normalized);
     initialFormRef.current = JSON.stringify(normalized);
     setFormDirty(false);
+    setAiFilledFields(new Set());
+    setAiReasoning([]);
+    setAiRiskLevel(null);
     if (entityType === "product" && Array.isArray(normalized.images)) {
       setMediaImages(normalized.images as Record<string, unknown>[]);
     }
   };
 
-  const activeProposal: SeoOptimizationProposal | null | undefined = useMemo(() => {
-    if (preview.data) {
-      return {
-        id: preview.data.proposalId,
-        entityType: preview.data.entityType,
-        entityId: preview.data.entityId,
-        entityGid: "",
-        status: preview.data.status,
-        source: preview.data.source,
-        riskLevel: preview.data.riskLevel,
-        currentValues: preview.data.currentValues,
-        proposedValues: preview.data.proposedValues,
-        reasoning: preview.data.reasoning,
-      };
+  const handleRestoreOriginal = () => {
+    if (!detail) return;
+    if (formDirty) {
+      const ok = window.confirm("Ripristinare i valori originali da Shopify? Le modifiche non salvate andranno perse.");
+      if (!ok) return;
     }
-    return detail?.latestProposal;
-  }, [detail?.latestProposal, preview.data]);
+    initFormFromDetail(detail);
+    lastInitKeyRef.current = entityKey;
+  };
 
   const handleClose = () => {
     if (formDirty) {
@@ -170,6 +197,12 @@ export function SeoEntityEditDrawer({
       setFormDirty(JSON.stringify(next) !== initialFormRef.current);
       return next;
     });
+    setAiFilledFields((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   };
 
   const handleImageAltChange = (index: number, alt: string) => {
@@ -183,10 +216,47 @@ export function SeoEntityEditDrawer({
       });
       return next;
     });
+    setAiFilledFields((prev) => {
+      if (!prev.has("imageAlt")) return prev;
+      const next = new Set(prev);
+      next.delete("imageAlt");
+      return next;
+    });
   };
 
   const buildProposedValues = () =>
     toProposalValues(formValues, entityType, mediaImages);
+
+  const applyProposalToForm = (
+    proposal: SeoOptimizationProposal,
+    options?: { confirmIfDirty?: boolean },
+  ) => {
+    const proposed = extractProposedValues(proposal);
+    if (options?.confirmIfDirty && formDirty) {
+      const ok = window.confirm(
+        "Caricare questa proposta nel form? Le modifiche non salvate andranno perse.",
+      );
+      if (!ok) return false;
+    }
+    const merged = mergeProposedIntoForm(formValues, proposed, entityType);
+    let nextMedia = mediaImages;
+    if (entityType === "product") {
+      nextMedia = resolveMediaFromProposal(
+        proposed,
+        mediaImages.length > 0 ? mediaImages : ((merged.images as Record<string, unknown>[]) ?? []),
+      );
+      setMediaImages(nextMedia);
+    }
+    setFormValues(merged);
+    setFormDirty(true);
+    setActiveProposalId(proposal.id);
+    setActiveProposal(proposal);
+    setAiFilledFields(collectAiFilledFields(formValues, merged, entityType, mediaImages, nextMedia));
+    setAiReasoning(normalizeReasoning(proposal.reasoning));
+    setAiRiskLevel(proposal.riskLevel ?? null);
+    setTab("fields");
+    return true;
+  };
 
   const handleSaveDraft = () => {
     saveManual.mutate(
@@ -198,8 +268,10 @@ export function SeoEntityEditDrawer({
       {
         onSuccess: (proposal) => {
           setActiveProposalId(proposal.id);
+          setActiveProposal(proposal);
           initialFormRef.current = JSON.stringify(formValues);
           setFormDirty(false);
+          setAiFilledFields(new Set());
           onDetailRefresh?.();
         },
       },
@@ -216,48 +288,58 @@ export function SeoEntityEditDrawer({
       },
       {
         onSuccess: (proposal) => {
-          setActiveProposalId(proposal.id);
-          const merged = mergeProposedIntoForm(
-            formValues,
-            proposal.proposedValues ?? undefined,
-            entityType,
-          );
-          setFormValues(merged);
+          const proposed = extractProposedValues(proposal);
+          const merged = mergeProposedIntoForm(formValues, proposed, entityType);
+          let nextMedia = mediaImages;
           if (entityType === "product") {
-            const nextMedia = resolveMediaFromProposal(
-              proposal.proposedValues ?? undefined,
+            nextMedia = resolveMediaFromProposal(
+              proposed,
               mediaImages.length > 0
                 ? mediaImages
                 : ((merged.images as Record<string, unknown>[]) ?? []),
             );
             setMediaImages(nextMedia);
           }
-          setFormDirty(JSON.stringify(merged) !== initialFormRef.current);
+          const usable = hasUsableProposalFields(
+            formValues,
+            merged,
+            entityType,
+            mediaImages,
+            nextMedia,
+          );
+          if (!usable) {
+            setAiToastVariant("error");
+            setAiToast("La proposta AI non contiene campi utilizzabili.");
+            return;
+          }
+          setFormValues(merged);
+          setFormDirty(true);
+          setActiveProposalId(proposal.id);
+          setActiveProposal(proposal);
+          setAiFilledFields(
+            collectAiFilledFields(formValues, merged, entityType, mediaImages, nextMedia),
+          );
+          setAiReasoning(normalizeReasoning(proposal.reasoning));
+          setAiRiskLevel(proposal.riskLevel ?? null);
           setTab("fields");
-          setAiToast("Proposta AI inserita nel form. Controlla e salva prima di applicare.");
-          onDetailRefresh?.();
+          if (needsImageAltWarning(entityType, nextMedia, proposed)) {
+            setAiToastVariant("warn");
+            setAiToast(
+              "La proposta AI non ha generato alt text per le immagini. Proposta AI inserita nei campi. Controlla, modifica se serve e salva come proposta.",
+            );
+          } else {
+            setAiToastVariant("success");
+            setAiToast(
+              "Proposta AI inserita nei campi. Controlla, modifica se serve e salva come proposta.",
+            );
+          }
         },
       },
     );
   };
 
-  const handleCopyProposalToForm = () => {
-    const proposed = activeProposal?.proposedValues ?? preview.data?.proposedValues;
-    if (!proposed) return;
-    const merged = mergeProposedIntoForm(formValues, proposed, entityType);
-    setFormValues(merged);
-    if (entityType === "product") {
-      setMediaImages(
-        resolveMediaFromProposal(
-          proposed,
-          mediaImages.length > 0
-            ? mediaImages
-            : ((merged.images as Record<string, unknown>[]) ?? []),
-        ),
-      );
-    }
-    setFormDirty(JSON.stringify(merged) !== initialFormRef.current);
-    setTab("fields");
+  const handleOpenHistoryProposal = (p: SeoOptimizationProposal) => {
+    applyProposalToForm(p, { confirmIfDirty: true });
   };
 
   const handleApply = () => {
@@ -284,6 +366,10 @@ export function SeoEntityEditDrawer({
                   ?.currentValues,
               res.detail as SeoProductDetailResponse | SeoCollectionDetailResponse | undefined,
             );
+            if (res.proposal) {
+              setActiveProposal(res.proposal);
+              setActiveProposalId(res.proposal.id);
+            }
           }
           onDetailRefresh?.();
         },
@@ -323,9 +409,11 @@ export function SeoEntityEditDrawer({
     <SeoScoreBadge score={scoreTotal} severity={severity as never} />
   );
 
+  const footerProposal = activeProposal ?? detail?.latestProposal;
+
   const footer = (
     <SeoProposalFooter
-      proposal={activeProposal}
+      proposal={footerProposal}
       writeProductsAvailable={writeProductsAvailable}
       openaiConfigured={openaiConfigured}
       loading={actionLoading}
@@ -335,18 +423,35 @@ export function SeoEntityEditDrawer({
       onGenerateAi={handleGenerateAi}
       onApprove={() => {
         if (activeProposalId) {
-          proposalActions.approve.mutate(activeProposalId, { onSuccess: onDetailRefresh });
+          proposalActions.approve.mutate(activeProposalId, {
+            onSuccess: (p) => {
+              setActiveProposal(p);
+              onDetailRefresh?.();
+            },
+          });
         }
       }}
       onReject={() => {
         if (activeProposalId) {
-          proposalActions.reject.mutate(activeProposalId, { onSuccess: onDetailRefresh });
+          proposalActions.reject.mutate(activeProposalId, {
+            onSuccess: (p) => {
+              setActiveProposal(p);
+              onDetailRefresh?.();
+            },
+          });
         }
       }}
       onApply={handleApply}
       onCancel={handleClose}
     />
   );
+
+  const aiBannerClass =
+    aiToastVariant === "error"
+      ? "content-seo-banner content-seo-banner--warn"
+      : aiToastVariant === "warn"
+        ? "content-seo-banner content-seo-banner--warn"
+        : "content-seo-banner content-seo-banner--success";
 
   return (
     <SeoEditModal
@@ -396,6 +501,14 @@ export function SeoEntityEditDrawer({
             >
               {syncLoading ? "Sincronizzazione…" : "Sincronizza da Shopify"}
             </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              disabled={actionLoading}
+              onClick={handleRestoreOriginal}
+            >
+              Ripristina valori originali
+            </button>
           </div>
 
           {appliedAt && (
@@ -417,9 +530,7 @@ export function SeoEntityEditDrawer({
             <div className="content-seo-banner content-seo-banner--success">{syncMessage}</div>
           )}
 
-          {aiToast && (
-            <div className="content-seo-banner content-seo-banner--success">{aiToast}</div>
-          )}
+          {aiToast && <div className={aiBannerClass}>{aiToast}</div>}
 
           {entityType === "product" && productDetail && (
             <p className="seo-edit-drawer__meta">
@@ -442,15 +553,32 @@ export function SeoEntityEditDrawer({
           </div>
 
           {tab === "fields" && (
-            <SeoFieldEditor
-              entityType={entityType}
-              values={formValues}
-              issues={effectiveIssues}
-              scoreBreakdown={scoreBreakdown}
-              mediaImages={mediaImages}
-              onChange={handleFieldChange}
-              onImageAltChange={handleImageAltChange}
-            />
+            <>
+              <SeoFieldEditor
+                entityType={entityType}
+                values={formValues}
+                issues={effectiveIssues}
+                scoreBreakdown={scoreBreakdown}
+                aiFilledFields={aiFilledFields}
+                onChange={handleFieldChange}
+              />
+              {(aiReasoning.length > 0 || aiRiskLevel) && (
+                <div className="gcr-card seo-ai-reasoning-card">
+                  {aiRiskLevel && (
+                    <p className="seo-ai-reasoning-card__risk">
+                      Rischio proposta: <strong>{aiRiskLevel}</strong>
+                    </p>
+                  )}
+                  {aiReasoning.length > 0 && (
+                    <ul className="seo-ai-reasoning-card__list">
+                      {aiReasoning.map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {tab === "score" && (
@@ -464,22 +592,17 @@ export function SeoEntityEditDrawer({
             </>
           )}
 
-          {tab === "proposal" && (
-            <>
-              <SeoProposalPreview
-                preview={preview.data}
-                loading={preview.isLoading && Boolean(activeProposalId)}
-              />
-              {(activeProposal?.proposedValues || preview.data?.proposedValues) && (
-                <button
-                  type="button"
-                  className="gcr-btn gcr-btn--secondary gcr-btn--sm seo-copy-proposal-btn"
-                  onClick={handleCopyProposalToForm}
-                >
-                  Ricarica proposta nel form
-                </button>
-              )}
-            </>
+          {tab === "images" && (
+            <SeoImagesEditor
+              entityType={entityType}
+              values={formValues}
+              issues={effectiveIssues}
+              scoreBreakdown={scoreBreakdown}
+              mediaImages={mediaImages}
+              aiFilledFields={aiFilledFields}
+              onChange={handleFieldChange}
+              onImageAltChange={handleImageAltChange}
+            />
           )}
 
           {tab === "history" && (
@@ -490,19 +613,23 @@ export function SeoEntityEditDrawer({
               ) : (
                 <ul className="shopify-seo-list">
                   {(detail.proposalHistory ?? []).map((p) => (
-                    <li key={p.id} className="shopify-seo-list__item">
-                      <span>
-                        {p.status} · {p.source} · {p.riskLevel}
-                      </span>
+                    <li key={p.id} className="shopify-seo-list__item seo-history-item">
+                      <div className="seo-history-item__main">
+                        <span>
+                          {p.status} · {p.source} · {p.riskLevel}
+                        </span>
+                        {p.reasoning && p.reasoning.length > 0 && (
+                          <p className="seo-history-item__reasoning">
+                            {normalizeReasoning(p.reasoning)[0]}
+                          </p>
+                        )}
+                      </div>
                       <button
                         type="button"
                         className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-                        onClick={() => {
-                          setActiveProposalId(p.id);
-                          setTab("proposal");
-                        }}
+                        onClick={() => handleOpenHistoryProposal(p)}
                       >
-                        Apri
+                        Carica nel form
                       </button>
                     </li>
                   ))}

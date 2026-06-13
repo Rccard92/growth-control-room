@@ -448,6 +448,38 @@
   color: #ffc107;
 }
 
+.seo-field-status-badge--verify {
+  background: rgba(33, 150, 243, 0.15);
+  color: #64b5f6;
+}
+
+.seo-ai-reasoning-card {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.seo-ai-reasoning-card__risk {
+  margin: 0 0 0.5rem;
+}
+
+.seo-ai-reasoning-card__list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.seo-history-item {
+  flex-direction: column;
+  align-items: flex-start !important;
+  gap: 0.5rem;
+}
+
+.seo-history-item__reasoning {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--gcr-text-muted, #888);
+}
+
 .seo-copy-proposal-btn {
   margin-top: 1rem;
 }

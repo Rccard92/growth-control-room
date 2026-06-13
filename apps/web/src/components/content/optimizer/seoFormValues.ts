@@ -1,5 +1,6 @@
 import type {
   SeoCollectionDetailResponse,
+  SeoOptimizationProposal,
   SeoProductDetailResponse,
   SeoScoreBreakdown,
 } from "@gcr/shared";
@@ -62,12 +63,21 @@ export function resolveMediaFromProposal(
   if (currentMedia.length === 0) return currentMedia;
 
   const altById = new Map<string, string>();
-  for (const entry of imageAlts) {
+  const altByPosition = new Map<number, string>();
+  const altByIndex = new Map<number, string>();
+  imageAlts.forEach((entry, idx) => {
     const row = entry as Record<string, unknown>;
     const id = String(row.image_id ?? row.imageId ?? row.id ?? "");
     const alt = String(row.proposed_alt ?? row.proposedAlt ?? row.altText ?? row.alt ?? "");
-    if (id && alt) altById.set(id, alt);
-  }
+    if (!alt) return;
+    if (id) altById.set(id, alt);
+    const pos = row.position ?? row.index;
+    if (typeof pos === "number") {
+      altByPosition.set(pos, alt);
+      altByPosition.set(pos - 1, alt);
+    }
+    altByIndex.set(idx, alt);
+  });
 
   const proposedById = new Map<string, Record<string, unknown>>();
   for (const item of proposedMedia) {
@@ -78,9 +88,13 @@ export function resolveMediaFromProposal(
 
   return currentMedia.map((img, idx) => {
     const id = String(img.id ?? "");
+    const position = typeof img.position === "number" ? img.position : idx + 1;
     const fromProposal = id ? proposedById.get(id) : undefined;
     const proposedAlt =
       (id ? altById.get(id) : undefined) ??
+      altByPosition.get(position) ??
+      altByPosition.get(idx) ??
+      altByIndex.get(idx) ??
       (typeof fromProposal?.altText === "string" ? fromProposal.altText : undefined) ??
       (typeof fromProposal?.alt === "string" ? fromProposal.alt : undefined) ??
       (typeof fromProposal?.proposed_alt === "string" ? fromProposal.proposed_alt : undefined);
@@ -227,7 +241,120 @@ export function mergeProposedIntoForm(
   return merged;
 }
 
-export type FieldStatus = "ok" | "missing" | "improve";
+/** Extract proposed values from API response (single normalization point) */
+export function extractProposedValues(
+  proposal: SeoOptimizationProposal | Record<string, unknown>,
+): Record<string, unknown> {
+  const raw = proposal as Record<string, unknown>;
+  const values =
+    raw.proposedValues ??
+    raw.proposed_values ??
+    (typeof raw.proposal === "object" && raw.proposal !== null
+      ? (raw.proposal as Record<string, unknown>).proposedValues ??
+        (raw.proposal as Record<string, unknown>).proposed_values
+      : undefined);
+  return (values as Record<string, unknown>) ?? {};
+}
+
+const TRACKED_FORM_FIELDS = [
+  "title",
+  "handle",
+  "seoTitle",
+  "metaDescription",
+  "descriptionHtml",
+  "descriptionText",
+  "imageAlt",
+] as const;
+
+function isNonEmptyFieldValue(value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
+/** True if merge changed at least one tracked field or image alt */
+export function hasUsableProposalFields(
+  before: SeoFormValues,
+  after: SeoFormValues,
+  entityType: "product" | "collection",
+  mediaBefore?: Record<string, unknown>[],
+  mediaAfter?: Record<string, unknown>[],
+): boolean {
+  for (const key of TRACKED_FORM_FIELDS) {
+    if (key === "imageAlt" && entityType === "product") continue;
+    const prev = before[key];
+    const next = after[key];
+    if (isNonEmptyFieldValue(next) && JSON.stringify(prev) !== JSON.stringify(next)) {
+      return true;
+    }
+  }
+  if (entityType === "product") {
+    const beforeMedia = mediaBefore ?? (before.images as Record<string, unknown>[] | undefined) ?? [];
+    const afterMedia = mediaAfter ?? (after.images as Record<string, unknown>[] | undefined) ?? [];
+    for (let i = 0; i < afterMedia.length; i++) {
+      const prevAlt = String(beforeMedia[i]?.altText ?? beforeMedia[i]?.alt ?? "");
+      const nextAlt = String(afterMedia[i]?.altText ?? afterMedia[i]?.alt ?? "");
+      if (nextAlt.trim() && prevAlt !== nextAlt) return true;
+    }
+  }
+  if (entityType === "collection" && isNonEmptyFieldValue(after.imageAlt)) {
+    return before.imageAlt !== after.imageAlt;
+  }
+  return false;
+}
+
+/** Fields newly filled or changed by AI merge */
+export function collectAiFilledFields(
+  before: SeoFormValues,
+  after: SeoFormValues,
+  entityType: "product" | "collection",
+  mediaBefore?: Record<string, unknown>[],
+  mediaAfter?: Record<string, unknown>[],
+): Set<string> {
+  const filled = new Set<string>();
+  for (const key of TRACKED_FORM_FIELDS) {
+    if (key === "imageAlt" && entityType === "product") continue;
+    const prev = before[key];
+    const next = after[key];
+    if (isNonEmptyFieldValue(next) && JSON.stringify(prev) !== JSON.stringify(next)) {
+      filled.add(key);
+    }
+  }
+  if (entityType === "product") {
+    const beforeMedia = mediaBefore ?? (before.images as Record<string, unknown>[] | undefined) ?? [];
+    const afterMedia = mediaAfter ?? (after.images as Record<string, unknown>[] | undefined) ?? [];
+    const altChanged = afterMedia.some((img, i) => {
+      const prevAlt = String(beforeMedia[i]?.altText ?? beforeMedia[i]?.alt ?? "");
+      const nextAlt = String(img.altText ?? img.alt ?? "");
+      return nextAlt.trim() && prevAlt !== nextAlt;
+    });
+    if (altChanged) filled.add("imageAlt");
+  } else if (isNonEmptyFieldValue(after.imageAlt) && before.imageAlt !== after.imageAlt) {
+    filled.add("imageAlt");
+  }
+  return filled;
+}
+
+/** Product has images missing alt and proposal has no image_alts */
+export function needsImageAltWarning(
+  entityType: "product" | "collection",
+  mediaImages: Record<string, unknown>[],
+  proposed: Record<string, unknown> | null | undefined,
+): boolean {
+  if (entityType !== "product" || mediaImages.length === 0) return false;
+  const hasMissingAlt = mediaImages.some((img) => {
+    const alt = img.altText ?? img.alt;
+    return typeof alt !== "string" || !alt.trim();
+  });
+  if (!hasMissingAlt) return false;
+  const imageAlts = pickArray(proposed ?? {}, "image_alts").length
+    ? pickArray(proposed ?? {}, "image_alts")
+    : pickArray(proposed ?? {}, "imageAlts");
+  return imageAlts.length === 0;
+}
+
+export type FieldStatus = "ok" | "missing" | "improve" | "verify";
 
 const ISSUE_FIELD_MAP: Record<string, string[]> = {
   title: ["title", "product_title", "collection_title"],
@@ -342,9 +469,14 @@ export function getFieldStatus(
   value: unknown,
   issues?: Record<string, unknown>[] | null,
   scoreBreakdown?: SeoScoreBreakdown | null,
+  aiFilledFields?: Set<string>,
 ): { status: FieldStatus; note?: string } {
   if (isEmptyValue(value)) {
     return { status: "missing", note: "Campo non impostato su Shopify" };
+  }
+
+  if (aiFilledFields?.has(field)) {
+    return { status: "verify", note: "Contenuto AI — verifica prima di salvare" };
   }
 
   const issue = findIssueForField(field, issues);
