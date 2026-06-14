@@ -220,9 +220,15 @@ async def get_brand_knowledge_score(
 )
 async def get_brand_context(
     project_id: UUID,
+    format: str | None = Query(
+        default=None,
+        description="format=prompt restituisce lo stesso bundle con promptContext.previewText",
+    ),
     session: AsyncSession = Depends(get_db),
 ) -> BrandContextBundleResponse:
+    """Contesto brand machine-ready. Con format=prompt, stessa response (preview in promptContext)."""
     await get_project_in_default_workspace(project_id, session)
+    del format
     return await bi_service.get_context_bundle(session, project_id)
 
 

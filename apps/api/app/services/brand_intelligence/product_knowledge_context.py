@@ -142,6 +142,78 @@ def format_item_for_prompt(item: BrandProductKnowledgeItemRead) -> str:
     return "\n".join(parts)
 
 
+def format_specific_product_context_for_prompt(
+    sp: BrandProductKnowledgeSpecificProductContext,
+) -> str:
+    title = sp.title or "Prodotto"
+    parts: list[str] = [f"Prodotto: {title}"]
+    if sp.handle:
+        parts.append(f"- Handle: {sp.handle}")
+    if sp.product_line:
+        parts.append(f"- Linea: {sp.product_line}")
+    if sp.strategic_description:
+        parts.append(f"- Descrizione strategica: {sp.strategic_description[:400]}")
+    if sp.origin:
+        parts.append(f"- Origine: {sp.origin[:300]}")
+    if sp.ingredients:
+        parts.append(f"- Ingredienti: {sp.ingredients[:300]}")
+    if sp.usage_suggestions:
+        parts.append(f"- Uso consigliato: {sp.usage_suggestions[:300]}")
+    if sp.allowed_claims:
+        parts.append(f"- Claim consentiti: {', '.join(sp.allowed_claims[:6])}")
+    if sp.forbidden_claims:
+        parts.append(f"- Claim vietati: {', '.join(sp.forbidden_claims[:6])}")
+    if sp.seo_notes:
+        parts.append(f"- Note SEO: {sp.seo_notes[:300]}")
+    if sp.faq:
+        for entry in sp.faq[:4]:
+            if isinstance(entry, dict):
+                q = entry.get("question", "")
+                a = entry.get("answer", "")
+                if q:
+                    parts.append(f"- FAQ: {q} → {a[:150]}")
+    return "\n".join(parts)
+
+
+def format_product_knowledge_preview(bundle_pk: BrandProductKnowledgeContext) -> str | None:
+    blocks: list[str] = ["PRODUCT KNOWLEDGE"]
+    rules = bundle_pk.general_rules
+    has_general = rules and (
+        rules.general_principles
+        or rules.common_strengths
+        or rules.quality_rules
+        or rules.production_notes
+        or rules.usage_notes
+        or rules.common_objections
+        or rules.common_faq
+        or rules.communication_rules
+        or rules.storytelling_rules
+    )
+    if has_general and rules:
+        general_parts = ["Regole generali:"]
+        if rules.general_principles:
+            general_parts.extend(f"- {p}" for p in rules.general_principles[:10])
+        if rules.common_strengths:
+            general_parts.append("Punti di forza comuni:")
+            general_parts.extend(f"- {s}" for s in rules.common_strengths[:8])
+        if rules.quality_rules:
+            general_parts.append("Regole qualità:")
+            general_parts.extend(f"- {r}" for r in rules.quality_rules[:8])
+        if len(general_parts) > 1:
+            blocks.append("\n".join(general_parts))
+    if bundle_pk.specific_products:
+        product_blocks = []
+        for sp in bundle_pk.specific_products[:15]:
+            block = format_specific_product_context_for_prompt(sp)
+            if len(block.splitlines()) > 1:
+                product_blocks.append(block)
+        if product_blocks:
+            blocks.append("Prodotti specifici:\n" + "\n\n".join(product_blocks))
+    if len(blocks) == 1:
+        return None
+    return "\n".join(blocks)
+
+
 def format_items_for_prompt(items: list[BrandProductKnowledgeItemRead]) -> str | None:
     if not items:
         return None

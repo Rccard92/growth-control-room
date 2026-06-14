@@ -1,17 +1,24 @@
 # Brand Intelligence
 
-Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.4** aggiunge Product Knowledge modulare: regole generali + schede prodotto collegate a Shopify.
+Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.5** aggiunge la tab **AI Context Preview** e sposta gli avvisi fonti esterne in Brand Profile.
+
+## Strategia v0.3.5 — AI Context Preview
+
+La UI espone sette tab:
+
+1. **Overview** — card stato moduli (senza warning tecnici fonti esterne)
+2. **Brand Profile** — fonti, enrich, profilo ufficiale + **Avvisi fonti esterne** (collassabile)
+3. **Brand Identity** — form manuale + import da 1 file
+4. **Visual Identity** — logo, palette, font + estrazione da sito
+5. **Safe Claims & Red Flags**
+6. **Product Knowledge**
+7. **AI Context** — anteprima `promptContext.previewText`, copia contesto, sezioni mancanti
+
+`GET /brand-intelligence/context` restituisce `promptContext.fullText` (moduli AI) e `promptContext.previewText` (UI). Parametro opzionale `?format=prompt`.
 
 ## Strategia v0.3.4 — Product Knowledge
 
-La UI espone sei tab:
-
-1. **Overview** — sei card di stato (Profile, Identity, Visual, Safe Claims, Product Knowledge)
-2. **Brand Profile** — fonti URL, proposta AI, profilo ufficiale
-3. **Brand Identity** — form manuale + import da 1 file
-4. **Visual Identity** — logo, palette, font + estrazione da sito
-5. **Safe Claims & Red Flags** — claim consentiti/vietati, red flags
-6. **Product Knowledge** — regole generali + schede prodotto Shopify
+La UI espone le sezioni modulari sopra (Overview + 5 moduli + AI Context).
 
 ### Due livelli
 

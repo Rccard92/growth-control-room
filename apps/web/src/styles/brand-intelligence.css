@@ -1260,6 +1260,42 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.bi-ai-context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.bi-ai-context-preview {
+  margin: 0;
+  padding: 1rem;
+  max-height: 480px;
+  overflow: auto;
+  font-family: var(--gcr-font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.bi-external-warnings {
+  margin-top: 1rem;
+}
+
+.bi-external-warnings__summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.25rem 0;
+  list-style: none;
+}
+
+.bi-external-warnings__summary::-webkit-details-marker {
+  display: none;
+}
+
 .bi-shopify-picker-list {
   list-style: none;
   margin: 0;

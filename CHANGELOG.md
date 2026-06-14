@@ -3,6 +3,14 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.5-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added AI Context Preview tab in Brand Intelligence
+- Added `previewText` human-friendly output in `promptContext` (AI modules still use `fullText`)
+- Moved external source enrichment warnings from Overview to collapsible section in Brand Profile
+
 ## [0.3.4-alpha] - 2026-06-13
 
 Tipo: Alpha minor

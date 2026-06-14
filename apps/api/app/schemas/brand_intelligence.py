@@ -820,6 +820,7 @@ class BrandPromptContext(BaseModel):
     safe_claims: str | None = Field(default=None, serialization_alias="safeClaims")
     product_knowledge: str | None = Field(default=None, serialization_alias="productKnowledge")
     full_text: str | None = Field(default=None, serialization_alias="fullText")
+    preview_text: str | None = Field(default=None, serialization_alias="previewText")
 
 
 class BrandContextBundleResponse(BaseModel):

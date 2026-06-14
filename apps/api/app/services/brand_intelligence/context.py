@@ -1,6 +1,7 @@
 """Brand Intelligence context builder.
 
 v0.3.2: machine-ready promptContext + Profile, Identity, Visual.
+v0.3.5: previewText human-friendly per AI Context Preview UI.
 """
 
 from __future__ import annotations
@@ -26,7 +27,10 @@ from app.schemas.brand_intelligence import (
     BrandProfileRead,
     BrandPromptContext,
 )
-from app.services.brand_intelligence.product_knowledge_context import build_product_knowledge_context
+from app.services.brand_intelligence.product_knowledge_context import (
+    build_product_knowledge_context,
+    format_product_knowledge_preview,
+)
 from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
 from app.services.brand_intelligence.safe_claims_service import safe_claims_completion
 from app.services.brand_intelligence.score import (
@@ -45,9 +49,15 @@ SAFE_CLAIMS_PRUDENCE_FALLBACK = """SAFE CLAIMS & RED FLAGS (fallback prudenza)
 - Non divulgare process secrets o dettagli produttivi riservati.
 - Preferire claim fattuali, verificabili e conformi al brand."""
 
+_EMPTY_SECTION_LABEL = "Sezione non compilata."
+
 
 class BrandIntelligenceContextBuilder:
-    """Central source of truth for brand context used by all AI modules."""
+    """Central source of truth for brand context used by all AI modules.
+
+    Tutti i moduli AI brand-facing devono usare BrandIntelligenceContextBuilder
+    e non leggere direttamente le tabelle Brand Intelligence.
+    """
 
     @staticmethod
     async def build_brand_context(
@@ -253,6 +263,69 @@ class BrandIntelligenceContextBuilder:
         return "\n".join(parts)
 
     @staticmethod
+    def _section_has_content(text: str | None) -> bool:
+        return bool(text and len(text.splitlines()) > 1)
+
+    @staticmethod
+    def build_prompt_preview_text(bundle: BrandContextBundleResponse) -> str | None:
+        if bundle.primary_source == "minimal" or not bundle.profile:
+            return None
+
+        blocks: list[str] = []
+
+        profile_text = BrandIntelligenceContextBuilder.format_profile_for_prompt(bundle.profile)
+        blocks.append(
+            profile_text
+            if BrandIntelligenceContextBuilder._section_has_content(profile_text)
+            else f"BRAND PROFILE\n{_EMPTY_SECTION_LABEL}"
+        )
+
+        if bundle.brand_identity:
+            identity_text = BrandIntelligenceContextBuilder.format_identity_for_prompt(
+                bundle.brand_identity
+            )
+            blocks.append(
+                identity_text
+                if BrandIntelligenceContextBuilder._section_has_content(identity_text)
+                else f"BRAND IDENTITY\n{_EMPTY_SECTION_LABEL}"
+            )
+        else:
+            blocks.append(f"BRAND IDENTITY\n{_EMPTY_SECTION_LABEL}")
+
+        if bundle.visual_identity:
+            visual_text = BrandIntelligenceContextBuilder.format_visual_for_prompt(
+                bundle.visual_identity
+            )
+            blocks.append(
+                visual_text
+                if BrandIntelligenceContextBuilder._section_has_content(visual_text)
+                else f"VISUAL IDENTITY\n{_EMPTY_SECTION_LABEL}"
+            )
+        else:
+            blocks.append(f"VISUAL IDENTITY\n{_EMPTY_SECTION_LABEL}")
+
+        if bundle.safe_claims and safe_claims_completion(bundle.safe_claims) != "empty":
+            blocks.append(
+                BrandIntelligenceContextBuilder.format_safe_claims_for_prompt(bundle.safe_claims)
+            )
+        else:
+            blocks.append(SAFE_CLAIMS_PRUDENCE_FALLBACK)
+
+        if bundle.product_knowledge:
+            pk_preview = format_product_knowledge_preview(bundle.product_knowledge)
+            blocks.append(
+                pk_preview if pk_preview else f"PRODUCT KNOWLEDGE\n{_EMPTY_SECTION_LABEL}"
+            )
+        else:
+            blocks.append(f"PRODUCT KNOWLEDGE\n{_EMPTY_SECTION_LABEL}")
+
+        if bundle.missing_context:
+            missing_parts = ["MISSING CONTEXT", *[f"- {m}" for m in bundle.missing_context]]
+            blocks.append("\n".join(missing_parts))
+
+        return "\n\n".join(blocks)
+
+    @staticmethod
     def build_prompt_context(bundle: BrandContextBundleResponse) -> BrandPromptContext | None:
         if bundle.primary_source == "minimal" or not bundle.profile:
             return None
@@ -337,6 +410,7 @@ class BrandIntelligenceContextBuilder:
             blocks.append(product_knowledge_text)
 
         full_text = "\n\n".join(blocks)
+        preview_text = BrandIntelligenceContextBuilder.build_prompt_preview_text(bundle)
         return BrandPromptContext(
             brand_profile=profile_text,
             brand_identity=identity_text,
@@ -344,6 +418,7 @@ class BrandIntelligenceContextBuilder:
             safe_claims=safe_claims_text,
             product_knowledge=product_knowledge_text,
             full_text=full_text,
+            preview_text=preview_text,
         )
 
     @staticmethod

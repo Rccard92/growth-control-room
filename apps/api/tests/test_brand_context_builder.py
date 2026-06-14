@@ -245,6 +245,40 @@ def test_build_prompt_context_includes_product_knowledge() -> None:
     assert "Artigianale" in prompt_ctx.product_knowledge
 
 
+def test_build_prompt_preview_text_includes_sections_and_missing() -> None:
+    bundle = BrandContextBundleResponse(
+        brand_context_version="v1",
+        primary_source="brand_profile",
+        missing_context=["Safe Claims non compilata: i moduli AI devono evitare claim sensibili."],
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Artisan brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        products=[],
+        categories=[],
+        audience=[],
+        claims=[],
+        content_pillars=[],
+        guardrails=[],
+        assets=[],
+        knowledge_score=_score(80),
+    )
+    prompt_ctx = BrandIntelligenceContextBuilder.build_prompt_context(bundle)
+    assert prompt_ctx is not None
+    assert prompt_ctx.preview_text is not None
+    assert "BRAND PROFILE" in prompt_ctx.preview_text
+    assert "BRAND IDENTITY" in prompt_ctx.preview_text
+    assert "Sezione non compilata." in prompt_ctx.preview_text
+    assert "MISSING CONTEXT" in prompt_ctx.preview_text
+    assert "Safe Claims non compilata" in prompt_ctx.preview_text
+    assert prompt_ctx.full_text is not None
+    assert "BRAND IDENTITY" not in prompt_ctx.full_text
+
+
 def test_format_item_for_prompt_ai_import() -> None:
     from app.schemas.brand_product_knowledge import BrandProductKnowledgeItemRead
     from app.services.brand_intelligence.product_knowledge_context import format_item_for_prompt

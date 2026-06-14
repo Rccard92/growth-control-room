@@ -74,6 +74,10 @@ export function BrandProfilePanel({ projectId }: BrandProfilePanelProps) {
 
   const official = { ...profile, ...officialForm };
 
+  const externalWarnings = Array.from(
+    new Set([...(profile?.enrichmentWarnings ?? []), ...(enrichResult?.warnings ?? [])]),
+  );
+
   function handleSaveSources(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -237,6 +241,19 @@ export function BrandProfilePanel({ projectId }: BrandProfilePanelProps) {
         </form>
       </section>
 
+      {externalWarnings.length > 0 && (
+        <details className="bi-profile-block gcr-card bi-external-warnings">
+          <summary className="bi-external-warnings__summary">
+            Avvisi fonti esterne ({externalWarnings.length})
+          </summary>
+          <ul className="bi-warnings-list">
+            {externalWarnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       {proposal && (
         <section className="bi-profile-block gcr-card">
           <h3 className="bi-panel__title">Blocco 2 — Proposta AI</h3>
@@ -260,14 +277,6 @@ export function BrandProfilePanel({ projectId }: BrandProfilePanelProps) {
               </span>
             </div>
           )}
-
-          {enrichResult?.warnings.length ? (
-            <ul className="bi-warnings-list">
-              {enrichResult.warnings.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-            </ul>
-          ) : null}
 
           <div className="bi-form-grid">
             <div className="gcr-field bi-form-grid--full">

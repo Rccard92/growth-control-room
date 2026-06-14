@@ -115,16 +115,6 @@ export function BrandIntelligenceOverviewPanel({
         </div>
       )}
 
-      {(overview.enrichmentWarnings?.length ?? 0) > 0 && (
-        <div className="gcr-alert gcr-alert--warning" style={{ marginTop: "1rem" }}>
-          <strong>Avvisi enrich:</strong>
-          <ul>
-            {overview.enrichmentWarnings!.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

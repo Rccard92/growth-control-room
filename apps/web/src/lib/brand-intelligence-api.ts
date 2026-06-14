@@ -46,9 +46,13 @@ export function getBrandKnowledgeScore(projectId: string): Promise<BrandKnowledg
   );
 }
 
-export function getBrandContext(projectId: string): Promise<BrandContextBundle> {
+export function getBrandContext(
+  projectId: string,
+  options?: { format?: "prompt" },
+): Promise<BrandContextBundle> {
+  const query = options?.format === "prompt" ? "?format=prompt" : "";
   return apiFetch<BrandContextBundle>(
-    `/api/projects/${projectId}/brand-intelligence/context`,
+    `/api/projects/${projectId}/brand-intelligence/context${query}`,
   );
 }
 

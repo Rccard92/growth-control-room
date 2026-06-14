@@ -7,9 +7,19 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.3.4-alpha";
+export const GCR_VERSION = "0.3.5-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.5-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Tab AI Context Preview: anteprima contesto passato ai moduli AI",
+      "promptContext.previewText human-friendly; fullText invariato per moduli AI",
+      "Avvisi fonti esterne (Trustpilot, Instagram) spostati in Brand Profile",
+    ],
+  },
   {
     version: "0.3.4-alpha",
     date: "2026-06-13",

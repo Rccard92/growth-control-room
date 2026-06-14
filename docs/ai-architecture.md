@@ -12,15 +12,18 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 # bundle.primary_source == "brand_profile" se profilo ufficiale sufficiente
 ```
 
-**Priorità context (0.3.4 machine-ready):**
+**Priorità context (0.3.5 machine-ready):**
 
 1. `brand_profiles` ufficiale → `primarySource=brand_profile` se profilo minimo presente
 2. Profilo incompleto → `primarySource=minimal`, `missingContext` unificato
 3. Bundle include `brandContextVersion: v1` e `promptContext` con blocchi testuali separati
 4. Moduli ufficiali: Profile, Identity, Visual, Safe Claims, **Product Knowledge**
 5. Product SEO: contesto brand + lookup `productKnowledge` per `shopify_product_id`; fallback generale se item assente
+6. **AI Context Preview** (tab UI): mostra `promptContext.previewText` — testo human-friendly con sezioni vuote esplicite e blocco MISSING CONTEXT
 
-Content SEO e Product SEO usano `get_prompt_context()` — beneficiano automaticamente di tutti i moduli ufficiali.
+**Regola fonte unica:** tutti i moduli AI brand-facing devono usare `BrandIntelligenceContextBuilder` e non leggere direttamente le tabelle Brand Intelligence.
+
+Content SEO e Product SEO usano `get_prompt_context()` → `fullText` (non `previewText`).
 
 ### Product SEO e Product Knowledge
 
@@ -31,9 +34,9 @@ Per ogni prodotto Shopify in ottimizzazione SEO:
 3. Se item assente → usa solo knowledge generale + dati Shopify
 4. Se Product Knowledge vuota → comportamento invariato (solo brand context + Shopify)
 
-### promptContext (v0.3.4)
+### promptContext (v0.3.5)
 
-`GET /brand-intelligence/context` restituisce sempre `promptContext` quando il profilo è sufficiente:
+`GET /brand-intelligence/context` restituisce sempre `promptContext` quando il profilo è sufficiente. Parametro opzionale `?format=prompt` (stessa response).
 
 ```json
 {
@@ -44,10 +47,14 @@ Per ogni prodotto Shopify in ottimizzazione SEO:
     "visualIdentity": "VISUAL IDENTITY\n- Colori: ...",
     "safeClaims": "SAFE CLAIMS & RED FLAGS\n- ...",
     "productKnowledge": "PRODUCT KNOWLEDGE — GENERAL\n- ...",
-    "fullText": "..."
+    "fullText": "...",
+    "previewText": "BRAND PROFILE\n...\n\nBRAND IDENTITY\nSezione non compilata.\n\nMISSING CONTEXT\n- ..."
   }
 }
 ```
+
+- **`fullText`**: contesto compatto per moduli AI (sezioni vuote omesse)
+- **`previewText`**: anteprima human-friendly per tab AI Context (sezioni vuote + MISSING CONTEXT)
 
 **Regola:** i moduli AI non devono usare campi UI raw nei prompt — solo `BrandContextBuilder` / `get_prompt_context()`.
 

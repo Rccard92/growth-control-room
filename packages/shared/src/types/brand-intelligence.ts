@@ -967,6 +967,7 @@ export interface BrandPromptContext {
   safeClaims?: string | null;
   productKnowledge?: string | null;
   fullText?: string | null;
+  previewText?: string | null;
 }
 
 export interface BrandContextBundle {
@@ -1000,4 +1001,5 @@ export type BrandIntelligenceTab =
   | "identity"
   | "visualIdentity"
   | "safeClaims"
-  | "productKnowledge";
+  | "productKnowledge"
+  | "aiContext";
