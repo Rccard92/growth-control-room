@@ -48,7 +48,17 @@ Guida rapida per ridurre i costi OpenAI senza degradare la qualità dei contenut
 5. **Salva** — la prossima generazione usa il nuovo modello senza redeploy Railway
 6. **Ripristina** torna al consigliato registry/env
 
-Banner in pagina: le variabili Railway sono solo default/fallback.
+Banner in pagina: le variabili Railway sono solo default/fallback — **non** sostituiscono le impostazioni salvate in Model Settings.
+
+## Ordine risoluzione modello
+
+1. Impostazione progetto da UI (`ai_model_settings`, `source=manual`)
+2. Impostazione globale (`project_id` NULL)
+3. Registry default + env tier (seed iniziale)
+4. `OPENAI_MODEL_CHEAP` / `STANDARD` / `PREMIUM` / `REASONING` / `FALLBACK`
+5. `OPENAI_MODEL` legacy — solo fallback finale
+
+`OPENAI_MODEL` non va rimosso da Railway, ma non comanda le richieste se esistono setting specifici per operation.
 
 ## Verifica in AI Costs
 

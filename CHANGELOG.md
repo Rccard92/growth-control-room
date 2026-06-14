@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.5-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed AI Model Settings response validation (GET `/ai-model-settings` no longer 500)
+- Normalized camelCase/snake_case mapping for model settings (internal snake_case, API camelCase output)
+- Improved empty state for AI Costs overview when no tracked requests in period
+- Clarified Railway model env variables are fallback/seed only, not global runtime override
+
 ## [0.5.4-alpha] - 2026-06-13
 
 Tipo: Alpha patch

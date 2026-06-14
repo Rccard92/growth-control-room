@@ -37,7 +37,7 @@ function EditSettingModal({
 
   useEffect(() => {
     if (item) {
-      setModel(item.model);
+      setModel(item.model ?? "");
       setModelTier(item.modelTier);
       setMaxTokens(item.maxOutputTokens ?? item.recommendedMaxOutputTokens);
       setTemperature(item.temperature ?? item.recommendedTemperature);
@@ -127,6 +127,7 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
   );
 
   const implemented = (data?.items ?? []).filter((i) => i.status === "implemented");
+  const plannedOrNonAi = (data?.items ?? []).filter((i) => i.status !== "implemented");
 
   if (isLoading) return <div className="gcr-skeleton" style={{ height: 200 }} />;
   if (isError) return <div className="gcr-alert gcr-alert--error">Impossibile caricare Model Settings.</div>;
@@ -163,7 +164,7 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
                 <td>{statusLabel(row.status)}</td>
                 <td>{row.contextProfile}</td>
                 <td>{row.modelTier}</td>
-                <td>{row.model}</td>
+                <td>{row.model ?? "—"}</td>
                 <td>{row.maxOutputTokens ?? "—"}</td>
                 <td>{row.temperature ?? "—"}</td>
                 <td>{row.source}</td>
@@ -190,6 +191,41 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
           </tbody>
         </table>
       </div>
+
+      {plannedOrNonAi.length > 0 && (
+        <div className="ai-model-settings-panel__planned">
+          <h3 className="gcr-card__title">Pianificate / Non AI</h3>
+          <div className="ai-usage-table-wrap">
+            <table className="ai-usage-table">
+              <thead>
+                <tr>
+                  <th>Punto AI</th>
+                  <th>Stato</th>
+                  <th>Profilo</th>
+                  <th>Tier consigliato</th>
+                  <th>Modello</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plannedOrNonAi.map((row) => (
+                  <tr key={row.operationKey}>
+                    <td>
+                      <strong>{row.label}</strong>
+                      <div className="ai-model-settings-panel__hint">{row.operationKey}</div>
+                    </td>
+                    <td>{statusLabel(row.status)}</td>
+                    <td>{row.contextProfile}</td>
+                    <td>{row.recommendedTier}</td>
+                    <td>—</td>
+                    <td>{row.guardrailWarnings[0] ?? row.recommendedUse}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {(data?.items ?? []).some((i) => i.guardrailWarnings.length > 0) && (
         <div className="ai-model-settings-panel__warnings">

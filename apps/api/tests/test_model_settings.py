@@ -3,18 +3,61 @@
 from __future__ import annotations
 
 import asyncio
-from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
-
+from app.api.routes.ai_model_settings import (
+    _normalize_setting_item,
+    _to_list_response,
+)
+from app.schemas.ai_model_settings import (
+    AiAvailableModelItem,
+    AiModelSettingItemResponse,
+)
 from app.schemas.ai_usage import AiRoutingInsights
 from app.services.ai.model_settings_service import (
     compute_guardrail_warnings,
+    get_available_models,
+    list_settings_for_project,
     seed_default_settings,
 )
 from app.services.ai.operation_registry import get_operation
+
+
+def _sample_snake_item(**overrides: object) -> dict:
+    base = {
+        "operation_key": "product_image_alt",
+        "label": "Alt immagine prodotto",
+        "status": "implemented",
+        "enabled": True,
+        "module": "product_seo",
+        "context_profile": "image_alt",
+        "recommended_tier": "cheap",
+        "recommended_model": "gpt-4o-mini",
+        "recommended_max_output_tokens": 120,
+        "recommended_temperature": 0.3,
+        "recommended_use": "Alt brevi",
+        "quality_level": "low",
+        "cost_sensitivity": "high",
+        "description": "Alt testo immagine",
+        "warning_notes": None,
+        "model": "gpt-4o-mini",
+        "model_tier": "cheap",
+        "max_output_tokens": 120,
+        "temperature": 0.3,
+        "fallback_model": "gpt-4o-mini",
+        "allow_fallback": True,
+        "reasoning_effort": None,
+        "notes": None,
+        "source": "env_seed",
+        "has_project_override": False,
+        "guardrail_warnings": [],
+        "recent_request_count": 0,
+        "avg_cost_recent": None,
+        "last_request_at": None,
+    }
+    base.update(overrides)
+    return base
 
 
 def test_routing_insights_snake_case_validates() -> None:
@@ -32,11 +75,162 @@ def test_routing_insights_snake_case_validates() -> None:
     assert dumped["requestsByTier"]["cheap"] == 2
 
 
+def test_setting_item_snake_case_validates() -> None:
+    item = AiModelSettingItemResponse.model_validate(_sample_snake_item())
+    dumped = item.model_dump(by_alias=True)
+    assert dumped["operationKey"] == "product_image_alt"
+    assert dumped["modelTier"] == "cheap"
+
+
+def test_setting_item_camel_case_normalizes() -> None:
+    camel = {
+        "operationKey": "blog_brief_generation",
+        "label": "Brief editoriale",
+        "status": "implemented",
+        "enabled": True,
+        "module": "blog_brief",
+        "contextProfile": "blog_brief",
+        "recommendedTier": "standard",
+        "recommendedModel": "gpt-4o-mini",
+        "recommendedMaxOutputTokens": 3000,
+        "recommendedTemperature": 0.5,
+        "recommendedUse": "Brief",
+        "qualityLevel": "high",
+        "costSensitivity": "medium",
+        "description": "Brief",
+        "model": "gpt-4o-mini",
+        "modelTier": "standard",
+        "allowFallback": True,
+        "source": "manual",
+        "hasProjectOverride": True,
+        "guardrailWarnings": [],
+        "recentRequestCount": 2,
+    }
+    normalized = _normalize_setting_item(camel)
+    item = AiModelSettingItemResponse.model_validate(normalized)
+    assert item.operation_key == "blog_brief_generation"
+    assert item.recent_request_count == 2
+
+
+def test_to_list_response_no_validation_error() -> None:
+    data = {
+        "items": [_sample_snake_item()],
+        "registry_count": 40,
+        "missing_settings": [],
+        "available_models": {
+            "env_models": {"cheap": "gpt-4o-mini"},
+            "models": [{"name": "gpt-4o-mini", "pricing_configured": True, "source": "env"}],
+            "warnings": [],
+        },
+    }
+    response = _to_list_response(data)
+    assert len(response.items) == 1
+    assert response.items[0].operation_key == "product_image_alt"
+    dumped = response.model_dump(by_alias=True)
+    assert dumped["items"][0]["operationKey"] == "product_image_alt"
+
+
+def test_to_list_response_camel_case_payload() -> None:
+    data = {
+        "items": [
+            {
+                "operationKey": "product_image_alt",
+                "label": "Alt",
+                "status": "implemented",
+                "enabled": True,
+                "module": "product_seo",
+                "contextProfile": "image_alt",
+                "recommendedTier": "cheap",
+                "recommendedModel": "gpt-4o-mini",
+                "recommendedMaxOutputTokens": 120,
+                "recommendedTemperature": 0.3,
+                "recommendedUse": "Alt",
+                "qualityLevel": "low",
+                "costSensitivity": "high",
+                "description": "d",
+                "model": "gpt-4o-mini",
+                "modelTier": "cheap",
+                "allowFallback": True,
+                "source": "env_seed",
+                "hasProjectOverride": False,
+                "guardrailWarnings": [],
+                "recentRequestCount": 0,
+            }
+        ],
+        "registryCount": 1,
+        "missingSettings": [],
+        "availableModels": {
+            "envModels": {"cheap": "gpt-4o-mini"},
+            "models": [{"name": "gpt-4o-mini", "pricingConfigured": True, "source": "env"}],
+            "warnings": [],
+        },
+    }
+    response = _to_list_response(data)
+    assert response.registry_count == 1
+    assert response.items[0].model == "gpt-4o-mini"
+
+
+def test_planned_operation_null_model() -> None:
+    item = AiModelSettingItemResponse.model_validate(
+        _sample_snake_item(
+            operation_key="collection_image_alt",
+            label="Alt collection",
+            status="planned",
+            enabled=False,
+            model=None,
+            model_tier="cheap",
+            guardrail_warnings=["Operazione pianificata — nessun modello attivo."],
+        )
+    )
+    assert item.model is None
+    assert item.status == "planned"
+
+
+def test_non_ai_operation_no_crash() -> None:
+    op = get_operation("editorial_plan_generation")
+    assert op is not None
+    assert op.status == "non_ai"
+    item = AiModelSettingItemResponse.model_validate(
+        _sample_snake_item(
+            operation_key=op.operation_key,
+            label=op.label,
+            status="non_ai",
+            enabled=False,
+            model=None,
+            module=op.module,
+            context_profile=op.context_profile,
+            recommended_tier=op.recommended_tier,
+            recommended_max_output_tokens=op.recommended_max_output_tokens,
+            recommended_temperature=op.recommended_temperature,
+            recommended_use=op.recommended_use,
+            quality_level=op.quality_level,
+            cost_sensitivity=op.cost_sensitivity,
+            description=op.description,
+            guardrail_warnings=["Operazione non AI — nessun modello configurato."],
+        )
+    )
+    assert item.status == "non_ai"
+
+
+def test_available_models_snake_case() -> None:
+    model = AiAvailableModelItem.model_validate(
+        {"name": "gpt-4o-mini", "pricing_configured": True, "source": "env"}
+    )
+    assert model.pricing_configured is True
+
+
 def test_critical_operation_cheap_warning() -> None:
     op = get_operation("article_draft_generation")
     assert op is not None
     warnings = compute_guardrail_warnings(op, model_tier="cheap", model_name="gpt-4o-mini")
     assert any("critica" in w for w in warnings)
+
+
+def test_planned_operation_guardrail_message() -> None:
+    op = get_operation("collection_image_alt")
+    assert op is not None
+    warnings = compute_guardrail_warnings(op, model_tier="cheap", model_name=None)
+    assert any("pianificata" in w.lower() for w in warnings)
 
 
 def test_unknown_model_pricing_warning() -> None:
@@ -56,5 +250,47 @@ def test_seed_default_settings_creates_rows() -> None:
         created = await seed_default_settings(session, project_id=None, source="env_seed")
         assert created > 0
         assert session.add.call_count == created
+
+    asyncio.run(run())
+
+
+def test_list_settings_empty_db_mock() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.flush = AsyncMock()
+
+        empty_scalars = MagicMock()
+        empty_scalars.all.return_value = []
+        empty_result = MagicMock()
+        empty_result.scalars.return_value = empty_scalars
+        empty_result.scalar_one_or_none.return_value = None
+        empty_result.one.return_value = (0, None, None)
+
+        session.execute = AsyncMock(return_value=empty_result)
+
+        data = await list_settings_for_project(session, project_id)
+        assert "items" in data
+        assert len(data["items"]) > 0
+        first = data["items"][0]
+        assert "operation_key" in first
+        assert "context_profile" in first
+        assert "model_tier" in first
+        assert "recommended_tier" in first
+
+    asyncio.run(run())
+
+
+def test_get_available_models_snake_case() -> None:
+    async def run() -> None:
+        session = AsyncMock()
+        log_scalars = MagicMock()
+        log_scalars.all.return_value = []
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalars=MagicMock(return_value=log_scalars))
+        )
+        data = await get_available_models(session)
+        assert "env_models" in data
+        assert "pricing_configured" in data["models"][0]
 
     asyncio.run(run())

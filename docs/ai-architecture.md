@@ -90,12 +90,12 @@ Vedi anche [Ottimizzazione costi AI](cost-optimization.md).
 
 1. Setting manuale progetto per `operation_key`
 2. Setting globale per `operation_key`
-3. Registry default + env tier
+3. Registry default + env tier (`OPENAI_MODEL_CHEAP/STANDARD/PREMIUM/REASONING`)
 4. `OPENAI_MODEL_FALLBACK`
 5. `OPENAI_MODEL` legacy
 6. Errore se nessun modello disponibile
 
-`OPENAI_MODEL` Railway **non** comanda più tutte le richieste: serve solo come fallback finale e seed iniziale. Le scelte operative vivono in **AI Costs → Model Settings**.
+`OPENAI_MODEL` Railway **non** comanda più tutte le richieste: serve solo come fallback finale e seed iniziale. Non va rimosso, ma non sostituisce setting DB per operation. Le scelte operative vivono in **AI Costs → Model Settings**.
 
 `AiRequestMetadata.operation_key` è obbligatorio sui call site implementati; se assente, inferenza da `module+operation+context_profile` con warning (no crash).
 

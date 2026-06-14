@@ -14,7 +14,7 @@ export interface AiModelSettingItem {
   costSensitivity: string;
   description: string;
   warningNotes: string | null;
-  model: string;
+  model: string | null;
   modelTier: string;
   maxOutputTokens: number | null;
   temperature: number | null;

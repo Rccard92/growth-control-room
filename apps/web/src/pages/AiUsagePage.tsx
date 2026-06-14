@@ -231,6 +231,12 @@ export function AiUsagePage() {
   }));
 
   const routingInsights = summary?.routingInsights;
+  const hasNoTrackedRequests = summary != null && summary.totalRequests === 0;
+  const hasMissingPricing =
+    summary != null
+    && summary.totalRequests > 0
+    && (summary.totalEstimatedCost === 0
+      || (routingInsights?.unconfiguredModelWarnings?.length ?? 0) > 0);
 
   return (
     <motion.div
@@ -332,6 +338,16 @@ export function AiUsagePage() {
         <div className="gcr-alert gcr-alert--error">Impossibile caricare i dati AI usage.</div>
       ) : activeTab === "overview" && summary ? (
         <>
+          {hasNoTrackedRequests && (
+            <div className="gcr-alert gcr-alert--info ai-usage-page__empty-state">
+              Nessuna richiesta AI tracciata nel periodo selezionato. I dati partono dal momento in cui AI Usage Monitor è stato attivato.
+            </div>
+          )}
+          {hasMissingPricing && (
+            <div className="gcr-alert gcr-alert--warning ai-usage-page__empty-state">
+              Alcuni costi non sono calcolati perché manca il pricing del modello.
+            </div>
+          )}
           <div className="gcr-grid gcr-grid--4 ai-usage-page__kpis">
             <MetricCard label="Costo stimato periodo" value={formatCost(summary.totalEstimatedCost)} />
             <MetricCard label="Richieste totali" value={summary.totalRequests} />

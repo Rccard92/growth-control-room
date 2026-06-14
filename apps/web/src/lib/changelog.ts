@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.5-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed AI Model Settings response validation",
+      "Normalized camelCase/snake_case mapping for model settings",
+      "Improved empty state for AI Costs overview",
+      "Clarified model env variables are fallback only",
+    ],
+  },
+  {
     version: "0.5.4-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

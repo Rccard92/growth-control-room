@@ -135,10 +135,16 @@ def compute_guardrail_warnings(
     op: AiOperationDefinition | None,
     *,
     model_tier: str,
-    model_name: str,
+    model_name: str | None,
 ) -> list[str]:
     warnings: list[str] = []
     if op is None:
+        return warnings
+    if op.status == "planned":
+        warnings.append("Operazione pianificata — nessun modello attivo.")
+        return warnings
+    if op.status == "non_ai":
+        warnings.append("Operazione non AI — nessun modello configurato.")
         return warnings
     cheap_tiers = {"cheap"}
     premium_tiers = {"premium", "reasoning"}
@@ -150,7 +156,7 @@ def compute_guardrail_warnings(
         warnings.append(
             f"Operation '{op.operation_key}' usa tier premium su task economico consigliato."
         )
-    if estimate_usage_cost(model_name, input_tokens=1, output_tokens=1) is None:
+    if model_name and estimate_usage_cost(model_name, input_tokens=1, output_tokens=1) is None:
         warnings.append(
             f"Costo stimato non affidabile: pricing modello '{model_name}' mancante."
         )
@@ -183,7 +189,7 @@ async def get_available_models(session: AsyncSession) -> dict[str, Any]:
         models.append(
             {
                 "name": name,
-                "pricingConfigured": estimate_usage_cost(name, input_tokens=1, output_tokens=1)
+                "pricing_configured": estimate_usage_cost(name, input_tokens=1, output_tokens=1)
                 is not None,
                 "source": (
                     "env"
@@ -200,7 +206,7 @@ async def get_available_models(session: AsyncSession) -> dict[str, Any]:
         if tier not in ("legacy",) and not val
     ]
     return {
-        "envModels": env_models,
+        "env_models": env_models,
         "models": models,
         "warnings": warnings,
     }
@@ -226,9 +232,9 @@ async def _usage_stats_for_operation(
     avg = float(row[1]) if row[1] is not None else None
     last_at = row[2]
     return {
-        "recentRequestCount": count,
-        "avgCostRecent": avg,
-        "lastRequestAt": last_at.isoformat() if last_at else None,
+        "recent_request_count": count,
+        "avg_cost_recent": avg,
+        "last_request_at": last_at.isoformat() if last_at else None,
     }
 
 
@@ -268,7 +274,7 @@ async def list_settings_for_project(
         stats = (
             await _usage_stats_for_operation(session, project_id, op.operation_key)
             if op.status == "implemented"
-            else {"recentRequestCount": 0, "avgCostRecent": None, "lastRequestAt": None}
+            else {"recent_request_count": 0, "avg_cost_recent": None, "last_request_at": None}
         )
         source = "registry_default"
         if op.operation_key in project_rows:
@@ -276,39 +282,44 @@ async def list_settings_for_project(
         elif op.operation_key in global_rows:
             source = global_rows[op.operation_key].source or "default"
 
+        is_operational = op.status == "implemented"
+        display_model = effective.model if is_operational else None
+        display_enabled = effective.enabled if is_operational else False
+        display_tier = effective.model_tier if is_operational else op.recommended_tier
+
         warnings = compute_guardrail_warnings(
             registry,
-            model_tier=effective.model_tier,
-            model_name=effective.model,
+            model_tier=display_tier,
+            model_name=display_model,
         )
         items.append(
             {
-                "operationKey": op.operation_key,
+                "operation_key": op.operation_key,
                 "label": op.label,
                 "status": op.status,
-                "enabled": effective.enabled,
+                "enabled": display_enabled,
                 "module": op.module,
-                "contextProfile": op.context_profile,
-                "recommendedTier": op.recommended_tier,
-                "recommendedModel": _default_model_for_operation(op),
-                "recommendedMaxOutputTokens": op.recommended_max_output_tokens,
-                "recommendedTemperature": op.recommended_temperature,
-                "recommendedUse": op.recommended_use,
-                "qualityLevel": op.quality_level,
-                "costSensitivity": op.cost_sensitivity,
+                "context_profile": op.context_profile,
+                "recommended_tier": op.recommended_tier,
+                "recommended_model": _default_model_for_operation(op),
+                "recommended_max_output_tokens": op.recommended_max_output_tokens,
+                "recommended_temperature": op.recommended_temperature,
+                "recommended_use": op.recommended_use,
+                "quality_level": op.quality_level,
+                "cost_sensitivity": op.cost_sensitivity,
                 "description": op.description,
-                "warningNotes": op.warning_notes,
-                "model": effective.model,
-                "modelTier": effective.model_tier,
-                "maxOutputTokens": effective.max_output_tokens,
-                "temperature": float(effective.temperature) if effective.temperature else None,
-                "fallbackModel": effective.fallback_model,
-                "allowFallback": effective.allow_fallback,
-                "reasoningEffort": effective.reasoning_effort,
+                "warning_notes": op.warning_notes,
+                "model": display_model,
+                "model_tier": display_tier,
+                "max_output_tokens": effective.max_output_tokens if is_operational else None,
+                "temperature": float(effective.temperature) if is_operational and effective.temperature else None,
+                "fallback_model": effective.fallback_model if is_operational else None,
+                "allow_fallback": effective.allow_fallback if is_operational else True,
+                "reasoning_effort": effective.reasoning_effort if is_operational else None,
                 "notes": effective.notes,
                 "source": source,
-                "hasProjectOverride": op.operation_key in project_rows,
-                "guardrailWarnings": warnings,
+                "has_project_override": op.operation_key in project_rows,
+                "guardrail_warnings": warnings,
                 **stats,
             }
         )
@@ -316,9 +327,9 @@ async def list_settings_for_project(
     available = await get_available_models(session)
     return {
         "items": items,
-        "registryCount": len(AI_OPERATIONS),
-        "missingSettings": missing,
-        "availableModels": available,
+        "registry_count": len(AI_OPERATIONS),
+        "missing_settings": missing,
+        "available_models": available,
     }
 
 
