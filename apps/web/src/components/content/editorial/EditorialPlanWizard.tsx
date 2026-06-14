@@ -14,6 +14,8 @@ import {
 } from "@gcr/shared";
 import { AppModal } from "../../ui/AppModal";
 import { AppSelect } from "../../ui/AppSelect";
+import { AppCheckbox } from "../../ui/AppCheckbox";
+import { AppDatePicker } from "../../ui/AppDatePicker";
 import { useGenerateEditorialCalendar } from "../../../hooks/useContentSeoEditorial";
 import { useShopifyProducts } from "../../../hooks/useShopify";
 
@@ -48,8 +50,11 @@ const INTENSITY_OPTIONS: { value: ContentSeoEditorialCommercialIntensity; label:
 ];
 
 const OBJECTIVE_OPTIONS = Object.entries(CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS).map(
-  ([value, label]) => ({ value, label }),
+  ([value, label]) => ({ value: value as ContentSeoEditorialObjective, label }),
 );
+
+const EDITORIAL_PLAN_ERROR =
+  "Impossibile generare il piano editoriale. Controlla i dati inseriti e riprova.";
 
 function defaultEndDate(): string {
   const d = new Date();
@@ -88,7 +93,10 @@ export function EditorialPlanWizard({
     "educational_article",
     "product_guide",
   ]);
-  const [objective, setObjective] = useState<ContentSeoEditorialObjective>("seo_traffic");
+  const [objectives, setObjectives] = useState<ContentSeoEditorialObjective[]>([
+    "education",
+    "seo_traffic",
+  ]);
   const [commercialIntensity, setCommercialIntensity] =
     useState<ContentSeoEditorialCommercialIntensity>("balanced");
   const [linkedProductIds, setLinkedProductIds] = useState<string[]>([]);
@@ -117,7 +125,7 @@ export function EditorialPlanWizard({
       frequency,
       preferredWeekdays: needsWeekdays ? preferredWeekdays : null,
       contentTypes,
-      objective,
+      objectives,
       commercialIntensity,
       linkedProductIds,
       avoidProductIds,
@@ -139,7 +147,16 @@ export function EditorialPlanWizard({
     if (step === 2 || step === 5) {
       if (contentTypes.length === 0) return "Seleziona almeno una tipologia di contenuto.";
     }
+    if (step === 3 || step === 5) {
+      if (objectives.length === 0) return "Seleziona almeno un obiettivo.";
+    }
     return null;
+  }
+
+  function toggleObjective(value: ContentSeoEditorialObjective) {
+    setObjectives((prev) =>
+      prev.includes(value) ? prev.filter((o) => o !== value) : [...prev, value],
+    );
   }
 
   function toggleContentType(type: ContentSeoEditorialContentType) {
@@ -181,7 +198,8 @@ export function EditorialPlanWizard({
       setPreviewItems(result.items);
       setStep(5);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Errore durante l'anteprima.");
+      console.error(e);
+      setError(EDITORIAL_PLAN_ERROR);
     }
   }
 
@@ -200,7 +218,8 @@ export function EditorialPlanWizard({
       onConfirmed();
       handleClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Errore durante la creazione del piano.");
+      console.error(e);
+      setError(EDITORIAL_PLAN_ERROR);
     }
   }
 
@@ -277,24 +296,18 @@ export function EditorialPlanWizard({
       {step === 1 && (
         <section className="editorial-wizard__body">
           <h4>Periodo e frequenza</h4>
-          <label className="gcr-field">
-            <span className="gcr-field__label">Data inizio</span>
-            <input
-              type="date"
-              className="gcr-input"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </label>
-          <label className="gcr-field">
-            <span className="gcr-field__label">Data fine</span>
-            <input
-              type="date"
-              className="gcr-input"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </label>
+          <AppDatePicker
+            label="Data inizio"
+            value={startDate}
+            max={endDate}
+            onChange={setStartDate}
+          />
+          <AppDatePicker
+            label="Data fine"
+            value={endDate}
+            min={startDate}
+            onChange={setEndDate}
+          />
           <AppSelect
             label="Frequenza"
             value={frequency}
@@ -305,14 +318,12 @@ export function EditorialPlanWizard({
             <fieldset className="editorial-wizard__checkbox-group">
               <legend className="gcr-field__label">Giorni preferiti</legend>
               {WEEKDAY_OPTIONS.map((opt) => (
-                <label key={opt.value} className="editorial-wizard__checkbox">
-                  <input
-                    type="checkbox"
-                    checked={preferredWeekdays.includes(opt.value)}
-                    onChange={() => toggleWeekday(opt.value)}
-                  />
-                  {opt.label}
-                </label>
+                <AppCheckbox
+                  key={opt.value}
+                  checked={preferredWeekdays.includes(opt.value)}
+                  onChange={() => toggleWeekday(opt.value)}
+                  label={opt.label}
+                />
               ))}
             </fieldset>
           )}
@@ -324,14 +335,13 @@ export function EditorialPlanWizard({
           <h4>Tipologie di contenuto</h4>
           <div className="editorial-wizard__checkbox-group">
             {ALL_CONTENT_TYPES.map((type) => (
-              <label key={type} className="editorial-wizard__checkbox">
-                <input
-                  type="checkbox"
-                  checked={contentTypes.includes(type)}
-                  onChange={() => toggleContentType(type)}
-                />
-                {CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS[type]}
-              </label>
+              <AppCheckbox
+                key={type}
+                variant="card"
+                checked={contentTypes.includes(type)}
+                onChange={() => toggleContentType(type)}
+                label={CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS[type]}
+              />
             ))}
           </div>
         </section>
@@ -340,12 +350,18 @@ export function EditorialPlanWizard({
       {step === 3 && (
         <section className="editorial-wizard__body">
           <h4>Obiettivo e intensità commerciale</h4>
-          <AppSelect
-            label="Obiettivo"
-            value={objective}
-            options={OBJECTIVE_OPTIONS}
-            onChange={(v) => setObjective(v as ContentSeoEditorialObjective)}
-          />
+          <p className="gcr-field__label">Obiettivi (seleziona uno o più)</p>
+          <div className="editorial-wizard__checkbox-group">
+            {OBJECTIVE_OPTIONS.map((opt) => (
+              <AppCheckbox
+                key={opt.value}
+                variant="card"
+                checked={objectives.includes(opt.value)}
+                onChange={() => toggleObjective(opt.value)}
+                label={opt.label}
+              />
+            ))}
+          </div>
           <AppSelect
             label="Intensità commerciale"
             value={commercialIntensity}
@@ -381,14 +397,12 @@ export function EditorialPlanWizard({
                   <p className="gcr-field__label">Prodotti da valorizzare</p>
                   <div className="editorial-wizard__product-scroll">
                     {filteredProducts.map((p) => (
-                      <label key={`link-${p.id}`} className="editorial-wizard__checkbox">
-                        <input
-                          type="checkbox"
-                          checked={linkedProductIds.includes(p.id)}
-                          onChange={() => toggleProductId(p.id, "linked")}
-                        />
-                        {p.title}
-                      </label>
+                      <AppCheckbox
+                        key={`link-${p.id}`}
+                        checked={linkedProductIds.includes(p.id)}
+                        onChange={() => toggleProductId(p.id, "linked")}
+                        label={p.title}
+                      />
                     ))}
                     {filteredProducts.length === 0 && (
                       <p className="gcr-card__description">Nessun prodotto trovato.</p>
@@ -399,14 +413,12 @@ export function EditorialPlanWizard({
                   <p className="gcr-field__label">Prodotti da evitare</p>
                   <div className="editorial-wizard__product-scroll">
                     {filteredProducts.map((p) => (
-                      <label key={`avoid-${p.id}`} className="editorial-wizard__checkbox">
-                        <input
-                          type="checkbox"
-                          checked={avoidProductIds.includes(p.id)}
-                          onChange={() => toggleProductId(p.id, "avoid")}
-                        />
-                        {p.title}
-                      </label>
+                      <AppCheckbox
+                        key={`avoid-${p.id}`}
+                        checked={avoidProductIds.includes(p.id)}
+                        onChange={() => toggleProductId(p.id, "avoid")}
+                        label={p.title}
+                      />
                     ))}
                   </div>
                 </div>
@@ -414,15 +426,19 @@ export function EditorialPlanWizard({
             </>
           )}
           <label className="gcr-field">
-            <span className="gcr-field__label">Keyword principali (separate da virgola)</span>
+            <span className="gcr-field__label">Keyword principali (facoltativo, separate da virgola)</span>
             <input
               className="gcr-input"
               value={primaryKeywords}
               onChange={(e) => setPrimaryKeywords(e.target.value)}
             />
+            <span className="gcr-field__help">
+              Facoltativo: se non inserisci keyword, il sistema le proporrà nel brief usando Brand
+              Intelligence e dati prodotto.
+            </span>
           </label>
           <label className="gcr-field">
-            <span className="gcr-field__label">Note</span>
+            <span className="gcr-field__label">Note (facoltativo)</span>
             <textarea
               className="gcr-input"
               rows={3}
@@ -442,6 +458,8 @@ export function EditorialPlanWizard({
                 <strong>{item.plannedDate.slice(0, 10)}</strong> — {item.title}
                 <span className="editorial-wizard__preview-type">
                   {CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS[item.contentType]}
+                  {item.objective &&
+                    ` · ${CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS[item.objective]}`}
                 </span>
               </li>
             ))}

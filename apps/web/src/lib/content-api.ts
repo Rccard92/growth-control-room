@@ -24,7 +24,7 @@ import type {
   EditorialPlanGenerateResponse,
   EditorialBriefUpdateRequest,
 } from "@gcr/shared";
-import { apiFetch } from "./api";
+import { apiFetch, jsonBody } from "./api";
 
 export function syncSeoOptimizer(projectId: string): Promise<SeoOptimizerSyncResponse> {
   return apiFetch<SeoOptimizerSyncResponse>(
@@ -304,7 +304,7 @@ export function createEditorialItem(
 ): Promise<ContentSeoEditorialItem> {
   return apiFetch<ContentSeoEditorialItem>(
     `/api/projects/${projectId}/content/seo/editorial-items`,
-    { method: "POST", body: JSON.stringify(data) },
+    { method: "POST", ...jsonBody(data) },
   );
 }
 
@@ -315,7 +315,7 @@ export function updateEditorialItem(
 ): Promise<ContentSeoEditorialItem> {
   return apiFetch<ContentSeoEditorialItem>(
     `/api/projects/${projectId}/content/seo/editorial-items/${itemId}`,
-    { method: "PUT", body: JSON.stringify(data) },
+    { method: "PUT", ...jsonBody(data) },
   );
 }
 
@@ -334,7 +334,7 @@ export function generateEditorialCalendar(
   const q = dryRun ? "?dryRun=true" : "";
   return apiFetch<EditorialPlanGenerateResponse>(
     `/api/projects/${projectId}/content/seo/editorial-plan/generate-calendar${q}`,
-    { method: "POST", body: JSON.stringify(data) },
+    { method: "POST", ...jsonBody(data) },
   );
 }
 
@@ -355,6 +355,6 @@ export function updateEditorialBrief(
 ): Promise<ContentSeoEditorialItem> {
   return apiFetch<ContentSeoEditorialItem>(
     `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/brief`,
-    { method: "PUT", body: JSON.stringify(data) },
+    { method: "PUT", ...jsonBody(data) },
   );
 }

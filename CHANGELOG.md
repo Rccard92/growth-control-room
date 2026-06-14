@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.3-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed editorial plan payload serialization
+- Added custom dark date picker
+- Added custom checkbox component
+- Added multi-objective editorial planning
+- Made keywords and notes optional
+
 ## [0.4.2-alpha] - 2026-06-13
 
 Tipo: Alpha patch

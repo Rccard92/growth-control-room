@@ -55,6 +55,13 @@ function buildFetchError(path: string, status: number, text: string): Error {
   return new Error(text || `Richiesta fallita (${status})`);
 }
 
+export function jsonBody(data: unknown): Pick<RequestInit, "body" | "headers"> {
+  return {
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  };
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,

@@ -207,7 +207,10 @@ class EditorialPlanGenerateRequest(BaseModel):
     content_types: list[ContentSeoEditorialContentType] = Field(
         validation_alias="contentTypes"
     )
-    objective: ContentSeoEditorialObjective
+    objectives: list[ContentSeoEditorialObjective] = Field(
+        default_factory=list, validation_alias="objectives"
+    )
+    objective: ContentSeoEditorialObjective | None = None
     commercial_intensity: ContentSeoEditorialCommercialIntensity = Field(
         validation_alias="commercialIntensity"
     )
@@ -230,6 +233,10 @@ class EditorialPlanGenerateRequest(BaseModel):
             raise ValueError("Seleziona almeno una tipologia di contenuto.")
         if self.frequency in ("custom", "twice_weekly") and not self.preferred_weekdays:
             raise ValueError("Seleziona almeno un giorno preferito per questa frequenza.")
+        if not self.objectives and self.objective:
+            self.objectives = [self.objective]
+        elif not self.objectives:
+            self.objectives = ["education"]
         return self
 
 

@@ -441,6 +441,12 @@
   color: var(--gcr-text-dim);
 }
 
+.gcr-field__help {
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.4;
+}
+
 /* Tables */
 .gcr-table {
   width: 100%;

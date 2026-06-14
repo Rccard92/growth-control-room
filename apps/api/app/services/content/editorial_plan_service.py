@@ -231,10 +231,12 @@ async def generate_editorial_calendar(
     brand = await _brand_name(session, project_id)
     status_value = _initial_status(request)
     content_types = request.content_types
+    objectives = request.objectives
 
     built: list[ContentSeoEditorialItem] = []
     for index, planned in enumerate(dates):
         content_type = content_types[index % len(content_types)]
+        objective = objectives[index % len(objectives)]
         keyword = _pick_keyword(request.primary_keywords, index)
         product = usable_products[index % len(usable_products)] if usable_products else None
         title = _build_title(
@@ -251,7 +253,7 @@ async def generate_editorial_calendar(
             content_type=content_type,
             planned_date=planned,
             status=status_value,
-            objective=request.objective,
+            objective=objective,
             primary_keyword=keyword if request.primary_keywords else None,
             commercial_intensity=request.commercial_intensity,
             linked_shopify_product_id=product.id if product else None,

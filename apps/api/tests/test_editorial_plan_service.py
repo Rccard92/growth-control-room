@@ -24,7 +24,7 @@ def _base_request(**overrides) -> EditorialPlanGenerateRequest:
         "frequency": "weekly",
         "preferredWeekdays": ["monday"],
         "contentTypes": ["educational_article", "recipe"],
-        "objective": "seo_traffic",
+        "objectives": ["seo_traffic"],
         "commercialIntensity": "balanced",
     }
     payload.update(overrides)
@@ -196,5 +196,102 @@ def test_generate_editorial_calendar_mixed_content_types_rotation() -> None:
             )
             types = [row.content_type for row in rows]
             assert types == ["educational_article", "product_guide", "recipe", "educational_article"]
+
+    asyncio.run(run())
+
+
+def test_objectives_normalization_from_legacy_objective() -> None:
+    request = EditorialPlanGenerateRequest.model_validate(
+        {
+            "startDate": "2026-06-01",
+            "endDate": "2026-06-03",
+            "frequency": "daily",
+            "contentTypes": ["recipe"],
+            "objective": "push_products",
+            "commercialIntensity": "balanced",
+        }
+    )
+    assert request.objectives == ["push_products"]
+
+
+def test_objectives_default_when_empty() -> None:
+    request = EditorialPlanGenerateRequest.model_validate(
+        {
+            "startDate": "2026-06-01",
+            "endDate": "2026-06-03",
+            "frequency": "daily",
+            "contentTypes": ["recipe"],
+            "commercialIntensity": "balanced",
+        }
+    )
+    assert request.objectives == ["education"]
+
+
+def test_generate_editorial_calendar_objectives_rotation() -> None:
+    request = _base_request(
+        frequency="daily",
+        endDate="2026-06-04",
+        objectives=["education", "seo_traffic", "answer_objections"],
+    )
+    project_id = uuid4()
+    mock_session = AsyncMock()
+
+    async def run():
+        with (
+            patch(
+                "app.services.content.editorial_plan_service._load_products",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.content.editorial_plan_service._brand_name",
+                new=AsyncMock(return_value=None),
+            ),
+        ):
+            rows = await generate_editorial_calendar(
+                mock_session,
+                project_id,
+                request,
+                dry_run=True,
+            )
+            objectives = [row.objective for row in rows]
+            assert objectives == [
+                "education",
+                "seo_traffic",
+                "answer_objections",
+                "education",
+            ]
+
+    asyncio.run(run())
+
+
+def test_generate_editorial_calendar_without_keywords() -> None:
+    request = _base_request(
+        frequency="daily",
+        endDate="2026-06-02",
+        primaryKeywords=[],
+    )
+    project_id = uuid4()
+    mock_session = AsyncMock()
+
+    async def run():
+        with (
+            patch(
+                "app.services.content.editorial_plan_service._load_products",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.content.editorial_plan_service._brand_name",
+                new=AsyncMock(return_value=None),
+            ),
+        ):
+            rows = await generate_editorial_calendar(
+                mock_session,
+                project_id,
+                request,
+                dry_run=True,
+            )
+            assert len(rows) == 2
+            assert rows[0].primary_keyword is None
+            assert rows[0].status == "idea"
 
     asyncio.run(run())

@@ -525,7 +525,8 @@ export interface EditorialPlanGenerateRequest {
   frequency: ContentSeoEditorialFrequency;
   preferredWeekdays?: EditorialWeekday[] | null;
   contentTypes: ContentSeoEditorialContentType[];
-  objective: ContentSeoEditorialObjective;
+  objectives?: ContentSeoEditorialObjective[];
+  objective?: ContentSeoEditorialObjective;
   commercialIntensity: ContentSeoEditorialCommercialIntensity;
   linkedProductIds?: string[];
   avoidProductIds?: string[];
