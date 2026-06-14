@@ -4,6 +4,8 @@ import type {
   AiModelSettingMutationResponse,
   AiModelSettingsListResponse,
   AiModelSettingUpdateInput,
+  AiModelValidateInput,
+  AiModelValidateResponse,
 } from "@gcr/shared";
 import { apiFetch, jsonBody } from "./api";
 
@@ -59,4 +61,14 @@ export function seedAiModelDefaults(projectId: string): Promise<{
 
 export function getAvailableAiModels(): Promise<AiAvailableModelsResponse> {
   return apiFetch<AiAvailableModelsResponse>("/api/ai-model-settings/available-models");
+}
+
+export function validateAiModel(
+  projectId: string,
+  body: AiModelValidateInput,
+): Promise<AiModelValidateResponse> {
+  return apiFetch<AiModelValidateResponse>(
+    `/api/projects/${projectId}/ai-model-settings/validate-model`,
+    { method: "POST", ...jsonBody(body) },
+  );
 }

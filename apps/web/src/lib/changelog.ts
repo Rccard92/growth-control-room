@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.8-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed AI generation failures after model settings routing",
+      "Centralized OpenAI request parameter compatibility",
+      "Added better OpenAI 400 error logging and UI feedback",
+      "Ensured generators use operation-level model settings",
+    ],
+  },
+  {
     version: "0.5.7-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

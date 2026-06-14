@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AiModelSettingUpdateInput } from "@gcr/shared";
+import type { AiModelSettingUpdateInput, AiModelValidateInput } from "@gcr/shared";
 import {
   applyGcrRecommendations,
   getAiModelSettings,
   resetAiModelSetting,
   resetModelsFromRailway,
   updateAiModelSetting,
+  validateAiModel,
 } from "../lib/ai-model-settings-api";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -60,5 +61,11 @@ export function useResetModelsFromRailway(projectId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.aiModelSettings.list(projectId) });
     },
+  });
+}
+
+export function useValidateAiModel(projectId: string) {
+  return useMutation({
+    mutationFn: (body: AiModelValidateInput) => validateAiModel(projectId, body),
   });
 }

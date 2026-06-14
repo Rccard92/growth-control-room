@@ -99,7 +99,32 @@ Vedi anche [Ottimizzazione costi AI](cost-optimization.md).
 
 `AiRequestMetadata.operation_key` è obbligatorio sui call site implementati; se assente, inferenza da `module+operation+context_profile` con warning (no crash).
 
-API: `GET/PUT/POST /api/projects/{id}/ai-model-settings`, `GET /api/ai-model-settings/available-models`.
+API: `GET/PUT/POST /api/projects/{id}/ai-model-settings`, `GET /api/ai-model-settings/available-models`, `POST /api/projects/{id}/ai-model-settings/validate-model`.
+
+### Compatibilità parametri OpenAI (0.5.8-alpha)
+
+`apps/api/app/services/ai/model_request_params.py` adatta i parametri Chat Completions al modello risolto:
+
+| Famiglia | Modelli | Parametri |
+|----------|---------|-----------|
+| `legacy_chat` | gpt-4o, gpt-4o-mini | `max_tokens`, `temperature`, `response_format` |
+| `reasoning` | gpt-5.x, o1, o3 | `max_completion_tokens`, `reasoning_effort` (no `temperature`) |
+
+Flusso runtime:
+
+```
+operation_key → DB Model Settings → resolve_ai_model → build_openai_request_params → chat.completions.create
+```
+
+Env Railway (seed/fallback, non override globale runtime):
+
+- `OPENAI_API_KEY` — obbligatoria per generazione AI
+- `OPENAI_MODEL_CHEAP/STANDARD/PREMIUM/REASONING/FALLBACK` — seed tier e fallback
+- `OPENAI_MODEL` — fallback finale legacy
+
+La scelta operativa per ogni funzione AI viene da **Model Settings** (DB) per `operation_key`.
+
+Errori OpenAI (`BadRequestError`, accesso modello) vengono loggati in `AiUsageLog` con `status=error` e messaggio leggibile verso UI. Con `use_ai=true`, i generatori SEO non fanno più fallback rule-based silenzioso su errore AI.
 
 ### Moduli tracciati
 

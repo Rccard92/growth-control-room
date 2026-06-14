@@ -8,6 +8,7 @@ import {
   useResetAiModelSetting,
   useResetModelsFromRailway,
   useUpdateAiModelSetting,
+  useValidateAiModel,
 } from "../hooks/useAiModelSettings";
 import { updateAiModelSetting } from "../lib/ai-model-settings-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -48,9 +49,13 @@ function SettingRow({
   onDraftChange,
   onSave,
   onReset,
+  onTest,
   saving,
   resetting,
+  testing,
   pricedModels,
+  knownModels,
+  testFeedback,
 }: {
   item: AiModelSettingItem;
   modelOptions: string[];
@@ -58,9 +63,13 @@ function SettingRow({
   onDraftChange: (value: string) => void;
   onSave: () => void;
   onReset: () => void;
+  onTest: () => void;
   saving: boolean;
   resetting: boolean;
+  testing: boolean;
   pricedModels: Set<string>;
+  knownModels: Set<string>;
+  testFeedback: string | null;
 }) {
   const [useCustom, setUseCustom] = useState(
     () => Boolean(draftModel) && !modelOptions.includes(draftModel),
@@ -82,6 +91,7 @@ function SettingRow({
   };
 
   const rowUnpriced = Boolean(draftModel.trim()) && !pricedModels.has(draftModel.trim());
+  const rowUnverified = Boolean(draftModel.trim()) && !knownModels.has(draftModel.trim());
 
   return (
     <article className="ai-models-row gcr-card">
@@ -123,6 +133,15 @@ function SettingRow({
           {rowUnpriced && (
             <p className="ai-models-row__warn">Pricing non configurato per questo modello.</p>
           )}
+          {rowUnverified && (
+            <p className="ai-models-row__warn">Modello non verificato.</p>
+          )}
+          {item.guardrailWarnings.map((warning) => (
+            <p key={warning} className="ai-models-row__warn">{warning}</p>
+          ))}
+          {testFeedback && (
+            <p className="ai-models-row__warn">{testFeedback}</p>
+          )}
           <div className="ai-models-row__actions">
             <button
               type="button"
@@ -131,6 +150,14 @@ function SettingRow({
               onClick={onSave}
             >
               Salva
+            </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              disabled={testing || !draftModel.trim()}
+              onClick={onTest}
+            >
+              Test modello
             </button>
             <button
               type="button"
@@ -167,7 +194,11 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
   const applyGcrMutation = useApplyGcrRecommendations(projectId);
   const resetRailwayMutation = useResetModelsFromRailway(projectId);
 
+  const validateMutation = useValidateAiModel(projectId);
+
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [testFeedbackByKey, setTestFeedbackByKey] = useState<Record<string, string>>({});
+  const [testingKey, setTestingKey] = useState<string | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<AiModelUiCategory | null>(
     "product_collection_seo",
   );
@@ -188,21 +219,22 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
   );
 
   const modelOptions = useMemo(() => {
-    const names = new Set<string>([
-      "gpt-5.4-nano",
-      "gpt-5.4-mini",
-      "gpt-5.4",
-      "gpt-5.5",
-    ]);
-    for (const m of data?.availableModels.models ?? []) {
-      names.add(m.name);
-    }
+    const known = (data?.availableModels.models ?? []).filter((m) => m.knownSupported);
+    const names = new Set<string>(known.map((m) => m.name));
     for (const item of data?.items ?? []) {
       if (item.model) names.add(item.model);
-      names.add(item.gcrRecommendedModel);
     }
     return Array.from(names).sort();
   }, [data]);
+
+  const knownModels = useMemo(
+    () => new Set(
+      (data?.availableModels.models ?? [])
+        .filter((m) => m.knownSupported)
+        .map((m) => m.name),
+    ),
+    [data],
+  );
 
   const pricedModels = useMemo(
     () => new Set(
@@ -245,6 +277,39 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
     }
     return map;
   }, [implemented]);
+
+  const handleTestRow = (operationKey: string) => {
+    const model = drafts[operationKey]?.trim();
+    if (!model) return;
+    setTestingKey(operationKey);
+    setTestFeedbackByKey((prev) => {
+      const next = { ...prev };
+      delete next[operationKey];
+      return next;
+    });
+    validateMutation.mutate(
+      { model, operationKey, runProbe: true },
+      {
+        onSuccess: (result) => {
+          const message = result.probeMessage
+            ?? (result.valid ? "Modello OK." : result.warnings.join(" "));
+          setTestFeedbackByKey((prev) => ({
+            ...prev,
+            [operationKey]: result.probeStatus === "ok"
+              ? `Test OK: ${message}`
+              : message,
+          }));
+        },
+        onError: (err) => {
+          setTestFeedbackByKey((prev) => ({
+            ...prev,
+            [operationKey]: err instanceof Error ? err.message : "Test modello fallito.",
+          }));
+        },
+        onSettled: () => setTestingKey(null),
+      },
+    );
+  };
 
   const handleSaveRow = (operationKey: string) => {
     const model = drafts[operationKey]?.trim();
@@ -374,9 +439,13 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
                       }
                       onSave={() => handleSaveRow(item.operationKey)}
                       onReset={() => resetMutation.mutate(item.operationKey)}
+                      onTest={() => handleTestRow(item.operationKey)}
                       saving={updateMutation.isPending}
                       resetting={resetMutation.isPending}
+                      testing={testingKey === item.operationKey}
                       pricedModels={pricedModels}
+                      knownModels={knownModels}
+                      testFeedback={testFeedbackByKey[item.operationKey] ?? null}
                     />
                   ))}
                 </div>

@@ -19,6 +19,8 @@ from app.schemas.ai_model_settings import (
     AiModelSettingMutationResponse,
     AiModelSettingsListResponse,
     AiModelSettingUpdateRequest,
+    AiModelValidateRequest,
+    AiModelValidateResponse,
 )
 from app.services.ai.model_settings_service import (
     apply_gcr_recommendations,
@@ -29,6 +31,7 @@ from app.services.ai.model_settings_service import (
     reset_project_setting,
     seed_default_settings,
     update_project_setting,
+    validate_model_for_operation,
 )
 from app.services.ai.operation_registry import get_operation, tier_cost_profile_label
 from app.services.projects import get_project_in_default_workspace
@@ -68,6 +71,7 @@ _ITEM_CAMEL_TO_SNAKE: dict[str, str] = {
 _AVAILABLE_CAMEL_TO_SNAKE: dict[str, str] = {
     "envModels": "env_models",
     "pricingConfigured": "pricing_configured",
+    "knownSupported": "known_supported",
 }
 
 _TOP_CAMEL_TO_SNAKE: dict[str, str] = {
@@ -337,6 +341,30 @@ async def reset_project_models_from_railway(
         updated_count=updated,
         message=f"Ripristinati {updated} modelli da registry/env Railway.",
     )
+
+
+@router.post(
+    "/{project_id}/ai-model-settings/validate-model",
+    response_model=AiModelValidateResponse,
+    response_model_by_alias=True,
+)
+async def validate_project_ai_model(
+    project_id: UUID,
+    body: AiModelValidateRequest,
+    session: AsyncSession = Depends(get_db),
+) -> AiModelValidateResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        data = await validate_model_for_operation(
+            session,
+            project_id,
+            model=body.model,
+            operation_key=body.operation_key,
+            run_probe=body.run_probe,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return AiModelValidateResponse.model_validate(data)
 
 
 @router.post(

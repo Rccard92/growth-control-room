@@ -3,6 +3,7 @@ import {
   useAnalyzeProductsSeo,
   useSeoOptimizerSync,
 } from "../../../hooks/useContentSeo";
+import { formatAiErrorMessage } from "../../../lib/api";
 
 export type ContentSeoFeedbackVariant = "success" | "warn" | "error";
 
@@ -17,8 +18,7 @@ interface ContentSeoActionBarProps {
 }
 
 function errorMessage(err: unknown): string {
-  if (err instanceof Error && err.message) return err.message;
-  return "Operazione non riuscita.";
+  return formatAiErrorMessage(err, "Operazione non riuscita.");
 }
 
 export function ContentSeoActionBar({ projectId, onFeedback }: ContentSeoActionBarProps) {

@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from openai import AsyncOpenAI, OpenAIError
+from openai import AsyncOpenAI, BadRequestError, OpenAIError
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -22,6 +22,7 @@ from app.services.ai.exceptions import (
     OpenAIRequestError,
 )
 from app.services.ai.model_policy import AiResolvedModel, resolve_ai_model, resolve_standard_fallback
+from app.services.ai.model_request_params import build_openai_request_params
 from app.services.ai.pricing import estimate_usage_cost
 from app.services.ai.usage_service import (
     UsageLogInput,
@@ -164,6 +165,69 @@ def _parse_json_object_response(response: Any) -> tuple[dict[str, Any], str]:
     return parsed, content
 
 
+OPENAI_CHAT_COMPLETIONS_ENDPOINT = "chat.completions.create"
+
+
+def _openai_error_snippet(exc: OpenAIError) -> str:
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        err = body.get("error")
+        if isinstance(err, dict) and err.get("message"):
+            return str(err["message"]).split("\n")[0]
+    message = str(exc).strip()
+    return message.split("\n")[0] if message else type(exc).__name__
+
+
+def _classify_openai_error(exc: OpenAIError) -> tuple[str, str]:
+    snippet = _openai_error_snippet(exc)
+    lowered = snippet.lower()
+    if "does not exist" in lowered or "model_not_found" in lowered:
+        return (
+            "access_denied",
+            "Il modello è configurato ma la tua API key potrebbe non avere accesso. "
+            "Prova un modello diverso o verifica l'account OpenAI.",
+        )
+    if "access" in lowered and ("denied" in lowered or "permission" in lowered):
+        return (
+            "access_denied",
+            "Il modello è configurato ma la tua API key potrebbe non avere accesso. "
+            "Prova un modello diverso o verifica l'account OpenAI.",
+        )
+    if isinstance(exc, BadRequestError) or "unsupported parameter" in lowered:
+        return (
+            "model_incompatible",
+            f"Errore AI: modello o parametri non compatibili. Dettaglio: {snippet}",
+        )
+    if "invalid_request" in lowered:
+        return (
+            "invalid_request",
+            f"Errore AI: richiesta non valida. Dettaglio: {snippet}",
+        )
+    return ("openai_error", f"Errore AI: {snippet}")
+
+
+def _log_openai_failure(
+    *,
+    metadata: AiRequestMetadata,
+    resolved: AiResolvedModel,
+    params: dict[str, Any],
+    exc: OpenAIError,
+) -> None:
+    snippet = _openai_error_snippet(exc)
+    logger.warning(
+        "OpenAI request failed endpoint=%s operation_key=%s context_profile=%s "
+        "resolved_model=%s model_policy_source=%s params_keys=%s error_type=%s error_message=%s",
+        OPENAI_CHAT_COMPLETIONS_ENDPOINT,
+        resolved.operation_key or metadata.operation_key,
+        metadata.context_profile,
+        resolved.model,
+        resolved.policy_source,
+        sorted(k for k in params if k not in ("messages",)),
+        type(exc).__name__,
+        snippet,
+    )
+
+
 async def _call_openai(
     client: AsyncOpenAI,
     *,
@@ -172,24 +236,13 @@ async def _call_openai(
     user_prompt: str,
     timeout: float,
 ) -> Any:
-    kwargs: dict[str, Any] = {
-        "model": resolved.model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "response_format": {"type": "json_object"},
-        "timeout": timeout,
-        "max_tokens": resolved.max_output_tokens,
-        "temperature": resolved.temperature,
-    }
-    reasoning_model = (settings.openai_model_reasoning or "").strip()
-    if (
-        resolved.reasoning_effort
-        and reasoning_model
-        and resolved.model == reasoning_model
-    ):
-        kwargs["reasoning_effort"] = resolved.reasoning_effort
+    kwargs = build_openai_request_params(
+        resolved,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        structured_json=True,
+        timeout=timeout,
+    )
     return await client.chat.completions.create(**kwargs)
 
 
@@ -278,9 +331,17 @@ async def generate_structured_json(
     parsed: dict[str, Any] | None = None
     active_resolved = resolved
     schema_retried = False
+    last_request_params: dict[str, Any] | None = None
 
     try:
         client = _client()
+        last_request_params = build_openai_request_params(
+            active_resolved,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            structured_json=True,
+            timeout=timeout,
+        )
         response = await _call_openai(
             client,
             resolved=active_resolved,
@@ -311,6 +372,13 @@ async def generate_structured_json(
                     resolved=active_resolved,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
+                    timeout=timeout,
+                )
+                last_request_params = build_openai_request_params(
+                    active_resolved,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    structured_json=True,
                     timeout=timeout,
                 )
                 parsed, content = _parse_json_object_response(response)
@@ -349,8 +417,22 @@ async def generate_structured_json(
     except OpenAIError as exc:
         status = "error"
         error_type = type(exc).__name__
-        error_message = str(exc).split("\n")[0]
-        logger.warning("OpenAI request failed: %s", error_message)
+        error_message = _openai_error_snippet(exc)
+        error_code, user_message = _classify_openai_error(exc)
+        if last_request_params is None:
+            last_request_params = build_openai_request_params(
+                active_resolved,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                structured_json=True,
+                timeout=timeout,
+            )
+        _log_openai_failure(
+            metadata=metadata,
+            resolved=active_resolved,
+            params=last_request_params,
+            exc=exc,
+        )
         duration_ms = int((time.perf_counter() - started) * 1000)
         await _persist_log(
             _base_log_input(
@@ -367,7 +449,7 @@ async def generate_structured_json(
                 error_message=error_message,
             )
         )
-        raise OpenAIRequestError("Richiesta OpenAI non riuscita") from exc
+        raise OpenAIRequestError(user_message, code=error_code) from exc
 
     assert parsed is not None
     duration_ms = int((time.perf_counter() - started) * 1000)
@@ -434,3 +516,80 @@ async def generate_structured_json(
         )
 
     return parsed
+
+
+async def probe_resolved_model(
+    *,
+    resolved: AiResolvedModel,
+    metadata: AiRequestMetadata,
+    timeout: float = 20.0,
+) -> dict[str, Any]:
+    """Lightweight OpenAI probe for model validation (minimal tokens)."""
+    if not is_openai_configured():
+        raise OpenAINotConfiguredError("OPENAI_API_KEY non configurata")
+
+    probe_resolved = resolved.model_copy(
+        update={"max_output_tokens": min(resolved.max_output_tokens, 32)}
+    )
+    prompt_hash = _hash_prompt('{"ok":true}', "ping")
+    started = time.perf_counter()
+    params = build_openai_request_params(
+        probe_resolved,
+        system_prompt='Rispondi con JSON: {"ok": true}',
+        user_prompt="ping",
+        structured_json=True,
+        timeout=timeout,
+    )
+
+    try:
+        client = _client()
+        response = await _call_openai(
+            client,
+            resolved=probe_resolved,
+            system_prompt='Rispondi con JSON: {"ok": true}',
+            user_prompt="ping",
+            timeout=timeout,
+        )
+        parsed, _content = _parse_json_object_response(response)
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        await _persist_log(
+            _base_log_input(
+                metadata=metadata,
+                resolved=probe_resolved,
+                requested_model=resolved.model,
+                prompt_hash=prompt_hash,
+                prompt_chars=20,
+                prompt_preview=None,
+                prompt_cache_key=None,
+                status="success",
+                duration_ms=duration_ms,
+                response_id=getattr(response, "id", None),
+            )
+        )
+        return parsed
+    except OpenAIError as exc:
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        error_message = _openai_error_snippet(exc)
+        error_code, user_message = _classify_openai_error(exc)
+        _log_openai_failure(
+            metadata=metadata,
+            resolved=probe_resolved,
+            params=params,
+            exc=exc,
+        )
+        await _persist_log(
+            _base_log_input(
+                metadata=metadata,
+                resolved=probe_resolved,
+                requested_model=resolved.model,
+                prompt_hash=prompt_hash,
+                prompt_chars=20,
+                prompt_preview=None,
+                prompt_cache_key=None,
+                status="error",
+                duration_ms=duration_ms,
+                error_type=type(exc).__name__,
+                error_message=error_message,
+            )
+        )
+        raise OpenAIRequestError(user_message, code=error_code) from exc

@@ -23,6 +23,13 @@ from app.services.ai.operation_registry import (
     resolve_registry_model,
     tier_cost_profile_label,
 )
+from app.services.ai.model_policy import AiModelTier, AiResolvedModel, infer_tier_from_model
+from app.services.ai.model_request_params import (
+    KNOWN_SUPPORTED_MODELS,
+    build_openai_request_params,
+    infer_model_family,
+    is_known_supported_model,
+)
 from app.services.ai.pricing import OPENAI_MODEL_PRICING, estimate_usage_cost
 
 
@@ -192,7 +199,10 @@ async def get_available_models(session: AsyncSession) -> dict[str, Any]:
     log_models = (
         await session.execute(select(AiUsageLog.model).distinct().limit(50))
     ).scalars().all()
-    all_names: set[str] = set()
+    all_names: set[str] = set(KNOWN_SUPPORTED_MODELS)
+    for op in list_operations(include_planned=True):
+        if op.gcr_recommended_model:
+            all_names.add(op.gcr_recommended_model.strip())
     for name in list(env_models.values()) + pricing_models + list(log_models):
         if name and str(name).strip():
             all_names.add(str(name).strip())
@@ -203,11 +213,15 @@ async def get_available_models(session: AsyncSession) -> dict[str, Any]:
                 "name": name,
                 "pricing_configured": estimate_usage_cost(name, input_tokens=1, output_tokens=1)
                 is not None,
+                "family": infer_model_family(name),
+                "known_supported": is_known_supported_model(name),
                 "source": (
                     "env"
                     if name in {v for v in env_models.values() if v}
                     else "pricing"
                     if name in pricing_models
+                    else "registry"
+                    if name in {op.gcr_recommended_model for op in list_operations(include_planned=True)}
                     else "logs"
                 ),
             }
@@ -304,6 +318,15 @@ async def list_settings_for_project(
             model_tier=display_tier,
             model_name=display_model,
         )
+        recent_error = (
+            await _recent_error_for_operation(
+                session, project_id, op.operation_key, display_model
+            )
+            if is_operational
+            else None
+        )
+        if recent_error:
+            warnings = [*warnings, recent_error]
         items.append(
             {
                 "operation_key": op.operation_key,
@@ -430,6 +453,130 @@ async def apply_gcr_recommendations(
     if updated:
         await session.flush()
     return updated
+
+
+async def _recent_error_for_operation(
+    session: AsyncSession,
+    project_id: UUID,
+    operation_key: str,
+    model_name: str | None,
+) -> str | None:
+    if not model_name:
+        return None
+    since = utc_now_naive() - timedelta(days=7)
+    row = (
+        await session.execute(
+            select(AiUsageLog.error_message, AiUsageLog.error_type)
+            .where(
+                AiUsageLog.project_id == project_id,
+                AiUsageLog.operation_key == operation_key,
+                AiUsageLog.model == model_name,
+                AiUsageLog.status == "error",
+                AiUsageLog.created_at >= since,
+            )
+            .order_by(AiUsageLog.created_at.desc())
+            .limit(1)
+        )
+    ).first()
+    if not row:
+        return None
+    try:
+        message, error_type = row
+    except (TypeError, ValueError):
+        return None
+    if not message:
+        return None
+    prefix = f"Ultimo errore AI ({error_type}): " if error_type else "Ultimo errore AI: "
+    return prefix + str(message)[:200]
+
+
+async def validate_model_for_operation(
+    session: AsyncSession,
+    project_id: UUID,
+    *,
+    model: str,
+    operation_key: str,
+    run_probe: bool = True,
+) -> dict[str, Any]:
+    from app.services.ai.ai_client import (
+        AiRequestMetadata,
+        OpenAINotConfiguredError,
+        OpenAIRequestError,
+        is_openai_configured,
+        probe_resolved_model,
+    )
+
+    model_name = model.strip()
+    if not model_name:
+        raise ValueError("model richiesto")
+
+    op = get_operation(operation_key)
+    if op is None:
+        raise ValueError(f"operation_key sconosciuta: {operation_key}")
+
+    warnings: list[str] = []
+    if not is_known_supported_model(model_name):
+        warnings.append("Modello non verificato nel catalogo GCR.")
+    if not _is_model_priced(model_name):
+        warnings.append("Pricing non configurato per questo modello.")
+
+    tier = infer_tier_from_model(model_name).value
+    resolved = AiResolvedModel(
+        model=model_name,
+        tier=tier,
+        max_output_tokens=min(op.recommended_max_output_tokens, 32),
+        temperature=op.recommended_temperature,
+        operation_key=operation_key,
+        policy_source="validate_probe",
+    )
+    try:
+        build_openai_request_params(
+            resolved,
+            system_prompt="probe",
+            user_prompt="ping",
+            structured_json=True,
+            timeout=20.0,
+        )
+        compatible = True
+    except Exception as exc:
+        compatible = False
+        warnings.append(f"Parametri non compatibili: {exc}")
+
+    probe_status = "skipped"
+    probe_message: str | None = None
+    if run_probe:
+        if not is_openai_configured():
+            probe_status = "skipped"
+            probe_message = "OPENAI_API_KEY non configurata — validazione locale sola."
+        else:
+            metadata = AiRequestMetadata(
+                project_id=project_id,
+                module="ai_model_settings",
+                operation="validate_model",
+                operation_key=operation_key,
+                context_profile=op.context_profile,
+            )
+            try:
+                await probe_resolved_model(resolved=resolved, metadata=metadata)
+                probe_status = "ok"
+                probe_message = "Modello risponde correttamente."
+            except OpenAINotConfiguredError:
+                probe_status = "skipped"
+                probe_message = "OPENAI_API_KEY non configurata."
+            except OpenAIRequestError as exc:
+                probe_status = "error"
+                probe_message = exc.message
+                compatible = False
+
+    return {
+        "valid": compatible and probe_status != "error",
+        "warnings": warnings,
+        "compatible": compatible,
+        "probe_status": probe_status,
+        "probe_message": probe_message,
+        "family": infer_model_family(model_name),
+        "known_supported": is_known_supported_model(model_name),
+    }
 
 
 async def reset_all_to_railway(

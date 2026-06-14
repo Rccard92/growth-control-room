@@ -73,6 +73,28 @@ class AiAvailableModelItem(BaseModel):
     name: str
     pricing_configured: bool = Field(serialization_alias="pricingConfigured")
     source: str
+    family: str = "legacy_chat"
+    known_supported: bool = Field(default=True, serialization_alias="knownSupported")
+
+
+class AiModelValidateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    model: str
+    operation_key: str = Field(serialization_alias="operationKey")
+    run_probe: bool = Field(default=True, serialization_alias="runProbe")
+
+
+class AiModelValidateResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    valid: bool
+    warnings: list[str]
+    compatible: bool
+    probe_status: str = Field(serialization_alias="probeStatus")
+    probe_message: str | None = Field(default=None, serialization_alias="probeMessage")
+    family: str
+    known_supported: bool = Field(serialization_alias="knownSupported")
 
 
 class AiAvailableModelsResponse(BaseModel):

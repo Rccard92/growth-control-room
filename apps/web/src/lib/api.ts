@@ -74,6 +74,21 @@ function buildFetchError(path: string, status: number, text: string): Error {
   return new Error(text || `Richiesta fallita (${status})`);
 }
 
+export function formatAiErrorMessage(err: unknown, fallback = "Generazione AI non riuscita."): string {
+  const raw = err instanceof Error ? err.message : fallback;
+  if (!raw.trim()) return fallback;
+  if (raw.startsWith("Errore AI:")) return raw;
+  if (
+    raw.toLowerCase().includes("modello")
+    || raw.toLowerCase().includes("openai")
+    || raw.toLowerCase().includes("parametr")
+    || raw.toLowerCase().includes("api key")
+  ) {
+    return raw.startsWith("Errore") ? raw : `Errore AI: ${raw}`;
+  }
+  return raw;
+}
+
 export function jsonBody(data: unknown): Pick<RequestInit, "body" | "headers"> {
   return {
     headers: { "Content-Type": "application/json" },

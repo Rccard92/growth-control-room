@@ -490,8 +490,10 @@ async def generate_seo_proposal_field(
                 value = str(value)
                 if risk_level not in ("low", "medium", "high"):
                     risk_level = "low"
-            except (OpenAINotConfiguredError, OpenAIRequestError):
-                value, reasoning, risk_level = _rules_metafield_context(metafield_ctx, entity)
+            except OpenAINotConfiguredError:
+                raise ValueError("AI non configurata") from None
+            except OpenAIRequestError as exc:
+                raise ValueError(exc.message) from exc
         else:
             if use_ai and not is_openai_configured():
                 raise ValueError("AI non configurata")
@@ -542,10 +544,10 @@ async def generate_seo_proposal_field(
                     value.setdefault("image_id", image_id)
             if risk_level not in ("low", "medium", "high"):
                 risk_level = "low"
-        except (OpenAINotConfiguredError, OpenAIRequestError):
-            value, reasoning, risk_level = _rules_single_field(
-                entity_type, field, entity, analysis, current, image_id
-            )
+        except OpenAINotConfiguredError:
+            raise ValueError("AI non configurata") from None
+        except OpenAIRequestError as exc:
+            raise ValueError(exc.message) from exc
     else:
         if use_ai and not is_openai_configured():
             raise ValueError("AI non configurata")

@@ -46,6 +46,8 @@ export interface AiAvailableModelItem {
   name: string;
   pricingConfigured: boolean;
   source: string;
+  family: string;
+  knownSupported: boolean;
 }
 
 export interface AiAvailableModelsResponse {
@@ -85,4 +87,20 @@ export interface AiModelSettingMutationResponse {
 export interface AiBulkActionResponse {
   updatedCount: number;
   message: string;
+}
+
+export interface AiModelValidateInput {
+  model: string;
+  operationKey: string;
+  runProbe?: boolean;
+}
+
+export interface AiModelValidateResponse {
+  valid: boolean;
+  warnings: string[];
+  compatible: boolean;
+  probeStatus: "ok" | "error" | "skipped";
+  probeMessage: string | null;
+  family: string;
+  knownSupported: boolean;
 }

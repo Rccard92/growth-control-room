@@ -338,12 +338,10 @@ async def generate_seo_proposal(
             reasoning = proposed.pop("reasoning", []) or []
             risk_from_ai = proposed.pop("risk_level", "low")
             proposed["risk_level"] = risk_from_ai
-        except (OpenAINotConfiguredError, OpenAIRequestError):
-            if entity_type == "product":
-                proposed = _rules_product_proposal(entity, analysis)
-            else:
-                proposed = _rules_collection_proposal(entity, analysis)
-            reasoning = proposed.pop("reasoning", []) or []
+        except OpenAINotConfiguredError:
+            raise ValueError("AI non configurata") from None
+        except OpenAIRequestError as exc:
+            raise ValueError(exc.message) from exc
     else:
         if entity_type == "product":
             proposed = _rules_product_proposal(entity, analysis)

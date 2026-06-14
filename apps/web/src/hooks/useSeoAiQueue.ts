@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { SeoProposalGenerateFieldResponse } from "@gcr/shared";
+import { formatAiErrorMessage } from "../lib/api";
 import type { FieldSource } from "../components/content/optimizer/seoFieldState";
 
 export interface SeoAiQueueItem {
@@ -79,8 +80,11 @@ export function useSeoAiQueue(handlers: SeoAiQueueHandlers) {
       } else {
         handlersRef.current.onApplyResult(item.fieldKey, response);
       }
-    } catch {
-      handlersRef.current.onError(item.fieldKey, "Generazione AI non riuscita.");
+    } catch (err) {
+      handlersRef.current.onError(
+        item.fieldKey,
+        formatAiErrorMessage(err),
+      );
     } finally {
       processingRef.current = false;
       activeFieldRef.current = null;

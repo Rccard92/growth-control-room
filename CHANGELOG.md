@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.8-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed AI generation failures after model settings routing
+- Centralized OpenAI request parameter compatibility for GPT-5.x models
+- Added better OpenAI 400 error logging and UI feedback
+- Ensured Product SEO, Brand Intelligence and Blog generators use operation-level model settings
+- Added validate-model endpoint and Test modello in Model Settings UI
+
 ## [0.5.7-alpha] - 2026-06-13
 
 Tipo: Alpha patch

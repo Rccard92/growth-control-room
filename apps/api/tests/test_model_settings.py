@@ -24,6 +24,7 @@ from app.services.ai.model_settings_service import (
     get_available_models,
     list_settings_for_project,
     seed_default_settings,
+    validate_model_for_operation,
 )
 from app.services.ai.operation_registry import get_operation, tier_cost_profile_label
 from app.services.ai.pricing import estimate_usage_cost
@@ -232,9 +233,16 @@ def test_non_ai_operation_no_crash() -> None:
 
 def test_available_models_snake_case() -> None:
     model = AiAvailableModelItem.model_validate(
-        {"name": "gpt-4o-mini", "pricing_configured": True, "source": "env"}
+        {
+            "name": "gpt-4o-mini",
+            "pricing_configured": True,
+            "source": "env",
+            "family": "legacy_chat",
+            "known_supported": True,
+        }
     )
     assert model.pricing_configured is True
+    assert model.known_supported is True
 
 
 def test_critical_operation_cheap_warning() -> None:
@@ -438,3 +446,43 @@ def test_update_request_rejects_string_body() -> None:
         raise AssertionError("expected ValidationError")
     except ValidationError:
         pass
+
+
+def test_validate_model_local_compatible() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        with patch(
+            "app.services.ai.ai_client.is_openai_configured",
+            return_value=False,
+        ):
+            data = await validate_model_for_operation(
+                session,
+                project_id,
+                model="gpt-5.4-mini",
+                operation_key="product_image_alt",
+                run_probe=False,
+            )
+        assert data["compatible"] is True
+        assert data["family"] == "reasoning"
+        assert data["known_supported"] is True
+
+    asyncio.run(run())
+
+
+def test_get_available_models_includes_gpt5() -> None:
+    async def run() -> None:
+        session = AsyncMock()
+        log_scalars = MagicMock()
+        log_scalars.all.return_value = []
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalars=MagicMock(return_value=log_scalars))
+        )
+        data = await get_available_models(session)
+        names = {m["name"] for m in data["models"]}
+        assert "gpt-5.4-mini" in names
+        gpt5 = next(m for m in data["models"] if m["name"] == "gpt-5.4-mini")
+        assert gpt5["family"] == "reasoning"
+        assert gpt5["known_supported"] is True
+
+    asyncio.run(run())

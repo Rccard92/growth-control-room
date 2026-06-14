@@ -17,6 +17,8 @@ export type {
   AiModelSettingsListResponse,
   AiModelSettingUpdateInput,
   AiModelUiCategory,
+  AiModelValidateInput,
+  AiModelValidateResponse,
 } from "./types/ai-model-settings";
 export type { Project, CreateProjectInput, ProjectStatus } from "./types/project";
 export type {
