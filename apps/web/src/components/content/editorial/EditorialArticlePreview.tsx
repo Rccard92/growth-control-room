@@ -66,11 +66,11 @@ export function EditorialArticlePreview({ value }: EditorialArticlePreviewProps)
             <dt>Meta description</dt>
             <dd>{value.metaDescription || "—"}</dd>
           </div>
-          {(value.authorName || value.authorRole) && (
+          {(value.authorName?.trim()) && (
             <div>
               <dt>Autore / firma</dt>
               <dd>
-                {value.authorName || "—"}
+                {value.authorName}
                 {value.authorRole ? ` — ${value.authorRole}` : ""}
               </dd>
             </div>

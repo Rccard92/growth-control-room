@@ -63,17 +63,19 @@ La generazione è **rule-based** (nessuna chiamata OpenAI): titoli placeholder d
 
 Campi editabili: titolo, data, stato, obiettivo, keyword, note.
 
-### Brief Generator (0.4.1-alpha)
+### Brief Generator (0.4.1-alpha, aggiornato 0.4.8-alpha)
 
 Workflow: **calendario → genera brief → modifica → salva → approva**.
 
 1. Apri item dal calendario → **Genera brief** (singolo item, no bulk)
-2. Backend usa `BrandIntelligenceContextBuilder` + Product Knowledge prodotto collegato
+2. Backend usa `BrandIntelligenceContextBuilder` + **Editorial Guidelines** + Product Knowledge prodotto collegato
 3. Brief salvato in `brief_payload` JSONB sull'item; status → `brief_pending`
-4. Editor nel drawer: titolo proposto, intento, struttura H2/H3, meta, claim, FAQ, warning
+4. Editor nel drawer: strategia SEO + sezione **Editoriale** (suggerimento autore opzionale, CTA community, tono)
 5. **Salva brief** — persiste modifiche senza cambiare status (opzionale)
 6. **Approva brief** — `PUT brief` con `status: brief_approved`
 7. **Rigenera brief** — conferma se ci sono modifiche non salvate
+
+**Firma autore (0.4.8):** `authorSuggestion` può essere vuoto (nessuna firma) o Davide / Filippo Leonardi / Salvo Leonardi in base al tipo contenuto. L'Article Generator rispetta questa scelta.
 
 **Non generato in questo step:** immagini, publish Shopify.
 
@@ -97,12 +99,17 @@ Workflow: **calendario → genera brief → modifica → salva → approva**.
   "metaDescription": "",
   "internalLinksSuggestions": [],
   "notes": "",
+  "authorSuggestion": "",
+  "authorReason": "",
+  "contentLengthProfile": "",
+  "communityCtaSuggestion": "",
+  "editorialToneNotes": [],
   "brandContextUsed": [],
   "warnings": []
 }
 ```
 
-### Article Draft Generator (0.4.6-alpha, aggiornato 0.4.7-alpha)
+### Article Draft Generator (0.4.6-alpha, aggiornato 0.4.7-alpha, 0.4.8-alpha)
 
 Workflow: **brief approvato → genera articolo → modifica → salva bozza → anteprima → segna pronto per pubblicazione**.
 
@@ -118,6 +125,8 @@ Workflow: **brief approvato → genera articolo → modifica → salva bozza →
 8. **Segna pronto per pubblicazione** — `PUT article` con `status: ready_to_publish`
 
 **Regole generazione (0.4.7):** target 700–1100 parole, max 5–7 H2, tono umano; Safe Claims prioritari su tutto.
+
+**Firma autore (0.4.8):** se `authorSuggestion` nel brief è vuoto, `authorName`/`authorRole` restano vuoti (post-processing server-side). Anteprima mostra firma solo se `authorName` valorizzato.
 
 **Non implementato:** pubblicazione Shopify, scheduling, batch articoli, generazione immagini.
 

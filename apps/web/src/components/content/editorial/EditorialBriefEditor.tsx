@@ -1,7 +1,22 @@
 import type { ReactNode } from "react";
 import type { EditorialBriefPayload } from "@gcr/shared";
 import { AutoResizeTextarea } from "../../ui/AutoResizeTextarea";
+import { AppSelect } from "../../ui/AppSelect";
 import { listToTextarea, textareaToList } from "./editorial-brief-utils";
+
+const AUTHOR_OPTIONS = [
+  { value: "", label: "Nessuna firma" },
+  { value: "Davide", label: "Davide" },
+  { value: "Filippo Leonardi", label: "Filippo Leonardi" },
+  { value: "Salvo Leonardi", label: "Salvo Leonardi" },
+];
+
+const LENGTH_OPTIONS = [
+  { value: "", label: "Non specificato" },
+  { value: "breve", label: "Breve" },
+  { value: "medio", label: "Medio" },
+  { value: "approfondito", label: "Approfondito" },
+];
 
 interface EditorialBriefEditorProps {
   value: EditorialBriefPayload;
@@ -155,13 +170,57 @@ export function EditorialBriefEditor({
           minRows={2}
         />
         <label className="gcr-field">
-          <span className="gcr-field__label">CTA consigliata</span>
+          <span className="gcr-field__label">CTA commerciale consigliata</span>
           <input
             className="gcr-input"
             value={value.recommendedCta}
             onChange={(e) => patch({ recommendedCta: e.target.value })}
           />
         </label>
+      </BriefSection>
+
+      <BriefSection title="Editoriale">
+        <div className="gcr-field">
+          <span className="gcr-field__label">Suggerimento autore</span>
+          <AppSelect
+            value={value.authorSuggestion ?? ""}
+            options={AUTHOR_OPTIONS}
+            onChange={(authorSuggestion) => patch({ authorSuggestion })}
+          />
+        </div>
+        <AutoResizeTextarea
+          label="Motivo autore"
+          value={value.authorReason ?? ""}
+          onChange={(authorReason) => patch({ authorReason })}
+          minRows={2}
+          maxRows={6}
+          placeholder="Perché suggerire o meno una firma per questo contenuto"
+        />
+        <div className="gcr-field">
+          <span className="gcr-field__label">Profilo lunghezza</span>
+          <AppSelect
+            value={value.contentLengthProfile ?? ""}
+            options={LENGTH_OPTIONS}
+            onChange={(contentLengthProfile) =>
+              patch({
+                contentLengthProfile: contentLengthProfile as EditorialBriefPayload["contentLengthProfile"],
+              })
+            }
+          />
+        </div>
+        <AutoResizeTextarea
+          label="CTA community suggerita"
+          value={value.communityCtaSuggestion ?? ""}
+          onChange={(communityCtaSuggestion) => patch({ communityCtaSuggestion })}
+          minRows={2}
+          maxRows={4}
+        />
+        <ListField
+          label="Note tono editoriale"
+          value={value.editorialToneNotes ?? []}
+          onChange={(editorialToneNotes) => patch({ editorialToneNotes })}
+          minRows={2}
+        />
       </BriefSection>
 
       <BriefSection title="Metadata">

@@ -57,18 +57,45 @@ def test_normalize_editorial_brief_payload_coerces_lists() -> None:
     assert payload.h2_h3_structure == ["H2: A"]
 
 
+def test_normalize_editorial_brief_payload_editorial_fields() -> None:
+    payload = normalize_editorial_brief_payload(
+        {
+            "proposedTitle": "Titolo",
+            "authorSuggestion": "Davide",
+            "authorReason": "Contenuto su produzione",
+            "contentLengthProfile": "medio",
+            "communityCtaSuggestion": "Commenta sotto",
+            "editorialToneNotes": ["Concreto", "Morbido"],
+        }
+    )
+    assert payload.author_suggestion == "Davide"
+    assert payload.author_reason == "Contenuto su produzione"
+    assert payload.content_length_profile == "medio"
+    assert payload.community_cta_suggestion == "Commenta sotto"
+    assert payload.editorial_tone_notes == ["Concreto", "Morbido"]
+
+
+def test_normalize_editorial_brief_payload_invalid_author_cleared() -> None:
+    payload = normalize_editorial_brief_payload(
+        {"proposedTitle": "Titolo", "authorSuggestion": "Mario Rossi"}
+    )
+    assert payload.author_suggestion == ""
+
+
 def test_build_bi_warnings_when_sections_missing() -> None:
     bundle = SimpleNamespace(
         brand_identity=None,
         safe_claims=None,
         product_knowledge=None,
         faq_objections=None,
+        editorial_guidelines=None,
     )
     warnings = build_bi_warnings(bundle)
     assert "Brand Identity mancante" in warnings
     assert "Safe Claims mancanti" in warnings
     assert "Product Knowledge mancante" in warnings
     assert "FAQ & Objections mancanti" in warnings
+    assert "Editorial Guidelines mancanti" in warnings
 
 
 def test_generate_editorial_brief_no_openai_key() -> None:

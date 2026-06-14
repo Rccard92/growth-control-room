@@ -97,8 +97,30 @@ _BRIEF_JSON_SCHEMA = """{
   "metaDescription": "string",
   "internalLinksSuggestions": ["string"],
   "notes": "string",
+  "authorSuggestion": "",
+  "authorReason": "string",
+  "contentLengthProfile": "breve|medio|approfondito",
+  "communityCtaSuggestion": "string",
+  "editorialToneNotes": ["string"],
   "warnings": ["string"]
 }"""
+
+_BRIEF_EDITORIAL_RULES = """
+REGOLE EDITORIALI (dal contesto EDITORIAL GUIDELINES — obbligatorie):
+- Usa filosofia contenuti, persone del brand, tono e lunghezza dalle Editorial Guidelines.
+- La firma autore è OPZIONALE: non forzare sempre Davide, Filippo o Salvo.
+- authorSuggestion può essere solo: "" (nessuna firma), "Davide", "Filippo Leonardi", "Salvo Leonardi".
+- Davide: produzione, lavorazione, processi, qualità, dietro le quinte.
+- Filippo Leonardi: apicoltura, territorio, esperienza aziendale, racconto autorevole.
+- Salvo Leonardi: continuità familiare, tono community/giovane e familiare.
+- Nessuna firma (authorSuggestion ""): guide generiche, ricette semplici, contenuti informativi SEO dove la firma sarebbe forzata.
+- Se suggerisci un autore, motiva in authorReason in modo concreto.
+- Se nessuna firma, spiega in authorReason (es. contenuto informativo generico).
+- communityCtaSuggestion: CTA community morbida, distinta da recommendedCta (commerciale).
+- contentLengthProfile: breve|medio|approfondito coerente con guidelines e tipo contenuto.
+- editorialToneNotes: note operative sul tono per il redattore.
+- Safe Claims restano prioritari assoluti.
+"""
 
 
 def _safe_claims_guardrail_suffix(brand_context: str | None) -> str:
@@ -123,6 +145,9 @@ def build_bi_warnings(bundle: BrandContextBundleResponse) -> list[str]:
         warnings.append("Product Knowledge mancante")
     if faq_objections_completion(bundle.faq_objections) == "empty":
         warnings.append("FAQ & Objections mancanti")
+    editorial_guidelines = getattr(bundle, "editorial_guidelines", None)
+    if editorial_guidelines_completion(editorial_guidelines) == "empty":
+        warnings.append("Editorial Guidelines mancanti")
     return warnings
 
 
@@ -159,6 +184,8 @@ def _build_system_prompt(brand_context: str | None, content_brief_rules: str) ->
         "Genera SOLO un brief operativo per un futuro articolo blog — NON scrivere l'articolo, "
         "NON generare body HTML, NON inventare claim non presenti nel contesto brand. "
         "Rispetta Safe Claims con priorità assoluta. "
+        "Usa le Editorial Guidelines dal contesto brand per tono, lunghezza e firma autore. "
+        f"{_BRIEF_EDITORIAL_RULES}"
         "Scrivi in italiano. Rispondi SOLO con JSON valido.\n\n"
         f"{content_brief_rules}"
     )
@@ -185,6 +212,8 @@ def _build_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> 
         "Il brief deve essere concreto e operativo per un redattore. "
         "In claimsToAvoid inserisci claim vietati dal contesto Safe Claims. "
         "In safeClaimsToUse inserisci solo claim esplicitamente consentiti. "
+        "Decidi authorSuggestion in base al tipo contenuto e all'angolo: non forzare sempre una firma. "
+        "Compila authorReason, contentLengthProfile, communityCtaSuggestion e editorialToneNotes. "
         "Se mancano informazioni, segnalale in warnings.\n\n"
         f"Rispondi con JSON nel seguente schema:\n{_BRIEF_JSON_SCHEMA}"
     )

@@ -592,6 +592,11 @@ export interface EditorialBriefPayload {
   notes: string;
   brandContextUsed: string[];
   warnings: string[];
+  authorSuggestion?: string;
+  authorReason?: string;
+  contentLengthProfile?: "" | "breve" | "medio" | "approfondito";
+  communityCtaSuggestion?: string;
+  editorialToneNotes?: string[];
 }
 
 export type EditorialBriefUpdateStatus = "brief_pending" | "brief_approved";

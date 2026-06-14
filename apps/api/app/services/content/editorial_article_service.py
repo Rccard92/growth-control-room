@@ -19,6 +19,7 @@ from app.schemas.content_seo_editorial import (
     EditorialArticlePayload,
     EditorialArticleUpdateRequest,
     normalize_editorial_article_payload,
+    normalize_editorial_brief_payload,
 )
 from app.services.ai.openai_client import (
     OpenAINotConfiguredError,
@@ -108,16 +109,56 @@ _ARTICLE_TYPE_INSTRUCTIONS: dict[str, str] = {
 _EDITORIAL_HUMAN_RULES = """
 REGOLE EDITORIALI (obbligatorie):
 - Non scrivere articoli lunghi solo per SEO; evita ripetizioni e riempitivi.
-- Target 700-1100 parole (salvo brief esplicito diverso o profilo lunghezza approfondito).
+- Target 700-1100 parole (salvo brief.contentLengthProfile=approfondito o brief esplicito diverso).
 - Max 5-7 sezioni H2 principali; max 4-6 FAQ solo se davvero utili.
 - Tono morbido, familiare, concreto — valore reale per i dubbi dei clienti.
-- Aggiungi nota umana / firma brand quando coerente (es. A cura di Davide, Filippo, Salvo).
-- NON inventare citazioni dirette o storie personali non presenti nel contesto brand.
-- Usa le persone del brand solo se coerenti col tema dell'articolo.
-- CTA finale community (scrivere, commentare, social, domande) — morbida, non aggressiva.
+- FIRMA AUTORE: segui authorSuggestion del brief. Se vuoto, authorName e authorRole restano vuoti.
+- NON inserire firma nel bodyHtml — solo nei campi authorName/authorRole se previsto dal brief.
+- NON inventare citazioni dirette o opinioni personali non presenti nel contesto brand.
+- NON attribuire opinioni a Davide, Filippo o Salvo se non supportate dalla Brand Intelligence.
+- communityCta: usa communityCtaSuggestion del brief se presente; formula naturale e variata, non ripetitiva.
 - communityCta è distinta da cta (community vs commerciale).
 - Safe Claims restano prioritari assoluti su tutto.
 """
+
+
+def _resolve_author_role(author_name: str, editorial_guidelines) -> str:
+    if not editorial_guidelines or not getattr(editorial_guidelines, "brand_people", None):
+        return ""
+    for person in editorial_guidelines.brand_people:
+        name = getattr(person, "name", "") or ""
+        if name.strip() == author_name.strip():
+            return getattr(person, "role", "") or ""
+    return ""
+
+
+def _apply_brief_author_to_payload(
+    payload: EditorialArticlePayload,
+    brief_raw: dict | None,
+    bundle,
+) -> EditorialArticlePayload:
+    brief = normalize_editorial_brief_payload(brief_raw or {})
+    author_suggestion = (brief.author_suggestion or "").strip()
+    updates: dict = {}
+
+    if not author_suggestion:
+        updates["author_name"] = ""
+        updates["author_role"] = ""
+    else:
+        updates["author_name"] = f"A cura di {author_suggestion}"
+        eg = getattr(bundle, "editorial_guidelines", None)
+        updates["author_role"] = _resolve_author_role(author_suggestion, eg)
+
+    if brief.community_cta_suggestion.strip() and not payload.community_cta.strip():
+        updates["community_cta"] = brief.community_cta_suggestion.strip()
+
+    brief_profile = (brief.content_length_profile or "").strip()
+    if brief_profile in ("breve", "medio", "approfondito"):
+        updates["content_length_profile"] = brief_profile
+
+    if updates:
+        return payload.model_copy(update=updates)
+    return payload
 
 
 def _count_words_from_html(html: str) -> int:
@@ -220,6 +261,11 @@ def _build_article_user_prompt(item: ContentSeoEditorialItem, type_instruction: 
         f"PRODOTTO COLLEGATO: {item.linked_shopify_product_title or '—'}\n\n"
         f"BRIEF SEO APPROVATO (fonte principale — segui struttura, keyword, claim, FAQ, CTA):\n"
         f"{brief_json}\n\n"
+        "FIRMA E TONO (dal brief):\n"
+        "- Se authorSuggestion è vuoto: authorName e authorRole devono restare vuoti.\n"
+        "- Se authorSuggestion è valorizzato: compila authorName (es. A cura di ...) e authorRole.\n"
+        "- Usa authorReason, editorialToneNotes, contentLengthProfile e communityCtaSuggestion del brief.\n"
+        "- Non inserire la firma nel bodyHtml.\n\n"
         "bodyHtml deve essere HTML pulito pronto per anteprima e pubblicazione Shopify futura. "
         "handle: slug URL-friendly in minuscolo con trattini. "
         "excerpt: 1-2 frasi introduttive. "
@@ -294,9 +340,17 @@ async def generate_editorial_article_core(
             timeout=120.0,
         )
         payload = normalize_editorial_article_payload(parsed)
+        payload = _apply_brief_author_to_payload(
+            payload, item.brief_payload, bundle
+        )
+        brief_profile = ""
+        if item.brief_payload:
+            brief_norm = normalize_editorial_brief_payload(item.brief_payload)
+            brief_profile = (brief_norm.content_length_profile or "").strip()
+        enrich_default = brief_profile or default_length
         payload = _enrich_article_payload(
             payload,
-            default_length=default_length,
+            default_length=enrich_default or None,
         )
     except OpenAINotConfiguredError:
         raise ArticleGenerationError(

@@ -78,6 +78,47 @@ def test_enrich_article_payload_reading_time() -> None:
     assert enriched.content_length_profile in ("breve", "medio", "approfondito")
 
 
+def test_apply_brief_author_clears_signature_when_no_suggestion() -> None:
+    from app.services.content.editorial_article_service import _apply_brief_author_to_payload
+
+    payload = normalize_editorial_article_payload(
+        {
+            **_sample_ai_article(),
+            "authorName": "A cura di Davide",
+            "authorRole": "coordinatore",
+        }
+    )
+    brief = {"proposedTitle": "Titolo", "authorSuggestion": ""}
+    result = _apply_brief_author_to_payload(payload, brief, SimpleNamespace())
+    assert result.author_name == ""
+    assert result.author_role == ""
+
+
+def test_apply_brief_author_sets_davide_from_suggestion() -> None:
+    from app.schemas.brand_editorial_guidelines import BrandPersonEntry
+    from app.services.content.editorial_article_service import _apply_brief_author_to_payload
+
+    payload = normalize_editorial_article_payload(_sample_ai_article())
+    brief = {
+        "proposedTitle": "Titolo",
+        "authorSuggestion": "Davide",
+        "authorReason": "Produzione e lavorazione",
+        "communityCtaSuggestion": "Raccontaci la tua esperienza",
+        "contentLengthProfile": "breve",
+    }
+    eg = SimpleNamespace(
+        brand_people=[
+            BrandPersonEntry(name="Davide", role="coordinatore della produzione"),
+        ]
+    )
+    bundle = SimpleNamespace(editorial_guidelines=eg)
+    result = _apply_brief_author_to_payload(payload, brief, bundle)
+    assert result.author_name == "A cura di Davide"
+    assert result.author_role == "coordinatore della produzione"
+    assert result.community_cta == "Raccontaci la tua esperienza"
+    assert result.content_length_profile == "breve"
+
+
 def test_generate_editorial_article_brief_not_approved() -> None:
     project_id = uuid4()
     item_id = uuid4()
@@ -191,6 +232,7 @@ def test_generate_editorial_article_success() -> None:
         assert result.status == "draft_review"
         assert result.article_payload is not None
         assert result.article_payload["title"] == "Guida olio EVO"
+        assert result.article_payload.get("authorName", "") == ""
 
     asyncio.run(run())
 

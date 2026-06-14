@@ -20,7 +20,35 @@ export function emptyEditorialBriefPayload(): EditorialBriefPayload {
     notes: "",
     brandContextUsed: [],
     warnings: [],
+    authorSuggestion: "",
+    authorReason: "",
+    contentLengthProfile: "",
+    communityCtaSuggestion: "",
+    editorialToneNotes: [],
   };
+}
+
+const VALID_AUTHOR_SUGGESTIONS = new Set([
+  "",
+  "Davide",
+  "Filippo Leonardi",
+  "Salvo Leonardi",
+]);
+
+const VALID_LENGTH_PROFILES = new Set(["", "breve", "medio", "approfondito"]);
+
+function coerceAuthorSuggestion(value: unknown): string {
+  const text = String(value ?? "").trim();
+  return VALID_AUTHOR_SUGGESTIONS.has(text) ? text : "";
+}
+
+function coerceLengthProfile(
+  value: unknown,
+): "" | "breve" | "medio" | "approfondito" {
+  const text = String(value ?? "").trim();
+  return VALID_LENGTH_PROFILES.has(text)
+    ? (text as "" | "breve" | "medio" | "approfondito")
+    : "";
 }
 
 function coerceStringList(value: unknown): string[] {
@@ -62,6 +90,11 @@ export function parseEditorialBriefPayload(
     notes: String(raw.notes ?? ""),
     brandContextUsed: coerceStringList(raw.brandContextUsed),
     warnings: coerceStringList(raw.warnings),
+    authorSuggestion: coerceAuthorSuggestion(raw.authorSuggestion),
+    authorReason: String(raw.authorReason ?? ""),
+    contentLengthProfile: coerceLengthProfile(raw.contentLengthProfile),
+    communityCtaSuggestion: String(raw.communityCtaSuggestion ?? ""),
+    editorialToneNotes: coerceStringList(raw.editorialToneNotes),
   };
 }
 

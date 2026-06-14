@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.8-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Blog Brief Generator now uses Editorial Guidelines (optional author suggestion workflow)
+- `brief_payload` extended with `authorSuggestion`, `authorReason`, `contentLengthProfile`, `communityCtaSuggestion`, `editorialToneNotes`
+- Article Generator respects brief author choice — no forced brand signature when `authorSuggestion` is empty
+- Article preview shows author only when `authorName` is set
+
 ## [0.4.7-alpha] - 2026-06-13
 
 Tipo: Alpha patch

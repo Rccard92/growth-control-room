@@ -342,6 +342,19 @@ class EditorialBriefPayload(BaseModel):
         default_factory=list, serialization_alias="brandContextUsed"
     )
     warnings: list[str] = Field(default_factory=list)
+    author_suggestion: str = Field(default="", serialization_alias="authorSuggestion")
+    author_reason: str = Field(default="", serialization_alias="authorReason")
+    content_length_profile: str = Field(default="", serialization_alias="contentLengthProfile")
+    community_cta_suggestion: str = Field(
+        default="", serialization_alias="communityCtaSuggestion"
+    )
+    editorial_tone_notes: list[str] = Field(
+        default_factory=list, serialization_alias="editorialToneNotes"
+    )
+
+
+_VALID_AUTHOR_SUGGESTIONS = frozenset({"", "Davide", "Filippo Leonardi", "Salvo Leonardi"})
+_VALID_CONTENT_LENGTH_PROFILES = frozenset({"", "breve", "medio", "approfondito"})
 
 
 def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
@@ -357,6 +370,7 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
         "internalLinksSuggestions": "internal_links_suggestions",
         "brandContextUsed": "brand_context_used",
         "warnings": "warnings",
+        "editorialToneNotes": "editorial_tone_notes",
     }
     for alias, field in list_fields.items():
         if alias in data:
@@ -372,6 +386,9 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
         "recommendedCta": "recommended_cta",
         "metaTitle": "meta_title",
         "metaDescription": "meta_description",
+        "authorSuggestion": "author_suggestion",
+        "authorReason": "author_reason",
+        "communityCtaSuggestion": "community_cta_suggestion",
     }
     for alias, field in str_aliases.items():
         if alias in data and field not in data:
@@ -381,6 +398,14 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
         else:
             data.setdefault(field, "")
     data.setdefault("notes", str(data.get("notes") or ""))
+    if "contentLengthProfile" in data and "content_length_profile" not in data:
+        data["content_length_profile"] = data.pop("contentLengthProfile")
+    author = str(data.get("author_suggestion") or "").strip()
+    data["author_suggestion"] = author if author in _VALID_AUTHOR_SUGGESTIONS else ""
+    profile = str(data.get("content_length_profile") or "").strip()
+    data["content_length_profile"] = (
+        profile if profile in _VALID_CONTENT_LENGTH_PROFILES else ""
+    )
     return EditorialBriefPayload.model_validate(data)
 
 

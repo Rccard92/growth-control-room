@@ -28,24 +28,26 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 
 Content SEO e Product SEO usano `get_prompt_context()` → `fullText` (non `previewText`). Se FAQ & Objections è vuota, il comportamento resta invariato.
 
-### Blog Brief Generator (implementato — Content SEO Editorial 0.4.1-alpha)
+### Blog Brief Generator (implementato — Content SEO Editorial 0.4.1-alpha, aggiornato 0.4.8-alpha)
 
 Modulo attivo nella tab **Blog & Ricette** per generare brief SEO su singolo item editoriale.
 
 - **Input**: item editoriale (tipo, keyword, obiettivo, prodotto collegato, note)
-- **Context**: `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, Product Knowledge (+ PK specifico prodotto se collegato)
+- **Context**: `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, **Editorial Guidelines**, Product Knowledge (+ PK specifico prodotto se collegato)
+- **Editorial Guidelines (0.4.8)**: suggerimento autore opzionale (`authorSuggestion`), profilo lunghezza, CTA community, note tono nel `brief_payload`
 - **Safe Claims**: priorità assoluta nel prompt; claim vietati in `claimsToAvoid`
 - **Output**: `brief_payload` JSONB; stato `brief_pending` dopo generate → `brief_approved` dopo approvazione utente
 - **Prerequisito Article Generator**: solo item con `brief_approved` e brief valorizzato
 - **Nessuna pubblicazione automatica** Shopify in questo step
 
-### Blog Article Draft Generator (implementato — Content SEO Editorial 0.4.6-alpha, aggiornato 0.4.7-alpha)
+### Blog Article Draft Generator (implementato — Content SEO Editorial 0.4.6-alpha, aggiornato 0.4.7-alpha, 0.4.8-alpha)
 
 Modulo attivo nella tab **Articolo & Anteprima** per generare bozze articolo da brief approvato.
 
 - **Input**: `brief_payload` approvato + metadati item (tipo, prodotto collegato)
 - **Context**: `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, **Editorial Guidelines**, Product Knowledge (+ PK specifico prodotto se collegato)
-- **Editorial Guidelines (0.4.7)**: articoli 700–1100 parole, tono umano, firma brand, CTA community separata da CTA commerciale
+- **Editorial Guidelines (0.4.7)**: articoli 700–1100 parole, tono umano, CTA community separata da CTA commerciale
+- **Firma opzionale (0.4.8)**: `authorName`/`authorRole` solo se `authorSuggestion` nel brief approvato; post-processing sovrascrive firme inventate dall'AI
 - **Safe Claims**: priorità assoluta nel prompt; nessun claim medico o terapeutico inventato
 - **Output**: `article_payload` JSONB con `bodyHtml` sanitizzato, `authorName`, `communityCta`, `estimatedReadingTime`, `contentLengthProfile`
 - **Anteprima**: HTML renderizzato lato client (whitelist tag via DOMParser) dopo sanitizzazione backend

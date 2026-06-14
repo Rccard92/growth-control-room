@@ -133,12 +133,12 @@ export function EditorialArticleEditor({
       />
 
       <label className="gcr-field">
-        <span className="gcr-field__label">Autore / firma</span>
+        <span className="gcr-field__label">Autore / firma (opzionale)</span>
         <input
           className="gcr-input"
           value={value.authorName ?? ""}
           onChange={(e) => patch({ authorName: e.target.value })}
-          placeholder="es. A cura di Davide"
+          placeholder="es. A cura di Davide — lasciare vuoto se assente"
         />
       </label>
 
