@@ -11,7 +11,7 @@ from typing import Any
 from uuid import UUID
 
 from openai import AsyncOpenAI, BadRequestError, OpenAIError
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.core.config import settings
 from app.db.session import get_session_factory
@@ -45,6 +45,12 @@ __all__ = [
 ]
 
 
+def _coerce_optional_id_to_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
 class AiRequestMetadata(BaseModel):
     project_id: UUID
     module: str
@@ -57,6 +63,18 @@ class AiRequestMetadata(BaseModel):
     context_chars: int | None = None
     context_blocks_used: list[str] | None = None
     operation_key: str | None = None
+
+    @field_validator("project_id", mode="before")
+    @classmethod
+    def _coerce_project_id(cls, value: object) -> UUID:
+        if isinstance(value, UUID):
+            return value
+        return UUID(str(value))
+
+    @field_validator("entity_id", "job_id", mode="before")
+    @classmethod
+    def _coerce_ids_to_string(cls, value: object) -> str | None:
+        return _coerce_optional_id_to_str(value)
 
 
 def is_openai_configured() -> bool:

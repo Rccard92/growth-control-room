@@ -9,6 +9,16 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.9-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed AiRequestMetadata UUID coercion",
+      "Product SEO AI generation no longer fails when entity_id is a UUID",
+      "Hardened AI metadata handling across all generators",
+    ],
+  },
+  {
     version: "0.5.8-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

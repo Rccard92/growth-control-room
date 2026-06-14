@@ -322,7 +322,7 @@ async def generate_seo_proposal(
                             else "collection_seo_full_proposal"
                         ),
                         entity_type=entity_type,
-                        entity_id=entity_id,
+                        entity_id=str(entity_id),
                     ),
                     ctx,
                 ),

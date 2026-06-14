@@ -77,12 +77,20 @@ function buildFetchError(path: string, status: number, text: string): Error {
 export function formatAiErrorMessage(err: unknown, fallback = "Generazione AI non riuscita."): string {
   const raw = err instanceof Error ? err.message : fallback;
   if (!raw.trim()) return fallback;
-  if (raw.startsWith("Errore AI:")) return raw;
+  const lowered = raw.toLowerCase();
   if (
-    raw.toLowerCase().includes("modello")
-    || raw.toLowerCase().includes("openai")
-    || raw.toLowerCase().includes("parametr")
-    || raw.toLowerCase().includes("api key")
+    lowered.includes("validation error")
+    || lowered.includes("airequestmetadata")
+    || (lowered.includes("entity_id") && lowered.includes("valid string"))
+  ) {
+    return "Generazione AI non riuscita. Controlla i dettagli in AI Costs.";
+  }
+  if (raw.startsWith("Errore AI:") || raw.startsWith("Errore metadata AI:")) return raw;
+  if (
+    lowered.includes("modello")
+    || lowered.includes("openai")
+    || lowered.includes("parametr")
+    || lowered.includes("api key")
   ) {
     return raw.startsWith("Errore") ? raw : `Errore AI: ${raw}`;
   }

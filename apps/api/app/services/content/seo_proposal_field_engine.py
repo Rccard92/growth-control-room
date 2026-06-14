@@ -454,7 +454,7 @@ async def generate_seo_proposal_field(
                 if field == "imageAlt" and entity_type == "product"
                 else entity_type
             ),
-            entity_id=entity_id,
+            entity_id=str(entity_id),
         ),
         ctx,
     )

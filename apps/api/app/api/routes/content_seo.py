@@ -1,6 +1,9 @@
 from uuid import UUID
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -111,6 +114,8 @@ from app.services.shopify.scopes import resolve_shopify_scopes
 from app.services.shopify.sync import sync_shopify_store
 
 router = APIRouter(prefix="/projects", tags=["content-seo"])
+
+logger = logging.getLogger(__name__)
 
 
 def _map_shopify_error(exc: ShopifyAPIError) -> HTTPException:
@@ -560,6 +565,12 @@ async def generate_proposal(
             use_ai=body.use_ai,
             mode=body.mode,
         )
+    except ValidationError as exc:
+        logger.warning("AiRequestMetadata validation failed in generate_proposal: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Errore metadata AI: entity_id non valido.",
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -600,6 +611,12 @@ async def generate_proposal_field(
             type_name=body.type,
             use_ai=body.use_ai,
         )
+    except ValidationError as exc:
+        logger.warning("AiRequestMetadata validation failed in generate_proposal_field: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Errore metadata AI: entity_id non valido.",
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

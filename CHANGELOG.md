@@ -3,6 +3,14 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.9-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed AiRequestMetadata UUID coercion
+- Product SEO AI generation no longer fails when entity_id is a UUID
+- Hardened AI metadata handling across all generators
+
 ## [0.5.8-alpha] - 2026-06-13
 
 Tipo: Alpha patch
