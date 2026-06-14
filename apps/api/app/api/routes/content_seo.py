@@ -9,6 +9,14 @@ from app.schemas.content_seo import (
     ContentSeoDashboardResponse,
     ContentSeoSyncResponse,
 )
+from app.schemas.content_seo_editorial import (
+    ContentSeoEditorialItemCreate,
+    ContentSeoEditorialItemListResponse,
+    ContentSeoEditorialItemRead,
+    ContentSeoEditorialItemUpdate,
+    EditorialPlanGenerateRequest,
+    EditorialPlanGenerateResponse,
+)
 from app.schemas.seo_optimizer import (
     SeoAnalyzeCountResponse,
     SeoApplyFieldsRequest,
@@ -32,6 +40,14 @@ from app.schemas.seo_optimizer import (
     SeoProposalRead,
 )
 from app.services.ai.openai_client import is_openai_configured
+from app.services.content.editorial_item_service import (
+    create_editorial_item,
+    delete_editorial_item,
+    get_editorial_item,
+    list_editorial_items,
+    update_editorial_item,
+)
+from app.services.content.editorial_plan_service import generate_editorial_calendar
 from app.services.content.analyze import run_content_seo_analyze
 from app.services.content.collection_seo_analyzer import analyze_collections_for_store
 from app.services.content.dashboard import build_content_seo_dashboard
@@ -752,3 +768,119 @@ async def apply_seo_entity_fields(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return SeoApplyFieldsResponse.model_validate(result)
+
+
+@router.get(
+    "/{project_id}/content/seo/editorial-items",
+    response_model=ContentSeoEditorialItemListResponse,
+    response_model_by_alias=True,
+)
+async def list_content_seo_editorial_items(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    status: str | None = Query(default=None),
+    content_type: str | None = Query(default=None, alias="contentType"),
+) -> ContentSeoEditorialItemListResponse:
+    await get_project_in_default_workspace(project_id, session)
+    rows = await list_editorial_items(
+        session,
+        project_id,
+        month=month,
+        status=status,
+        content_type=content_type,
+    )
+    return ContentSeoEditorialItemListResponse(
+        items=[ContentSeoEditorialItemRead.model_validate(r) for r in rows],
+        month=month,
+    )
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_content_seo_editorial_item(
+    project_id: UUID,
+    payload: ContentSeoEditorialItemCreate,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await create_editorial_item(session, project_id, payload)
+    return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.get(
+    "/{project_id}/content/seo/editorial-items/{item_id}",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def get_content_seo_editorial_item(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_editorial_item(session, project_id, item_id)
+    return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/content/seo/editorial-items/{item_id}",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def update_content_seo_editorial_item(
+    project_id: UUID,
+    item_id: UUID,
+    payload: ContentSeoEditorialItemUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await update_editorial_item(session, project_id, item_id, payload)
+    return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.delete(
+    "/{project_id}/content/seo/editorial-items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_content_seo_editorial_item(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    await get_project_in_default_workspace(project_id, session)
+    await delete_editorial_item(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-plan/generate-calendar",
+    response_model=EditorialPlanGenerateResponse,
+    response_model_by_alias=True,
+)
+async def generate_content_seo_editorial_calendar(
+    project_id: UUID,
+    payload: EditorialPlanGenerateRequest,
+    session: AsyncSession = Depends(get_db),
+    dry_run: bool = Query(default=False, alias="dryRun"),
+) -> EditorialPlanGenerateResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        rows = await generate_editorial_calendar(
+            session, project_id, payload, dry_run=dry_run
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    message = (
+        "Anteprima piano editoriale generata."
+        if dry_run
+        else f"Piano editoriale creato con {len(rows)} contenuti."
+    )
+    return EditorialPlanGenerateResponse(
+        items=[ContentSeoEditorialItemRead.model_validate(r) for r in rows],
+        dry_run=dry_run,
+        message=message,
+    )

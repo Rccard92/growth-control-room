@@ -16,6 +16,12 @@ import type {
   SeoMetafieldDefinitionsSyncResponse,
   SeoProposalPreviewResponse,
   ContentSeoDashboard,
+  ContentSeoEditorialItem,
+  ContentSeoEditorialItemCreate,
+  ContentSeoEditorialItemListResponse,
+  ContentSeoEditorialItemUpdate,
+  EditorialPlanGenerateRequest,
+  EditorialPlanGenerateResponse,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
 
@@ -274,5 +280,59 @@ export function syncCollectionSeo(
 export function getContentSeoDebug(projectId: string): Promise<SeoContentDebugResponse> {
   return apiFetch<SeoContentDebugResponse>(
     `/api/projects/${projectId}/content/seo/debug`,
+  );
+}
+
+export function getEditorialItems(
+  projectId: string,
+  params?: { month?: string; status?: string; contentType?: string },
+): Promise<ContentSeoEditorialItemListResponse> {
+  const search = new URLSearchParams();
+  if (params?.month) search.set("month", params.month);
+  if (params?.status) search.set("status", params.status);
+  if (params?.contentType) search.set("contentType", params.contentType);
+  const q = search.toString();
+  return apiFetch<ContentSeoEditorialItemListResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items${q ? `?${q}` : ""}`,
+  );
+}
+
+export function createEditorialItem(
+  projectId: string,
+  data: ContentSeoEditorialItemCreate,
+): Promise<ContentSeoEditorialItem> {
+  return apiFetch<ContentSeoEditorialItem>(
+    `/api/projects/${projectId}/content/seo/editorial-items`,
+    { method: "POST", body: JSON.stringify(data) },
+  );
+}
+
+export function updateEditorialItem(
+  projectId: string,
+  itemId: string,
+  data: ContentSeoEditorialItemUpdate,
+): Promise<ContentSeoEditorialItem> {
+  return apiFetch<ContentSeoEditorialItem>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}`,
+    { method: "PUT", body: JSON.stringify(data) },
+  );
+}
+
+export function deleteEditorialItem(projectId: string, itemId: string): Promise<void> {
+  return apiFetch<void>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}`,
+    { method: "DELETE" },
+  );
+}
+
+export function generateEditorialCalendar(
+  projectId: string,
+  data: EditorialPlanGenerateRequest,
+  dryRun = false,
+): Promise<EditorialPlanGenerateResponse> {
+  const q = dryRun ? "?dryRun=true" : "";
+  return apiFetch<EditorialPlanGenerateResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-plan/generate-calendar${q}`,
+    { method: "POST", body: JSON.stringify(data) },
   );
 }

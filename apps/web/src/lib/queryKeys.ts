@@ -38,6 +38,8 @@ export const queryKeys = {
       ["contentSeo", projectId, "proposal", proposalId] as const,
     proposalPreview: (projectId: string, proposalId: string) =>
       ["contentSeo", projectId, "proposalPreview", proposalId] as const,
+    editorialItems: (projectId: string, month?: string) =>
+      ["contentSeo", projectId, "editorialItems", month ?? "all"] as const,
   },
   brandIntelligence: {
     overview: (projectId: string) => ["brandIntelligence", projectId, "overview"] as const,

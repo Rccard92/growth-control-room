@@ -1225,3 +1225,320 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Content SEO page tabs */
+.content-seo-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.25rem;
+  border-radius: var(--gcr-radius, 8px);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.content-seo-tabs__btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gcr-text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.content-seo-tabs__btn:hover {
+  color: var(--gcr-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.content-seo-tabs__btn--active {
+  color: var(--gcr-text);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Editorial room */
+.editorial-room__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.editorial-room__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.editorial-room__subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gcr-text-muted);
+  max-width: 52ch;
+}
+
+.editorial-legend {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--gcr-radius, 8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.editorial-legend__title {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.editorial-legend__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.editorial-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.editorial-legend__label {
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.editorial-status {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.editorial-status--idea { background: #334155; color: #e2e8f0; }
+.editorial-status--brief-pending { background: #1e3a5f; color: #93c5fd; }
+.editorial-status--brief-approved { background: #14532d; color: #86efac; }
+.editorial-status--draft-pending { background: #422006; color: #fcd34d; }
+.editorial-status--draft-review { background: #713f12; color: #fde68a; }
+.editorial-status--ready { background: #064e3b; color: #6ee7b7; }
+.editorial-status--scheduled { background: #312e81; color: #c4b5fd; }
+.editorial-status--published { background: #14532d; color: #bbf7d0; }
+.editorial-status--error { background: #7f1d1d; color: #fecaca; }
+
+.editorial-calendar {
+  padding: 1rem;
+}
+
+.editorial-calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.editorial-calendar__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.editorial-calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.editorial-calendar__weekday {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gcr-text-muted);
+  text-transform: uppercase;
+}
+
+.editorial-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.editorial-calendar__day {
+  min-height: 96px;
+  padding: 0.35rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.editorial-calendar__day--today {
+  border-color: var(--gcr-accent-emerald, #34d399);
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.35);
+}
+
+.editorial-calendar__day--outside {
+  opacity: 0.45;
+}
+
+.editorial-calendar__day-num {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.editorial-calendar__day-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.editorial-item-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gcr-text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.65rem;
+}
+
+.editorial-item-card:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.editorial-item-card__title {
+  font-weight: 600;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.editorial-item-card__meta,
+.editorial-item-card__product {
+  color: var(--gcr-text-muted);
+}
+
+.editorial-calendar-skeleton {
+  min-height: 420px;
+  border-radius: var(--gcr-radius, 8px);
+}
+
+.editorial-drawer__type {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+  color: var(--gcr-text-muted);
+}
+
+.editorial-drawer__linked {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+}
+
+.editorial-drawer__brief h4 {
+  margin: 0 0 0.5rem;
+}
+
+.editorial-wizard {
+  max-width: 560px;
+}
+
+.editorial-wizard__steps {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--gcr-text-muted);
+}
+
+.editorial-wizard__body h4 {
+  margin: 0 0 1rem;
+}
+
+.editorial-wizard__checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+  border: none;
+  padding: 0;
+}
+
+.editorial-wizard__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.editorial-wizard__shopify-hint {
+  margin-bottom: 0.75rem;
+}
+
+.editorial-wizard__product-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.editorial-wizard__product-scroll {
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editorial-wizard__preview-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.editorial-wizard__preview-list li {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.editorial-wizard__preview-type {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.editorial-wizard__footer {
+  margin-top: auto;
+}
+
+@media (max-width: 768px) {
+  .editorial-wizard__product-lists {
+    grid-template-columns: 1fr;
+  }
+
+  .editorial-calendar__day {
+    min-height: 72px;
+  }
+}

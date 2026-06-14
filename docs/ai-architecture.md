@@ -27,6 +27,18 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 
 Content SEO e Product SEO usano `get_prompt_context()` → `fullText` (non `previewText`). Se FAQ & Objections è vuota, il comportamento resta invariato.
 
+### Blog Brief Generator (futuro — Content SEO Editorial)
+
+Modulo pianificato per la tab **Blog & Ricette** dopo la foundation 0.4.0-alpha (calendario + wizard rule-based).
+
+- **Input**: item editoriale con keyword, obiettivo, prodotto collegato, note
+- **Context**: `BrandContextBuilder` / `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, Product Knowledge
+- **Safe Claims**: priorità assoluta; nessun claim vietato o non supportato nel brief
+- **Output**: `brief_payload` JSONB sull'item; stato `brief_pending` → `brief_approved` dopo revisione utente
+- **Nessuna pubblicazione automatica**: apply su Shopify solo dopo approvazione esplicita (step Publisher separato)
+- **Nessun OpenAI** nella generazione calendario 0.4.0-alpha — solo titoli placeholder rule-based
+
+
 ### Product SEO e Product Knowledge
 
 Per ogni prodotto Shopify in ottimizzazione SEO:

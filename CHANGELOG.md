@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.0-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Split Content SEO in due tab: Prodotti & Categorie (optimizer esistente) e Blog & Ricette (calendario editoriale)
+- Nuovo modello `ContentSeoEditorialItem` e migration `027` per calendario blog/ricette
+- API CRUD editorial-items + generazione piano rule-based (`generate-calendar`, supporto `dryRun`)
+- UI calendario mensile, wizard 4 step, drawer item con CTA brief disabilitata
+- Blog & Ricette accessibile senza Shopify; prodotti opzionali nel wizard
+- Documentazione `docs/content-seo.md` e sezione Brief Generator futuro in `docs/ai-architecture.md`
+
 ## [0.3.8-alpha] - 2026-06-13
 
 Tipo: Alpha patch

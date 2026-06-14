@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { SeoOptimizerTab } from "@gcr/shared";
-import { StatusBadge } from "../../StatusBadge";
 import { EntitySeoTable, type EntityFilter } from "./EntitySeoTable";
 import { SeoEntityEditDrawer } from "./SeoEntityEditDrawer";
 import { ContentSeoOptimizerKpi, averageScore } from "./ContentSeoOptimizerKpi";
@@ -15,10 +14,9 @@ import {
 } from "../../../hooks/useContentSeo";
 import { useShopifyScopes } from "../../../hooks/useShopify";
 
-const TABS: { id: SeoOptimizerTab; label: string; comingSoon?: boolean }[] = [
+const TABS: { id: SeoOptimizerTab; label: string }[] = [
   { id: "products", label: "Prodotti" },
   { id: "collections", label: "Categorie" },
-  { id: "editorial", label: "Blog & Ricette", comingSoon: true },
 ];
 
 interface SeoOptimizerRoomProps {
@@ -125,11 +123,9 @@ export function SeoOptimizerRoom({
             key={t.id}
             type="button"
             className={`seo-optimizer-tab ${tab === t.id ? "seo-optimizer-tab--active" : ""}`}
-            disabled={t.comingSoon}
-            onClick={() => !t.comingSoon && setTab(t.id)}
+            onClick={() => setTab(t.id)}
           >
             {t.label}
-            {t.comingSoon && <StatusBadge variant="coming_soon" />}
           </button>
         ))}
       </div>
@@ -177,14 +173,6 @@ export function SeoOptimizerRoom({
               emptyMessage="Nessuna collection Shopify sincronizzata. Clicca 'Sincronizza Shopify'."
             />
           )}
-        </div>
-      )}
-
-      {tab === "editorial" && (
-        <div className="gcr-card content-seo-empty content-seo-empty--compact">
-          <h3 className="gcr-card__title">Blog & Ricette</h3>
-          <p className="gcr-card__description">Modulo Editorial SEO in arrivo.</p>
-          <StatusBadge variant="coming_soon" />
         </div>
       )}
 

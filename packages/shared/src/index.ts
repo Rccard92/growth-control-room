@@ -122,6 +122,24 @@ export type {
   ContentOpportunityStatus,
   ContentBriefStatus,
   SearchIntent,
+  ContentSeoMainTab,
+  ContentSeoEditorialStatus,
+  ContentSeoEditorialContentType,
+  ContentSeoEditorialObjective,
+  ContentSeoEditorialCommercialIntensity,
+  ContentSeoEditorialFrequency,
+  EditorialWeekday,
+  ContentSeoEditorialItem,
+  ContentSeoEditorialItemCreate,
+  ContentSeoEditorialItemUpdate,
+  ContentSeoEditorialItemListResponse,
+  EditorialPlanGenerateRequest,
+  EditorialPlanGenerateResponse,
+} from "./types/content";
+export {
+  CONTENT_SEO_EDITORIAL_STATUS_LABELS,
+  CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS,
+  CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS,
 } from "./types/content";
 export type {
   BrandProfile,

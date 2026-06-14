@@ -363,3 +363,178 @@ export interface SeoEntitySyncResponse {
   detail: SeoProductDetailResponse | SeoCollectionDetailResponse;
   message: string;
 }
+
+// --- Content SEO Editorial (Blog & Ricette) ---
+
+export type ContentSeoMainTab = "products" | "editorial";
+
+export type ContentSeoEditorialStatus =
+  | "idea"
+  | "brief_pending"
+  | "brief_approved"
+  | "draft_pending"
+  | "draft_review"
+  | "ready_to_publish"
+  | "scheduled"
+  | "published"
+  | "publish_error";
+
+export type ContentSeoEditorialContentType =
+  | "educational_article"
+  | "product_guide"
+  | "recipe"
+  | "faq_objection_article"
+  | "product_comparison"
+  | "seasonal_article"
+  | "brand_storytelling";
+
+export type ContentSeoEditorialObjective =
+  | "seo_traffic"
+  | "education"
+  | "push_products"
+  | "answer_objections"
+  | "support_ads"
+  | "support_email"
+  | "seasonal_content";
+
+export type ContentSeoEditorialCommercialIntensity = "soft" | "balanced" | "sales_oriented";
+
+export type ContentSeoEditorialFrequency =
+  | "daily"
+  | "every_2_days"
+  | "every_3_days"
+  | "every_4_days"
+  | "weekly"
+  | "twice_weekly"
+  | "custom";
+
+export type EditorialWeekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+export const CONTENT_SEO_EDITORIAL_STATUS_LABELS: Record<ContentSeoEditorialStatus, string> = {
+  idea: "Idea",
+  brief_pending: "Brief in attesa",
+  brief_approved: "Brief approvato",
+  draft_pending: "Bozza in attesa",
+  draft_review: "Bozza in revisione",
+  ready_to_publish: "Pronto per pubblicazione",
+  scheduled: "Programmato",
+  published: "Pubblicato",
+  publish_error: "Errore pubblicazione",
+};
+
+export const CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS: Record<
+  ContentSeoEditorialContentType,
+  string
+> = {
+  educational_article: "Articolo educativo",
+  product_guide: "Guida prodotto",
+  recipe: "Ricetta",
+  faq_objection_article: "FAQ/obiezione in articolo",
+  product_comparison: "Confronto tra prodotti",
+  seasonal_article: "Articolo stagionale",
+  brand_storytelling: "Storytelling brand/prodotto",
+};
+
+export const CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS: Record<
+  ContentSeoEditorialObjective,
+  string
+> = {
+  seo_traffic: "Aumentare traffico SEO",
+  education: "Educare il pubblico",
+  push_products: "Spingere prodotti specifici",
+  answer_objections: "Rispondere a obiezioni frequenti",
+  support_ads: "Supportare campagne ads",
+  support_email: "Supportare email marketing",
+  seasonal_content: "Preparare contenuti stagionali",
+};
+
+export interface ContentSeoEditorialItem {
+  id: string;
+  projectId: string;
+  title: string;
+  contentType: ContentSeoEditorialContentType;
+  plannedDate: string;
+  status: ContentSeoEditorialStatus;
+  objective?: ContentSeoEditorialObjective | null;
+  primaryKeyword?: string | null;
+  secondaryKeywords?: string[] | null;
+  targetAudience?: string | null;
+  searchIntent?: string | null;
+  commercialIntensity?: ContentSeoEditorialCommercialIntensity | null;
+  linkedShopifyProductId?: string | null;
+  linkedShopifyProductGid?: string | null;
+  linkedShopifyProductTitle?: string | null;
+  linkedShopifyProductHandle?: string | null;
+  linkedCollectionId?: string | null;
+  linkedCollectionTitle?: string | null;
+  notes?: string | null;
+  briefPayload?: Record<string, unknown> | null;
+  articlePayload?: Record<string, unknown> | null;
+  shopifyBlogId?: string | null;
+  shopifyArticleId?: string | null;
+  shopifyStatus?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentSeoEditorialItemCreate {
+  title: string;
+  contentType: ContentSeoEditorialContentType;
+  plannedDate: string;
+  status?: ContentSeoEditorialStatus;
+  objective?: ContentSeoEditorialObjective | null;
+  primaryKeyword?: string | null;
+  secondaryKeywords?: string[] | null;
+  notes?: string | null;
+  linkedShopifyProductId?: string | null;
+  linkedShopifyProductGid?: string | null;
+  linkedShopifyProductTitle?: string | null;
+  linkedShopifyProductHandle?: string | null;
+}
+
+export interface ContentSeoEditorialItemUpdate {
+  title?: string;
+  contentType?: ContentSeoEditorialContentType;
+  plannedDate?: string;
+  status?: ContentSeoEditorialStatus;
+  objective?: ContentSeoEditorialObjective | null;
+  primaryKeyword?: string | null;
+  secondaryKeywords?: string[] | null;
+  notes?: string | null;
+  linkedShopifyProductId?: string | null;
+  linkedShopifyProductGid?: string | null;
+  linkedShopifyProductTitle?: string | null;
+  linkedShopifyProductHandle?: string | null;
+}
+
+export interface ContentSeoEditorialItemListResponse {
+  items: ContentSeoEditorialItem[];
+  month?: string | null;
+}
+
+export interface EditorialPlanGenerateRequest {
+  startDate: string;
+  endDate: string;
+  frequency: ContentSeoEditorialFrequency;
+  preferredWeekdays?: EditorialWeekday[] | null;
+  contentTypes: ContentSeoEditorialContentType[];
+  objective: ContentSeoEditorialObjective;
+  commercialIntensity: ContentSeoEditorialCommercialIntensity;
+  linkedProductIds?: string[];
+  avoidProductIds?: string[];
+  primaryKeywords?: string[];
+  notes?: string;
+}
+
+export interface EditorialPlanGenerateResponse {
+  items: ContentSeoEditorialItem[];
+  dryRun: boolean;
+  message: string;
+}
