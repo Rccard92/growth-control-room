@@ -515,6 +515,26 @@
   overflow-x: hidden;
   word-break: break-word;
   line-height: 1.35;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--gcr-text);
+  background: var(--gcr-bg-elevated);
+  border: 1px solid var(--gcr-border);
+  border-radius: var(--gcr-radius-sm);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auto-resize-textarea:focus {
+  border-color: var(--gcr-accent-violet);
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
+}
+
+.auto-resize-textarea::placeholder {
+  color: var(--gcr-text-dim);
 }
 
 .auto-resize-textarea--error {

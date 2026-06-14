@@ -476,7 +476,7 @@ export interface ContentSeoEditorialItem {
   linkedCollectionTitle?: string | null;
   notes?: string | null;
   briefPayload?: Record<string, unknown> | null;
-  articlePayload?: Record<string, unknown> | null;
+  articlePayload?: EditorialArticlePayload | null;
   shopifyBlogId?: string | null;
   shopifyArticleId?: string | null;
   shopifyStatus?: string | null;
@@ -599,4 +599,28 @@ export type EditorialBriefUpdateStatus = "brief_pending" | "brief_approved";
 export interface EditorialBriefUpdateRequest {
   briefPayload: EditorialBriefPayload;
   status?: EditorialBriefUpdateStatus;
+}
+
+export interface EditorialArticlePayload {
+  title: string;
+  handle: string;
+  excerpt: string;
+  bodyHtml: string;
+  bodyMarkdown: string;
+  seoTitle: string;
+  metaDescription: string;
+  tags: string[];
+  linkedProducts: string[];
+  cta: string;
+  status: "draft";
+  warnings: string[];
+  brandContextUsed: string[];
+  generatedAt: string;
+}
+
+export type ArticleUpdateStatus = "draft_pending" | "draft_review" | "ready_to_publish";
+
+export interface EditorialArticleUpdateRequest {
+  articlePayload: EditorialArticlePayload;
+  status?: ArticleUpdateStatus;
 }

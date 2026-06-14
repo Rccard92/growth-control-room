@@ -17,6 +17,7 @@ from app.schemas.content_seo_editorial import (
     EditorialBriefUpdateRequest,
     EditorialBriefBatchJobResponse,
     EditorialBriefBatchStartRequest,
+    EditorialArticleUpdateRequest,
     EditorialItemRescheduleRequest,
     EditorialItemRescheduleResponse,
     EditorialPlanGenerateRequest,
@@ -61,6 +62,10 @@ from app.services.content.editorial_brief_batch_service import (
     get_brief_batch_job,
     job_to_response,
     start_brief_batch_job,
+)
+from app.services.content.editorial_article_service import (
+    generate_editorial_article,
+    update_editorial_article,
 )
 from app.services.content.editorial_plan_service import generate_editorial_calendar
 from app.services.content.analyze import run_content_seo_analyze
@@ -952,6 +957,40 @@ async def update_content_seo_editorial_brief(
     await get_project_in_default_workspace(project_id, session)
     try:
         row = await update_editorial_brief(session, project_id, item_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/generate-article",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def generate_content_seo_editorial_article(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await generate_editorial_article(session, project_id, item_id)
+    return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/content/seo/editorial-items/{item_id}/article",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def update_content_seo_editorial_article(
+    project_id: UUID,
+    item_id: UUID,
+    payload: EditorialArticleUpdateRequest,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        row = await update_editorial_article(session, project_id, item_id, payload)
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return ContentSeoEditorialItemRead.model_validate(row)

@@ -413,12 +413,14 @@
   gap: 0.375rem;
 }
 
-.gcr-field label {
+.gcr-field label,
+.gcr-field__label {
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--gcr-text-muted);
 }
 
+.gcr-input,
 .gcr-field input,
 .gcr-field textarea {
   padding: 0.625rem 0.875rem;
@@ -429,15 +431,21 @@
   border: 1px solid var(--gcr-border);
   border-radius: var(--gcr-radius-sm);
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  box-sizing: border-box;
 }
 
+.gcr-input:focus,
 .gcr-field input:focus,
 .gcr-field textarea:focus {
   border-color: var(--gcr-accent-violet);
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
 }
 
-.gcr-field input::placeholder {
+.gcr-input::placeholder,
+.gcr-field input::placeholder,
+.gcr-field textarea::placeholder {
   color: var(--gcr-text-dim);
 }
 

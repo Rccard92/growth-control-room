@@ -3,6 +3,7 @@ import type {
   ContentSeoEditorialItemCreate,
   ContentSeoEditorialItemUpdate,
   EditorialBriefUpdateRequest,
+  EditorialArticleUpdateRequest,
   EditorialItemRescheduleRequest,
   EditorialPlanGenerateRequest,
 } from "@gcr/shared";
@@ -11,11 +12,13 @@ import {
   deleteEditorialItem,
   generateEditorialBrief,
   generateEditorialCalendar,
+  generateEditorialArticle,
   getEditorialBriefBatchJob,
   getEditorialItems,
   rescheduleEditorialItem,
   startEditorialBriefBatch,
   updateEditorialBrief,
+  updateEditorialArticle,
   updateEditorialItem,
 } from "../lib/content-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -146,5 +149,27 @@ export function useEditorialBriefBatchJob(
       if (status === "pending" || status === "running") return 2000;
       return false;
     },
+  });
+}
+
+export function useGenerateEditorialArticle(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => generateEditorialArticle(projectId, itemId),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useUpdateEditorialArticle(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      data,
+    }: {
+      itemId: string;
+      data: EditorialArticleUpdateRequest;
+    }) => updateEditorialArticle(projectId, itemId, data),
+    onSuccess: () => invalidateEditorial(qc, projectId),
   });
 }

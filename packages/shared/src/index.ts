@@ -143,6 +143,9 @@ export type {
   EditorialBriefPayload,
   EditorialBriefUpdateRequest,
   EditorialBriefUpdateStatus,
+  EditorialArticlePayload,
+  EditorialArticleUpdateRequest,
+  ArticleUpdateStatus,
 } from "./types/content";
 export {
   CONTENT_SEO_EDITORIAL_STATUS_LABELS,

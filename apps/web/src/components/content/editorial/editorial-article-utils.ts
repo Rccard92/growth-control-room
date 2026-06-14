@@ -1,0 +1,85 @@
+import type { EditorialArticlePayload } from "@gcr/shared";
+
+export function emptyEditorialArticlePayload(): EditorialArticlePayload {
+  return {
+    title: "",
+    handle: "",
+    excerpt: "",
+    bodyHtml: "",
+    bodyMarkdown: "",
+    seoTitle: "",
+    metaDescription: "",
+    tags: [],
+    linkedProducts: [],
+    cta: "",
+    status: "draft",
+    warnings: [],
+    brandContextUsed: [],
+    generatedAt: "",
+  };
+}
+
+function coerceStringList(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+export function parseEditorialArticlePayload(
+  raw: Record<string, unknown> | null | undefined,
+): EditorialArticlePayload {
+  if (!raw || Object.keys(raw).length === 0) {
+    return emptyEditorialArticlePayload();
+  }
+  return {
+    title: String(raw.title ?? ""),
+    handle: String(raw.handle ?? ""),
+    excerpt: String(raw.excerpt ?? ""),
+    bodyHtml: String(raw.bodyHtml ?? ""),
+    bodyMarkdown: String(raw.bodyMarkdown ?? ""),
+    seoTitle: String(raw.seoTitle ?? ""),
+    metaDescription: String(raw.metaDescription ?? ""),
+    tags: coerceStringList(raw.tags),
+    linkedProducts: coerceStringList(raw.linkedProducts),
+    cta: String(raw.cta ?? ""),
+    status: "draft",
+    warnings: coerceStringList(raw.warnings),
+    brandContextUsed: coerceStringList(raw.brandContextUsed),
+    generatedAt: String(raw.generatedAt ?? ""),
+  };
+}
+
+export function hasEditorialArticle(
+  raw: Record<string, unknown> | EditorialArticlePayload | null | undefined,
+): boolean {
+  if (!raw || Object.keys(raw).length === 0) return false;
+  const parsed =
+    "bodyHtml" in raw && typeof raw.bodyHtml === "string"
+      ? (raw as EditorialArticlePayload)
+      : parseEditorialArticlePayload(raw as Record<string, unknown>);
+  return Boolean(
+    parsed.title.trim() ||
+      parsed.bodyHtml.trim() ||
+      parsed.bodyMarkdown.trim() ||
+      parsed.excerpt.trim(),
+  );
+}
+
+export function listToTextarea(lines: string[]): string {
+  return lines.join("\n");
+}
+
+export function textareaToList(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}

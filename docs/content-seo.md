@@ -2,7 +2,7 @@
 
 Modulo **Content SEO** del Growth Control Room: ottimizzazione Shopify (prodotti e categorie) e pianificazione editoriale blog/ricette.
 
-Versione corrente: **0.4.1-alpha** (Brief Generator).
+Versione corrente: **0.4.6-alpha** (Article Draft Generator).
 
 ## Struttura UI
 
@@ -75,7 +75,7 @@ Workflow: **calendario → genera brief → modifica → salva → approva**.
 6. **Approva brief** — `PUT brief` con `status: brief_approved`
 7. **Rigenera brief** — conferma se ci sono modifiche non salvate
 
-**Non generato in questo step:** articolo completo, body HTML, immagini, publish Shopify.
+**Non generato in questo step:** immagini, publish Shopify.
 
 #### Struttura `brief_payload`
 
@@ -102,6 +102,46 @@ Workflow: **calendario → genera brief → modifica → salva → approva**.
 }
 ```
 
+### Article Draft Generator (0.4.6-alpha)
+
+Workflow: **brief approvato → genera articolo → modifica → salva bozza → anteprima → segna pronto per pubblicazione**.
+
+**Prerequisito:** item con `status: brief_approved` e `brief_payload` valorizzato.
+
+1. Tab **Articolo & Anteprima** nel modal item
+2. **Genera articolo** — `POST editorial-items/{id}/generate-article`
+3. Backend usa `BrandIntelligenceContextBuilder` + brief approvato come fonte principale + Product Knowledge prodotto collegato
+4. Articolo salvato in `article_payload` JSONB; status → `draft_review`
+5. Editor: titolo, handle, excerpt, body HTML/Markdown, SEO meta, tags, CTA
+6. **Anteprima**: `bodyHtml` renderizzato (sanitizzato whitelist client-side + backend in save/generate)
+7. **Salva bozza articolo** — `PUT article` mantiene `draft_review`
+8. **Segna pronto per pubblicazione** — `PUT article` con `status: ready_to_publish`
+
+**Non implementato:** pubblicazione Shopify, scheduling, batch articoli, generazione immagini.
+
+#### Struttura `article_payload`
+
+```json
+{
+  "title": "",
+  "handle": "",
+  "excerpt": "",
+  "bodyHtml": "",
+  "bodyMarkdown": "",
+  "seoTitle": "",
+  "metaDescription": "",
+  "tags": [],
+  "linkedProducts": [],
+  "cta": "",
+  "status": "draft",
+  "warnings": [],
+  "brandContextUsed": [],
+  "generatedAt": ""
+}
+```
+
+`bodyHtml` è il contenuto principale per anteprima e futura pubblicazione Shopify.
+
 ## API
 
 Base: `/api/projects/{project_id}/content/seo/`
@@ -116,6 +156,8 @@ Base: `/api/projects/{project_id}/content/seo/`
 | POST | `editorial-plan/generate-calendar` | Body wizard; `?dryRun=true` per anteprima |
 | POST | `editorial-items/{item_id}/generate-brief` | Genera brief AI per singolo item |
 | PUT | `editorial-items/{item_id}/brief` | Salva/approva `briefPayload`; `status` opzionale (`brief_pending` \| `brief_approved`) |
+| POST | `editorial-items/{item_id}/generate-article` | Genera bozza articolo da brief approvato |
+| PUT | `editorial-items/{item_id}/article` | Salva `articlePayload`; `status` opzionale (`draft_pending` \| `draft_review` \| `ready_to_publish`) |
 
 Nessun endpoint editorial richiede Shopify connesso.
 
@@ -123,13 +165,13 @@ Nessun endpoint editorial richiede Shopify connesso.
 
 Tabella: `content_seo_editorial_items` (migration `027`).
 
-Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`. Campo JSONB `brief_payload` per brief SEO; `article_payload` riservato ad Article Generator.
+Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`. Campi JSONB `brief_payload` (brief SEO) e `article_payload` (bozza articolo).
 
 ## Roadmap (step successivi)
 
-1. **Article Generator** — bozze lunghe da brief con `brief_approved`
-2. **Shopify Publisher** — draft blog/article su Shopify
-3. **Sync/analyze SEO blog** — audit contenuti blog esistenti
+1. **Shopify Publisher** — draft blog/article su Shopify con conferma esplicita
+2. **Sync/analyze SEO blog** — audit contenuti blog esistenti
+3. **Batch article generation** — generazione massiva bozze (dopo validazione singolo articolo)
 
 ## Test manuali
 
@@ -140,3 +182,4 @@ Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`
 5. Validazioni: date invertite, zero tipi, custom senza giorni → errori leggibili
 6. Senza Shopify: wizard OK, prodotti disabilitati/empty state
 7. Genera brief su item → modifica meta/struttura → salva → reload → approva → badge «Brief approvato»
+8. Tab Articolo & Anteprima → genera articolo → editor + anteprima HTML → salva bozza → segna pronto per pubblicazione → badge calendario aggiornato

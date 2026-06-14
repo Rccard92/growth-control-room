@@ -402,3 +402,83 @@ class EditorialBriefUpdateRequest(BaseModel):
         if self.status == "brief_approved" and not self.brief_payload:
             raise ValueError("Il brief non può essere vuoto per l'approvazione.")
         return self
+
+
+ArticleUpdateStatus = Literal["draft_pending", "draft_review", "ready_to_publish"]
+
+
+class EditorialArticlePayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    title: str = ""
+    handle: str = ""
+    excerpt: str = ""
+    body_html: str = Field(default="", serialization_alias="bodyHtml")
+    body_markdown: str = Field(default="", serialization_alias="bodyMarkdown")
+    seo_title: str = Field(default="", serialization_alias="seoTitle")
+    meta_description: str = Field(default="", serialization_alias="metaDescription")
+    tags: list[str] = Field(default_factory=list)
+    linked_products: list[str] = Field(
+        default_factory=list, serialization_alias="linkedProducts"
+    )
+    cta: str = ""
+    status: Literal["draft"] = "draft"
+    warnings: list[str] = Field(default_factory=list)
+    brand_context_used: list[str] = Field(
+        default_factory=list, serialization_alias="brandContextUsed"
+    )
+    generated_at: str = Field(default="", serialization_alias="generatedAt")
+
+
+def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
+    """Sanitize AI or client article JSON into a typed payload."""
+    from app.utils.html_sanitize import sanitize_editorial_article_html
+
+    data = dict(raw)
+    list_fields = {
+        "tags": "tags",
+        "linkedProducts": "linked_products",
+        "warnings": "warnings",
+        "brandContextUsed": "brand_context_used",
+    }
+    for alias, field in list_fields.items():
+        if alias in data:
+            data[field] = _coerce_str_list(data.pop(alias))
+        elif field in data:
+            data[field] = _coerce_str_list(data[field])
+    str_aliases = {
+        "title": "title",
+        "handle": "handle",
+        "excerpt": "excerpt",
+        "bodyHtml": "body_html",
+        "bodyMarkdown": "body_markdown",
+        "seoTitle": "seo_title",
+        "metaDescription": "meta_description",
+        "cta": "cta",
+        "generatedAt": "generated_at",
+    }
+    for alias, field in str_aliases.items():
+        if alias in data and field not in data:
+            data[field] = str(data.pop(alias) or "")
+        elif field in data and data[field] is not None:
+            data[field] = str(data[field])
+        else:
+            data.setdefault(field, "")
+    data.setdefault("status", "draft")
+    payload = EditorialArticlePayload.model_validate(data)
+    sanitized_html = sanitize_editorial_article_html(payload.body_html)
+    return payload.model_copy(update={"body_html": sanitized_html})
+
+
+class EditorialArticleUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    article_payload: dict = Field(validation_alias="articlePayload")
+    status: ArticleUpdateStatus | None = None
+
+    @field_validator("article_payload")
+    @classmethod
+    def validate_article_object(cls, value: dict) -> dict:
+        if not isinstance(value, dict):
+            raise ValueError("articlePayload deve essere un oggetto JSON.")
+        return value

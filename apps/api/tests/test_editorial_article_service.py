@@ -1,0 +1,204 @@
+"""Editorial article generator service tests."""
+
+import asyncio
+from datetime import date
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+from uuid import uuid4
+
+import pytest
+from fastapi import HTTPException
+
+from app.schemas.content_seo_editorial import (
+    EditorialArticleUpdateRequest,
+    normalize_editorial_article_payload,
+)
+from app.services.content.editorial_article_service import (
+    ArticleGenerationError,
+    generate_editorial_article,
+    generate_editorial_article_core,
+    update_editorial_article,
+)
+from app.utils.html_sanitize import sanitize_editorial_article_html
+
+
+def _sample_ai_article() -> dict:
+    return {
+        "title": "Guida olio EVO",
+        "handle": "guida-olio-evo",
+        "excerpt": "Tutto sull'olio extravergine.",
+        "bodyHtml": "<h2>Cos'è</h2><p>Testo <strong>utile</strong>.</p><script>alert(1)</script>",
+        "bodyMarkdown": "## Cos'è\nTesto utile.",
+        "seoTitle": "Olio EVO: guida",
+        "metaDescription": "Guida completa.",
+        "tags": ["olio", "cucina"],
+        "linkedProducts": ["Olio classico"],
+        "cta": "Scopri la linea",
+        "warnings": [],
+    }
+
+
+def test_sanitize_editorial_article_html_strips_script() -> None:
+    raw = "<h2>Titolo</h2><p>Ok</p><script>evil()</script>"
+    out = sanitize_editorial_article_html(raw)
+    assert "<script" not in out
+    assert "<h2>" in out
+    assert "<p>" in out
+
+
+def test_normalize_editorial_article_payload_sanitizes_body() -> None:
+    payload = normalize_editorial_article_payload(_sample_ai_article())
+    assert payload.title == "Guida olio EVO"
+    assert "<script" not in payload.body_html
+    assert "<h2>" in payload.body_html
+    assert "utile" in payload.body_html
+
+
+def test_generate_editorial_article_brief_not_approved() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+    row = SimpleNamespace(
+        id=item_id,
+        project_id=project_id,
+        status="brief_pending",
+        brief_payload={"proposedTitle": "Titolo"},
+        linked_shopify_product_id=None,
+        linked_shopify_product_title=None,
+        content_type="educational_article",
+        title="Idea",
+        planned_date=date(2026, 6, 15),
+        article_payload=None,
+    )
+    mock_session = AsyncMock()
+
+    async def run() -> None:
+        with patch(
+            "app.services.content.editorial_article_service.is_openai_configured",
+            return_value=True,
+        ):
+            with patch(
+                "app.services.content.editorial_article_service.get_editorial_item",
+                new_callable=AsyncMock,
+                return_value=row,
+            ):
+                with pytest.raises(ArticleGenerationError) as exc:
+                    await generate_editorial_article_core(mock_session, project_id, item_id)
+                assert exc.value.brief_not_approved
+
+    asyncio.run(run())
+
+
+def test_generate_editorial_article_no_openai() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+
+    async def run() -> None:
+        mock_session = AsyncMock()
+        with patch(
+            "app.services.content.editorial_article_service.is_openai_configured",
+            return_value=False,
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await generate_editorial_article(mock_session, project_id, item_id)
+            assert exc.value.status_code == 503
+            assert "OPENAI_API_KEY" in str(exc.value.detail)
+
+    asyncio.run(run())
+
+
+def test_generate_editorial_article_success() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+    row = SimpleNamespace(
+        id=item_id,
+        project_id=project_id,
+        status="brief_approved",
+        brief_payload={"proposedTitle": "Titolo", "h2H3Structure": ["H2: Intro"]},
+        linked_shopify_product_id="gid://shopify/Product/1",
+        linked_shopify_product_title="Olio",
+        content_type="educational_article",
+        title="Idea blog",
+        planned_date=date(2026, 6, 15),
+        article_payload=None,
+    )
+    mock_session = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.refresh = AsyncMock()
+
+    async def run() -> None:
+        with patch(
+            "app.services.content.editorial_article_service.is_openai_configured",
+            return_value=True,
+        ):
+            with patch(
+                "app.services.content.editorial_article_service.get_editorial_item",
+                new_callable=AsyncMock,
+                return_value=row,
+            ):
+                with patch(
+                    "app.services.content.editorial_article_service.BrandIntelligenceContextBuilder.build_brand_context",
+                    new_callable=AsyncMock,
+                    return_value=SimpleNamespace(
+                        brand_identity=None,
+                        safe_claims=None,
+                        product_knowledge=None,
+                        faq_objections=None,
+                        profile=None,
+                        prompt_context=None,
+                    ),
+                ):
+                    with patch(
+                        "app.services.content.editorial_article_service.BrandIntelligenceContextBuilder.format_for_prompt",
+                        return_value="BRAND CONTEXT",
+                    ):
+                        with patch(
+                            "app.services.content.editorial_article_service.get_product_knowledge_prompt_for_entity",
+                            new_callable=AsyncMock,
+                            return_value="PK",
+                        ):
+                            with patch(
+                                "app.services.content.editorial_article_service.generate_structured_json",
+                                new_callable=AsyncMock,
+                                return_value=_sample_ai_article(),
+                            ):
+                                result = await generate_editorial_article_core(
+                                    mock_session, project_id, item_id
+                                )
+        assert result.status == "draft_review"
+        assert result.article_payload is not None
+        assert result.article_payload["title"] == "Guida olio EVO"
+
+    asyncio.run(run())
+
+
+def test_update_editorial_article_ready_to_publish() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+    row = SimpleNamespace(
+        id=item_id,
+        project_id=project_id,
+        status="draft_review",
+        article_payload=None,
+    )
+    mock_session = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.refresh = AsyncMock()
+
+    request = EditorialArticleUpdateRequest(
+        article_payload=_sample_ai_article(),
+        status="ready_to_publish",
+    )
+
+    async def run() -> None:
+        with patch(
+            "app.services.content.editorial_article_service.get_editorial_item",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            result = await update_editorial_article(
+                mock_session, project_id, item_id, request
+            )
+        assert result.status == "ready_to_publish"
+        assert result.article_payload is not None
+
+    asyncio.run(run())

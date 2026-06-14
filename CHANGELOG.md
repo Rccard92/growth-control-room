@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.6-alpha] - 2026-06-14
+
+Tipo: Alpha patch
+
+- Fixed Brief SEO textarea styling (dark theme coerente)
+- Added Article & Preview tab in editorial item modal
+- Added single article draft generation from approved brief
+- Added rendered article preview with HTML sanitization
+- Shopify publishing remains disabled for future step
+
 ## [0.4.5-alpha] - 2026-06-13
 
 Tipo: Alpha patch

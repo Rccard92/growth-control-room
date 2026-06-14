@@ -35,10 +35,20 @@ Modulo attivo nella tab **Blog & Ricette** per generare brief SEO su singolo ite
 - **Context**: `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, Product Knowledge (+ PK specifico prodotto se collegato)
 - **Safe Claims**: priorità assoluta nel prompt; claim vietati in `claimsToAvoid`
 - **Output**: `brief_payload` JSONB; stato `brief_pending` dopo generate → `brief_approved` dopo approvazione utente
-- **Prerequisito Article Generator**: solo item con `brief_approved`
-- **Nessuna pubblicazione automatica** e nessun articolo completo in questo step
-- **OPENAI_API_KEY** richiesta; BI incompleta → warnings, non blocco
+- **Prerequisito Article Generator**: solo item con `brief_approved` e brief valorizzato
+- **Nessuna pubblicazione automatica** Shopify in questo step
 
+### Blog Article Draft Generator (implementato — Content SEO Editorial 0.4.6-alpha)
+
+Modulo attivo nella tab **Articolo & Anteprima** per generare bozze articolo da brief approvato.
+
+- **Input**: `brief_payload` approvato + metadati item (tipo, prodotto collegato)
+- **Context**: `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, Product Knowledge (+ PK specifico prodotto se collegato)
+- **Safe Claims**: priorità assoluta nel prompt; nessun claim medico o terapeutico inventato
+- **Output**: `article_payload` JSONB con `bodyHtml` sanitizzato; stato `draft_review` dopo generate
+- **Anteprima**: HTML renderizzato lato client (whitelist tag via DOMParser) dopo sanitizzazione backend
+- **Review umana**: salva bozza, modifica manuale, `ready_to_publish` prima di Shopify Publisher (step futuro)
+- **OPENAI_API_KEY** richiesta; BI incompleta → warnings, non blocco
 
 ### Product SEO e Product Knowledge
 

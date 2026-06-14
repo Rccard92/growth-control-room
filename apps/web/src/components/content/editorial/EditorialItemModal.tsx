@@ -3,6 +3,7 @@ import type {
   ContentSeoEditorialItem,
   ContentSeoEditorialObjective,
   ContentSeoEditorialStatus,
+  EditorialArticlePayload,
   EditorialBriefPayload,
 } from "@gcr/shared";
 import {
@@ -11,10 +12,16 @@ import {
   CONTENT_SEO_EDITORIAL_STATUS_LABELS,
 } from "@gcr/shared";
 import { EditorialBriefEditor } from "./EditorialBriefEditor";
+import { EditorialArticleEditor } from "./EditorialArticleEditor";
+import { EditorialArticlePreview } from "./EditorialArticlePreview";
 import {
   hasEditorialBrief,
   parseEditorialBriefPayload,
 } from "./editorial-brief-utils";
+import {
+  hasEditorialArticle,
+  parseEditorialArticlePayload,
+} from "./editorial-article-utils";
 import { AppModal } from "../../ui/AppModal";
 import { AppSelect } from "../../ui/AppSelect";
 import { AppDatePicker } from "../../ui/AppDatePicker";
@@ -23,8 +30,10 @@ import { AutoResizeTextarea } from "../../ui/AutoResizeTextarea";
 import { EditorialStatusBadge } from "./EditorialStatusLegend";
 import {
   useDeleteEditorialItem,
+  useGenerateEditorialArticle,
   useGenerateEditorialBrief,
   useRescheduleEditorialItem,
+  useUpdateEditorialArticle,
   useUpdateEditorialBrief,
   useUpdateEditorialItem,
 } from "../../../hooks/useContentSeoEditorial";
@@ -61,6 +70,8 @@ export function EditorialItemModal({
   const deleteMutation = useDeleteEditorialItem(projectId);
   const generateBriefMutation = useGenerateEditorialBrief(projectId);
   const updateBriefMutation = useUpdateEditorialBrief(projectId);
+  const generateArticleMutation = useGenerateEditorialArticle(projectId);
+  const updateArticleMutation = useUpdateEditorialArticle(projectId);
 
   const [title, setTitle] = useState("");
   const [plannedDate, setPlannedDate] = useState("");
@@ -73,10 +84,14 @@ export function EditorialItemModal({
   const [notes, setNotes] = useState("");
   const [brief, setBrief] = useState<EditorialBriefPayload | null>(null);
   const [savedBriefSnapshot, setSavedBriefSnapshot] = useState("");
+  const [article, setArticle] = useState<EditorialArticlePayload | null>(null);
+  const [savedArticleSnapshot, setSavedArticleSnapshot] = useState("");
+  const [articleView, setArticleView] = useState<"editor" | "preview">("editor");
+  const [articleBodyMode, setArticleBodyMode] = useState<"html" | "markdown">("html");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"detail" | "brief">("detail");
+  const [activeTab, setActiveTab] = useState<"detail" | "brief" | "article">("detail");
 
   useEffect(() => {
     if (!item) return;
@@ -94,6 +109,13 @@ export function EditorialItemModal({
     const parsed = parseEditorialBriefPayload(item.briefPayload ?? null);
     setBrief(hasEditorialBrief(item.briefPayload ?? null) ? parsed : null);
     setSavedBriefSnapshot(JSON.stringify(parsed));
+    const parsedArticle = parseEditorialArticlePayload(
+      (item.articlePayload ?? null) as Record<string, unknown> | null,
+    );
+    setArticle(hasEditorialArticle(item.articlePayload ?? null) ? parsedArticle : null);
+    setSavedArticleSnapshot(JSON.stringify(parsedArticle));
+    setArticleView("editor");
+    setArticleBodyMode("html");
     setError(null);
     setWarning(null);
     setSuccess(null);
@@ -103,6 +125,13 @@ export function EditorialItemModal({
     if (!brief) return false;
     return JSON.stringify(brief) !== savedBriefSnapshot;
   }, [brief, savedBriefSnapshot]);
+
+  const articleDirty = useMemo(() => {
+    if (!article) return false;
+    return JSON.stringify(article) !== savedArticleSnapshot;
+  }, [article, savedArticleSnapshot]);
+
+  const briefApproved = status === "brief_approved" || item?.status === "brief_approved";
 
   const dateChanged = plannedDate !== originalPlannedDate;
   const hasFollowingItems = useMemo(() => {
@@ -133,6 +162,13 @@ export function EditorialItemModal({
     if (hasEditorialBrief(updated.briefPayload ?? null)) {
       setBrief(parsed);
       setSavedBriefSnapshot(JSON.stringify(parsed));
+    }
+    const parsedArticle = parseEditorialArticlePayload(
+      (updated.articlePayload ?? null) as Record<string, unknown> | null,
+    );
+    if (hasEditorialArticle(updated.articlePayload ?? null)) {
+      setArticle(parsedArticle);
+      setSavedArticleSnapshot(JSON.stringify(parsedArticle));
     }
   }
 
@@ -247,6 +283,59 @@ export function EditorialItemModal({
     }
   }
 
+  async function handleGenerateArticle() {
+    if (!item) return;
+    if (
+      article &&
+      articleDirty &&
+      !window.confirm("Rigenerando perderai le modifiche non salvate. Continuare?")
+    ) {
+      return;
+    }
+    if (
+      article &&
+      !articleDirty &&
+      !window.confirm("Rigenerare l'articolo sostituirà la bozza attuale. Continuare?")
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      const updated = await generateArticleMutation.mutateAsync(item.id);
+      syncItem(updated);
+      setActiveTab("article");
+      setArticleView("preview");
+      setSuccess("Articolo generato.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("Approva il brief")) {
+        setError("Approva il brief prima di generare l'articolo.");
+      } else if (msg.includes("AI non configurata")) {
+        setError("AI non configurata. Inserisci OPENAI_API_KEY per generare l'articolo.");
+      } else {
+        setError("Articolo non generato per questo contenuto.");
+      }
+    }
+  }
+
+  async function handleSaveArticle(markReady = false) {
+    if (!item || !article) return;
+    setError(null);
+    try {
+      const updated = await updateArticleMutation.mutateAsync({
+        itemId: item.id,
+        data: {
+          articlePayload: article,
+          status: markReady ? "ready_to_publish" : "draft_review",
+        },
+      });
+      syncItem(updated);
+      setSuccess(markReady ? "Articolo segnato pronto per pubblicazione." : "Bozza articolo salvata.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Errore durante il salvataggio dell'articolo.");
+    }
+  }
+
   if (!item) return null;
 
   const hasBrief = Boolean(brief);
@@ -258,6 +347,8 @@ export function EditorialItemModal({
 
   const isSaving = updateMutation.isPending || rescheduleMutation.isPending;
   const itemHasBrief = hasEditorialBrief(item.briefPayload ?? null);
+  const itemHasArticle = hasEditorialArticle(item.articlePayload ?? null);
+  const hasArticle = Boolean(article);
 
   const footer =
     activeTab === "detail" ? (
@@ -282,7 +373,7 @@ export function EditorialItemModal({
           {isSaving ? "Salvataggio…" : "Salva item"}
         </button>
       </>
-    ) : (
+    ) : activeTab === "brief" ? (
       <>
         <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
           Chiudi
@@ -322,6 +413,50 @@ export function EditorialItemModal({
               onClick={() => void handleSaveBrief(true)}
             >
               Approva brief
+            </button>
+          </>
+        )}
+      </>
+    ) : (
+      <>
+        <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
+          Chiudi
+        </button>
+        {!hasArticle && (
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--primary"
+            disabled={!briefApproved || generateArticleMutation.isPending}
+            onClick={() => void handleGenerateArticle()}
+          >
+            {generateArticleMutation.isPending ? "Generazione…" : "Genera articolo"}
+          </button>
+        )}
+        {hasArticle && (
+          <>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--ghost"
+              disabled={!briefApproved || generateArticleMutation.isPending}
+              onClick={() => void handleGenerateArticle()}
+            >
+              {generateArticleMutation.isPending ? "Rigenerazione…" : "Rigenera articolo"}
+            </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary"
+              disabled={updateArticleMutation.isPending}
+              onClick={() => void handleSaveArticle(false)}
+            >
+              Salva bozza articolo
+            </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              disabled={updateArticleMutation.isPending}
+              onClick={() => void handleSaveArticle(true)}
+            >
+              Segna pronto per pubblicazione
             </button>
           </>
         )}
@@ -371,6 +506,21 @@ export function EditorialItemModal({
             onClick={() => setActiveTab("brief")}
           >
             Brief SEO
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "article"}
+            className={[
+              "editorial-item-modal__tab",
+              activeTab === "article" ? "editorial-item-modal__tab--active" : "",
+              itemHasArticle ? "editorial-item-modal__tab--has-content" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setActiveTab("article")}
+          >
+            Articolo & Anteprima
           </button>
         </div>
 
@@ -465,6 +615,77 @@ export function EditorialItemModal({
                   prodotto collegato e Safe Claims.
                 </p>
               </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === "article" && (
+          <section className="editorial-item-modal__section editorial-item-modal__article-tab">
+            <div className="editorial-item-modal__brief-status">
+              <span className="gcr-field__label">Stato articolo</span>
+              <EditorialStatusBadge status={status} />
+            </div>
+
+            {!briefApproved && (
+              <div className="editorial-item-modal__brief-empty gcr-card">
+                <p className="gcr-card__description">
+                  Approva prima il brief SEO per generare l&apos;articolo.
+                </p>
+              </div>
+            )}
+
+            {briefApproved && !hasArticle && (
+              <div className="editorial-item-modal__brief-empty gcr-card">
+                <p className="gcr-card__description">
+                  Genera una bozza articolo usando il brief approvato e la Brand Intelligence.
+                </p>
+              </div>
+            )}
+
+            {hasArticle && (
+              <>
+                <div className="editorial-article-subtabs" role="tablist">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={articleView === "editor"}
+                    className={[
+                      "editorial-article-subtabs__tab",
+                      articleView === "editor" ? "editorial-article-subtabs__tab--active" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => setArticleView("editor")}
+                  >
+                    Editor
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={articleView === "preview"}
+                    className={[
+                      "editorial-article-subtabs__tab",
+                      articleView === "preview" ? "editorial-article-subtabs__tab--active" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => setArticleView("preview")}
+                  >
+                    Anteprima
+                  </button>
+                </div>
+
+                {articleView === "editor" ? (
+                  <EditorialArticleEditor
+                    value={article!}
+                    onChange={setArticle}
+                    bodyMode={articleBodyMode}
+                    onBodyModeChange={setArticleBodyMode}
+                  />
+                ) : (
+                  <EditorialArticlePreview value={article!} />
+                )}
+              </>
             )}
           </section>
         )}
