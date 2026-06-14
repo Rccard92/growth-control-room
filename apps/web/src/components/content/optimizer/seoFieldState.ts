@@ -98,12 +98,11 @@ export function initFieldStateMap(
     const alt = fieldValueFromForm("imageAlt", formValues, mediaImages, metafieldValues);
     map.imageAlt = emptyFieldState(alt);
   } else {
-    for (const img of mediaImages) {
-      const id = String(img.id ?? "");
-      if (!id) continue;
-      const fk = imageAltFieldKey(id);
+    mediaImages.forEach((img, index) => {
+      const id = String(img.id ?? "").trim();
+      const fk = id ? imageAltFieldKey(id) : `imageAlt:local:${index}`;
       map[fk] = emptyFieldState(String(img.altText ?? img.alt ?? ""));
-    }
+    });
     for (const mf of metafields) {
       const fk = metafieldFieldKey(mf.id);
       const val = metafieldValues[mf.id] ?? mf.displayValue ?? mf.value ?? "";
@@ -257,18 +256,46 @@ export function isApplicableField(row: FieldState): boolean {
   return row.accepted || row.source === "manual";
 }
 
-export function getApplicableFieldKeys(map: FieldStateMap): string[] {
+export function getApplicableFieldKeys(
+  map: FieldStateMap,
+  mediaImages: Record<string, unknown>[] = [],
+): string[] {
+  const mediaById = new Map(
+    mediaImages.map((img, index) => {
+      const id = String(img.id ?? "").trim();
+      return [id || `local:${index}`, img] as const;
+    }),
+  );
   return Object.entries(map)
-    .filter(([, row]) => isApplicableField(row))
+    .filter(([key, row]) => {
+      if (!isApplicableField(row)) return false;
+      if (key.startsWith("imageAlt:local:")) return false;
+      if (key.startsWith("imageAlt:")) {
+        const imageId = parseImageAltFieldKey(key);
+        if (!imageId) return false;
+        const img = mediaImages.find((m) => String(m.id ?? "").trim() === imageId);
+        if (img && img.shopifyApplicable === false) return false;
+        if (img && !String(img.id ?? "").trim()) return false;
+        void mediaById;
+        return true;
+      }
+      return true;
+    })
     .map(([key]) => key);
 }
 
-export function getChangedFieldKeys(map: FieldStateMap): string[] {
-  return getApplicableFieldKeys(map);
+export function getChangedFieldKeys(
+  map: FieldStateMap,
+  mediaImages: Record<string, unknown>[] = [],
+): string[] {
+  return getApplicableFieldKeys(map, mediaImages);
 }
 
-export function hasApplicableChanges(map: FieldStateMap): boolean {
-  return getApplicableFieldKeys(map).length > 0;
+export function hasApplicableChanges(
+  map: FieldStateMap,
+  mediaImages: Record<string, unknown>[] = [],
+): boolean {
+  return getApplicableFieldKeys(map, mediaImages).length > 0;
 }
 
 export function hasSaveableChanges(map: FieldStateMap): boolean {
@@ -321,7 +348,7 @@ export function buildApplyFieldsPayload(
   metafields: SeoProductMetafieldItem[] = [],
   metafieldValues: Record<string, string> = {},
 ): { fields: Record<string, unknown>; changedFields: string[] } {
-  const applicableKeys = getApplicableFieldKeys(fieldStateMap);
+  const applicableKeys = getApplicableFieldKeys(fieldStateMap, mediaImages);
   const { proposedValues } = buildChangedProposalValues(
     formValues,
     entityType,
@@ -426,7 +453,7 @@ export function buildChangedProposalValues(
   metafields: SeoProductMetafieldItem[] = [],
 ): { proposedValues: Record<string, unknown>; changedFields: string[] } {
   const full = toProposalValues(formValues, entityType, mediaImages);
-  const changedKeys = getChangedFieldKeys(fieldStateMap);
+  const changedKeys = getChangedFieldKeys(fieldStateMap, mediaImages);
   const proposedValues: Record<string, unknown> = {};
   const changedFields: string[] = [];
 

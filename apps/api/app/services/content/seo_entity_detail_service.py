@@ -11,6 +11,11 @@ from app.services.content.seo_current_values import (
     collection_api_current_values,
     product_api_current_values,
 )
+from app.services.content.seo_image_utils import (
+    collection_image_applicable,
+    normalize_product_image_row,
+    normalize_product_images,
+)
 from app.services.content.seo_scoring_engine import rebuild_score_breakdown_from_analysis
 from app.services.shopify.analytics import compute_best_sellers, product_lookup
 from app.services.shopify.metafield_merge import build_product_metafields_merged
@@ -188,9 +193,14 @@ async def get_product_seo_detail(
     history = await _proposal_history(store, session, "product", product_id)
     change_logs = await _change_logs_for_entity(store, session, "product", product_id)
 
-    images = product.media_images or []
+    images = normalize_product_images(product.media_images or [])
     if not images and product.featured_image_url:
-        images = [{"url": product.featured_image_url, "altText": None}]
+        images = [
+            normalize_product_image_row(
+                {"url": product.featured_image_url, "altText": None},
+                index=0,
+            )
+        ]
 
     current_values = product_api_current_values(product, images=images)
     missing_description = not current_values.get("descriptionHtml") and not current_values.get(
@@ -280,6 +290,10 @@ async def get_collection_seo_detail(
         "descriptionText"
     )
     missing_images = not collection.image_url
+    image_applicable, image_reason = collection_image_applicable(
+        collection.image_url,
+        collection.shopify_gid,
+    )
 
     return {
         "collection": {
@@ -302,6 +316,8 @@ async def get_collection_seo_detail(
         "image": {
             "url": collection.image_url,
             "alt": collection.image_alt,
+            "shopifyApplicable": image_applicable,
+            "applicabilityReason": image_reason,
         },
         "latest_proposal": _proposal_payload(latest),
         "proposal_history": [_proposal_payload(p) for p in history if p],

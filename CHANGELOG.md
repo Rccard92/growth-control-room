@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.10-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Stabilized product and collection image ALT generation
+- Added robust per-image ALT generation handling
+- Fixed image ALT values disappearing after apply
+- Improved Shopify/non-Shopify image state feedback
+
 ## [0.5.9-alpha] - 2026-06-13
 
 Tipo: Alpha patch

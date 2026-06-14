@@ -96,6 +96,11 @@ export function useSeoAiQueue(handlers: SeoAiQueueHandlers) {
 
   const enqueue = useCallback(
     (item: Omit<SeoAiQueueItem, "id"> & { id?: string }) => {
+      const alreadyQueued = queueRef.current.some((q) => q.fieldKey === item.fieldKey);
+      const alreadyActive = activeFieldRef.current === item.fieldKey && processingRef.current;
+      if (alreadyQueued || alreadyActive || generatingFields.has(item.fieldKey)) {
+        return;
+      }
       const full: SeoAiQueueItem = {
         ...item,
         id: item.id ?? crypto.randomUUID(),
@@ -106,7 +111,15 @@ export function useSeoAiQueue(handlers: SeoAiQueueHandlers) {
       syncCounts();
       void processNext();
     },
-    [processNext, syncCounts],
+    [processNext, syncCounts, generatingFields],
+  );
+
+  const isQueued = useCallback(
+    (fieldKey: string) =>
+      queueRef.current.some((q) => q.fieldKey === fieldKey)
+      || (activeFieldRef.current === fieldKey && processingRef.current)
+      || generatingFields.has(fieldKey),
+    [generatingFields],
   );
 
   const clear = useCallback(() => {
@@ -126,6 +139,7 @@ export function useSeoAiQueue(handlers: SeoAiQueueHandlers) {
   return {
     enqueue,
     clear,
+    isQueued,
     pendingQueueCount,
     isProcessing,
     isGeneratingField,

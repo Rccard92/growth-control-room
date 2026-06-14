@@ -38,6 +38,7 @@ from app.services.ai.context_profiles import (
     build_prompt_cache_key,
     enrich_ai_metadata,
 )
+from app.services.content.seo_image_utils import resolve_product_image
 from app.services.shopify.metafield_merge import build_product_metafields_merged
 from app.services.shopify.metafield_utils import (
     is_ai_generatable_metafield_type,
@@ -104,15 +105,7 @@ def _rules_single_field(
     risk = str(full.get("risk_level", "low"))
 
     if field == "imageAlt" and entity_type == "product":
-        if not image_id:
-            raise ValueError("image_id richiesto per imageAlt prodotto")
-        media = current.get("media_images") or []
-        target = next(
-            (m for m in media if str(m.get("id") or "") == str(image_id)),
-            None,
-        )
-        if target is None:
-            raise ValueError("Immagine non trovata")
+        target = resolve_product_image(current, image_id)
         if isinstance(entity, ShopifyProduct):
             proposed_alt = _proposed_alt_for_product(entity, target)
         else:
@@ -409,8 +402,8 @@ async def generate_seo_proposal_field(
         raise ValueError("entity_type non supportato")
 
     snake_field = _resolve_snake_field(entity_type, field)
-    if field == "imageAlt" and entity_type == "product" and not image_id:
-        raise ValueError("image_id richiesto per imageAlt prodotto")
+    if field == "imageAlt" and entity_type == "product":
+        resolve_product_image(current, image_id)
 
     skill_ctx = load_seo_skill_context()
     if field == "imageAlt":
@@ -455,6 +448,7 @@ async def generate_seo_proposal_field(
                 else entity_type
             ),
             entity_id=str(entity_id),
+            job_id=str(image_id) if field == "imageAlt" and entity_type == "product" and image_id else None,
         ),
         ctx,
     )

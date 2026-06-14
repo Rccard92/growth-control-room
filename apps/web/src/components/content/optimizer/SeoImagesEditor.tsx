@@ -1,9 +1,12 @@
 import type { SeoScoreBreakdown } from "@gcr/shared";
 import { SeoFieldStatusBadge, fieldStatusNote } from "./SeoFieldStatusBadge";
 import type { FieldStateMap } from "./seoFieldState";
-import { imageAltFieldKey } from "./seoFieldState";
 import type { SeoFormValues } from "./seoFormValues";
 import { getUniqueFieldHelperText } from "./seoFormValues";
+import {
+  applicabilityNote,
+  resolveImageAltFieldKey,
+} from "./seoAltBatch";
 
 interface SeoImagesEditorProps {
   entityType: "product" | "collection";
@@ -11,6 +14,7 @@ interface SeoImagesEditorProps {
   issues?: Record<string, unknown>[] | null;
   scoreBreakdown?: SeoScoreBreakdown | null;
   mediaImages?: Record<string, unknown>[];
+  collectionImage?: Record<string, unknown> | null;
   fieldStateMap?: FieldStateMap;
   openaiConfigured?: boolean;
   missingAltCount?: number;
@@ -29,6 +33,7 @@ export function SeoImagesEditor({
   issues,
   scoreBreakdown,
   mediaImages = [],
+  collectionImage = null,
   fieldStateMap,
   openaiConfigured,
   missingAltCount = 0,
@@ -41,6 +46,7 @@ export function SeoImagesEditor({
   onAcceptField,
 }: SeoImagesEditorProps) {
   const allHaveAlt = entityType === "product" && mediaImages.length > 0 && missingAltCount === 0;
+  const collectionApplicable = collectionImage?.shopifyApplicable !== false;
 
   return (
     <div className="seo-field-editor seo-images-editor">
@@ -75,9 +81,15 @@ export function SeoImagesEditor({
               issues={issues}
               scoreBreakdown={scoreBreakdown}
               fieldState={fieldStateMap?.imageAlt}
+              shopifyApplicable={collectionImage?.shopifyApplicable !== false && collectionApplicable}
+              applicabilityNote={
+                collectionImage?.shopifyApplicable === false
+                  ? "Questa immagine non ha un riferimento Shopify aggiornabile"
+                  : undefined
+              }
             />
             <span className="seo-field-editor__actions">
-              {openaiConfigured && onGenerateField && (
+              {openaiConfigured && onGenerateField && collectionImage?.shopifyApplicable !== false && (
                 <button
                   type="button"
                   className="gcr-btn gcr-btn--secondary gcr-btn--sm seo-field-ai-btn"
@@ -133,7 +145,21 @@ export function SeoImagesEditor({
             const fs = fieldStateMap?.imageAlt;
             const helperText = getUniqueFieldHelperText(
               fs,
-              fieldStatusNote("imageAlt", values.imageAlt, issues, scoreBreakdown, undefined, fs),
+              fieldStatusNote(
+                "imageAlt",
+                values.imageAlt,
+                issues,
+                scoreBreakdown,
+                undefined,
+                fs,
+                {
+                  shopifyApplicable: collectionImage?.shopifyApplicable !== false,
+                  applicabilityNote:
+                    collectionImage?.shopifyApplicable === false
+                      ? "Questa immagine non ha un riferimento Shopify aggiornabile"
+                      : undefined,
+                },
+              ),
             );
             return helperText ? (
               <span className="seo-field-editor__note">{helperText}</span>
@@ -144,10 +170,10 @@ export function SeoImagesEditor({
         <p className="shopify-empty-copy">Nessuna immagine sincronizzata.</p>
       ) : (
         mediaImages.map((img, idx) => {
-          const imageId = String(img.id ?? idx);
-          const fk = imageAltFieldKey(imageId);
+          const { fieldKey: fk, imageId, applicable } = resolveImageAltFieldKey(img, idx);
           const fs = fieldStateMap?.[fk];
           const altVal = String(img.altText ?? img.alt ?? "");
+          const note = applicabilityNote(img);
           return (
             <div key={fk} className="seo-images-tab__item">
               {typeof img.url === "string" && (
@@ -162,9 +188,12 @@ export function SeoImagesEditor({
                     issues={issues}
                     scoreBreakdown={scoreBreakdown}
                     fieldState={fs}
+                    shopifyApplicable={applicable}
+                    perImageMode
+                    applicabilityNote={note}
                   />
                   <span className="seo-field-editor__actions">
-                    {openaiConfigured && onGenerateField && (
+                    {openaiConfigured && onGenerateField && applicable && imageId && (
                       <button
                         type="button"
                         className="gcr-btn gcr-btn--secondary gcr-btn--sm seo-field-ai-btn"
@@ -214,7 +243,11 @@ export function SeoImagesEditor({
                 {(() => {
                   const helperText = getUniqueFieldHelperText(
                     fs,
-                    fieldStatusNote("imageAlt", altVal, issues, scoreBreakdown, undefined, fs),
+                    fieldStatusNote("imageAlt", altVal, issues, scoreBreakdown, undefined, fs, {
+                      shopifyApplicable: applicable,
+                      perImageMode: true,
+                      applicabilityNote: note,
+                    }),
                   );
                   return helperText ? (
                     <span className="seo-field-editor__note">{helperText}</span>

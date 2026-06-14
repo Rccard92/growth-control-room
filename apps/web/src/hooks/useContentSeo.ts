@@ -266,7 +266,15 @@ export function useApplyEntityFields(projectId: string) {
       fields: Record<string, unknown>;
       changedFields: string[];
     }) => applyEntityFields(projectId, body),
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
+      const detail = data.detail as Record<string, unknown> | undefined;
+      if (detail) {
+        if (vars.entityType === "product") {
+          qc.setQueryData(queryKeys.contentSeo.productDetail(projectId, vars.entityId), detail);
+        } else {
+          qc.setQueryData(queryKeys.contentSeo.collectionDetail(projectId, vars.entityId), detail);
+        }
+      }
       void qc.invalidateQueries({ queryKey: queryKeys.contentSeo.proposals(projectId) });
       if (vars.entityType === "product") {
         void qc.invalidateQueries({

@@ -85,6 +85,14 @@ export function formatAiErrorMessage(err: unknown, fallback = "Generazione AI no
   ) {
     return "Generazione AI non riuscita. Controlla i dettagli in AI Costs.";
   }
+  if (
+    lowered.includes("immagine")
+    || lowered.includes("image_id")
+    || lowered.includes("imagealt")
+    || lowered.includes("alt text")
+  ) {
+    return "Generazione ALT non riuscita per questa immagine.";
+  }
   if (raw.startsWith("Errore AI:") || raw.startsWith("Errore metadata AI:")) return raw;
   if (
     lowered.includes("modello")

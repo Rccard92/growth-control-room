@@ -24,7 +24,10 @@ def test_diff_meta_description_changed() -> None:
 
 def test_diff_image_alts_partial() -> None:
     current = {
-        "media_images": [{"id": "gid://shopify/MediaImage/1", "altText": ""}],
+        "media_images": [
+            {"id": "gid://shopify/MediaImage/1", "altText": ""},
+            {"id": "gid://shopify/MediaImage/2", "altText": "unchanged"},
+        ],
     }
     proposed = {
         "image_alts": [
@@ -39,8 +42,11 @@ def test_diff_image_alts_partial() -> None:
     }
     delta, fields = compute_changed_proposed(current, proposed)
     assert "image_alts" in fields
+    assert "media_images" in fields
     assert len(delta["image_alts"]) == 1
-    assert delta["image_alts"][0]["proposed_alt"] == "Miele biologico in barattolo"
+    assert len(delta["media_images"]) == 2
+    assert delta["media_images"][0]["altText"] == "Miele biologico in barattolo"
+    assert delta["media_images"][1]["altText"] == "unchanged"
 
 
 def test_diff_empty_when_no_changes() -> None:

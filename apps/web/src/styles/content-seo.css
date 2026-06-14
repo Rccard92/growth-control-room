@@ -640,6 +640,21 @@
   color: #bdbdbd;
 }
 
+.seo-field-status-badge--local_draft {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffb74d;
+}
+
+.seo-field-status-badge--apply_failed {
+  background: rgba(244, 67, 54, 0.15);
+  color: #ef9a9a;
+}
+
+.seo-field-status-badge--accepted {
+  background: rgba(76, 175, 80, 0.15);
+  color: #81c784;
+}
+
 .seo-field-editor__actions {
   display: inline-flex;
   gap: 0.35rem;

@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.10-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Stabilized product and collection image ALT generation",
+      "Added robust per-image ALT generation handling",
+      "Fixed image ALT values disappearing after apply",
+      "Improved Shopify/non-Shopify image state feedback",
+    ],
+  },
+  {
     version: "0.5.9-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

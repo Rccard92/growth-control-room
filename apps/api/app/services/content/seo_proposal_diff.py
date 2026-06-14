@@ -74,25 +74,19 @@ def _diff_media_images(
 ) -> list[dict[str, Any]] | None:
     if not changed_image_alts:
         return None
+    from app.services.content.seo_image_utils import merge_media_image_alts
+
     alt_by_id = {
-        str(item["image_id"]): item["proposed_alt"] for item in changed_image_alts
+        str(item["image_id"]): str(item["proposed_alt"]) for item in changed_image_alts
     }
     source_media = proposed.get("media_images") or proposed.get("mediaImages")
-    if not isinstance(source_media, list):
-        source_media = current.get("media_images") or []
-
-    updated: list[dict[str, Any]] = []
-    for index, image in enumerate(source_media):
-        if not isinstance(image, dict):
-            continue
-        row = dict(image)
-        image_id = str(row.get("id") or row.get("image_id") or "")
-        if image_id in alt_by_id:
-            row["altText"] = alt_by_id[image_id]
-        row.setdefault("position", index + 1)
-        if image_id in alt_by_id:
-            updated.append(row)
-    return updated or None
+    existing = current.get("media_images") or []
+    merged = merge_media_image_alts(
+        existing,
+        alt_by_id=alt_by_id,
+        proposed_media=source_media if isinstance(source_media, list) else None,
+    )
+    return merged or None
 
 
 def compute_changed_proposed(

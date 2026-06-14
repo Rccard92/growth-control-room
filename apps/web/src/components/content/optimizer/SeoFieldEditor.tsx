@@ -13,6 +13,7 @@ interface SeoFieldEditorProps {
   scoreBreakdown?: SeoScoreBreakdown | null;
   fieldStateMap?: FieldStateMap;
   mediaImages?: Record<string, unknown>[];
+  collectionImage?: Record<string, unknown> | null;
   openaiConfigured?: boolean;
   missingAltCount?: number;
   batchAltLoading?: boolean;
@@ -142,6 +143,7 @@ export function SeoFieldEditor({
   scoreBreakdown,
   fieldStateMap,
   mediaImages = [],
+  collectionImage = null,
   openaiConfigured,
   missingAltCount = 0,
   batchAltLoading = false,
@@ -188,6 +190,7 @@ export function SeoFieldEditor({
           issues={issues}
           scoreBreakdown={scoreBreakdown}
           mediaImages={mediaImages}
+          collectionImage={collectionImage}
           fieldStateMap={fieldStateMap}
           openaiConfigured={openaiConfigured}
           missingAltCount={missingAltCount}

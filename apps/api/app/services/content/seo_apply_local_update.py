@@ -17,6 +17,11 @@ from app.models.shopify import (
     ShopifyProductMetafield,
     ShopifyStore,
 )
+from app.services.content.seo_image_utils import (
+    extract_shopify_media_alts,
+    merge_media_image_alts,
+    normalize_product_images,
+)
 from app.services.shopify.html_utils import html_to_text
 from app.services.shopify.metafield_value_format import serialize_metafield_value
 
@@ -220,45 +225,67 @@ async def apply_proposed_values_to_product(
 
     if shopify_node:
         _apply_shopify_product_node(product, shopify_node)
-    else:
-        title = _get_proposed(proposed, "product_title", "proposed_product_title")
-        if title:
-            product.title = title
-        handle = _get_proposed(proposed, "handle", "proposed_handle")
-        if handle:
-            product.handle = handle
-        seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
-        if seo_title:
-            product.seo_title = seo_title
-        meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
-        if meta:
-            product.seo_description = meta
-        desc_html = _get_proposed(proposed, "description_html", "proposed_description_html")
-        if desc_html:
-            product.description_html = desc_html
-            product.description_text = html_to_text(desc_html)
-        media = _get_proposed(proposed, "media_images", "images")
-        if media is not None:
-            product.media_images = media
 
-        if store_id is not None:
-            await _upsert_product_metafields_from_proposed(
-                session,
-                store_id,
-                product_id,
-                proposed,
-                shopify_response,
-            )
+    title = _get_proposed(proposed, "product_title", "proposed_product_title")
+    if title and not shopify_node:
+        product.title = title
+    handle = _get_proposed(proposed, "handle", "proposed_handle")
+    if handle and not shopify_node:
+        product.handle = handle
+    seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
+    if seo_title and not shopify_node:
+        product.seo_title = seo_title
+    meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
+    if meta and not shopify_node:
+        product.seo_description = meta
+    desc_html = _get_proposed(proposed, "description_html", "proposed_description_html")
+    if desc_html and not shopify_node:
+        product.description_html = desc_html
+        product.description_text = html_to_text(desc_html)
 
-        product.raw_payload = _merge_raw_payload(
-            product.raw_payload,
-            {
-                "title": product.title,
-                "handle": product.handle,
-                "seo": {"title": product.seo_title, "description": product.seo_description},
-                "descriptionHtml": product.description_html,
-            },
+    alt_by_id: dict[str, str] = {}
+    image_alts = proposed.get("image_alts") or proposed.get("imageAlts") or []
+    if isinstance(image_alts, list):
+        for entry in image_alts:
+            if not isinstance(entry, dict):
+                continue
+            image_id = str(entry.get("image_id") or entry.get("imageId") or "")
+            proposed_alt = str(
+                entry.get("proposed_alt") or entry.get("proposedAlt") or entry.get("alt") or ""
+            ).strip()
+            if image_id and proposed_alt:
+                alt_by_id[image_id] = proposed_alt
+
+    proposed_media = _get_proposed(proposed, "media_images", "images")
+    shopify_media = extract_shopify_media_alts(shopify_response)
+    if alt_by_id or proposed_media is not None or shopify_media:
+        product.media_images = merge_media_image_alts(
+            product.media_images,
+            alt_by_id=alt_by_id or None,
+            proposed_media=proposed_media if isinstance(proposed_media, list) else None,
+            shopify_media=shopify_media or None,
         )
+    elif proposed_media is not None and not shopify_node:
+        product.media_images = normalize_product_images(proposed_media)
+
+    if store_id is not None:
+        await _upsert_product_metafields_from_proposed(
+            session,
+            store_id,
+            product_id,
+            proposed,
+            shopify_response,
+        )
+
+    product.raw_payload = _merge_raw_payload(
+        product.raw_payload,
+        {
+            "title": product.title,
+            "handle": product.handle,
+            "seo": {"title": product.seo_title, "description": product.seo_description},
+            "descriptionHtml": product.description_html,
+        },
+    )
 
     await session.flush()
     return product
@@ -270,6 +297,7 @@ async def apply_proposed_values_to_collection(
     proposed: dict[str, Any],
     *,
     shopify_node: dict[str, Any] | None = None,
+    shopify_response: dict[str, Any] | None = None,
 ) -> ShopifyCollection | None:
     collection = (
         await session.execute(
@@ -281,38 +309,47 @@ async def apply_proposed_values_to_collection(
 
     if shopify_node:
         _apply_shopify_collection_node(collection, shopify_node)
-    else:
-        title = _get_proposed(proposed, "collection_title", "proposed_collection_title")
-        if title:
-            collection.title = title
-        handle = _get_proposed(proposed, "handle", "proposed_handle")
-        if handle:
-            collection.handle = handle
-        seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
-        if seo_title:
-            collection.seo_title = seo_title
-        meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
-        if meta:
-            collection.seo_description = meta
-        desc_html = _get_proposed(
-            proposed, "description_html", "proposed_description", "proposed_description_html"
-        )
-        if desc_html:
-            collection.description_html = desc_html
-            collection.description_text = html_to_text(desc_html)
-        image_alt = _get_proposed(proposed, "image_alt", "proposed_image_alt")
-        if image_alt:
-            collection.image_alt = image_alt
 
-        collection.raw_payload = _merge_raw_payload(
-            collection.raw_payload,
-            {
-                "title": collection.title,
-                "handle": collection.handle,
-                "seo": {"title": collection.seo_title, "description": collection.seo_description},
-                "descriptionHtml": collection.description_html,
-            },
-        )
+    title = _get_proposed(proposed, "collection_title", "proposed_collection_title")
+    if title and not shopify_node:
+        collection.title = title
+    handle = _get_proposed(proposed, "handle", "proposed_handle")
+    if handle and not shopify_node:
+        collection.handle = handle
+    seo_title = _get_proposed(proposed, "seo_title", "proposed_seo_title")
+    if seo_title and not shopify_node:
+        collection.seo_title = seo_title
+    meta = _get_proposed(proposed, "meta_description", "proposed_meta_description")
+    if meta and not shopify_node:
+        collection.seo_description = meta
+    desc_html = _get_proposed(
+        proposed, "description_html", "proposed_description", "proposed_description_html"
+    )
+    if desc_html and not shopify_node:
+        collection.description_html = desc_html
+        collection.description_text = html_to_text(desc_html)
+
+    image_alt = _get_proposed(proposed, "image_alt", "proposed_image_alt")
+    if image_alt:
+        collection.image_alt = image_alt
+    elif shopify_response:
+        alt_block = shopify_response.get("collectionImageAltUpdate") or {}
+        collection_node = alt_block.get("collection") or {}
+        image = collection_node.get("image") or {}
+        alt_from_shopify = image.get("altText")
+        if alt_from_shopify is not None:
+            collection.image_alt = alt_from_shopify
+
+    collection.raw_payload = _merge_raw_payload(
+        collection.raw_payload,
+        {
+            "title": collection.title,
+            "handle": collection.handle,
+            "seo": {"title": collection.seo_title, "description": collection.seo_description},
+            "descriptionHtml": collection.description_html,
+            "image": {"altText": collection.image_alt},
+        },
+    )
 
     await session.flush()
     return collection
@@ -345,6 +382,10 @@ async def apply_proposed_values_to_entity(
         )
     if entity_type == "collection":
         return await apply_proposed_values_to_collection(
-            session, entity_id, proposed, shopify_node=shopify_node
+            session,
+            entity_id,
+            proposed,
+            shopify_node=shopify_node,
+            shopify_response=shopify_response,
         )
     return None

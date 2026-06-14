@@ -361,7 +361,9 @@ export type FieldStatus =
   | "verify"
   | "ai_proposed"
   | "accepted"
-  | "generating";
+  | "generating"
+  | "local_draft"
+  | "apply_failed";
 
 const ISSUE_FIELD_MAP: Record<string, string[]> = {
   title: ["title", "product_title", "collection_title"],
@@ -483,14 +485,48 @@ export function getFieldStatus(
     accepted?: boolean;
     dirty?: boolean;
     reasoning?: string;
+    applyFailed?: boolean;
+  },
+  options?: {
+    shopifyApplicable?: boolean;
+    perImageMode?: boolean;
+    applicabilityNote?: string;
   },
 ): { status: FieldStatus; note?: string } {
   if (fieldState?.generating) {
     return { status: "generating", note: "Generazione AI in corso…" };
   }
 
-  if (isEmptyValue(value)) {
-    return { status: "missing", note: "Campo non impostato su Shopify" };
+  if (fieldState?.applyFailed && !isEmptyValue(value)) {
+    return {
+      status: "apply_failed",
+      note: "ALT generato ma non applicato a Shopify.",
+    };
+  }
+
+  const hasValue = !isEmptyValue(value);
+
+  if (!hasValue) {
+    if (options?.shopifyApplicable === false) {
+      return {
+        status: "missing",
+        note: options.applicabilityNote ?? "Immagine senza riferimento Shopify aggiornabile",
+      };
+    }
+    return { status: "missing", note: "Mancante" };
+  }
+
+  if (options?.shopifyApplicable === false) {
+    if (fieldState?.source === "ai" && fieldState.dirty && !fieldState.accepted) {
+      return {
+        status: "ai_proposed",
+        note: fieldState.reasoning || "Proposto da AI — non applicabile su Shopify",
+      };
+    }
+    return {
+      status: "local_draft",
+      note: options.applicabilityNote ?? "Bozza locale — immagine non aggiornabile su Shopify",
+    };
   }
 
   if (fieldState?.source === "ai" && fieldState.accepted && fieldState.dirty) {
@@ -512,19 +548,21 @@ export function getFieldStatus(
     return { status: "verify", note: "Contenuto AI accettato" };
   }
 
-  const issue = findIssueForField(field, issues);
-  if (issue) {
-    const sev = String(issue.severity ?? "");
-    if (sev === "critical" || sev === "warning" || sev === "opportunity") {
-      return {
-        status: "improve",
-        note: String(issue.message ?? "Campo da migliorare"),
-      };
+  if (!options?.perImageMode) {
+    const issue = findIssueForField(field, issues);
+    if (issue) {
+      const sev = String(issue.severity ?? "");
+      if (sev === "critical" || sev === "warning" || sev === "opportunity") {
+        return {
+          status: "improve",
+          note: String(issue.message ?? "Campo da migliorare"),
+        };
+      }
     }
   }
 
   const pct = breakdownScoreForField(field, scoreBreakdown);
-  if (pct != null && pct < 80) {
+  if (pct != null && pct < 80 && !options?.perImageMode) {
     return { status: "improve", note: "Score componente sotto soglia ottimale" };
   }
 

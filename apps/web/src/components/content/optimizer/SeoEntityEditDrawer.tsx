@@ -46,6 +46,12 @@ import {
 } from "../../../hooks/useContentSeo";
 import { useSeoAiQueue } from "../../../hooks/useSeoAiQueue";
 import { generateProposalField } from "../../../lib/content-api";
+import {
+  formatAltBatchSummary,
+  isShopifyApplicableImage,
+  planMissingAltBatch,
+  resolveImageAltFieldKey,
+} from "./seoAltBatch";
 
 type DrawerTab = "main" | "metafields";
 
@@ -58,7 +64,10 @@ function buildMetafieldValues(metafields: SeoProductMetafieldItem[]): Record<str
 }
 
 function countMissingAlts(mediaImages: Record<string, unknown>[]): number {
-  return mediaImages.filter((img) => !String(img.altText ?? img.alt ?? "").trim()).length;
+  return mediaImages.filter((img) => {
+    if (!isShopifyApplicableImage(img)) return false;
+    return !String(img.altText ?? img.alt ?? "").trim();
+  }).length;
 }
 
 interface SeoEntityEditDrawerProps {
@@ -105,9 +114,11 @@ export function SeoEntityEditDrawer({
   const [localUpdateFailed, setLocalUpdateFailed] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [batchAltSummary, setBatchAltSummary] = useState<string | null>(null);
   const [fieldStateMap, setFieldStateMap] = useState<FieldStateMap>({});
   const initialFormRef = useRef<string>("");
   const lastInitKeyRef = useRef<string | null>(null);
+  const altBatchStatsRef = useRef({ generated: 0, skipped: 0, failed: 0, pending: 0 });
 
   const formValuesRef = useRef(formValues);
   const mediaImagesRef = useRef(mediaImages);
@@ -209,6 +220,18 @@ export function SeoEntityEditDrawer({
     [entityType, markDirty],
   );
 
+  const trackAltBatchItemDone = useCallback((fieldKey: string, success: boolean) => {
+    if (!fieldKey.startsWith("imageAlt:") || fieldKey.startsWith("imageAlt:local:")) return;
+    const stats = altBatchStatsRef.current;
+    if (stats.pending <= 0) return;
+    if (success) stats.generated += 1;
+    else stats.failed += 1;
+    stats.pending -= 1;
+    if (stats.pending === 0) {
+      setBatchAltSummary(formatAltBatchSummary(stats.generated, stats.skipped, stats.failed).message);
+    }
+  }, []);
+
   const aiQueue = useSeoAiQueue({
     onStartGenerating: (fieldKey) => {
       setFieldStateMap((prev) => setFieldGenerating(prev, fieldKey));
@@ -216,12 +239,17 @@ export function SeoEntityEditDrawer({
     onClearGenerating: (fieldKey) => {
       setFieldStateMap((prev) => clearFieldGenerating(prev, fieldKey));
     },
-    onApplyResult: applyAiResult,
+    onApplyResult: (fieldKey, res) => {
+      applyAiResult(fieldKey, res);
+      trackAltBatchItemDone(fieldKey, true);
+    },
     onSkipped: (fieldKey, message) => {
       setFieldStateMap((prev) => setFieldAiSkipped(prev, fieldKey, message));
+      trackAltBatchItemDone(fieldKey, false);
     },
     onError: (fieldKey, message) => {
       setFieldStateMap((prev) => setFieldAiSkipped(prev, fieldKey, message));
+      trackAltBatchItemDone(fieldKey, false);
     },
     getFieldState: (fieldKey) => {
       const row = fieldStateMapRef.current[fieldKey];
@@ -237,7 +265,8 @@ export function SeoEntityEditDrawer({
       const normalized = normalizeFormValues(raw, entityType, detailSource);
       const images =
         entityType === "product"
-          ? (productDetail?.images ?? (normalized.images as Record<string, unknown>[]) ?? [])
+          ? ((detailSource as SeoProductDetailResponse).images
+            ?? (normalized.images as Record<string, unknown>[]) ?? [])
           : collectionDetail?.image
             ? [collectionDetail.image]
             : [];
@@ -353,9 +382,8 @@ export function SeoEntityEditDrawer({
     setMediaImages((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], altText: alt };
-      const imageId = String(next[index].id ?? index);
-      const fk = imageAltFieldKey(imageId);
-      setFieldStateMap((fsm) => updateFieldStateValue(fsm, fk, alt, "manual"));
+      const { fieldKey } = resolveImageAltFieldKey(next[index], index);
+      setFieldStateMap((fsm) => updateFieldStateValue(fsm, fieldKey, alt, "manual"));
       setFormValues((fv) => {
         const updated = { ...fv, images: next };
         markDirty(updated, metafieldValues);
@@ -371,16 +399,19 @@ export function SeoEntityEditDrawer({
     if (!row) return;
     setFieldStateMap(restored);
     if (fieldKey.startsWith("imageAlt:")) {
-      const imageId = fieldKey.slice("imageAlt:".length);
       setMediaImages((prev) =>
-        prev.map((img) =>
-          String(img.id ?? "") === imageId ? { ...img, altText: row.originalValue } : img,
-        ),
+        prev.map((img, idx) => {
+          const { fieldKey: fk } = resolveImageAltFieldKey(img, idx);
+          if (fk !== fieldKey) return img;
+          return { ...img, altText: row.originalValue };
+        }),
       );
       setFormValues((fv) => {
-        const images = (fv.images as Record<string, unknown>[] | undefined)?.map((img) =>
-          String(img.id ?? "") === imageId ? { ...img, altText: row.originalValue } : img,
-        );
+        const images = (fv.images as Record<string, unknown>[] | undefined)?.map((img, idx) => {
+          const { fieldKey: fk } = resolveImageAltFieldKey(img, idx);
+          if (fk !== fieldKey) return img;
+          return { ...img, altText: row.originalValue };
+        });
         const next = { ...fv, images };
         markDirty(next, metafieldValues);
         return next;
@@ -407,7 +438,21 @@ export function SeoEntityEditDrawer({
 
   const enqueueFieldAi = (field: SeoEditableField, imageId?: string) => {
     const stateKey = field === "imageAlt" && imageId ? imageAltFieldKey(imageId) : field;
+    if (field === "imageAlt" && imageId) {
+      const img = mediaImagesRef.current.find((m) => String(m.id ?? "").trim() === imageId);
+      if (img && !isShopifyApplicableImage(img)) {
+        setFieldStateMap((prev) =>
+          setFieldAiSkipped(
+            prev,
+            stateKey,
+            "Campo non aggiornabile su Shopify",
+          ),
+        );
+        return;
+      }
+    }
     const row = fieldStateMapRef.current[stateKey];
+    if (aiQueue.isQueued(stateKey)) return;
     aiQueue.enqueue({
       fieldKey: stateKey,
       valueAtEnqueue: row?.value ?? "",
@@ -442,11 +487,26 @@ export function SeoEntityEditDrawer({
   };
 
   const handleGenerateMissingAlts = () => {
-    mediaImagesRef.current.forEach((img, idx) => {
-      const alt = String(img.altText ?? img.alt ?? "").trim();
-      if (alt) return;
-      const imageId = String(img.id ?? idx);
-      enqueueFieldAi("imageAlt", imageId);
+    const { enqueue, skipped } = planMissingAltBatch(mediaImagesRef.current);
+    altBatchStatsRef.current = {
+      generated: 0,
+      skipped: skipped.length,
+      failed: 0,
+      pending: enqueue.length,
+    };
+    skipped.forEach((item) => {
+      setFieldStateMap((prev) =>
+        setFieldAiSkipped(prev, item.fieldKey, item.reason ?? "Campo non aggiornabile su Shopify"),
+      );
+    });
+    if (enqueue.length === 0) {
+      const summary = formatAltBatchSummary(0, skipped.length, 0);
+      setBatchAltSummary(summary.message);
+      return;
+    }
+    setBatchAltSummary(null);
+    enqueue.forEach((item) => {
+      enqueueFieldAi("imageAlt", item.imageId);
     });
   };
 
@@ -479,7 +539,7 @@ export function SeoEntityEditDrawer({
   };
 
   const handleApplySelectedFields = () => {
-    const applicableKeys = getApplicableFieldKeys(fieldStateMap);
+    const applicableKeys = getApplicableFieldKeys(fieldStateMap, mediaImages);
     if (applicableKeys.length === 0) return;
 
     const { fields, changedFields } = buildApplyFieldsPayload(
@@ -564,11 +624,16 @@ export function SeoEntityEditDrawer({
   const batchAltLoading = useMemo(
     () =>
       mediaImages.some((img, idx) => {
-        const fk = imageAltFieldKey(String(img.id ?? idx));
-        return fieldStateMap[fk]?.generating;
+        const { fieldKey } = resolveImageAltFieldKey(img, idx);
+        return fieldStateMap[fieldKey]?.generating;
       }),
     [mediaImages, fieldStateMap],
   );
+
+  const collectionImage =
+    entityType === "collection"
+      ? ((collectionDetail?.image as Record<string, unknown> | undefined) ?? null)
+      : null;
 
   const headerExtra = scoreTotal != null && (
     <SeoScoreBadge score={scoreTotal} severity={severity as never} />
@@ -606,8 +671,8 @@ export function SeoEntityEditDrawer({
       loading={actionLoading}
       saveLoading={saveManual.isPending}
       applyLoading={applyFields.isPending}
-      applyDisabled={!hasApplicableChanges(fieldStateMap)}
-      saveDisabled={!hasApplicableChanges(fieldStateMap)}
+      applyDisabled={!hasApplicableChanges(fieldStateMap, mediaImages)}
+      saveDisabled={!hasApplicableChanges(fieldStateMap, mediaImages)}
       onApplySelected={handleApplySelectedFields}
       onSaveDraft={handleSaveDraft}
       onCancel={handleClose}
@@ -670,6 +735,10 @@ export function SeoEntityEditDrawer({
             </div>
           )}
 
+          {batchAltSummary && (
+            <div className="content-seo-banner content-seo-banner--success">{batchAltSummary}</div>
+          )}
+
           {applyError && (
             <div className="content-seo-banner content-seo-banner--warn">{applyError}</div>
           )}
@@ -697,6 +766,7 @@ export function SeoEntityEditDrawer({
               scoreBreakdown={scoreBreakdown}
               fieldStateMap={fieldStateMap}
               mediaImages={mediaImages}
+              collectionImage={collectionImage}
               openaiConfigured={openaiConfigured}
               missingAltCount={missingAltCount}
               batchAltLoading={batchAltLoading}

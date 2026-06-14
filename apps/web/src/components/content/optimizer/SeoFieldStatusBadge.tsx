@@ -10,6 +10,8 @@ const LABELS: Record<FieldStatus, string> = {
   ai_proposed: "Proposto da AI",
   accepted: "Accettato",
   generating: "AI…",
+  local_draft: "Bozza locale",
+  apply_failed: "Errore apply",
 };
 
 interface SeoFieldStatusBadgeProps {
@@ -19,6 +21,9 @@ interface SeoFieldStatusBadgeProps {
   scoreBreakdown?: SeoScoreBreakdown | null;
   aiFilledFields?: Set<string>;
   fieldState?: FieldState;
+  shopifyApplicable?: boolean;
+  perImageMode?: boolean;
+  applicabilityNote?: string;
 }
 
 export function SeoFieldStatusBadge({
@@ -28,6 +33,9 @@ export function SeoFieldStatusBadge({
   scoreBreakdown,
   aiFilledFields,
   fieldState,
+  shopifyApplicable,
+  perImageMode,
+  applicabilityNote,
 }: SeoFieldStatusBadgeProps) {
   const { status } = getFieldStatus(
     field,
@@ -36,6 +44,7 @@ export function SeoFieldStatusBadge({
     scoreBreakdown,
     aiFilledFields,
     fieldState,
+    { shopifyApplicable, perImageMode, applicabilityNote },
   );
   return (
     <span className={`seo-field-status-badge seo-field-status-badge--${status}`}>
@@ -51,6 +60,11 @@ export function fieldStatusNote(
   scoreBreakdown?: SeoScoreBreakdown | null,
   aiFilledFields?: Set<string>,
   fieldState?: FieldState,
+  options?: {
+    shopifyApplicable?: boolean;
+    perImageMode?: boolean;
+    applicabilityNote?: string;
+  },
 ): string | undefined {
   const { note, status } = getFieldStatus(
     field,
@@ -59,6 +73,7 @@ export function fieldStatusNote(
     scoreBreakdown,
     aiFilledFields,
     fieldState,
+    options,
   );
   return status !== "ok" ? note : undefined;
 }

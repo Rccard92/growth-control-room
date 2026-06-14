@@ -612,12 +612,38 @@ async def generate_proposal_field(
             use_ai=body.use_ai,
         )
     except ValidationError as exc:
-        logger.warning("AiRequestMetadata validation failed in generate_proposal_field: %s", exc)
+        logger.warning(
+            "generate-field failed project=%s entity_type=%s entity_id=%s field=%s image_id=%s error=%s",
+            project_id,
+            body.entity_type,
+            body.entity_id,
+            body.field,
+            body.image_id,
+            exc,
+        )
         raise HTTPException(
             status_code=400,
             detail="Errore metadata AI: entity_id non valido.",
         ) from exc
     except ValueError as exc:
+        operation_key = None
+        if body.field == "imageAlt":
+            operation_key = (
+                "product_image_alt" if body.entity_type == "product" else "collection_image_alt"
+            )
+        logger.warning(
+            "generate-field failed project=%s entity_type=%s entity_id=%s field=%s image_id=%s "
+            "operation_key=%s context_profile=%s use_ai=%s error=%s",
+            project_id,
+            body.entity_type,
+            body.entity_id,
+            body.field,
+            body.image_id,
+            operation_key,
+            "image_alt" if body.field == "imageAlt" else None,
+            body.use_ai,
+            exc,
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return SeoProposalGenerateFieldResponse.model_validate(result)
