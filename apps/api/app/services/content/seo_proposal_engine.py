@@ -370,7 +370,20 @@ async def generate_seo_proposal(
 
 
 def openai_status() -> dict[str, Any]:
+    if not is_openai_configured():
+        return {"configured": False, "model": None, "tierModels": None}
     return {
-        "configured": is_openai_configured(),
-        "model": settings.openai_model if is_openai_configured() else None,
+        "configured": True,
+        "model": settings.openai_model,
+        "tierModels": {
+            "cheap": settings.openai_model_cheap or settings.openai_model,
+            "standard": settings.openai_model_standard or settings.openai_model,
+            "premium": settings.openai_model_premium or "gpt-4o",
+            "reasoning": settings.openai_model_reasoning,
+            "fallback": (
+                settings.openai_model_fallback
+                or settings.openai_model_standard
+                or settings.openai_model
+            ),
+        },
     }

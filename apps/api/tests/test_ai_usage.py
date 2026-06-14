@@ -93,6 +93,9 @@ def test_summary_by_module_operation_day() -> None:
                 operation="generate_brief",
                 model="gpt-4o-mini",
                 created_at=now,
+                model_tier="standard",
+                context_profile="blog_brief",
+                model_policy_source="context_profile",
             ),
             SimpleNamespace(
                 estimated_total_cost=Decimal("0.02"),
@@ -104,6 +107,9 @@ def test_summary_by_module_operation_day() -> None:
                 operation="generate_field",
                 model="gpt-4o-mini",
                 created_at=now,
+                model_tier="cheap",
+                context_profile="image_alt",
+                model_policy_source="context_profile",
             ),
         ]
 
@@ -119,6 +125,42 @@ def test_summary_by_module_operation_day() -> None:
         assert len(summary["byModule"]) == 2
         assert len(summary["byOperation"]) == 2
         assert len(summary["byDay"]) == 1
+        assert len(summary["byTier"]) == 2
+        assert summary["routingInsights"]["requestsByTier"]["standard"] == 1
+        assert summary["routingInsights"]["requestsByTier"]["cheap"] == 1
+
+    asyncio.run(run())
+
+
+def test_summary_filter_by_model_tier() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        now = utc_now_naive()
+        rows = [
+            SimpleNamespace(
+                estimated_total_cost=Decimal("0.01"),
+                input_tokens=100,
+                output_tokens=50,
+                cached_input_tokens=10,
+                status="success",
+                module="product_seo",
+                operation="generate_field",
+                model="gpt-4o-mini",
+                created_at=now,
+                model_tier="cheap",
+                context_profile="image_alt",
+                model_policy_source="context_profile",
+            ),
+        ]
+
+        session = AsyncMock()
+        scalars = MagicMock()
+        scalars.all.return_value = rows
+        session.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=scalars)))
+
+        summary = await get_usage_summary(session, project_id, model_tier="cheap")
+        assert summary["totalRequests"] == 1
+        assert summary["byTier"][0]["key"] == "cheap"
 
     asyncio.run(run())
 
@@ -187,10 +229,14 @@ def test_log_success_request_mock_openai() -> None:
                     project_id=project_id,
                     module="blog_brief",
                     operation="generate_brief",
+                    context_profile="blog_brief",
                 ),
             )
             assert result == {"ok": True}
             mock_persist.assert_awaited()
+            create_kwargs = client.chat.completions.create.await_args.kwargs
+            assert "max_tokens" in create_kwargs
+            assert "temperature" in create_kwargs
 
     asyncio.run(run())
 
@@ -276,6 +322,7 @@ def test_apply_log_filters_use_naive_datetimes() -> None:
         module=None,
         operation=None,
         model=None,
+        model_tier=None,
         status=None,
     )
     compiled = str(filtered.compile(compile_kwargs={"literal_binds": True}))

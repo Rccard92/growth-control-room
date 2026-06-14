@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     frontend_url: str | None = None
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    openai_model_cheap: str | None = None
+    openai_model_standard: str | None = None
+    openai_model_premium: str | None = "gpt-4o"
+    openai_model_reasoning: str | None = None
+    openai_model_fallback: str | None = None
+    ai_allow_model_override: bool = False
+    ai_enable_model_fallback_on_schema_error: bool = False
     ai_daily_budget_usd: float | None = None
     ai_monthly_budget_usd: float | None = None
     ai_single_request_warn_usd: float | None = None

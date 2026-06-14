@@ -9,6 +9,18 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.3-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Added centralized AI Model Routing with 5 tiers (cheap, standard, premium, reasoning, fallback)",
+      "Model selection driven by context profile — no per-service hardcoded models",
+      "AI client passes max_tokens and temperature from policy; optional schema-error retry",
+      "AI Costs: tier column, tier filter, Model Routing Insights",
+      "New tier model env vars and override/fallback toggles",
+    ],
+  },
+  {
     version: "0.5.2-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

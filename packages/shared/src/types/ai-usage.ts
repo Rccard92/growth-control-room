@@ -8,6 +8,15 @@ export interface AiUsageBreakdownItem {
   inputTokens?: number;
 }
 
+export interface AiRoutingInsights {
+  costByTier: Record<string, number>;
+  requestsByTier: Record<string, number>;
+  premiumOnCheapProfileCount: number;
+  explicitOverrideCount: number;
+  unconfiguredModelWarnings: string[];
+  schemaFallbackRetryCount: number;
+}
+
 export interface AiUsageSummary {
   totalEstimatedCost: number;
   totalRequests: number;
@@ -19,7 +28,9 @@ export interface AiUsageSummary {
   byModule: AiUsageBreakdownItem[];
   byOperation: AiUsageBreakdownItem[];
   byModel: AiUsageBreakdownItem[];
+  byTier: AiUsageBreakdownItem[];
   byDay: AiUsageBreakdownItem[];
+  routingInsights?: AiRoutingInsights;
   projectCount?: number;
 }
 
@@ -54,6 +65,12 @@ export interface AiUsageLog {
   contextHash: string | null;
   contextChars: number | null;
   contextBlocksUsed: string[] | null;
+  modelTier: string | null;
+  modelPolicySource: string | null;
+  requestedModel: string | null;
+  maxOutputTokens: number | null;
+  temperature: number | null;
+  reasoningEffort: string | null;
   responseId: string | null;
   errorType: string | null;
   errorMessage: string | null;
@@ -90,6 +107,7 @@ export interface AiUsageFilters {
   module?: string;
   operation?: string;
   model?: string;
+  modelTier?: string;
   status?: string;
   limit?: number;
   offset?: number;

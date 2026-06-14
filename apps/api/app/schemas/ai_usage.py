@@ -19,6 +19,17 @@ class AiUsageBreakdownItem(BaseModel):
     input_tokens: int | None = Field(default=None, serialization_alias="inputTokens")
 
 
+class AiRoutingInsights(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    cost_by_tier: dict[str, float] = Field(serialization_alias="costByTier")
+    requests_by_tier: dict[str, int] = Field(serialization_alias="requestsByTier")
+    premium_on_cheap_profile_count: int = Field(serialization_alias="premiumOnCheapProfileCount")
+    explicit_override_count: int = Field(serialization_alias="explicitOverrideCount")
+    unconfigured_model_warnings: list[str] = Field(serialization_alias="unconfiguredModelWarnings")
+    schema_fallback_retry_count: int = Field(serialization_alias="schemaFallbackRetryCount")
+
+
 class AiUsageSummaryResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -32,7 +43,11 @@ class AiUsageSummaryResponse(BaseModel):
     by_module: list[AiUsageBreakdownItem] = Field(serialization_alias="byModule")
     by_operation: list[AiUsageBreakdownItem] = Field(serialization_alias="byOperation")
     by_model: list[AiUsageBreakdownItem] = Field(serialization_alias="byModel")
+    by_tier: list[AiUsageBreakdownItem] = Field(default_factory=list, serialization_alias="byTier")
     by_day: list[AiUsageBreakdownItem] = Field(serialization_alias="byDay")
+    routing_insights: AiRoutingInsights | None = Field(
+        default=None, serialization_alias="routingInsights"
+    )
     project_count: int | None = Field(default=None, serialization_alias="projectCount")
 
 
@@ -71,6 +86,12 @@ class AiUsageLogRead(BaseModel):
     context_blocks_used: list[str] | None = Field(
         default=None, serialization_alias="contextBlocksUsed"
     )
+    model_tier: str | None = Field(default=None, serialization_alias="modelTier")
+    model_policy_source: str | None = Field(default=None, serialization_alias="modelPolicySource")
+    requested_model: str | None = Field(default=None, serialization_alias="requestedModel")
+    max_output_tokens: int | None = Field(default=None, serialization_alias="maxOutputTokens")
+    temperature: float | None = None
+    reasoning_effort: str | None = Field(default=None, serialization_alias="reasoningEffort")
     response_id: str | None = Field(serialization_alias="responseId")
     error_type: str | None = Field(serialization_alias="errorType")
     error_message: str | None = Field(serialization_alias="errorMessage")

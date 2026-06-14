@@ -28,6 +28,15 @@ const MODULE_OPTIONS = [
   { value: "article_generator", label: "Article Generator" },
 ];
 
+const TIER_OPTIONS = [
+  { value: "", label: "Tutti i tier" },
+  { value: "cheap", label: "Cheap" },
+  { value: "standard", label: "Standard" },
+  { value: "premium", label: "Premium" },
+  { value: "reasoning", label: "Reasoning" },
+  { value: "fallback", label: "Fallback" },
+];
+
 function formatCost(value: number | null | undefined): string {
   if (value == null) return "—";
   return `$${value.toFixed(4)}`;
@@ -92,6 +101,10 @@ function LogDetailModal({
             <div><dt>Durata</dt><dd>{log.durationMs != null ? `${log.durationMs} ms` : "—"}</dd></div>
             <div><dt>Response ID</dt><dd>{log.responseId ?? "—"}</dd></div>
             <div><dt>Context profile</dt><dd>{log.contextProfile ?? "—"}</dd></div>
+            <div><dt>Model tier</dt><dd>{log.modelTier ?? "—"}</dd></div>
+            <div><dt>Policy source</dt><dd>{log.modelPolicySource ?? "—"}</dd></div>
+            <div><dt>Max output tokens</dt><dd>{log.maxOutputTokens ?? "—"}</dd></div>
+            <div><dt>Temperature</dt><dd>{log.temperature ?? "—"}</dd></div>
             <div><dt>Context chars</dt><dd>{log.contextChars != null ? formatTokens(log.contextChars) : "—"}</dd></div>
             <div><dt>Context hash</dt><dd>{log.contextHash ?? "—"}</dd></div>
             <div><dt>Blocchi contesto</dt><dd>{formatContextBlocks(log.contextBlocksUsed)}</dd></div>
@@ -99,6 +112,13 @@ function LogDetailModal({
           {log.contextProfile && (
             <div className="ai-usage-detail__insight gcr-alert gcr-alert--info">
               Questo task ha usato il profilo: <strong>{log.contextProfile}</strong>
+              {log.modelTier && (
+                <>
+                  {" "}
+                  — Policy: {log.contextProfile} → <strong>{log.modelTier}</strong>
+                  {log.model ? ` → ${log.model}` : ""}
+                </>
+              )}
               {log.contextBlocksUsed && log.contextBlocksUsed.length > 0 && (
                 <> — Blocchi usati: {formatContextBlocks(log.contextBlocksUsed)}</>
               )}
@@ -132,6 +152,7 @@ export function AiUsagePage() {
   const [moduleFilter, setModuleFilter] = useState("");
   const [operationFilter, setOperationFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
+  const [tierFilter, setTierFilter] = useState("");
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
   const filters = useMemo(
@@ -140,8 +161,9 @@ export function AiUsagePage() {
       module: moduleFilter || undefined,
       operation: operationFilter || undefined,
       model: modelFilter || undefined,
+      modelTier: tierFilter || undefined,
     }),
-    [dateRange, moduleFilter, operationFilter, modelFilter],
+    [dateRange, moduleFilter, operationFilter, modelFilter, tierFilter],
   );
 
   const summaryQuery = useAiUsageSummary(projectId, filters);
@@ -164,6 +186,14 @@ export function AiUsagePage() {
     name: m.key ?? "?",
     cost: m.estimatedCost,
   }));
+
+  const tierChartData = (summary?.byTier ?? []).map((t) => ({
+    name: t.key ?? "?",
+    cost: t.estimatedCost,
+    requests: t.requests,
+  }));
+
+  const routingInsights = summary?.routingInsights;
 
   return (
     <motion.div
@@ -216,6 +246,16 @@ export function AiUsagePage() {
           value={modelFilter}
           onChange={(e) => setModelFilter(e.target.value)}
         />
+        <select
+          className="gcr-input"
+          value={tierFilter}
+          onChange={(e) => setTierFilter(e.target.value)}
+          aria-label="Filtra tier modello"
+        >
+          {TIER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
       {summaryQuery.isLoading ? (
@@ -273,6 +313,67 @@ export function AiUsagePage() {
             </div>
           </div>
 
+          {routingInsights && (
+            <div className="gcr-card ai-usage-page__routing-insights">
+              <h3 className="gcr-card__title">Model Routing Insights</h3>
+              <div className="gcr-grid gcr-grid--3 ai-usage-page__routing-kpis">
+                {Object.entries(routingInsights.costByTier).map(([tier, cost]) => (
+                  <MetricCard
+                    key={tier}
+                    label={`Costo tier ${tier}`}
+                    value={formatCost(cost)}
+                  />
+                ))}
+                {Object.entries(routingInsights.requestsByTier).map(([tier, count]) => (
+                  <MetricCard
+                    key={`req-${tier}`}
+                    label={`Richieste tier ${tier}`}
+                    value={count}
+                  />
+                ))}
+              </div>
+              {(routingInsights.premiumOnCheapProfileCount > 0
+                || routingInsights.explicitOverrideCount > 0
+                || routingInsights.schemaFallbackRetryCount > 0
+                || routingInsights.unconfiguredModelWarnings.length > 0) && (
+                <div className="ai-usage-page__routing-warnings">
+                  {routingInsights.premiumOnCheapProfileCount > 0 && (
+                    <div className="gcr-alert gcr-alert--warning">
+                      {routingInsights.premiumOnCheapProfileCount} richieste premium su profili cheap.
+                    </div>
+                  )}
+                  {routingInsights.explicitOverrideCount > 0 && (
+                    <div className="gcr-alert gcr-alert--info">
+                      {routingInsights.explicitOverrideCount} override modello espliciti nel periodo.
+                    </div>
+                  )}
+                  {routingInsights.schemaFallbackRetryCount > 0 && (
+                    <div className="gcr-alert gcr-alert--info">
+                      {routingInsights.schemaFallbackRetryCount} retry schema fallback (cheap → standard).
+                    </div>
+                  )}
+                  {routingInsights.unconfiguredModelWarnings.length > 0 && (
+                    <div className="gcr-alert gcr-alert--warning">
+                      Tier senza modello env configurato:{" "}
+                      {routingInsights.unconfiguredModelWarnings.join(", ")}
+                    </div>
+                  )}
+                </div>
+              )}
+              {tierChartData.length > 0 && (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={tierChartData}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                    <XAxis dataKey="name" fontSize={11} />
+                    <YAxis fontSize={11} tickFormatter={(v) => `$${v}`} />
+                    <Tooltip formatter={(v: number) => formatCost(v)} />
+                    <Bar dataKey="cost" fill="var(--gcr-accent-3, #22c55e)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          )}
+
           <div className="gcr-card ai-usage-page__table-card">
             <h3 className="gcr-card__title">Ultime richieste AI</h3>
             {logs.length === 0 ? (
@@ -285,6 +386,7 @@ export function AiUsagePage() {
                       <th>Data/ora</th>
                       <th>Modulo</th>
                       <th>Profilo</th>
+                      <th>Tier</th>
                       <th>Operazione</th>
                       <th>Modello</th>
                       <th>In</th>
@@ -305,6 +407,7 @@ export function AiUsagePage() {
                         <td>{new Date(row.createdAt).toLocaleString("it-IT")}</td>
                         <td>{row.module}</td>
                         <td>{row.contextProfile ?? "—"}</td>
+                        <td>{row.modelTier ?? "—"}</td>
                         <td>{row.operation}</td>
                         <td>{row.model}</td>
                         <td>{row.inputTokens}</td>

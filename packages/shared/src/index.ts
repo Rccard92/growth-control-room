@@ -1,5 +1,6 @@
 export type {
   AiUsageBreakdownItem,
+  AiRoutingInsights,
   AiUsageSummary,
   AiUsageLog,
   AiUsageLogListResponse,

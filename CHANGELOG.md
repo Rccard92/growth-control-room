@@ -3,6 +3,18 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.3-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added centralized AI Model Routing (`model_policy.py`) with 5 tiers: cheap, standard, premium, reasoning, fallback
+- Model resolved from context profile + metadata; services no longer choose OpenAI models
+- Extended `ai_client` with max_tokens, temperature, optional schema-error retry to standard tier
+- Extended `AiUsageLog` with model tier, policy source, requested model, max tokens, temperature
+- AI Costs page: tier column, tier filter, Model Routing Insights (cost/requests per tier + warnings)
+- New env vars: `OPENAI_MODEL_CHEAP/STANDARD/PREMIUM/REASONING/FALLBACK`, `AI_ALLOW_MODEL_OVERRIDE`, `AI_ENABLE_MODEL_FALLBACK_ON_SCHEMA_ERROR`
+- Docs: AI Model Routing section in `ai-architecture.md`, new `cost-optimization.md`
+
 ## [0.5.2-alpha] - 2026-06-13
 
 Tipo: Alpha patch

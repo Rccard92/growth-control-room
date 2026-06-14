@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.ai_usage import (
     AiBudgetStatusResponse,
+    AiRoutingInsights,
     AiUsageBreakdownItem,
     AiUsageEstimateResponse,
     AiUsageLogListResponse,
@@ -57,7 +58,13 @@ def _to_summary_response(data: dict) -> AiUsageSummaryResponse:
         by_module=breakdown(data["byModule"]),
         by_operation=breakdown(data["byOperation"]),
         by_model=breakdown(data["byModel"]),
+        by_tier=breakdown(data.get("byTier", [])),
         by_day=breakdown(data["byDay"], use_date=True),
+        routing_insights=(
+            AiRoutingInsights(**data["routingInsights"])
+            if data.get("routingInsights")
+            else None
+        ),
         project_count=data.get("projectCount"),
     )
 
@@ -90,6 +97,16 @@ def _log_to_read(row) -> AiUsageLogRead:
         prompt_preview=row.prompt_preview,
         output_preview=row.output_preview,
         prompt_cache_key=row.prompt_cache_key,
+        context_profile=row.context_profile,
+        context_hash=row.context_hash,
+        context_chars=row.context_chars,
+        context_blocks_used=row.context_blocks_used,
+        model_tier=row.model_tier,
+        model_policy_source=row.model_policy_source,
+        requested_model=row.requested_model,
+        max_output_tokens=row.max_output_tokens,
+        temperature=float(row.temperature) if row.temperature is not None else None,
+        reasoning_effort=row.reasoning_effort,
         response_id=row.response_id,
         error_type=row.error_type,
         error_message=row.error_message,
@@ -109,6 +126,7 @@ async def project_ai_usage_summary(
     module: str | None = None,
     operation: str | None = None,
     model: str | None = None,
+    model_tier: str | None = Query(default=None, alias="modelTier"),
     session: AsyncSession = Depends(get_db),
 ) -> AiUsageSummaryResponse:
     await get_project_in_default_workspace(project_id, session)
@@ -120,6 +138,7 @@ async def project_ai_usage_summary(
         module=module,
         operation=operation,
         model=model,
+        model_tier=model_tier,
     )
     return _to_summary_response(data)
 
@@ -136,6 +155,7 @@ async def project_ai_usage_logs(
     module: str | None = None,
     operation: str | None = None,
     model: str | None = None,
+    model_tier: str | None = Query(default=None, alias="modelTier"),
     status: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -150,6 +170,7 @@ async def project_ai_usage_logs(
         module=module,
         operation=operation,
         model=model,
+        model_tier=model_tier,
         status=status,
         limit=limit,
         offset=offset,

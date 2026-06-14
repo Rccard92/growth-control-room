@@ -66,6 +66,7 @@ function buildQuery(filters?: AiUsageFilters): string {
   if (filters?.module) q.set("module", filters.module);
   if (filters?.operation) q.set("operation", filters.operation);
   if (filters?.model) q.set("model", filters.model);
+  if (filters?.modelTier) q.set("modelTier", filters.modelTier);
   if (filters?.status) q.set("status", filters.status);
   if (filters?.limit != null) q.set("limit", String(filters.limit));
   if (filters?.offset != null) q.set("offset", String(filters.offset));

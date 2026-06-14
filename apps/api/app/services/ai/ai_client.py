@@ -21,6 +21,7 @@ from app.services.ai.exceptions import (
     OpenAINotConfiguredError,
     OpenAIRequestError,
 )
+from app.services.ai.model_policy import AiResolvedModel, resolve_ai_model, resolve_standard_fallback
 from app.services.ai.pricing import estimate_usage_cost
 from app.services.ai.usage_service import (
     UsageLogInput,
@@ -80,6 +81,20 @@ def _context_fields_from_metadata(metadata: AiRequestMetadata) -> dict[str, Any]
     }
 
 
+def _model_policy_fields(
+    resolved: AiResolvedModel,
+    requested_model: str | None,
+) -> dict[str, Any]:
+    return {
+        "model_tier": resolved.tier,
+        "model_policy_source": resolved.policy_source,
+        "requested_model": requested_model,
+        "max_output_tokens": resolved.max_output_tokens,
+        "temperature": Decimal(str(resolved.temperature)),
+        "reasoning_effort": resolved.reasoning_effort,
+    }
+
+
 def _extract_usage(response: Any) -> dict[str, int]:
     usage = getattr(response, "usage", None)
     if usage is None:
@@ -113,6 +128,68 @@ def _extract_usage(response: Any) -> dict[str, int]:
     }
 
 
+class _SchemaParseError(Exception):
+    def __init__(self, *, content: str, response: Any | None, message: str) -> None:
+        super().__init__(message)
+        self.content = content
+        self.response = response
+        self.error_message = message
+
+
+def _parse_json_object_response(response: Any) -> tuple[dict[str, Any], str]:
+    content = (response.choices[0].message.content or "").strip()
+    if not content:
+        raise _SchemaParseError(
+            content=content,
+            response=response,
+            message="Risposta OpenAI vuota",
+        )
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise _SchemaParseError(
+            content=content,
+            response=response,
+            message="Risposta OpenAI non è JSON valido",
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise _SchemaParseError(
+            content=content,
+            response=response,
+            message="Risposta OpenAI deve essere un oggetto JSON",
+        )
+    return parsed, content
+
+
+async def _call_openai(
+    client: AsyncOpenAI,
+    *,
+    resolved: AiResolvedModel,
+    system_prompt: str,
+    user_prompt: str,
+    timeout: float,
+) -> Any:
+    kwargs: dict[str, Any] = {
+        "model": resolved.model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "response_format": {"type": "json_object"},
+        "timeout": timeout,
+        "max_tokens": resolved.max_output_tokens,
+        "temperature": resolved.temperature,
+    }
+    reasoning_model = (settings.openai_model_reasoning or "").strip()
+    if (
+        resolved.reasoning_effort
+        and reasoning_model
+        and resolved.model == reasoning_model
+    ):
+        kwargs["reasoning_effort"] = resolved.reasoning_effort
+    return await client.chat.completions.create(**kwargs)
+
+
 async def _persist_log(data: UsageLogInput) -> None:
     session_factory = get_session_factory()
     async with session_factory() as session:
@@ -124,6 +201,39 @@ async def _persist_log(data: UsageLogInput) -> None:
             logger.exception("Failed to persist AI usage log")
 
 
+def _base_log_input(
+    *,
+    metadata: AiRequestMetadata,
+    resolved: AiResolvedModel,
+    requested_model: str | None,
+    prompt_hash: str,
+    prompt_chars: int,
+    prompt_preview: str | None,
+    prompt_cache_key: str | None,
+    status: str,
+    duration_ms: int,
+    **extra: Any,
+) -> UsageLogInput:
+    return UsageLogInput(
+        project_id=metadata.project_id,
+        model=resolved.model,
+        module=metadata.module,
+        operation=metadata.operation,
+        entity_type=metadata.entity_type,
+        entity_id=metadata.entity_id,
+        job_id=metadata.job_id,
+        status=status,
+        duration_ms=duration_ms,
+        prompt_chars=prompt_chars,
+        prompt_hash=prompt_hash,
+        prompt_preview=prompt_preview,
+        prompt_cache_key=prompt_cache_key,
+        **_context_fields_from_metadata(metadata),
+        **_model_policy_fields(resolved, requested_model),
+        **extra,
+    )
+
+
 async def generate_structured_json(
     *,
     system_prompt: str,
@@ -133,7 +243,19 @@ async def generate_structured_json(
     model: str | None = None,
     prompt_cache_key: str | None = None,
 ) -> dict[str, Any]:
-    resolved_model = model or settings.openai_model
+    resolved = resolve_ai_model(
+        metadata,
+        context_profile=metadata.context_profile,
+        requested_model=model,
+    )
+    if resolved.warning:
+        logger.info(
+            "AI model policy warning (project=%s module=%s): %s",
+            metadata.project_id,
+            metadata.module,
+            resolved.warning,
+        )
+
     prompt_hash = _hash_prompt(system_prompt, user_prompt)
     prompt_chars = len(system_prompt) + len(user_prompt)
     prompt_preview = None
@@ -148,31 +270,73 @@ async def generate_structured_json(
     started = time.perf_counter()
     response = None
     content = ""
-    error_type: str | None = None
-    error_message: str | None = None
-    status = "success"
+    parsed: dict[str, Any] | None = None
+    active_resolved = resolved
+    schema_retried = False
 
     try:
         client = _client()
-        response = await client.chat.completions.create(
-            model=resolved_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
+        response = await _call_openai(
+            client,
+            resolved=active_resolved,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             timeout=timeout,
         )
-        content = (response.choices[0].message.content or "").strip()
-        if not content:
-            raise OpenAIRequestError("Risposta OpenAI vuota")
-        parsed = json.loads(content)
-        if not isinstance(parsed, dict):
-            raise OpenAIRequestError("Risposta OpenAI deve essere un oggetto JSON")
+        try:
+            parsed, content = _parse_json_object_response(response)
+        except _SchemaParseError as parse_exc:
+            if (
+                settings.ai_enable_model_fallback_on_schema_error
+                and active_resolved.policy_source != "schema_fallback_retry"
+            ):
+                schema_retried = True
+                active_resolved = resolve_standard_fallback()
+                logger.warning(
+                    "Schema parse failed; retry with standard tier (project=%s module=%s)",
+                    metadata.project_id,
+                    metadata.module,
+                )
+                response = await _call_openai(
+                    client,
+                    resolved=active_resolved,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    timeout=timeout,
+                )
+                parsed, content = _parse_json_object_response(response)
+            else:
+                raise OpenAIRequestError(parse_exc.error_message) from parse_exc
     except OpenAINotConfiguredError:
         raise
     except OpenAIRequestError:
         raise
+    except _SchemaParseError as parse_exc:
+        status = "error"
+        error_type = "SchemaParseError"
+        error_message = parse_exc.error_message
+        content = parse_exc.content
+        response = parse_exc.response
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        await _persist_log(
+            _base_log_input(
+                metadata=metadata,
+                resolved=active_resolved,
+                requested_model=model,
+                prompt_hash=prompt_hash,
+                prompt_chars=prompt_chars,
+                prompt_preview=prompt_preview,
+                prompt_cache_key=prompt_cache_key,
+                status=status,
+                duration_ms=duration_ms,
+                output_chars=len(content),
+                output_preview=truncate_preview(content) if settings.ai_log_prompt_preview else None,
+                response_id=getattr(response, "id", None) if response else None,
+                error_type=error_type,
+                error_message=error_message,
+            )
+        )
+        raise OpenAIRequestError(error_message)
     except OpenAIError as exc:
         status = "error"
         error_type = type(exc).__name__
@@ -180,60 +344,27 @@ async def generate_structured_json(
         logger.warning("OpenAI request failed: %s", error_message)
         duration_ms = int((time.perf_counter() - started) * 1000)
         await _persist_log(
-            UsageLogInput(
-                project_id=metadata.project_id,
-                model=resolved_model,
-                module=metadata.module,
-                operation=metadata.operation,
-                entity_type=metadata.entity_type,
-                entity_id=metadata.entity_id,
-                job_id=metadata.job_id,
-                status=status,
-                duration_ms=duration_ms,
-                prompt_chars=prompt_chars,
+            _base_log_input(
+                metadata=metadata,
+                resolved=active_resolved,
+                requested_model=model,
                 prompt_hash=prompt_hash,
+                prompt_chars=prompt_chars,
                 prompt_preview=prompt_preview,
                 prompt_cache_key=prompt_cache_key,
+                status=status,
+                duration_ms=duration_ms,
                 error_type=error_type,
                 error_message=error_message,
-                **_context_fields_from_metadata(metadata),
             )
         )
         raise OpenAIRequestError("Richiesta OpenAI non riuscita") from exc
-    except json.JSONDecodeError as exc:
-        status = "error"
-        error_type = "JSONDecodeError"
-        error_message = "Risposta OpenAI non è JSON valido"
-        duration_ms = int((time.perf_counter() - started) * 1000)
-        await _persist_log(
-            UsageLogInput(
-                project_id=metadata.project_id,
-                model=resolved_model,
-                module=metadata.module,
-                operation=metadata.operation,
-                entity_type=metadata.entity_type,
-                entity_id=metadata.entity_id,
-                job_id=metadata.job_id,
-                status=status,
-                duration_ms=duration_ms,
-                prompt_chars=prompt_chars,
-                output_chars=len(content),
-                prompt_hash=prompt_hash,
-                prompt_preview=prompt_preview,
-                output_preview=truncate_preview(content) if settings.ai_log_prompt_preview else None,
-                prompt_cache_key=prompt_cache_key,
-                response_id=getattr(response, "id", None) if response else None,
-                error_type=error_type,
-                error_message=error_message,
-                **_context_fields_from_metadata(metadata),
-            )
-        )
-        raise OpenAIRequestError(error_message) from exc
 
+    assert parsed is not None
     duration_ms = int((time.perf_counter() - started) * 1000)
     usage = _extract_usage(response)
     cost = estimate_usage_cost(
-        resolved_model,
+        active_resolved.model,
         input_tokens=usage["input_tokens"],
         output_tokens=usage["output_tokens"],
         cached_input_tokens=usage["cached_input_tokens"],
@@ -260,15 +391,16 @@ async def generate_structured_json(
     output_preview = truncate_preview(content) if settings.ai_log_prompt_preview else None
 
     await _persist_log(
-        UsageLogInput(
-            project_id=metadata.project_id,
-            model=resolved_model,
-            module=metadata.module,
-            operation=metadata.operation,
-            entity_type=metadata.entity_type,
-            entity_id=metadata.entity_id,
-            job_id=metadata.job_id,
-            status=status,
+        _base_log_input(
+            metadata=metadata,
+            resolved=active_resolved,
+            requested_model=model,
+            prompt_hash=prompt_hash,
+            prompt_chars=prompt_chars,
+            prompt_preview=prompt_preview,
+            prompt_cache_key=prompt_cache_key,
+            status="success",
+            duration_ms=duration_ms,
             input_tokens=usage["input_tokens"],
             output_tokens=usage["output_tokens"],
             total_tokens=usage["total_tokens"],
@@ -278,16 +410,18 @@ async def generate_structured_json(
             estimated_output_cost=estimated_output,
             estimated_cached_cost=estimated_cached,
             estimated_total_cost=estimated_total,
-            duration_ms=duration_ms,
-            prompt_chars=prompt_chars,
             output_chars=len(content),
-            prompt_hash=prompt_hash,
-            prompt_preview=prompt_preview,
             output_preview=output_preview,
-            prompt_cache_key=prompt_cache_key,
             response_id=getattr(response, "id", None),
-            **_context_fields_from_metadata(metadata),
         )
     )
+
+    if schema_retried:
+        logger.info(
+            "Schema fallback retry succeeded (project=%s module=%s tier=%s)",
+            metadata.project_id,
+            metadata.module,
+            active_resolved.tier,
+        )
 
     return parsed

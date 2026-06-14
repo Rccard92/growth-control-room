@@ -51,6 +51,35 @@ BrandIntelligenceContextBuilder → AI Context Profiles → ai_client → AiUsag
 
 Ogni profilo restituisce `contextText`, `contextBlocksUsed`, `warnings`, `contextHash`. `AiRequestMetadata` e `AiUsageLog` tracciano `context_profile`, `context_hash`, `context_chars`, `context_blocks_used`.
 
+### AI Model Routing (0.5.3-alpha)
+
+**Regola architetturale:** nessun servizio decide il modello OpenAI. La risoluzione è centralizzata in `apps/api/app/services/ai/model_policy.py` tramite `resolve_ai_model()`.
+
+Flusso aggiornato:
+
+```
+AI Context Profiles → resolve_ai_model → ai_client → AiUsageLog
+```
+
+| Tier | Uso tipico |
+|------|------------|
+| `cheap` | Alt immagini, singolo campo SEO, task minimal |
+| `standard` | Proposte SEO complete, brief, import BI |
+| `premium` | Articoli da brief approvato |
+| `reasoning` | Compliance review (solo se `OPENAI_MODEL_REASONING` configurato) |
+| `fallback` | Modello di ripiego se tier non configurato |
+
+Env tier models: `OPENAI_MODEL_CHEAP`, `OPENAI_MODEL_STANDARD`, `OPENAI_MODEL_PREMIUM`, `OPENAI_MODEL_REASONING`, `OPENAI_MODEL_FALLBACK`. `OPENAI_MODEL` resta fallback globale.
+
+Opzioni:
+
+- `AI_ALLOW_MODEL_OVERRIDE=true` — consente `model=` esplicito su `generate_structured_json()`
+- `AI_ENABLE_MODEL_FALLBACK_ON_SCHEMA_ERROR=true` — retry automatico su tier `standard` se JSON invalido
+
+`AiUsageLog` traccia anche `model_tier`, `model_policy_source`, `requested_model`, `max_output_tokens`, `temperature`, `reasoning_effort`. La pagina **AI Costs** espone breakdown per tier e **Model Routing Insights**.
+
+Vedi anche [Ottimizzazione costi AI](cost-optimization.md).
+
 ### Moduli tracciati
 
 `brand_intelligence`, `product_seo`, `content_seo`, `blog_brief`, `article_generator` (+ operazioni batch BI/editorial).

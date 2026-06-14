@@ -440,7 +440,11 @@ async def generate_seo_proposal_field(
             project_id=store.project_id,
             module=seo_module,
             operation="generate_field",
-            entity_type=entity_type,
+            entity_type=(
+                "product_image"
+                if field == "imageAlt" and entity_type == "product"
+                else entity_type
+            ),
             entity_id=entity_id,
         ),
         ctx,
