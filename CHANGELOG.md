@@ -3,6 +3,14 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.9-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed Changelog page version source
+- Removed duplicated AI reasoning helper text in Product/Collection SEO fields
+- Fixed collection image alt accept action
+
 ## [0.4.8-alpha] - 2026-06-13
 
 Tipo: Alpha patch

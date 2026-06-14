@@ -1,8 +1,9 @@
 import type { SeoScoreBreakdown } from "@gcr/shared";
-import { SeoFieldStatusBadge } from "./SeoFieldStatusBadge";
+import { SeoFieldStatusBadge, fieldStatusNote } from "./SeoFieldStatusBadge";
 import type { FieldStateMap } from "./seoFieldState";
 import { imageAltFieldKey } from "./seoFieldState";
 import type { SeoFormValues } from "./seoFormValues";
+import { getUniqueFieldHelperText } from "./seoFormValues";
 
 interface SeoImagesEditorProps {
   entityType: "product" | "collection";
@@ -104,6 +105,21 @@ export function SeoImagesEditor({
                     Ripristina
                   </button>
                 )}
+              {fieldStateMap?.imageAlt?.source === "ai" &&
+                !fieldStateMap.imageAlt.accepted &&
+                fieldStateMap.imageAlt.dirty &&
+                onAcceptField && (
+                  <button
+                    type="button"
+                    className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onAcceptField("imageAlt");
+                    }}
+                  >
+                    Accetta
+                  </button>
+                )}
             </span>
           </span>
           <input
@@ -113,9 +129,16 @@ export function SeoImagesEditor({
             disabled={fieldStateMap?.imageAlt?.generating}
             onChange={(e) => onChange("imageAlt", e.target.value)}
           />
-          {fieldStateMap?.imageAlt?.reasoning && (
-            <span className="seo-field-editor__note">{fieldStateMap.imageAlt.reasoning}</span>
-          )}
+          {(() => {
+            const fs = fieldStateMap?.imageAlt;
+            const helperText = getUniqueFieldHelperText(
+              fs,
+              fieldStatusNote("imageAlt", values.imageAlt, issues, scoreBreakdown, undefined, fs),
+            );
+            return helperText ? (
+              <span className="seo-field-editor__note">{helperText}</span>
+            ) : null;
+          })()}
         </label>
       ) : mediaImages.length === 0 ? (
         <p className="shopify-empty-copy">Nessuna immagine sincronizzata.</p>
@@ -188,9 +211,15 @@ export function SeoImagesEditor({
                   disabled={fs?.generating}
                   onChange={(e) => onImageAltChange?.(idx, e.target.value)}
                 />
-                {fs?.reasoning && (
-                  <span className="seo-field-editor__note">{fs.reasoning}</span>
-                )}
+                {(() => {
+                  const helperText = getUniqueFieldHelperText(
+                    fs,
+                    fieldStatusNote("imageAlt", altVal, issues, scoreBreakdown, undefined, fs),
+                  );
+                  return helperText ? (
+                    <span className="seo-field-editor__note">{helperText}</span>
+                  ) : null;
+                })()}
               </label>
             </div>
           );

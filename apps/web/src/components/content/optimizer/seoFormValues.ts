@@ -530,3 +530,14 @@ export function getFieldStatus(
 
   return { status: "ok" };
 }
+
+export function getUniqueFieldHelperText(
+  fieldState?: { reasoning?: string },
+  statusNote?: string,
+): string | undefined {
+  const reasoning = fieldState?.reasoning?.trim();
+  const note = statusNote?.trim();
+  if (reasoning) return reasoning;
+  if (note) return note;
+  return undefined;
+}

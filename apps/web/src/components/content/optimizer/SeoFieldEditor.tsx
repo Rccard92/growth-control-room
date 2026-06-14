@@ -4,6 +4,7 @@ import { SeoFieldStatusBadge, fieldStatusNote } from "./SeoFieldStatusBadge";
 import { SeoImagesEditor } from "./SeoImagesEditor";
 import type { FieldState, FieldStateMap, SeoEditableField } from "./seoFieldState";
 import type { SeoFormValues } from "./seoFormValues";
+import { getUniqueFieldHelperText } from "./seoFormValues";
 
 interface SeoFieldEditorProps {
   entityType: "product" | "collection";
@@ -50,7 +51,8 @@ function FieldRow({
   onAcceptField?: (field: string) => void;
   multiline?: boolean;
 }) {
-  const note = fieldStatusNote(field, value, issues, scoreBreakdown, undefined, fieldState);
+  const statusNote = fieldStatusNote(field, value, issues, scoreBreakdown, undefined, fieldState);
+  const helperText = getUniqueFieldHelperText(fieldState, statusNote);
   const showRestore = fieldState?.dirty && fieldState.value !== fieldState.originalValue;
   const showAccept =
     fieldState?.source === "ai" && !fieldState.accepted && fieldState.dirty;
@@ -124,10 +126,7 @@ function FieldRow({
           onChange={(e) => onChange(field, e.target.value)}
         />
       )}
-      {note && <span className="seo-field-editor__note">{note}</span>}
-      {fieldState?.reasoning && (
-        <span className="seo-field-editor__note">{fieldState.reasoning}</span>
-      )}
+      {helperText && <span className="seo-field-editor__note">{helperText}</span>}
     </label>
   );
 }

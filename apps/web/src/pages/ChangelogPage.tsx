@@ -1,5 +1,5 @@
 import { PageHeader } from "../components/PageHeader";
-import { CHANGELOG_RELEASES, GCR_VERSION } from "../constants/changelog";
+import { CHANGELOG_RELEASES, GCR_VERSION } from "../lib/changelog";
 import { useProject } from "../hooks/useProjects";
 import { APP_ROUTES } from "../routes/config";
 import { useParams } from "react-router-dom";
