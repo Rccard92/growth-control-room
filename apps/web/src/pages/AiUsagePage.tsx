@@ -43,7 +43,7 @@ type AiUsageTab = "overview" | "logs" | "settings" | "budget";
 const TAB_OPTIONS: { id: AiUsageTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "logs", label: "Logs" },
-  { id: "settings", label: "Model Settings" },
+  { id: "settings", label: "Modelli AI" },
   { id: "budget", label: "Budget" },
 ];
 

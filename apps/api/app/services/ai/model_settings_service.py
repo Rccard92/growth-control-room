@@ -21,6 +21,7 @@ from app.services.ai.operation_registry import (
     list_operations,
     recommended_model_from_env,
     resolve_registry_model,
+    tier_cost_profile_label,
 )
 from app.services.ai.pricing import OPENAI_MODEL_PRICING, estimate_usage_cost
 
@@ -156,11 +157,22 @@ def compute_guardrail_warnings(
         warnings.append(
             f"Operation '{op.operation_key}' usa tier premium su task economico consigliato."
         )
-    if model_name and estimate_usage_cost(model_name, input_tokens=1, output_tokens=1) is None:
-        warnings.append(
-            f"Costo stimato non affidabile: pricing modello '{model_name}' mancante."
-        )
     return warnings
+
+
+def _is_model_priced(model_name: str | None) -> bool:
+    if not model_name or not str(model_name).strip():
+        return True
+    return estimate_usage_cost(str(model_name).strip(), input_tokens=1, output_tokens=1) is not None
+
+
+def _collect_unpriced_models(items: list[dict[str, Any]]) -> list[str]:
+    unpriced: set[str] = set()
+    for item in items:
+        model = item.get("model")
+        if model and not _is_model_priced(model):
+            unpriced.add(str(model).strip())
+    return sorted(unpriced)
 
 
 async def get_available_models(session: AsyncSession) -> dict[str, Any]:
@@ -320,15 +332,21 @@ async def list_settings_for_project(
                 "source": source,
                 "has_project_override": op.operation_key in project_rows,
                 "guardrail_warnings": warnings,
+                "ui_category": op.ui_category,
+                "gcr_recommended_model": op.gcr_recommended_model,
+                "gcr_recommendation_reason": op.gcr_recommendation_reason,
+                "cost_profile_label": tier_cost_profile_label(display_tier),
                 **stats,
             }
         )
 
+    unpriced_models = _collect_unpriced_models(items)
     available = await get_available_models(session)
     return {
         "items": items,
         "registry_count": len(AI_OPERATIONS),
         "missing_settings": missing,
+        "unpriced_models": unpriced_models,
         "available_models": available,
     }
 
@@ -392,3 +410,39 @@ async def reset_project_setting(
         await session.delete(row)
         await session.flush()
     await seed_default_settings(session, project_id=project_id, source="env_seed")
+
+
+async def apply_gcr_recommendations(
+    session: AsyncSession,
+    project_id: UUID,
+) -> int:
+    updated = 0
+    for op in list_operations(include_planned=False):
+        if op.status != "implemented":
+            continue
+        row = await get_setting_row(session, project_id, op.operation_key)
+        if row is None:
+            row = _setting_from_registry(op, project_id=project_id, source="manual")
+            session.add(row)
+        row.model = op.gcr_recommended_model
+        row.source = "manual"
+        updated += 1
+    if updated:
+        await session.flush()
+    return updated
+
+
+async def reset_all_to_railway(
+    session: AsyncSession,
+    project_id: UUID,
+) -> int:
+    rows = (
+        await session.execute(
+            select(AiModelSetting).where(AiModelSetting.project_id == project_id)
+        )
+    ).scalars().all()
+    for row in rows:
+        await session.delete(row)
+    if rows:
+        await session.flush()
+    return await seed_default_settings(session, project_id=project_id, source="env_seed")

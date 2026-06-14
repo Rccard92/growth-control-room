@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+
 from typing import Literal
 
 from pydantic import BaseModel
@@ -12,6 +12,14 @@ from app.core.config import settings
 QualityLevel = Literal["low", "medium", "high", "critical"]
 CostSensitivity = Literal["low", "medium", "high"]
 OperationStatus = Literal["implemented", "planned", "non_ai"]
+UiCategory = Literal[
+    "brand_intelligence",
+    "product_collection_seo",
+    "blog_articles",
+    "ped_social",
+    "email_ads",
+    "seo_advanced",
+]
 
 
 class AiOperationDefinition(BaseModel):
@@ -32,8 +40,275 @@ class AiOperationDefinition(BaseModel):
     warning_notes: str | None = None
     status: OperationStatus = "implemented"
     enabled: bool = True
+    ui_category: UiCategory = "brand_intelligence"
+    gcr_recommended_model: str = "gpt-5.4"
+    gcr_recommendation_reason: str = ""
 
     model_config = {"populate_by_name": True}
+
+
+def tier_cost_profile_label(tier: str) -> str:
+    if tier == "cheap":
+        return "profilo costo: leggero"
+    if tier in ("premium", "reasoning"):
+        return "profilo costo: alta qualità"
+    if tier == "fallback":
+        return "profilo costo: ripiego"
+    return "profilo costo: bilanciato"
+
+
+GCR_METADATA: dict[str, dict[str, str]] = {
+    "brand_profile_enrichment": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Usa un modello leggero: arricchimento breve e strutturato.",
+        "description": "Arricchisce il profilo brand con dati strutturati.",
+    },
+    "brand_identity_import": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Equilibrio qualità/costo per estrazione da documenti brand.",
+        "description": "Importa identità e tono da file brand.",
+    },
+    "visual_identity_extraction": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Analisi visiva con contesto sufficiente senza sprechi.",
+        "description": "Estrae palette e stile visivo dal brand.",
+    },
+    "safe_claims_import": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Claim sanitari richiedono accuratezza: evita modelli troppo leggeri.",
+        "description": "Importa e valida safe claims da documenti.",
+    },
+    "product_knowledge_general_import": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Sintesi knowledge generale con buon rapporto qualità/costo.",
+        "description": "Importa product knowledge generale.",
+    },
+    "product_knowledge_item_import": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Estrazione per prodotto con contesto medio-lungo.",
+        "description": "Importa knowledge per singolo prodotto.",
+    },
+    "faq_objections_import": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Parsing FAQ strutturate con modello bilanciato.",
+        "description": "Importa FAQ e obiezioni da file.",
+    },
+    "brand_document_extraction": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Estrazione fatti da PDF con qualità affidabile.",
+        "description": "Estrae fatti da documenti brand.",
+    },
+    "brand_synthesis": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Sintesi moduli BI con output coerente.",
+        "description": "Sintetizza sezioni Brand Intelligence.",
+    },
+    "brand_brief_synthesis": {
+        "ui_category": "brand_intelligence",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Brief intelligence da batch con qualità narrativa media.",
+        "description": "Genera brief brand da import batch.",
+    },
+    "product_seo_field": {
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Usa un modello leggero: singolo campo SEO breve.",
+        "description": "Genera un campo SEO singolo per prodotto.",
+    },
+    "collection_seo_field": {
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Usa un modello leggero: meta collection brevi.",
+        "description": "Genera un campo SEO singolo per collection.",
+    },
+    "product_image_alt": {
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Usa un modello leggero: è un task breve e controllato.",
+        "description": "Genera testi ALT brevi per immagini prodotto.",
+    },
+    "collection_image_alt": {
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Usa un modello leggero per alt testuali brevi.",
+        "description": "Genera testi ALT per immagini collection.",
+    },
+    "product_seo_full_proposal": {
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Proposta multi-campo con contesto brand: modello bilanciato.",
+        "description": "Proposta SEO completa per prodotto.",
+    },
+    "collection_seo_full_proposal": {
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Proposta SEO collection con qualità e costo equilibrati.",
+        "description": "Proposta SEO completa per collection.",
+    },
+    "seo_compliance_review": {
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Revisione compliance: non usare modelli troppo leggeri.",
+        "description": "Revisione compliance SEO su contenuti.",
+    },
+    "editorial_plan_generation": {
+        "ui_category": "blog_articles",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Funzione rule-based: nessun modello AI attivo.",
+        "description": "Piano editoriale (non usa AI).",
+    },
+    "blog_brief_generation": {
+        "ui_category": "blog_articles",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Brief strutturato con brand context: modello bilanciato.",
+        "description": "Genera brief editoriale per articoli blog.",
+    },
+    "blog_brief_batch_item": {
+        "ui_category": "blog_articles",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Stesso profilo del brief singolo in batch.",
+        "description": "Genera brief in batch editoriale.",
+    },
+    "article_draft_generation": {
+        "ui_category": "blog_articles",
+        "gcr_recommended_model": "gpt-5.5",
+        "gcr_recommendation_reason": "Alta qualità per articoli lunghi, tono brand e claim.",
+        "description": "Genera bozza articolo completa da brief.",
+    },
+    "article_rewrite": {
+        "ui_category": "blog_articles",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Riscrittura mantiene tono brand con costo contenuto.",
+        "description": "Riscrive articoli esistenti.",
+    },
+    "article_meta_generation": {
+        "ui_category": "blog_articles",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Meta title/description brevi: modello leggero.",
+        "description": "Genera meta SEO per articoli.",
+    },
+    "article_compliance_review": {
+        "ui_category": "blog_articles",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Revisione claim su articolo: qualità affidabile.",
+        "description": "Revisione compliance su articoli.",
+    },
+    "ped_strategy": {
+        "ui_category": "ped_social",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Strategia PED richiede ragionamento strutturato.",
+        "description": "Genera strategia PED.",
+    },
+    "ped_calendar_generation": {
+        "ui_category": "ped_social",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Calendario editoriale con output medio-lungo.",
+        "description": "Genera calendario contenuti PED.",
+    },
+    "ped_post_copy": {
+        "ui_category": "ped_social",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Copy social breve: modello leggero.",
+        "description": "Genera copy per post social.",
+    },
+    "ped_creative_prompt": {
+        "ui_category": "ped_social",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Prompt creativi con variabilità controllata.",
+        "description": "Genera prompt creativi PED.",
+    },
+    "ped_image_prompt": {
+        "ui_category": "ped_social",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Prompt immagine breve: massimo risparmio.",
+        "description": "Genera prompt per immagini PED.",
+    },
+    "social_comment_response": {
+        "ui_category": "ped_social",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Risposte brevi ai commenti: modello leggero.",
+        "description": "Genera risposte a commenti social.",
+    },
+    "seo_keyword_research": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Ricerca keyword con analisi strutturata.",
+        "description": "Ricerca keyword SEO avanzata.",
+    },
+    "seo_content_gap_analysis": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Gap analysis con contesto medio.",
+        "description": "Analisi content gap SEO.",
+    },
+    "seo_article_outline": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Outline articolo con struttura coerente.",
+        "description": "Genera outline articoli SEO.",
+    },
+    "seo_article_generation": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.5",
+        "gcr_recommendation_reason": "Articoli SEO lunghi: alta qualità.",
+        "description": "Genera articoli SEO completi.",
+    },
+    "seo_article_optimization": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Ottimizzazione con revisione mirata.",
+        "description": "Ottimizza articoli SEO esistenti.",
+    },
+    "email_campaign_strategy": {
+        "ui_category": "email_ads",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Strategia campagna email strutturata.",
+        "description": "Genera strategia campagne email.",
+    },
+    "email_copy_generation": {
+        "ui_category": "email_ads",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Copy email breve e persuasivo: modello leggero.",
+        "description": "Genera copy per email marketing.",
+    },
+    "ads_copy_generation": {
+        "ui_category": "email_ads",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Varianti ads brevi: modello leggero.",
+        "description": "Genera copy per annunci.",
+    },
+    "landing_copy_generation": {
+        "ui_category": "email_ads",
+        "gcr_recommended_model": "gpt-5.5",
+        "gcr_recommendation_reason": "Landing lunghe: alta qualità narrativa.",
+        "description": "Genera copy per landing page.",
+    },
+}
+
+
+def _apply_gcr_metadata(op: AiOperationDefinition) -> AiOperationDefinition:
+    meta = GCR_METADATA.get(op.operation_key, {})
+    if not meta:
+        return op
+    updates: dict[str, str] = {}
+    if "ui_category" in meta:
+        updates["ui_category"] = meta["ui_category"]
+    if "gcr_recommended_model" in meta:
+        updates["gcr_recommended_model"] = meta["gcr_recommended_model"]
+    if "gcr_recommendation_reason" in meta:
+        updates["gcr_recommendation_reason"] = meta["gcr_recommendation_reason"]
+    if "description" in meta:
+        updates["description"] = meta["description"]
+    return op.model_copy(update=updates)
 
 
 def recommended_model_from_env(env_key: str) -> str | None:
@@ -443,7 +718,8 @@ def _build_registry() -> dict[str, AiOperationDefinition]:
         _op("ads_copy_generation", "Copy ads", "ads", "generate_copy", "generic", "standard", "OPENAI_MODEL_STANDARD", 1500, 0.6, status="planned", enabled=False, recommended_use="Standard per varianti ads."),
         _op("landing_copy_generation", "Copy landing", "ads", "generate_landing", "article_draft", "premium", "OPENAI_MODEL_PREMIUM", 5000, 0.55, status="planned", enabled=False, recommended_use="Premium per landing lunghe."),
     ]
-    return {op.operation_key: op for op in ops}
+    enriched = [_apply_gcr_metadata(op) for op in ops]
+    return {op.operation_key: op for op in enriched}
 
 
 AI_OPERATIONS: dict[str, AiOperationDefinition] = _build_registry()

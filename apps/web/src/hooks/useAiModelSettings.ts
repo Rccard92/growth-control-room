@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AiModelSettingUpdateInput } from "@gcr/shared";
 import {
+  applyGcrRecommendations,
   getAiModelSettings,
   resetAiModelSetting,
+  resetModelsFromRailway,
   updateAiModelSetting,
 } from "../lib/ai-model-settings-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -35,6 +37,26 @@ export function useResetAiModelSetting(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (operationKey: string) => resetAiModelSetting(projectId, operationKey),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.aiModelSettings.list(projectId) });
+    },
+  });
+}
+
+export function useApplyGcrRecommendations(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => applyGcrRecommendations(projectId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.aiModelSettings.list(projectId) });
+    },
+  });
+}
+
+export function useResetModelsFromRailway(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => resetModelsFromRailway(projectId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.aiModelSettings.list(projectId) });
     },

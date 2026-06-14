@@ -1,5 +1,6 @@
 import type {
   AiAvailableModelsResponse,
+  AiBulkActionResponse,
   AiModelSettingMutationResponse,
   AiModelSettingsListResponse,
   AiModelSettingUpdateInput,
@@ -29,6 +30,20 @@ export function resetAiModelSetting(
 ): Promise<AiModelSettingMutationResponse> {
   return apiFetch<AiModelSettingMutationResponse>(
     `/api/projects/${projectId}/ai-model-settings/${operationKey}/reset`,
+    { method: "POST" },
+  );
+}
+
+export function applyGcrRecommendations(projectId: string): Promise<AiBulkActionResponse> {
+  return apiFetch<AiBulkActionResponse>(
+    `/api/projects/${projectId}/ai-model-settings/apply-gcr-recommendations`,
+    { method: "POST" },
+  );
+}
+
+export function resetModelsFromRailway(projectId: string): Promise<AiBulkActionResponse> {
+  return apiFetch<AiBulkActionResponse>(
+    `/api/projects/${projectId}/ai-model-settings/reset-railway`,
     { method: "POST" },
   );
 }

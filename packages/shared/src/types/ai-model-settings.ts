@@ -1,3 +1,11 @@
+export type AiModelUiCategory =
+  | "brand_intelligence"
+  | "product_collection_seo"
+  | "blog_articles"
+  | "ped_social"
+  | "email_ads"
+  | "seo_advanced";
+
 export interface AiModelSettingItem {
   operationKey: string;
   label: string;
@@ -28,6 +36,10 @@ export interface AiModelSettingItem {
   recentRequestCount: number;
   avgCostRecent: number | null;
   lastRequestAt: string | null;
+  uiCategory: AiModelUiCategory;
+  gcrRecommendedModel: string;
+  gcrRecommendationReason: string;
+  costProfileLabel: string;
 }
 
 export interface AiAvailableModelItem {
@@ -46,6 +58,7 @@ export interface AiModelSettingsListResponse {
   items: AiModelSettingItem[];
   registryCount: number;
   missingSettings: string[];
+  unpricedModels: string[];
   availableModels: AiAvailableModelsResponse;
 }
 
@@ -67,4 +80,9 @@ export interface AiModelSettingMutationResponse {
   modelTier: string;
   source: string;
   message: string | null;
+}
+
+export interface AiBulkActionResponse {
+  updatedCount: number;
+  message: string;
 }

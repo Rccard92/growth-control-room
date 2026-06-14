@@ -11,10 +11,12 @@ export type {
 export type {
   AiAvailableModelItem,
   AiAvailableModelsResponse,
+  AiBulkActionResponse,
   AiModelSettingItem,
   AiModelSettingMutationResponse,
   AiModelSettingsListResponse,
   AiModelSettingUpdateInput,
+  AiModelUiCategory,
 } from "./types/ai-model-settings";
 export type { Project, CreateProjectInput, ProjectStatus } from "./types/project";
 export type {

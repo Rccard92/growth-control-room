@@ -9,6 +9,18 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.6-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Simplified AI Model Settings UI (Modelli AI)",
+      "Added GCR recommended model per AI operation",
+      "Added category grouping for AI operations",
+      "Reduced technical noise in model settings",
+      "Consolidated pricing warnings",
+    ],
+  },
+  {
     version: "0.5.5-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

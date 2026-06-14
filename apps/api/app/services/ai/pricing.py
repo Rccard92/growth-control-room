@@ -29,6 +29,26 @@ class CostEstimate:
 
 
 OPENAI_MODEL_PRICING: dict[str, ModelPricing] = {
+    "gpt-5.4-nano": ModelPricing(
+        input_price_per_1m=Decimal("0.05"),
+        output_price_per_1m=Decimal("0.20"),
+        cached_input_price_per_1m=Decimal("0.025"),
+    ),
+    "gpt-5.4-mini": ModelPricing(
+        input_price_per_1m=Decimal("0.15"),
+        output_price_per_1m=Decimal("0.60"),
+        cached_input_price_per_1m=Decimal("0.075"),
+    ),
+    "gpt-5.4": ModelPricing(
+        input_price_per_1m=Decimal("1.00"),
+        output_price_per_1m=Decimal("4.00"),
+        cached_input_price_per_1m=Decimal("0.50"),
+    ),
+    "gpt-5.5": ModelPricing(
+        input_price_per_1m=Decimal("2.50"),
+        output_price_per_1m=Decimal("10.00"),
+        cached_input_price_per_1m=Decimal("1.25"),
+    ),
     "gpt-4o-mini": ModelPricing(
         input_price_per_1m=Decimal("0.15"),
         output_price_per_1m=Decimal("0.60"),

@@ -16,12 +16,14 @@ from app.schemas.ai_model_settings import (
 )
 from app.schemas.ai_usage import AiRoutingInsights
 from app.services.ai.model_settings_service import (
+    apply_gcr_recommendations,
     compute_guardrail_warnings,
     get_available_models,
     list_settings_for_project,
     seed_default_settings,
 )
-from app.services.ai.operation_registry import get_operation
+from app.services.ai.operation_registry import get_operation, tier_cost_profile_label
+from app.services.ai.pricing import estimate_usage_cost
 
 
 def _sample_snake_item(**overrides: object) -> dict:
@@ -55,6 +57,10 @@ def _sample_snake_item(**overrides: object) -> dict:
         "recent_request_count": 0,
         "avg_cost_recent": None,
         "last_request_at": None,
+        "ui_category": "product_collection_seo",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Usa un modello leggero: è un task breve e controllato.",
+        "cost_profile_label": "profilo costo: leggero",
     }
     base.update(overrides)
     return base
@@ -105,6 +111,10 @@ def test_setting_item_camel_case_normalizes() -> None:
         "hasProjectOverride": True,
         "guardrailWarnings": [],
         "recentRequestCount": 2,
+        "uiCategory": "blog_articles",
+        "gcrRecommendedModel": "gpt-5.4",
+        "gcrRecommendationReason": "Brief strutturato.",
+        "costProfileLabel": "profilo costo: bilanciato",
     }
     normalized = _normalize_setting_item(camel)
     item = AiModelSettingItemResponse.model_validate(normalized)
@@ -122,6 +132,7 @@ def test_to_list_response_no_validation_error() -> None:
             "models": [{"name": "gpt-4o-mini", "pricing_configured": True, "source": "env"}],
             "warnings": [],
         },
+        "unpriced_models": [],
     }
     response = _to_list_response(data)
     assert len(response.items) == 1
@@ -155,6 +166,10 @@ def test_to_list_response_camel_case_payload() -> None:
                 "hasProjectOverride": False,
                 "guardrailWarnings": [],
                 "recentRequestCount": 0,
+                "uiCategory": "product_collection_seo",
+                "gcrRecommendedModel": "gpt-5.4-mini",
+                "gcrRecommendationReason": "Task breve.",
+                "costProfileLabel": "profilo costo: leggero",
             }
         ],
         "registryCount": 1,
@@ -233,11 +248,73 @@ def test_planned_operation_guardrail_message() -> None:
     assert any("pianificata" in w.lower() for w in warnings)
 
 
-def test_unknown_model_pricing_warning() -> None:
+def test_unknown_model_not_in_guardrail_warnings() -> None:
     op = get_operation("product_image_alt")
     assert op is not None
     warnings = compute_guardrail_warnings(op, model_tier="cheap", model_name="unknown-model-xyz-999")
-    assert any("pricing" in w.lower() for w in warnings)
+    assert not any("pricing" in w.lower() for w in warnings)
+
+
+def test_gpt5_pricing_configured() -> None:
+    assert estimate_usage_cost("gpt-5.5", input_tokens=100, output_tokens=50) is not None
+    assert estimate_usage_cost("gpt-5.4-mini", input_tokens=100, output_tokens=50) is not None
+
+
+def test_registry_gcr_recommendations() -> None:
+    alt = get_operation("product_image_alt")
+    article = get_operation("article_draft_generation")
+    assert alt is not None and article is not None
+    assert alt.gcr_recommended_model == "gpt-5.4-mini"
+    assert article.gcr_recommended_model == "gpt-5.5"
+    assert alt.ui_category == "product_collection_seo"
+    assert tier_cost_profile_label("cheap") == "profilo costo: leggero"
+
+
+def test_apply_gcr_recommendations_updates_implemented() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.flush = AsyncMock()
+        session.add = MagicMock()
+
+        row = MagicMock()
+        row.model = "old-model"
+        row.source = "env_seed"
+
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=row))
+        )
+
+        updated = await apply_gcr_recommendations(session, project_id)
+        assert updated > 0
+        assert row.model != "old-model"
+        assert row.source == "manual"
+
+    asyncio.run(run())
+
+
+def test_list_settings_includes_gcr_fields() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.flush = AsyncMock()
+
+        empty_scalars = MagicMock()
+        empty_scalars.all.return_value = []
+        empty_result = MagicMock()
+        empty_result.scalars.return_value = empty_scalars
+        empty_result.scalar_one_or_none.return_value = None
+        empty_result.one.return_value = (0, None, None)
+
+        session.execute = AsyncMock(return_value=empty_result)
+
+        data = await list_settings_for_project(session, project_id)
+        alt = next(i for i in data["items"] if i["operation_key"] == "product_image_alt")
+        assert alt["gcr_recommended_model"] == "gpt-5.4-mini"
+        assert alt["ui_category"] == "product_collection_seo"
+        assert "unpriced_models" in data
+
+    asyncio.run(run())
 
 
 def test_seed_default_settings_creates_rows() -> None:

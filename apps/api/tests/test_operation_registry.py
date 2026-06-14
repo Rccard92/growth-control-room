@@ -45,5 +45,13 @@ def test_infer_product_image_alt() -> None:
     assert key == "product_image_alt"
 
 
+def test_registry_gcr_fields() -> None:
+    op = get_operation("product_image_alt")
+    assert op is not None
+    assert op.gcr_recommended_model == "gpt-5.4-mini"
+    assert op.gcr_recommendation_reason
+    assert op.ui_category == "product_collection_seo"
+
+
 def test_list_operations_includes_planned() -> None:
     assert len(list_operations(include_planned=True)) >= len(list_operations(include_planned=False))

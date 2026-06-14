@@ -14,20 +14,23 @@ from app.db.session import get_db
 from app.schemas.ai_model_settings import (
     AiAvailableModelItem,
     AiAvailableModelsResponse,
+    AiBulkActionResponse,
     AiModelSettingItemResponse,
     AiModelSettingMutationResponse,
     AiModelSettingsListResponse,
     AiModelSettingUpdateRequest,
 )
 from app.services.ai.model_settings_service import (
+    apply_gcr_recommendations,
     get_available_models,
     get_setting_row,
     list_settings_for_project,
+    reset_all_to_railway,
     reset_project_setting,
     seed_default_settings,
     update_project_setting,
 )
-from app.services.ai.operation_registry import get_operation
+from app.services.ai.operation_registry import get_operation, tier_cost_profile_label
 from app.services.projects import get_project_in_default_workspace
 
 logger = logging.getLogger(__name__)
@@ -56,6 +59,10 @@ _ITEM_CAMEL_TO_SNAKE: dict[str, str] = {
     "recentRequestCount": "recent_request_count",
     "avgCostRecent": "avg_cost_recent",
     "lastRequestAt": "last_request_at",
+    "uiCategory": "ui_category",
+    "gcrRecommendedModel": "gcr_recommended_model",
+    "gcrRecommendationReason": "gcr_recommendation_reason",
+    "costProfileLabel": "cost_profile_label",
 }
 
 _AVAILABLE_CAMEL_TO_SNAKE: dict[str, str] = {
@@ -66,6 +73,7 @@ _AVAILABLE_CAMEL_TO_SNAKE: dict[str, str] = {
 _TOP_CAMEL_TO_SNAKE: dict[str, str] = {
     "registryCount": "registry_count",
     "missingSettings": "missing_settings",
+    "unpricedModels": "unpriced_models",
     "availableModels": "available_models",
 }
 
@@ -109,7 +117,7 @@ def _fallback_setting_item(operation_key: str) -> AiModelSettingItemResponse:
             recommended_max_output_tokens=2000,
             recommended_temperature=0.45,
             recommended_use="N/D",
-            quality_level="normal",
+            quality_level="medium",
             cost_sensitivity="medium",
             description="",
             model=None,
@@ -119,6 +127,10 @@ def _fallback_setting_item(operation_key: str) -> AiModelSettingItemResponse:
             has_project_override=False,
             guardrail_warnings=["Item incompleto — fallback sicuro applicato."],
             recent_request_count=0,
+            ui_category="brand_intelligence",
+            gcr_recommended_model="gpt-5.4",
+            gcr_recommendation_reason="",
+            cost_profile_label="profilo costo: bilanciato",
         )
     return AiModelSettingItemResponse(
         operation_key=op.operation_key,
@@ -136,7 +148,7 @@ def _fallback_setting_item(operation_key: str) -> AiModelSettingItemResponse:
         cost_sensitivity=op.cost_sensitivity,
         description=op.description,
         warning_notes=op.warning_notes,
-        model=None if op.status != "implemented" else None,
+        model=op.gcr_recommended_model if op.status == "implemented" else None,
         model_tier=op.recommended_tier,
         allow_fallback=True,
         source="registry_default",
@@ -149,12 +161,17 @@ def _fallback_setting_item(operation_key: str) -> AiModelSettingItemResponse:
             else []
         ),
         recent_request_count=0,
+        ui_category=op.ui_category,
+        gcr_recommended_model=op.gcr_recommended_model,
+        gcr_recommendation_reason=op.gcr_recommendation_reason,
+        cost_profile_label=tier_cost_profile_label(op.recommended_tier),
     )
 
 
 def _to_list_response(data: dict) -> AiModelSettingsListResponse:
     registry_count = data.get("registry_count", data.get("registryCount", 0))
     missing_settings = data.get("missing_settings", data.get("missingSettings", []))
+    unpriced_models = data.get("unpriced_models", data.get("unpricedModels", []))
     available_raw = data.get("available_models", data.get("availableModels", {}))
     available = _normalize_available_models(available_raw)
 
@@ -164,6 +181,15 @@ def _to_list_response(data: dict) -> AiModelSettingsListResponse:
     for raw in data.get("items", []):
         normalized = _normalize_setting_item(raw)
         operation_key = normalized.get("operation_key", "unknown")
+        op = get_operation(operation_key)
+        if op is not None:
+            normalized.setdefault("ui_category", op.ui_category)
+            normalized.setdefault("gcr_recommended_model", op.gcr_recommended_model)
+            normalized.setdefault("gcr_recommendation_reason", op.gcr_recommendation_reason)
+            normalized.setdefault(
+                "cost_profile_label",
+                tier_cost_profile_label(normalized.get("model_tier", op.recommended_tier)),
+            )
         try:
             items.append(AiModelSettingItemResponse.model_validate(normalized))
         except ValidationError as exc:
@@ -190,6 +216,7 @@ def _to_list_response(data: dict) -> AiModelSettingsListResponse:
         items=items,
         registry_count=registry_count,
         missing_settings=missing_settings,
+        unpriced_models=unpriced_models,
         available_models=available_response,
     )
 
@@ -273,6 +300,42 @@ async def reset_project_ai_model_setting(
         model_tier=row.model_tier if row else "",
         source=row.source if row else "env_seed",
         message="Ripristinato al consigliato registry/env.",
+    )
+
+
+@router.post(
+    "/{project_id}/ai-model-settings/apply-gcr-recommendations",
+    response_model=AiBulkActionResponse,
+    response_model_by_alias=True,
+)
+async def apply_project_gcr_recommendations(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> AiBulkActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    updated = await apply_gcr_recommendations(session, project_id)
+    await session.commit()
+    return AiBulkActionResponse(
+        updated_count=updated,
+        message=f"Applicati consigli GCR su {updated} funzioni AI attive.",
+    )
+
+
+@router.post(
+    "/{project_id}/ai-model-settings/reset-railway",
+    response_model=AiBulkActionResponse,
+    response_model_by_alias=True,
+)
+async def reset_project_models_from_railway(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> AiBulkActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    updated = await reset_all_to_railway(session, project_id)
+    await session.commit()
+    return AiBulkActionResponse(
+        updated_count=updated,
+        message=f"Ripristinati {updated} modelli da registry/env Railway.",
     )
 
 

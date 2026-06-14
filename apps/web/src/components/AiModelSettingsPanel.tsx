@@ -1,258 +1,423 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AiModelSettingItem } from "@gcr/shared";
+import { useQueryClient } from "@tanstack/react-query";
+import type { AiModelSettingItem, AiModelUiCategory } from "@gcr/shared";
 import { AppModal } from "./ui/AppModal";
 import {
   useAiModelSettings,
+  useApplyGcrRecommendations,
   useResetAiModelSetting,
+  useResetModelsFromRailway,
   useUpdateAiModelSetting,
 } from "../hooks/useAiModelSettings";
+import { updateAiModelSetting } from "../lib/ai-model-settings-api";
+import { queryKeys } from "../lib/queryKeys";
 
-const TIER_OPTIONS = ["cheap", "standard", "premium", "reasoning", "fallback"];
+const OTHER_MODEL_VALUE = "__other__";
 
-function statusLabel(status: string): string {
-  if (status === "implemented") return "Attivo";
-  if (status === "planned") return "Pianificato";
-  return "Non AI";
+const CATEGORY_ORDER: { id: AiModelUiCategory; label: string }[] = [
+  { id: "brand_intelligence", label: "Brand Intelligence" },
+  { id: "product_collection_seo", label: "Product & Collection SEO" },
+  { id: "blog_articles", label: "Blog & Articoli" },
+  { id: "ped_social", label: "PED & Social" },
+  { id: "email_ads", label: "Email & Ads" },
+  { id: "seo_advanced", label: "SEO Avanzata" },
+];
+
+const MODEL_SELECT_HINTS: Record<string, string> = {
+  "gpt-5.4-nano": "massimo risparmio, solo test semplici",
+  "gpt-5.4-mini": "consigliato per task brevi",
+  "gpt-5.4": "equilibrio qualità/costo",
+  "gpt-5.5": "alta qualità",
+};
+
+function modelOptionLabel(name: string): string {
+  const hint = MODEL_SELECT_HINTS[name];
+  return hint ? `${name} — ${hint}` : name;
 }
 
-function EditSettingModal({
-  open,
+function statusLabel(status: string): string {
+  if (status === "planned") return "Pianificato";
+  if (status === "non_ai") return "Non AI";
+  return "Attivo";
+}
+
+function SettingRow({
   item,
   modelOptions,
-  onClose,
+  draftModel,
+  onDraftChange,
   onSave,
+  onReset,
   saving,
+  resetting,
+  pricedModels,
 }: {
-  open: boolean;
-  item: AiModelSettingItem | null;
+  item: AiModelSettingItem;
   modelOptions: string[];
-  onClose: () => void;
-  onSave: (body: { model: string; modelTier: string; maxOutputTokens: number; temperature: number }) => void;
+  draftModel: string;
+  onDraftChange: (value: string) => void;
+  onSave: () => void;
+  onReset: () => void;
   saving: boolean;
+  resetting: boolean;
+  pricedModels: Set<string>;
 }) {
-  const [model, setModel] = useState("");
-  const [modelTier, setModelTier] = useState("standard");
-  const [maxTokens, setMaxTokens] = useState(2000);
-  const [temperature, setTemperature] = useState(0.45);
+  const [useCustom, setUseCustom] = useState(
+    () => Boolean(draftModel) && !modelOptions.includes(draftModel),
+  );
+  const savedModel = item.model ?? "";
+  const isDirty = draftModel.trim() !== savedModel.trim();
+  const selectValue = useCustom ? OTHER_MODEL_VALUE : (draftModel || modelOptions[0] || "");
 
-  useEffect(() => {
-    if (item) {
-      setModel(item.model ?? "");
-      setModelTier(item.modelTier);
-      setMaxTokens(item.maxOutputTokens ?? item.recommendedMaxOutputTokens);
-      setTemperature(item.temperature ?? item.recommendedTemperature);
+  const handleSelectChange = (value: string) => {
+    if (value === OTHER_MODEL_VALUE) {
+      setUseCustom(true);
+      if (modelOptions.includes(draftModel)) {
+        onDraftChange("");
+      }
+      return;
     }
-  }, [item]);
+    setUseCustom(false);
+    onDraftChange(value);
+  };
 
-  if (!item) return null;
+  const rowUnpriced = Boolean(draftModel.trim()) && !pricedModels.has(draftModel.trim());
 
   return (
-    <AppModal open={open} onClose={onClose} title={`Modifica: ${item.label}`}>
-      <div className="ai-model-settings-edit">
-        <p className="gcr-card__description">{item.recommendedUse}</p>
-        <label className="gcr-field">
-          <span>Modello</span>
-          <input
-            className="gcr-input"
-            list="ai-model-options"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-          />
-          <datalist id="ai-model-options">
-            {modelOptions.map((m) => (
-              <option key={m} value={m} />
+    <article className="ai-models-row gcr-card">
+      <div className="ai-models-row__main">
+        <div className="ai-models-row__info">
+          <h4 className="ai-models-row__title">{item.label}</h4>
+          <p className="gcr-card__description">{item.description}</p>
+          <p className="ai-models-row__gcr">
+            <strong>Consiglio GCR:</strong> {item.gcrRecommendationReason}
+            <span className="ai-models-row__gcr-model"> ({item.gcrRecommendedModel})</span>
+          </p>
+          <span className="ai-models-row__badge">{item.costProfileLabel}</span>
+        </div>
+        <div className="ai-models-row__controls">
+          <label className="gcr-field">
+            <span>Modello</span>
+            <select
+              className="gcr-input"
+              value={selectValue}
+              onChange={(e) => handleSelectChange(e.target.value)}
+            >
+              {modelOptions.map((m) => (
+                <option key={m} value={m}>{modelOptionLabel(m)}</option>
+              ))}
+              <option value={OTHER_MODEL_VALUE}>Altro modello…</option>
+            </select>
+          </label>
+          {useCustom && (
+            <label className="gcr-field">
+              <span>Nome modello</span>
+              <input
+                className="gcr-input"
+                value={draftModel}
+                onChange={(e) => onDraftChange(e.target.value)}
+                placeholder="es. gpt-5.4-mini"
+              />
+            </label>
+          )}
+          {rowUnpriced && (
+            <p className="ai-models-row__warn">Pricing non configurato per questo modello.</p>
+          )}
+          <div className="ai-models-row__actions">
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary gcr-btn--sm"
+              disabled={saving || !isDirty || !draftModel.trim()}
+              onClick={onSave}
+            >
+              Salva
+            </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--ghost gcr-btn--sm"
+              disabled={resetting}
+              onClick={onReset}
+            >
+              Ripristina consigliato
+            </button>
+          </div>
+        </div>
+      </div>
+      <details className="ai-models-row__advanced">
+        <summary>Avanzate</summary>
+        <dl className="ai-models-row__advanced-grid">
+          <div><dt>Tier</dt><dd>{item.modelTier}</dd></div>
+          <div><dt>Context profile</dt><dd>{item.contextProfile}</dd></div>
+          <div><dt>Source</dt><dd>{item.source}</dd></div>
+          <div><dt>Max output tokens</dt><dd>{item.maxOutputTokens ?? "—"}</dd></div>
+          <div><dt>Temperature</dt><dd>{item.temperature ?? "—"}</dd></div>
+          <div><dt>Fallback</dt><dd>{item.fallbackModel ?? "—"}</dd></div>
+          <div><dt>Operation key</dt><dd>{item.operationKey}</dd></div>
+        </dl>
+      </details>
+    </article>
+  );
+}
+
+export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
+  const qc = useQueryClient();
+  const { data, isLoading, isError } = useAiModelSettings(projectId);
+  const updateMutation = useUpdateAiModelSetting(projectId);
+  const resetMutation = useResetAiModelSetting(projectId);
+  const applyGcrMutation = useApplyGcrRecommendations(projectId);
+  const resetRailwayMutation = useResetModelsFromRailway(projectId);
+
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [expandedCategory, setExpandedCategory] = useState<AiModelUiCategory | null>(
+    "product_collection_seo",
+  );
+  const [confirmAction, setConfirmAction] = useState<"gcr" | "railway" | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
+
+  const implemented = useMemo(
+    () => (data?.items ?? []).filter((i) => i.status === "implemented"),
+    [data],
+  );
+  const futureItems = useMemo(
+    () => (data?.items ?? []).filter((i) => i.status !== "implemented"),
+    [data],
+  );
+
+  const modelOptions = useMemo(() => {
+    const names = new Set<string>([
+      "gpt-5.4-nano",
+      "gpt-5.4-mini",
+      "gpt-5.4",
+      "gpt-5.5",
+    ]);
+    for (const m of data?.availableModels.models ?? []) {
+      names.add(m.name);
+    }
+    for (const item of data?.items ?? []) {
+      if (item.model) names.add(item.model);
+      names.add(item.gcrRecommendedModel);
+    }
+    return Array.from(names).sort();
+  }, [data]);
+
+  const pricedModels = useMemo(
+    () => new Set(
+      (data?.availableModels.models ?? [])
+        .filter((m) => m.pricingConfigured)
+        .map((m) => m.name),
+    ),
+    [data],
+  );
+
+  useEffect(() => {
+    if (!data) return;
+    const next: Record<string, string> = {};
+    for (const item of data.items) {
+      if (item.status === "implemented") {
+        next[item.operationKey] = item.model ?? item.gcrRecommendedModel;
+      }
+    }
+    setDrafts(next);
+  }, [data]);
+
+  const dirtyKeys = useMemo(
+    () => implemented.filter((item) => {
+      const draft = drafts[item.operationKey] ?? "";
+      const saved = item.model ?? "";
+      return draft.trim() !== saved.trim();
+    }).map((i) => i.operationKey),
+    [implemented, drafts],
+  );
+
+  const grouped = useMemo(() => {
+    const map = new Map<AiModelUiCategory, AiModelSettingItem[]>();
+    for (const cat of CATEGORY_ORDER) {
+      map.set(cat.id, []);
+    }
+    for (const item of implemented) {
+      const list = map.get(item.uiCategory) ?? [];
+      list.push(item);
+      map.set(item.uiCategory, list);
+    }
+    return map;
+  }, [implemented]);
+
+  const handleSaveRow = (operationKey: string) => {
+    const model = drafts[operationKey]?.trim();
+    if (!model) return;
+    updateMutation.mutate({ operationKey, body: { model } });
+  };
+
+  const runSaveAll = async () => {
+    if (dirtyKeys.length === 0) return;
+    setSavingAll(true);
+    try {
+      for (const key of dirtyKeys) {
+        const model = drafts[key]?.trim();
+        if (!model) continue;
+        await updateAiModelSetting(projectId, key, { model });
+      }
+      await qc.invalidateQueries({ queryKey: queryKeys.aiModelSettings.list(projectId) });
+    } finally {
+      setSavingAll(false);
+    }
+  };
+
+  if (isLoading) return <div className="gcr-skeleton" style={{ height: 200 }} />;
+  if (isError) return <div className="gcr-alert gcr-alert--error">Impossibile caricare Modelli AI.</div>;
+
+  return (
+    <div className="ai-models-panel">
+      <header className="ai-models-panel__header">
+        <h2 className="gcr-card__title">Modelli AI</h2>
+        <p className="gcr-card__description">
+          Qui scegli quale modello usare per ogni funzione AI del progetto. Le variabili Railway
+          servono solo come default/fallback.
+        </p>
+      </header>
+
+      <div className="ai-models-panel__toolbar">
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+          onClick={() => setConfirmAction("gcr")}
+          disabled={applyGcrMutation.isPending}
+        >
+          Applica consigli GCR
+        </button>
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+          onClick={() => setConfirmAction("railway")}
+          disabled={resetRailwayMutation.isPending}
+        >
+          Ripristina da Railway
+        </button>
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--primary gcr-btn--sm"
+          disabled={savingAll || dirtyKeys.length === 0}
+          onClick={() => void runSaveAll()}
+        >
+          Salva tutte le modifiche{dirtyKeys.length > 0 ? ` (${dirtyKeys.length})` : ""}
+        </button>
+      </div>
+
+      {(data?.unpricedModels?.length ?? 0) > 0 && (
+        <div className="gcr-alert gcr-alert--warning ai-models-panel__pricing-banner">
+          Alcuni modelli non hanno pricing configurato:{" "}
+          {data?.unpricedModels.join(", ")}. Aggiungi il pricing per calcolare i costi correttamente.
+        </div>
+      )}
+
+      <div className="ai-models-panel__categories">
+        {CATEGORY_ORDER.map((cat) => {
+          const items = grouped.get(cat.id) ?? [];
+          if (items.length === 0) return null;
+          const open = expandedCategory === cat.id;
+          return (
+            <section key={cat.id} className="ai-models-category gcr-card">
+              <button
+                type="button"
+                className="ai-models-category__toggle"
+                onClick={() => setExpandedCategory(open ? null : cat.id)}
+              >
+                <span>{cat.label}</span>
+                <span className="ai-models-category__count">{items.length}</span>
+              </button>
+              {open && (
+                <div className="ai-models-category__body">
+                  {items.map((item) => (
+                    <SettingRow
+                      key={item.operationKey}
+                      item={item}
+                      modelOptions={modelOptions}
+                      draftModel={drafts[item.operationKey] ?? item.model ?? ""}
+                      onDraftChange={(value) =>
+                        setDrafts((prev) => ({ ...prev, [item.operationKey]: value }))
+                      }
+                      onSave={() => handleSaveRow(item.operationKey)}
+                      onReset={() => resetMutation.mutate(item.operationKey)}
+                      saving={updateMutation.isPending}
+                      resetting={resetMutation.isPending}
+                      pricedModels={pricedModels}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      {futureItems.length > 0 && (
+        <details className="ai-models-panel__future gcr-card">
+          <summary>Funzioni future ({futureItems.length})</summary>
+          <ul className="ai-models-panel__future-list">
+            {futureItems.map((item) => (
+              <li key={item.operationKey} className="ai-models-panel__future-item">
+                <strong>{item.label}</strong>
+                <span className="ai-models-panel__future-status">{statusLabel(item.status)}</span>
+                <p className="gcr-card__description">{item.description}</p>
+                <p className="ai-models-row__gcr">
+                  Consiglio GCR: {item.gcrRecommendationReason} ({item.gcrRecommendedModel})
+                </p>
+              </li>
             ))}
-          </datalist>
-        </label>
-        <label className="gcr-field">
-          <span>Tier</span>
-          <select
-            className="gcr-input"
-            value={modelTier}
-            onChange={(e) => setModelTier(e.target.value)}
-          >
-            {TIER_OPTIONS.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-        </label>
-        <label className="gcr-field">
-          <span>Max output tokens</span>
-          <input
-            className="gcr-input"
-            type="number"
-            value={maxTokens}
-            onChange={(e) => setMaxTokens(Number(e.target.value))}
-          />
-        </label>
-        <label className="gcr-field">
-          <span>Temperature</span>
-          <input
-            className="gcr-input"
-            type="number"
-            step="0.05"
-            min="0"
-            max="1"
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-          />
-        </label>
+          </ul>
+        </details>
+      )}
+
+      <AppModal
+        open={confirmAction === "gcr"}
+        onClose={() => setConfirmAction(null)}
+        title="Applica consigli GCR"
+      >
+        <p className="gcr-card__description">
+          Stai per aggiornare i modelli consigliati per tutte le funzioni AI attive.
+        </p>
         <div className="ai-model-settings-edit__actions">
-          <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
+          <button type="button" className="gcr-btn gcr-btn--secondary" onClick={() => setConfirmAction(null)}>
             Annulla
           </button>
           <button
             type="button"
             className="gcr-btn gcr-btn--primary"
-            disabled={saving || !model.trim()}
-            onClick={() => onSave({ model, modelTier, maxOutputTokens: maxTokens, temperature })}
+            disabled={applyGcrMutation.isPending}
+            onClick={() => {
+              applyGcrMutation.mutate(undefined, { onSuccess: () => setConfirmAction(null) });
+            }}
           >
-            Salva
+            Conferma
           </button>
         </div>
-      </div>
-    </AppModal>
-  );
-}
+      </AppModal>
 
-export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
-  const { data, isLoading, isError } = useAiModelSettings(projectId);
-  const updateMutation = useUpdateAiModelSetting(projectId);
-  const resetMutation = useResetAiModelSetting(projectId);
-  const [editItem, setEditItem] = useState<AiModelSettingItem | null>(null);
-
-  const modelOptions = useMemo(
-    () => (data?.availableModels.models ?? []).map((m) => m.name),
-    [data],
-  );
-
-  const implemented = (data?.items ?? []).filter((i) => i.status === "implemented");
-  const plannedOrNonAi = (data?.items ?? []).filter((i) => i.status !== "implemented");
-
-  if (isLoading) return <div className="gcr-skeleton" style={{ height: 200 }} />;
-  if (isError) return <div className="gcr-alert gcr-alert--error">Impossibile caricare Model Settings.</div>;
-
-  return (
-    <div className="ai-model-settings-panel">
-      <div className="gcr-alert gcr-alert--info ai-model-settings-panel__banner">
-        Le variabili Railway sono usate solo come default/fallback. Le scelte operative sono quelle salvate qui.
-      </div>
-
-      <div className="ai-usage-table-wrap">
-        <table className="ai-usage-table">
-          <thead>
-            <tr>
-              <th>Punto AI</th>
-              <th>Stato</th>
-              <th>Profilo</th>
-              <th>Tier</th>
-              <th>Modello</th>
-              <th>Max tokens</th>
-              <th>Temp</th>
-              <th>Source</th>
-              <th>Costo medio</th>
-              <th>Azioni</th>
-            </tr>
-          </thead>
-          <tbody>
-            {implemented.map((row) => (
-              <tr key={row.operationKey}>
-                <td>
-                  <strong>{row.label}</strong>
-                  <div className="ai-model-settings-panel__hint">{row.operationKey}</div>
-                </td>
-                <td>{statusLabel(row.status)}</td>
-                <td>{row.contextProfile}</td>
-                <td>{row.modelTier}</td>
-                <td>{row.model ?? "—"}</td>
-                <td>{row.maxOutputTokens ?? "—"}</td>
-                <td>{row.temperature ?? "—"}</td>
-                <td>{row.source}</td>
-                <td>{row.avgCostRecent != null ? `$${row.avgCostRecent.toFixed(4)}` : "—"}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="gcr-btn gcr-btn--ghost gcr-btn--sm"
-                    onClick={() => setEditItem(row)}
-                  >
-                    Modifica
-                  </button>
-                  <button
-                    type="button"
-                    className="gcr-btn gcr-btn--ghost gcr-btn--sm"
-                    disabled={resetMutation.isPending}
-                    onClick={() => resetMutation.mutate(row.operationKey)}
-                  >
-                    Ripristina
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {plannedOrNonAi.length > 0 && (
-        <div className="ai-model-settings-panel__planned">
-          <h3 className="gcr-card__title">Pianificate / Non AI</h3>
-          <div className="ai-usage-table-wrap">
-            <table className="ai-usage-table">
-              <thead>
-                <tr>
-                  <th>Punto AI</th>
-                  <th>Stato</th>
-                  <th>Profilo</th>
-                  <th>Tier consigliato</th>
-                  <th>Modello</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plannedOrNonAi.map((row) => (
-                  <tr key={row.operationKey}>
-                    <td>
-                      <strong>{row.label}</strong>
-                      <div className="ai-model-settings-panel__hint">{row.operationKey}</div>
-                    </td>
-                    <td>{statusLabel(row.status)}</td>
-                    <td>{row.contextProfile}</td>
-                    <td>{row.recommendedTier}</td>
-                    <td>—</td>
-                    <td>{row.guardrailWarnings[0] ?? row.recommendedUse}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <AppModal
+        open={confirmAction === "railway"}
+        onClose={() => setConfirmAction(null)}
+        title="Ripristina da Railway"
+      >
+        <p className="gcr-card__description">
+          Ripristinerai tutti i modelli del progetto ai default registry/env Railway. Gli override
+          manuali verranno rimossi.
+        </p>
+        <div className="ai-model-settings-edit__actions">
+          <button type="button" className="gcr-btn gcr-btn--secondary" onClick={() => setConfirmAction(null)}>
+            Annulla
+          </button>
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--primary"
+            disabled={resetRailwayMutation.isPending}
+            onClick={() => {
+              resetRailwayMutation.mutate(undefined, { onSuccess: () => setConfirmAction(null) });
+            }}
+          >
+            Conferma
+          </button>
         </div>
-      )}
-
-      {(data?.items ?? []).some((i) => i.guardrailWarnings.length > 0) && (
-        <div className="ai-model-settings-panel__warnings">
-          {implemented
-            .filter((i) => i.guardrailWarnings.length > 0)
-            .map((i) => (
-              <div key={i.operationKey} className="gcr-alert gcr-alert--warning">
-                <strong>{i.label}:</strong> {i.guardrailWarnings.join(" ")}
-              </div>
-            ))}
-        </div>
-      )}
-
-      <EditSettingModal
-        open={Boolean(editItem)}
-        item={editItem}
-        modelOptions={modelOptions}
-        onClose={() => setEditItem(null)}
-        saving={updateMutation.isPending}
-        onSave={(body) => {
-          if (!editItem) return;
-          updateMutation.mutate(
-            { operationKey: editItem.operationKey, body },
-            { onSuccess: () => setEditItem(null) },
-          );
-        }}
-      />
+      </AppModal>
     </div>
   );
 }

@@ -54,6 +54,17 @@ class AiModelSettingItemResponse(BaseModel):
     recent_request_count: int = Field(serialization_alias="recentRequestCount")
     avg_cost_recent: float | None = Field(default=None, serialization_alias="avgCostRecent")
     last_request_at: str | None = Field(default=None, serialization_alias="lastRequestAt")
+    ui_category: str = Field(serialization_alias="uiCategory")
+    gcr_recommended_model: str = Field(serialization_alias="gcrRecommendedModel")
+    gcr_recommendation_reason: str = Field(serialization_alias="gcrRecommendationReason")
+    cost_profile_label: str = Field(serialization_alias="costProfileLabel")
+
+
+class AiBulkActionResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    updated_count: int = Field(serialization_alias="updatedCount")
+    message: str
 
 
 class AiAvailableModelItem(BaseModel):
@@ -78,6 +89,7 @@ class AiModelSettingsListResponse(BaseModel):
     items: list[AiModelSettingItemResponse]
     registry_count: int = Field(serialization_alias="registryCount")
     missing_settings: list[str] = Field(serialization_alias="missingSettings")
+    unpriced_models: list[str] = Field(default_factory=list, serialization_alias="unpricedModels")
     available_models: AiAvailableModelsResponse = Field(serialization_alias="availableModels")
 
 

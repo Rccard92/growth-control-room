@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.6-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Simplified AI Model Settings UI renamed to Modelli AI with category accordions
+- Added GCR recommended model and reason per AI operation in registry
+- Added bulk actions: Applica consigli GCR, Ripristina da Railway, Salva tutte
+- Consolidated pricing warnings into single banner; added GPT-5.x model pricing
+- Technical fields (tier, tokens, source) moved to expandable Avanzate section
+
 ## [0.5.5-alpha] - 2026-06-13
 
 Tipo: Alpha patch
