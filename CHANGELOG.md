@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.8-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed legacy FAQ & Objections dict normalization
+- Prevented Brand Intelligence Overview and AI Context crashes from mixed FAQ data
+- Added defensive normalization for FAQ context and score calculation
+- Added Alembic migration to repair existing FAQ JSONB data
+
 ## [0.3.7-alpha] - 2026-06-13
 
 Tipo: Alpha patch

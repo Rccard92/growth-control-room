@@ -30,7 +30,7 @@ export function BrandIntelligencePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const { data: project } = useProject(id);
-  const { data: overview, isLoading } = useBrandIntelligenceOverview(projectId);
+  const { data: overview, isLoading, isError: overviewError } = useBrandIntelligenceOverview(projectId);
   const [tab, setTab] = useState<BrandIntelligenceTab>("overview");
 
   return (
@@ -61,6 +61,12 @@ export function BrandIntelligencePage() {
           </button>
         ))}
       </nav>
+
+      {overviewError && tab === "overview" && (
+        <div className="gcr-alert gcr-alert--error" style={{ marginBottom: "1rem" }}>
+          Impossibile caricare la Overview. Controlla i dati della Brand Intelligence.
+        </div>
+      )}
 
       {isLoading && tab === "overview" && (
         <p className="bi-panel__subtitle">Caricamento overview…</p>

@@ -49,7 +49,7 @@ function getEmptySections(context: BrandContextBundle): string[] {
 }
 
 export function BrandAiContextPanel({ projectId }: BrandAiContextPanelProps) {
-  const { data: context, isLoading, isFetching, refetch } = useBrandContext(projectId);
+  const { data: context, isLoading, isFetching, isError, refetch } = useBrandContext(projectId);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +79,16 @@ export function BrandAiContextPanel({ projectId }: BrandAiContextPanelProps) {
 
   if (isLoading) {
     return <p className="bi-panel__subtitle">Caricamento contesto AI…</p>;
+  }
+
+  if (isError) {
+    return (
+      <div className="bi-profile-v1">
+        <div className="gcr-alert gcr-alert--error">
+          Impossibile caricare il contesto AI. Controlla i dati della Brand Intelligence.
+        </div>
+      </div>
+    );
   }
 
   if (!context || context.primarySource === "minimal") {

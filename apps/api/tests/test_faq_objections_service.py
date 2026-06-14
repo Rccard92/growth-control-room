@@ -10,6 +10,7 @@ from app.services.brand_intelligence.faq_objections_service import (
     apply_faq_objections_proposal,
     faq_objections_completion,
     faq_objections_missing_fields,
+    normalize_faq_objections_row,
     upsert_faq_objections,
 )
 
@@ -204,3 +205,37 @@ def test_upsert_faq_objections_with_list_str_on_all_fields() -> None:
             assert result.notes == "Note test"
 
     asyncio.run(run())
+
+
+def test_faq_objections_completion_with_legacy_dict_does_not_crash() -> None:
+    row = SimpleNamespace(
+        general_faq=[{"question": "Spedite?", "answer": "Sì"}],
+        product_process_questions=None,
+        purchase_shipping_questions=None,
+        objections=[{"objection": "Costa troppo", "answer": "Valore"}],
+        myths_misconceptions=None,
+        recommended_answers=["Risposta consigliata"],
+        content_opportunities=None,
+        social_comment_insights=[{"insight": "Cliente scettico", "doubt": "Prezzo"}],
+        notes=None,
+    )
+    assert faq_objections_completion(row) == "complete"
+    missing = faq_objections_missing_fields(row)
+    assert missing == []
+
+
+def test_normalize_faq_objections_row_converts_legacy_dicts() -> None:
+    row = SimpleNamespace(
+        general_faq=[{"question": "Q?", "answer": "A"}],
+        product_process_questions=None,
+        purchase_shipping_questions=None,
+        objections=["plain"],
+        myths_misconceptions=None,
+        recommended_answers=None,
+        content_opportunities=None,
+        social_comment_insights=None,
+    )
+    changed = normalize_faq_objections_row(row)  # type: ignore[arg-type]
+    assert changed is True
+    assert row.general_faq == ["Domanda: Q?\nRisposta: A"]
+    assert row.objections == ["plain"]

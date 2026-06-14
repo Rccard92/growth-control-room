@@ -43,24 +43,51 @@ _STRING_LIST_FIELDS = (
 )
 
 
-def _has_text(value: str | None) -> bool:
-    return bool(value and value.strip())
-
-
-def _has_list(value: list | None) -> bool:
-    return bool(value and len(value) > 0)
-
-
-def _has_string_list(value: list[str] | None) -> bool:
-    if not value:
+def has_text(value: object | None) -> bool:
+    if value is None:
         return False
-    return any(_has_text(item) for item in value)
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (dict, list)):
+        return bool(normalize_to_string_list(value))
+    return False
+
+
+def _field_value_changed(current: object | None, normalized: list[str]) -> bool:
+    if current is None:
+        return bool(normalized)
+    if not isinstance(current, list):
+        return True
+    if len(current) != len(normalized):
+        return True
+    for item, norm in zip(current, normalized, strict=False):
+        if item != norm:
+            return True
+    return False
+
+
+def normalize_faq_objections_row(row: BrandFaqObjections) -> bool:
+    """Normalize all FAQ list fields in-place. Returns True if any field changed."""
+    changed = False
+    for field in _STRING_LIST_FIELDS:
+        current = getattr(row, field)
+        normalized = normalize_to_string_list(current)
+        if _field_value_changed(current, normalized):
+            setattr(row, field, normalized)
+            changed = True
+    return changed
+
+
+def _has_string_list(value: object | None) -> bool:
+    return bool(normalize_to_string_list(value))
 
 
 def _any_faq_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
     if not row:
         return False
-    return any(_has_string_list(getattr(row, field)) for field in _FAQ_FIELDS)
+    return any(
+        _has_string_list(getattr(row, field, None)) for field in _FAQ_FIELDS
+    )
 
 
 def _any_content_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
@@ -68,11 +95,11 @@ def _any_content_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | 
         return False
     if _any_faq_populated(row):
         return True
-    if any(_has_list(getattr(row, field)) for field in _LIST_FIELDS):
+    if any(_has_string_list(getattr(row, field, None)) for field in _LIST_FIELDS):
         return True
-    if _has_string_list(row.social_comment_insights):
+    if _has_string_list(getattr(row, "social_comment_insights", None)):
         return True
-    return _has_text(row.notes)
+    return has_text(getattr(row, "notes", None))
 
 
 def faq_objections_has_content(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
@@ -87,9 +114,9 @@ def faq_objections_missing_fields(
     missing: list[str] = []
     if not _any_faq_populated(row):
         missing.append("general_faq")
-    if not _has_list(row.objections):
+    if not _has_string_list(getattr(row, "objections", None)):
         missing.append("objections")
-    if not _has_list(row.recommended_answers):
+    if not _has_string_list(getattr(row, "recommended_answers", None)):
         missing.append("recommended_answers")
     return missing
 
@@ -101,8 +128,8 @@ def faq_objections_completion(
         return "empty"
     if (
         _any_faq_populated(row)
-        and _has_list(row.objections)
-        and _has_list(row.recommended_answers)
+        and _has_string_list(getattr(row, "objections", None))
+        and _has_string_list(getattr(row, "recommended_answers", None))
     ):
         return "complete"
     if _any_content_populated(row):
@@ -121,16 +148,14 @@ def faq_objections_missing_context(
 
 
 def _apply_string_field(row: BrandFaqObjections, attr: str, value: str | None) -> None:
-    if _has_text(value):
+    if has_text(value) and isinstance(value, str):
         setattr(row, attr, value.strip())
 
 
 def _apply_string_list_field(row: BrandFaqObjections, attr: str, value: list[str] | None) -> None:
     if value is None:
         return
-    normalized = normalize_to_string_list(value)
-    if normalized:
-        setattr(row, attr, normalized)
+    setattr(row, attr, normalize_to_string_list(value))
 
 
 def _merge_warnings(row: BrandFaqObjections, warnings: list[str]) -> None:
@@ -161,8 +186,18 @@ async def _get_or_create_faq_objections(
     return row
 
 
+async def _repair_faq_objections_row_if_needed(
+    session: AsyncSession, row: BrandFaqObjections
+) -> BrandFaqObjections:
+    if normalize_faq_objections_row(row):
+        await session.commit()
+        await session.refresh(row)
+    return row
+
+
 async def get_faq_objections(session: AsyncSession, project_id: UUID) -> BrandFaqObjections:
-    return await _get_or_create_faq_objections(session, project_id)
+    row = await _get_or_create_faq_objections(session, project_id)
+    return await _repair_faq_objections_row_if_needed(session, row)
 
 
 async def upsert_faq_objections(

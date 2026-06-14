@@ -34,6 +34,7 @@ from app.services.brand_intelligence.product_knowledge_context import (
     format_product_knowledge_preview,
 )
 from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
+from app.services.brand_intelligence.faq_objections_normalize import normalize_to_string_list
 from app.services.brand_intelligence.faq_objections_service import (
     faq_objections_completion,
     faq_objections_missing_context,
@@ -287,12 +288,16 @@ class BrandIntelligenceContextBuilder:
         return bool(text and len(text.splitlines()) > 1)
 
     @staticmethod
-    def _format_string_list(label: str, items: list[str] | None) -> list[str]:
-        if not items:
+    def _normalized_strings(value: object | None) -> list[str]:
+        return normalize_to_string_list(value)
+
+    @staticmethod
+    def _format_string_list(label: str, items: object | None) -> list[str]:
+        normalized = BrandIntelligenceContextBuilder._normalized_strings(items)
+        if not normalized:
             return []
         lines = [f"{label}:"]
-        for item in items:
-            text = (item or "").strip()
+        for text in normalized:
             if text:
                 lines.append(f"- {text}")
         return lines if len(lines) > 1 else []
@@ -317,21 +322,26 @@ class BrandIntelligenceContextBuilder:
                 "Domande acquisto/spedizione", row.purchase_shipping_questions
             )
         )
-        if row.objections:
+        objections = BrandIntelligenceContextBuilder._normalized_strings(row.objections)
+        if objections:
             parts.append("Obiezioni frequenti:")
-            parts.extend(f"- {o}" for o in row.objections[:20])
-        if row.myths_misconceptions:
+            parts.extend(f"- {o}" for o in objections[:20])
+        myths = BrandIntelligenceContextBuilder._normalized_strings(row.myths_misconceptions)
+        if myths:
             parts.append("Falsi miti:")
-            parts.extend(f"- {m}" for m in row.myths_misconceptions[:20])
-        if row.recommended_answers:
+            parts.extend(f"- {m}" for m in myths[:20])
+        recommended = BrandIntelligenceContextBuilder._normalized_strings(row.recommended_answers)
+        if recommended:
             parts.append("Risposte consigliate:")
-            parts.extend(f"- {r}" for r in row.recommended_answers[:20])
-        if row.content_opportunities:
+            parts.extend(f"- {r}" for r in recommended[:20])
+        opportunities = BrandIntelligenceContextBuilder._normalized_strings(row.content_opportunities)
+        if opportunities:
             parts.append("Opportunità contenuto:")
-            parts.extend(f"- {c}" for c in row.content_opportunities[:15])
-        if row.social_comment_insights:
+            parts.extend(f"- {c}" for c in opportunities[:15])
+        social = BrandIntelligenceContextBuilder._normalized_strings(row.social_comment_insights)
+        if social:
             parts.append("Insight commenti social:")
-            parts.extend(f"- {s}" for s in row.social_comment_insights[:15] if (s or "").strip())
+            parts.extend(f"- {s}" for s in social[:15])
         if row.notes:
             parts.append(f"Note: {row.notes[:400]}")
         return "\n".join(parts) if len(parts) > 1 else None
