@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -12,6 +12,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.datetime import (
+    day_end_exclusive_utc_naive,
+    day_start_utc_naive,
+    month_start_utc_naive,
+    to_utc_naive,
+    utc_now_naive,
+)
 from app.models.ai_usage_log import AiUsageLog
 from app.models.project import Project
 from app.services.workspace import get_default_workspace
@@ -98,24 +105,18 @@ async def record_usage_log(session: AsyncSession, data: UsageLogInput) -> AiUsag
     return row
 
 
-def _period_start_utc(day: date) -> datetime:
-    return datetime.combine(day, time.min, tzinfo=timezone.utc)
-
-
-def _month_start_utc(day: date) -> datetime:
-    return datetime(day.year, day.month, 1, tzinfo=timezone.utc)
-
-
 async def sum_project_spend(
     session: AsyncSession,
     project_id: UUID,
     *,
     since: datetime,
 ) -> Decimal:
+    since_naive = to_utc_naive(since)
+    assert since_naive is not None
     result = await session.execute(
         select(func.coalesce(func.sum(AiUsageLog.estimated_total_cost), 0)).where(
             AiUsageLog.project_id == project_id,
-            AiUsageLog.created_at >= since,
+            AiUsageLog.created_at >= since_naive,
             AiUsageLog.status == "success",
         )
     )
@@ -127,10 +128,10 @@ from app.services.ai.exceptions import AiBudgetExceededError, AiSingleRequestBlo
 
 
 async def check_budget_before_request(session: AsyncSession, project_id: UUID) -> None:
-    today = datetime.now(timezone.utc).date()
+    today = utc_now_naive().date()
     if settings.ai_daily_budget_usd and settings.ai_daily_budget_usd > 0:
         daily_spent = await sum_project_spend(
-            session, project_id, since=_period_start_utc(today)
+            session, project_id, since=day_start_utc_naive(today)
         )
         if daily_spent >= Decimal(str(settings.ai_daily_budget_usd)):
             raise AiBudgetExceededError(
@@ -140,7 +141,7 @@ async def check_budget_before_request(session: AsyncSession, project_id: UUID) -
 
     if settings.ai_monthly_budget_usd and settings.ai_monthly_budget_usd > 0:
         monthly_spent = await sum_project_spend(
-            session, project_id, since=_month_start_utc(today)
+            session, project_id, since=month_start_utc_naive(today)
         )
         if monthly_spent >= Decimal(str(settings.ai_monthly_budget_usd)):
             raise AiBudgetExceededError(
@@ -174,10 +175,9 @@ def _apply_log_filters(
     if project_id is not None:
         stmt = stmt.where(AiUsageLog.project_id == project_id)
     if start_date:
-        stmt = stmt.where(AiUsageLog.created_at >= _period_start_utc(start_date))
+        stmt = stmt.where(AiUsageLog.created_at >= day_start_utc_naive(start_date))
     if end_date:
-        end_exclusive = _period_start_utc(end_date) + timedelta(days=1)
-        stmt = stmt.where(AiUsageLog.created_at < end_exclusive)
+        stmt = stmt.where(AiUsageLog.created_at < day_end_exclusive_utc_naive(end_date))
     if module:
         stmt = stmt.where(AiUsageLog.module == module)
     if operation:
@@ -326,9 +326,9 @@ async def get_usage_log(
 
 
 async def get_budget_status(session: AsyncSession, project_id: UUID) -> dict[str, Any]:
-    today = datetime.now(timezone.utc).date()
-    daily_spent = await sum_project_spend(session, project_id, since=_period_start_utc(today))
-    monthly_spent = await sum_project_spend(session, project_id, since=_month_start_utc(today))
+    today = utc_now_naive().date()
+    daily_spent = await sum_project_spend(session, project_id, since=day_start_utc_naive(today))
+    monthly_spent = await sum_project_spend(session, project_id, since=month_start_utc_naive(today))
 
     daily_limit = settings.ai_daily_budget_usd or 0
     monthly_limit = settings.ai_monthly_budget_usd or 0
@@ -363,9 +363,7 @@ async def estimate_operation_cost(
     operation: str,
     count: int = 1,
 ) -> dict[str, Any]:
-    from datetime import timedelta
-
-    since = datetime.now(timezone.utc) - timedelta(days=7)
+    since = utc_now_naive() - timedelta(days=7)
     stmt = (
         select(
             func.count(AiUsageLog.id),

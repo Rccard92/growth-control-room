@@ -9,6 +9,15 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.1-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed AI Usage Monitor timezone handling",
+      "Budget status no longer crashes with aware datetime filters",
+    ],
+  },
+  {
     version: "0.5.0-alpha",
     date: "2026-06-13",
     type: "Alpha minor",

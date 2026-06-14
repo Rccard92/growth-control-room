@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,15 +11,29 @@ from uuid import uuid4
 
 import pytest
 
+from app.core.datetime import (
+    date_range_bounds_utc_naive,
+    day_end_exclusive_utc_naive,
+    day_start_utc_naive,
+    to_utc_naive,
+    utc_now_naive,
+)
 from app.services.ai.exceptions import AiBudgetExceededError
 from app.services.ai.pricing import estimate_usage_cost
 from app.services.ai.usage_service import (
     UsageLogInput,
+    _apply_log_filters,
     check_budget_before_request,
     estimate_operation_cost,
+    get_budget_status,
     get_usage_summary,
+    list_usage_logs,
     record_usage_log,
+    sum_project_spend,
 )
+from sqlalchemy import select
+
+from app.models.ai_usage_log import AiUsageLog
 
 
 def test_cost_estimate_configured() -> None:
@@ -67,7 +81,7 @@ def test_record_usage_log() -> None:
 def test_summary_by_module_operation_day() -> None:
     async def run() -> None:
         project_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = utc_now_naive()
         rows = [
             SimpleNamespace(
                 estimated_total_cost=Decimal("0.01"),
@@ -233,5 +247,114 @@ def test_estimate_operation_cost() -> None:
         )
         assert result["estimatedTotalCost"] == pytest.approx(0.06)
         assert result["basedOnRequests"] == 5
+
+    asyncio.run(run())
+
+
+def test_to_utc_naive_strips_tzinfo() -> None:
+    aware = datetime(2026, 6, 13, 12, 0, 0, tzinfo=timezone.utc)
+    naive = to_utc_naive(aware)
+    assert naive is not None
+    assert naive.tzinfo is None
+    assert naive.hour == 12
+
+
+def test_date_range_bounds_end_exclusive() -> None:
+    start, end = date_range_bounds_utc_naive(date(2026, 6, 1), date(2026, 6, 3))
+    assert start == day_start_utc_naive(date(2026, 6, 1))
+    assert end == day_end_exclusive_utc_naive(date(2026, 6, 3))
+    assert end == day_start_utc_naive(date(2026, 6, 4))
+
+
+def test_apply_log_filters_use_naive_datetimes() -> None:
+    stmt = select(AiUsageLog)
+    filtered = _apply_log_filters(
+        stmt,
+        project_id=uuid4(),
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 10),
+        module=None,
+        operation=None,
+        model=None,
+        status=None,
+    )
+    compiled = str(filtered.compile(compile_kwargs={"literal_binds": True}))
+    assert "tzinfo" not in compiled
+
+
+def test_get_budget_status_empty_logs() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        with patch(
+            "app.services.ai.usage_service.sum_project_spend",
+            new=AsyncMock(return_value=Decimal("0")),
+        ) as mock_sum:
+            result = await get_budget_status(session, project_id)
+            assert result["dailySpent"] == 0.0
+            assert result["monthlySpent"] == 0.0
+            assert result["blocked"] is False
+            assert mock_sum.await_count == 2
+            for call in mock_sum.await_args_list:
+                since = call.kwargs["since"]
+                assert since.tzinfo is None
+
+    asyncio.run(run())
+
+
+def test_sum_project_spend_converts_aware_since() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one=MagicMock(return_value=0))
+        )
+        aware_since = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+        await sum_project_spend(session, project_id, since=aware_since)
+        session.execute.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_get_usage_summary_with_date_range() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        scalars = MagicMock()
+        scalars.all.return_value = []
+        session.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=scalars)))
+
+        summary = await get_usage_summary(
+            session,
+            project_id,
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 6, 13),
+        )
+        assert summary["totalRequests"] == 0
+        assert summary["totalEstimatedCost"] == 0.0
+
+    asyncio.run(run())
+
+
+def test_list_usage_logs_with_date_range() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        count_result = MagicMock(scalar_one=MagicMock(return_value=0))
+        list_scalars = MagicMock()
+        list_scalars.all.return_value = []
+        list_result = MagicMock(scalars=MagicMock(return_value=list_scalars))
+        session.execute = AsyncMock(side_effect=[count_result, list_result])
+
+        rows, total = await list_usage_logs(
+            session,
+            project_id,
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 6, 13),
+            limit=10,
+            offset=0,
+        )
+        assert rows == []
+        assert total == 0
 
     asyncio.run(run())
