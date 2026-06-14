@@ -102,7 +102,7 @@ Workflow: **calendario → genera brief → modifica → salva → approva**.
 }
 ```
 
-### Article Draft Generator (0.4.6-alpha)
+### Article Draft Generator (0.4.6-alpha, aggiornato 0.4.7-alpha)
 
 Workflow: **brief approvato → genera articolo → modifica → salva bozza → anteprima → segna pronto per pubblicazione**.
 
@@ -110,12 +110,14 @@ Workflow: **brief approvato → genera articolo → modifica → salva bozza →
 
 1. Tab **Articolo & Anteprima** nel modal item
 2. **Genera articolo** — `POST editorial-items/{id}/generate-article`
-3. Backend usa `BrandIntelligenceContextBuilder` + brief approvato come fonte principale + Product Knowledge prodotto collegato
+3. Backend usa `BrandIntelligenceContextBuilder` + **Editorial Guidelines** + brief approvato come fonte principale + Product Knowledge prodotto collegato
 4. Articolo salvato in `article_payload` JSONB; status → `draft_review`
-5. Editor: titolo, handle, excerpt, body HTML/Markdown, SEO meta, tags, CTA
-6. **Anteprima**: `bodyHtml` renderizzato (sanitizzato whitelist client-side + backend in save/generate)
+5. Editor: titolo, handle, excerpt, body HTML/Markdown, SEO meta, tags, CTA commerciale, **autore/firma**, **CTA community**
+6. **Anteprima**: `bodyHtml` renderizzato; sidebar metadata con tempo lettura e profilo lunghezza
 7. **Salva bozza articolo** — `PUT article` mantiene `draft_review`
 8. **Segna pronto per pubblicazione** — `PUT article` con `status: ready_to_publish`
+
+**Regole generazione (0.4.7):** target 700–1100 parole, max 5–7 H2, tono umano; Safe Claims prioritari su tutto.
 
 **Non implementato:** pubblicazione Shopify, scheduling, batch articoli, generazione immagini.
 
@@ -133,6 +135,11 @@ Workflow: **brief approvato → genera articolo → modifica → salva bozza →
   "tags": [],
   "linkedProducts": [],
   "cta": "",
+  "authorName": "",
+  "authorRole": "",
+  "communityCta": "",
+  "estimatedReadingTime": "5 min",
+  "contentLengthProfile": "medio",
   "status": "draft",
   "warnings": [],
   "brandContextUsed": [],

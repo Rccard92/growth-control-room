@@ -18,6 +18,7 @@ const TAB_BY_KEY: Record<string, BrandIntelligenceTab> = {
   safeClaims: "safeClaims",
   productKnowledge: "productKnowledge",
   faqObjections: "faqObjections",
+  editorialGuidelines: "editorialGuidelines",
 };
 
 function formatDate(iso: string | null | undefined): string {

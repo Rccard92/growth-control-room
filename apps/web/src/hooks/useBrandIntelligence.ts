@@ -13,6 +13,7 @@ import {
   enrichBrandProfile,
   extractVisualFromWebsite,
   getBrandContext,
+  getBrandEditorialGuidelines,
   getBrandIdentity,
   getBrandIntelligenceOverview,
   getBrandProfile,
@@ -27,6 +28,7 @@ import {
   importFaqObjectionsFromFile,
   importProductKnowledgeGeneralFromFile,
   importProductKnowledgeItemsFromFile,
+  updateBrandEditorialGuidelines,
   updateBrandIdentity,
   updateBrandProfile,
   updateBrandSafeClaims,
@@ -51,6 +53,9 @@ function invalidateBrand(projectId: string, qc: ReturnType<typeof useQueryClient
   });
   void qc.invalidateQueries({
     queryKey: queryKeys.brandIntelligence.faqObjections(projectId),
+  });
+  void qc.invalidateQueries({
+    queryKey: queryKeys.brandIntelligence.editorialGuidelines(projectId),
   });
   void qc.invalidateQueries({
     queryKey: queryKeys.brandIntelligence.productKnowledgeGeneral(projectId),
@@ -250,6 +255,26 @@ export function useApplyFaqObjectionsProposal(projectId: string) {
       applyFaqObjectionsProposal(projectId, data),
     onSuccess: (data) => {
       qc.setQueryData(queryKeys.brandIntelligence.faqObjections(projectId), data.faqObjections);
+      invalidateBrand(projectId, qc);
+    },
+  });
+}
+
+export function useBrandEditorialGuidelines(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.editorialGuidelines(projectId ?? ""),
+    queryFn: () => getBrandEditorialGuidelines(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useUpdateBrandEditorialGuidelines(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateBrandEditorialGuidelines>[1]) =>
+      updateBrandEditorialGuidelines(projectId, data),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.brandIntelligence.editorialGuidelines(projectId), data);
       invalidateBrand(projectId, qc);
     },
   });

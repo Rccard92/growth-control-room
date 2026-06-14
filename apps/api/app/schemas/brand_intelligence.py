@@ -12,6 +12,7 @@ from app.schemas.brand_identity_visual import (
 from app.schemas.brand_product_knowledge import BrandProductKnowledgeContext
 from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
+from app.schemas.brand_editorial_guidelines import BrandEditorialGuidelinesRead
 
 
 class BrandProfileRead(BaseModel):
@@ -821,6 +822,9 @@ class BrandPromptContext(BaseModel):
     safe_claims: str | None = Field(default=None, serialization_alias="safeClaims")
     product_knowledge: str | None = Field(default=None, serialization_alias="productKnowledge")
     faq_objections: str | None = Field(default=None, serialization_alias="faqObjections")
+    editorial_guidelines: str | None = Field(
+        default=None, serialization_alias="editorialGuidelines"
+    )
     full_text: str | None = Field(default=None, serialization_alias="fullText")
     preview_text: str | None = Field(default=None, serialization_alias="previewText")
 
@@ -849,6 +853,9 @@ class BrandContextBundleResponse(BaseModel):
     )
     faq_objections: BrandFaqObjectionsRead | None = Field(
         default=None, serialization_alias="faqObjections"
+    )
+    editorial_guidelines: BrandEditorialGuidelinesRead | None = Field(
+        default=None, serialization_alias="editorialGuidelines"
     )
     product_knowledge: BrandProductKnowledgeContext | None = Field(
         default=None, serialization_alias="productKnowledge"

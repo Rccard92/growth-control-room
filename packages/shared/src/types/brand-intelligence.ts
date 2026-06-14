@@ -370,6 +370,32 @@ export interface BrandFaqObjectionsApplyProposalResponse {
   message: string;
 }
 
+export interface BrandPersonEntry {
+  name: string;
+  role: string;
+  whenToUse: string;
+  tone: string;
+}
+
+export type DefaultArticleLength = "breve" | "medio" | "approfondito";
+
+export interface BrandEditorialGuidelines {
+  id: string;
+  projectId: string;
+  contentPhilosophy?: string | null;
+  articleLengthPolicy?: string | null;
+  readingStyle?: string | null;
+  storytellingRules?: string[] | null;
+  brandPeople?: BrandPersonEntry[] | null;
+  authorVoiceRules?: string[] | null;
+  communityCtaRules?: string[] | null;
+  articleDos?: string[] | null;
+  articleDonts?: string[] | null;
+  defaultArticleLength?: DefaultArticleLength | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BrandProductKnowledgeGeneral {
   id: string;
   projectId: string;
@@ -1025,6 +1051,7 @@ export interface BrandPromptContext {
   safeClaims?: string | null;
   productKnowledge?: string | null;
   faqObjections?: string | null;
+  editorialGuidelines?: string | null;
   fullText?: string | null;
   previewText?: string | null;
 }
@@ -1042,6 +1069,7 @@ export interface BrandContextBundle {
   visualIdentity?: BrandVisualIdentity | null;
   safeClaims?: BrandSafeClaims | null;
   faqObjections?: BrandFaqObjections | null;
+  editorialGuidelines?: BrandEditorialGuidelines | null;
   productKnowledge?: BrandProductKnowledgeContext | null;
   voice?: BrandVoice | null;
   products: BrandProductKnowledge[];
@@ -1063,4 +1091,5 @@ export type BrandIntelligenceTab =
   | "safeClaims"
   | "productKnowledge"
   | "faqObjections"
+  | "editorialGuidelines"
   | "aiContext";

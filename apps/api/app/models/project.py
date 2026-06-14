@@ -97,6 +97,11 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    brand_editorial_guidelines: Mapped["BrandEditorialGuidelines | None"] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
     brand_voice: Mapped["BrandVoice | None"] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",

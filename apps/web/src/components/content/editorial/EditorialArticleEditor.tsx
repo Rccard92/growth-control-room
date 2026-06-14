@@ -125,9 +125,36 @@ export function EditorialArticleEditor({
       />
 
       <AutoResizeTextarea
-        label="CTA"
+        label="CTA commerciale"
         value={value.cta}
         onChange={(cta) => patch({ cta })}
+        minRows={2}
+        maxRows={4}
+      />
+
+      <label className="gcr-field">
+        <span className="gcr-field__label">Autore / firma</span>
+        <input
+          className="gcr-input"
+          value={value.authorName ?? ""}
+          onChange={(e) => patch({ authorName: e.target.value })}
+          placeholder="es. A cura di Davide"
+        />
+      </label>
+
+      <label className="gcr-field">
+        <span className="gcr-field__label">Ruolo autore</span>
+        <input
+          className="gcr-input"
+          value={value.authorRole ?? ""}
+          onChange={(e) => patch({ authorRole: e.target.value })}
+        />
+      </label>
+
+      <AutoResizeTextarea
+        label="CTA community"
+        value={value.communityCta ?? ""}
+        onChange={(communityCta) => patch({ communityCta })}
         minRows={2}
         maxRows={4}
       />

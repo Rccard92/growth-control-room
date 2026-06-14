@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import type { BrandIntelligenceTab } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
 import { BrandAiContextPanel } from "../components/brand-intelligence/BrandAiContextPanel";
+import { BrandEditorialGuidelinesPanel } from "../components/brand-intelligence/BrandEditorialGuidelinesPanel";
 import { BrandFaqObjectionsPanel } from "../components/brand-intelligence/BrandFaqObjectionsPanel";
 import { BrandIdentityPanel } from "../components/brand-intelligence/BrandIdentityPanel";
 import { BrandIntelligenceOverviewPanel } from "../components/brand-intelligence/BrandIntelligenceOverview";
@@ -23,6 +24,7 @@ const TABS: { id: BrandIntelligenceTab; label: string }[] = [
   { id: "safeClaims", label: "Safe Claims" },
   { id: "productKnowledge", label: "Product Knowledge" },
   { id: "faqObjections", label: "FAQ & Objections" },
+  { id: "editorialGuidelines", label: "Editorial Guidelines" },
   { id: "aiContext", label: "AI Context" },
 ];
 
@@ -82,6 +84,9 @@ export function BrandIntelligencePage() {
       {tab === "safeClaims" && <BrandSafeClaimsPanel projectId={projectId} />}
       {tab === "productKnowledge" && <BrandProductKnowledgePanel projectId={projectId} />}
       {tab === "faqObjections" && <BrandFaqObjectionsPanel projectId={projectId} />}
+      {tab === "editorialGuidelines" && (
+        <BrandEditorialGuidelinesPanel projectId={projectId} />
+      )}
       {tab === "aiContext" && <BrandAiContextPanel projectId={projectId} />}
     </motion.div>
   );

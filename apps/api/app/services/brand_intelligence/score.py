@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
+    BrandEditorialGuidelines,
     BrandFaqObjections,
     BrandIdentity,
     BrandProductKnowledgeGeneral,
@@ -18,6 +19,10 @@ from app.models.brand_intelligence import (
 from app.services.brand_intelligence.faq_objections_service import (
     faq_objections_completion,
     faq_objections_missing_fields,
+)
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    editorial_guidelines_completion,
+    editorial_guidelines_missing_fields,
 )
 from app.services.brand_intelligence.identity_service import (
     identity_completion,
@@ -40,6 +45,7 @@ SECTION_LABELS = {
     "safeClaims": "Safe Claims & Red Flags",
     "productKnowledge": "Product Knowledge",
     "faqObjections": "FAQ & Objections",
+    "editorialGuidelines": "Editorial Guidelines",
 }
 
 
@@ -217,6 +223,13 @@ async def compute_brand_knowledge_score(
             select(BrandFaqObjections).where(BrandFaqObjections.project_id == project_id)
         )
     ).scalar_one_or_none()
+    editorial_guidelines = (
+        await session.execute(
+            select(BrandEditorialGuidelines).where(
+                BrandEditorialGuidelines.project_id == project_id
+            )
+        )
+    ).scalar_one_or_none()
     items_count = int(pk_items_count or 0)
 
     profile_score, profile_missing, profile_recs = _score_brand_profile(profile)
@@ -225,6 +238,7 @@ async def compute_brand_knowledge_score(
     safe_claims_status = safe_claims_completion(safe_claims)
     pk_status = product_knowledge_module_completion(pk_general, items_count)
     faq_status = faq_objections_completion(faq_objections)
+    eg_status = editorial_guidelines_completion(editorial_guidelines)
 
     section_scores = {
         "brandProfile": profile_score,
@@ -233,6 +247,7 @@ async def compute_brand_knowledge_score(
         "safeClaims": _completion_to_score(safe_claims_status),
         "productKnowledge": _completion_to_score(pk_status),
         "faqObjections": _completion_to_score(faq_status),
+        "editorialGuidelines": _completion_to_score(eg_status),
     }
     overall = round(sum(section_scores.values()) / len(section_scores))
 
@@ -243,6 +258,7 @@ async def compute_brand_knowledge_score(
         + safe_claims_missing_fields(safe_claims)
         + product_knowledge_missing_fields(pk_general, items_count)
         + faq_objections_missing_fields(faq_objections)
+        + editorial_guidelines_missing_fields(editorial_guidelines)
     )
     recs = list(profile_recs)
     if identity_status == "empty":
@@ -255,6 +271,8 @@ async def compute_brand_knowledge_score(
         recs.append("Compila Product Knowledge generale e aggiungi almeno un prodotto Shopify.")
     if faq_status == "empty":
         recs.append("Compila FAQ & Objections con domande frequenti e obiezioni clienti.")
+    if eg_status == "empty":
+        recs.append("Compila Editorial Guidelines con filosofia contenuti e persone del brand.")
 
     return BrandKnowledgeScore(
         overall_score=overall,

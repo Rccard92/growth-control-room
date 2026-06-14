@@ -342,6 +342,56 @@ def test_build_prompt_context_includes_faq_objections() -> None:
     assert "FAQ & OBJECTIONS" in (prompt_ctx.preview_text or "")
 
 
+def test_build_prompt_context_includes_editorial_guidelines() -> None:
+    from app.schemas.brand_editorial_guidelines import (
+        BrandEditorialGuidelinesRead,
+        BrandPersonEntry,
+    )
+
+    eg_read = BrandEditorialGuidelinesRead(
+        id=uuid4(),
+        project_id=_PID,
+        content_philosophy="Articoli utili, non prolissi",
+        reading_style="Morbido e concreto",
+        default_article_length="medio",
+        brand_people=[
+            BrandPersonEntry(name="Davide", role="coordinatore", whenToUse="produzione", tone="diretto")
+        ],
+        community_cta_rules=["Invita a commentare"],
+        article_dos=["Essere concreti"],
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+    bundle = BrandContextBundleResponse(
+        brand_context_version="v1",
+        primary_source="brand_profile",
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Artisan brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        editorial_guidelines=eg_read,
+        products=[],
+        categories=[],
+        audience=[],
+        claims=[],
+        content_pillars=[],
+        guardrails=[],
+        assets=[],
+        knowledge_score=_score(80),
+    )
+    prompt_ctx = BrandIntelligenceContextBuilder.build_prompt_context(bundle)
+    assert prompt_ctx is not None
+    assert prompt_ctx.editorial_guidelines is not None
+    assert "EDITORIAL GUIDELINES" in prompt_ctx.editorial_guidelines
+    assert "Davide" in prompt_ctx.editorial_guidelines
+    assert "EDITORIAL GUIDELINES" in (prompt_ctx.full_text or "")
+    assert "EDITORIAL GUIDELINES" in (prompt_ctx.preview_text or "")
+
+
 def test_format_faq_objections_empty_returns_none() -> None:
     from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
 

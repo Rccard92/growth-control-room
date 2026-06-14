@@ -17,11 +17,12 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 1. `brand_profiles` ufficiale → `primarySource=brand_profile` se profilo minimo presente
 2. Profilo incompleto → `primarySource=minimal`, `missingContext` unificato
 3. Bundle include `brandContextVersion: v1` e `promptContext` con blocchi testuali separati
-4. Moduli ufficiali: Profile, Identity, Visual, Safe Claims, Product Knowledge, **FAQ & Objections**
+4. Moduli ufficiali: Profile, Identity, Visual, Safe Claims, Product Knowledge, FAQ & Objections, **Editorial Guidelines**
 5. Product SEO: contesto brand + lookup `productKnowledge` per `shopify_product_id`; fallback generale se item assente
-6. **FAQ & Objections** (se compilata): dubbi, obiezioni e risposte consigliate in `fullText` — usata da PED, blog, social response, SEO ed email in modo non distruttivo
-7. **Safe Claims ha priorità** su contenuti generati da FAQ: non usare FAQ per claim non consentiti
-8. **AI Context Preview** (tab UI): mostra `promptContext.previewText`
+6. **FAQ & Objections** (se compilata): dubbi, obiezioni e risposte consigliate in `fullText`
+7. **Editorial Guidelines** (se compilate): filosofia contenuti, persone brand, regole CTA community in `fullText`
+8. **Safe Claims ha priorità** su FAQ e Editorial Guidelines: non usare altre sezioni per claim non consentiti
+9. **AI Context Preview** (tab UI): mostra `promptContext.previewText`
 
 **Regola fonte unica:** tutti i moduli AI brand-facing devono usare `BrandIntelligenceContextBuilder` e non leggere direttamente le tabelle Brand Intelligence.
 
@@ -38,14 +39,15 @@ Modulo attivo nella tab **Blog & Ricette** per generare brief SEO su singolo ite
 - **Prerequisito Article Generator**: solo item con `brief_approved` e brief valorizzato
 - **Nessuna pubblicazione automatica** Shopify in questo step
 
-### Blog Article Draft Generator (implementato — Content SEO Editorial 0.4.6-alpha)
+### Blog Article Draft Generator (implementato — Content SEO Editorial 0.4.6-alpha, aggiornato 0.4.7-alpha)
 
 Modulo attivo nella tab **Articolo & Anteprima** per generare bozze articolo da brief approvato.
 
 - **Input**: `brief_payload` approvato + metadati item (tipo, prodotto collegato)
-- **Context**: `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, Product Knowledge (+ PK specifico prodotto se collegato)
+- **Context**: `BrandIntelligenceContextBuilder` — profilo, identity, Safe Claims, FAQ, **Editorial Guidelines**, Product Knowledge (+ PK specifico prodotto se collegato)
+- **Editorial Guidelines (0.4.7)**: articoli 700–1100 parole, tono umano, firma brand, CTA community separata da CTA commerciale
 - **Safe Claims**: priorità assoluta nel prompt; nessun claim medico o terapeutico inventato
-- **Output**: `article_payload` JSONB con `bodyHtml` sanitizzato; stato `draft_review` dopo generate
+- **Output**: `article_payload` JSONB con `bodyHtml` sanitizzato, `authorName`, `communityCta`, `estimatedReadingTime`, `contentLengthProfile`
 - **Anteprima**: HTML renderizzato lato client (whitelist tag via DOMParser) dopo sanitizzazione backend
 - **Review umana**: salva bozza, modifica manuale, `ready_to_publish` prima di Shopify Publisher (step futuro)
 - **OPENAI_API_KEY** richiesta; BI incompleta → warnings, non blocco
@@ -74,6 +76,7 @@ Per ogni prodotto Shopify in ottimizzazione SEO:
     "safeClaims": "SAFE CLAIMS & RED FLAGS\n- ...",
     "productKnowledge": "PRODUCT KNOWLEDGE — GENERAL\n- ...",
     "faqObjections": "FAQ & OBJECTIONS\nFAQ generali:\n- ...",
+    "editorialGuidelines": "EDITORIAL GUIDELINES\nFilosofia contenuti: ...",
     "fullText": "...",
     "previewText": "..."
   }
@@ -83,6 +86,7 @@ Per ogni prodotto Shopify in ottimizzazione SEO:
 - **`fullText`**: contesto compatto per moduli AI (sezioni vuote omesse)
 - **`previewText`**: anteprima human-friendly per tab AI Context
 - **`faqObjections`**: blocco testuale con FAQ, obiezioni, miti e risposte consigliate (omesso se vuoto)
+- **`editorialGuidelines`**: filosofia contenuti, persone brand, regole CTA community (omesso se vuoto)
 
 **Regola:** i moduli AI non devono usare campi UI raw nei prompt — solo `BrandContextBuilder` / `get_prompt_context()`.
 

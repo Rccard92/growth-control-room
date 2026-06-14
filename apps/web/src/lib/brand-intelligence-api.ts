@@ -18,6 +18,7 @@ import type {
   BrandFaqObjectionsApplyProposalRequest,
   BrandFaqObjectionsApplyProposalResponse,
   BrandFaqObjectionsImportResponse,
+  BrandEditorialGuidelines,
   BrandProductKnowledgeGeneral,
   BrandProductKnowledgeGeneralApplyProposalRequest,
   BrandProductKnowledgeGeneralApplyProposalResponse,
@@ -273,6 +274,28 @@ export function applyFaqObjectionsProposal(
     `/api/projects/${projectId}/brand-intelligence/faq-objections/apply-proposal`,
     {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function getBrandEditorialGuidelines(
+  projectId: string,
+): Promise<BrandEditorialGuidelines> {
+  return apiFetch<BrandEditorialGuidelines>(
+    `/api/projects/${projectId}/brand-intelligence/editorial-guidelines`,
+  );
+}
+
+export function updateBrandEditorialGuidelines(
+  projectId: string,
+  data: Partial<BrandEditorialGuidelines>,
+): Promise<BrandEditorialGuidelines> {
+  return apiFetch<BrandEditorialGuidelines>(
+    `/api/projects/${projectId}/brand-intelligence/editorial-guidelines`,
+    {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     },

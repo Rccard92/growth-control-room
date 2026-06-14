@@ -12,6 +12,11 @@ export function emptyEditorialArticlePayload(): EditorialArticlePayload {
     tags: [],
     linkedProducts: [],
     cta: "",
+    authorName: "",
+    authorRole: "",
+    communityCta: "",
+    estimatedReadingTime: "",
+    contentLengthProfile: undefined,
     status: "draft",
     warnings: [],
     brandContextUsed: [],
@@ -50,6 +55,16 @@ export function parseEditorialArticlePayload(
     tags: coerceStringList(raw.tags),
     linkedProducts: coerceStringList(raw.linkedProducts),
     cta: String(raw.cta ?? ""),
+    authorName: String(raw.authorName ?? ""),
+    authorRole: String(raw.authorRole ?? ""),
+    communityCta: String(raw.communityCta ?? ""),
+    estimatedReadingTime: String(raw.estimatedReadingTime ?? ""),
+    contentLengthProfile:
+      raw.contentLengthProfile === "breve" ||
+      raw.contentLengthProfile === "medio" ||
+      raw.contentLengthProfile === "approfondito"
+        ? raw.contentLengthProfile
+        : undefined,
     status: "draft",
     warnings: coerceStringList(raw.warnings),
     brandContextUsed: coerceStringList(raw.brandContextUsed),

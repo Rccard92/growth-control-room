@@ -52,6 +52,10 @@ from app.schemas.brand_faq_objections import (
     BrandFaqObjectionsRead,
     BrandFaqObjectionsUpdate,
 )
+from app.schemas.brand_editorial_guidelines import (
+    BrandEditorialGuidelinesRead,
+    BrandEditorialGuidelinesUpdate,
+)
 from app.schemas.brand_profile_v1 import (
     BrandProfileApplyProposalRequest,
     BrandProfileEnrichRequest,
@@ -187,6 +191,10 @@ from app.services.brand_intelligence.faq_objections_service import (
     apply_faq_objections_proposal,
     get_faq_objections,
     upsert_faq_objections,
+)
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    get_editorial_guidelines,
+    upsert_editorial_guidelines,
 )
 from app.services.brand_intelligence.visual_extraction import extract_visual_from_website
 from app.services.brand_intelligence.visual_identity_service import (
@@ -566,6 +574,35 @@ async def apply_brand_faq_objections_proposal(
         faq_objections=BrandFaqObjectionsRead.model_validate(row),
         message="FAQ & Objections aggiornati.",
     )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/editorial-guidelines",
+    response_model=BrandEditorialGuidelinesRead,
+    response_model_by_alias=True,
+)
+async def get_brand_editorial_guidelines(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandEditorialGuidelinesRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_editorial_guidelines(session, project_id)
+    return BrandEditorialGuidelinesRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/brand-intelligence/editorial-guidelines",
+    response_model=BrandEditorialGuidelinesRead,
+    response_model_by_alias=True,
+)
+async def update_brand_editorial_guidelines(
+    project_id: UUID,
+    payload: BrandEditorialGuidelinesUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandEditorialGuidelinesRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await upsert_editorial_guidelines(session, project_id, payload)
+    return BrandEditorialGuidelinesRead.model_validate(row)
 
 
 @router.get(

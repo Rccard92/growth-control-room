@@ -161,6 +161,31 @@ class BrandFaqObjections(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="brand_faq_objections")
 
 
+class BrandEditorialGuidelines(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_editorial_guidelines"
+    __table_args__ = (
+        UniqueConstraint("project_id", name="uq_brand_editorial_guidelines_project_id"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    content_philosophy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    article_length_policy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reading_style: Mapped[str | None] = mapped_column(Text, nullable=True)
+    storytelling_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    brand_people: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
+    author_voice_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    community_cta_rules: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    article_dos: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    article_donts: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    default_article_length: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_editorial_guidelines")
+
+
 class BrandProductKnowledgeGeneral(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "brand_product_knowledge_general"
     __table_args__ = (

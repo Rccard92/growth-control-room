@@ -422,6 +422,15 @@ class EditorialArticlePayload(BaseModel):
         default_factory=list, serialization_alias="linkedProducts"
     )
     cta: str = ""
+    author_name: str = Field(default="", serialization_alias="authorName")
+    author_role: str = Field(default="", serialization_alias="authorRole")
+    community_cta: str = Field(default="", serialization_alias="communityCta")
+    estimated_reading_time: str = Field(
+        default="", serialization_alias="estimatedReadingTime"
+    )
+    content_length_profile: Literal["breve", "medio", "approfondito"] | None = Field(
+        default=None, serialization_alias="contentLengthProfile"
+    )
     status: Literal["draft"] = "draft"
     warnings: list[str] = Field(default_factory=list)
     brand_context_used: list[str] = Field(
@@ -455,6 +464,10 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
         "seoTitle": "seo_title",
         "metaDescription": "meta_description",
         "cta": "cta",
+        "authorName": "author_name",
+        "authorRole": "author_role",
+        "communityCta": "community_cta",
+        "estimatedReadingTime": "estimated_reading_time",
         "generatedAt": "generated_at",
     }
     for alias, field in str_aliases.items():
@@ -464,6 +477,11 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
             data[field] = str(data[field])
         else:
             data.setdefault(field, "")
+    if "contentLengthProfile" in data and "content_length_profile" not in data:
+        data["content_length_profile"] = data.pop("contentLengthProfile")
+    profile = data.get("content_length_profile")
+    if profile not in (None, "breve", "medio", "approfondito"):
+        data["content_length_profile"] = None
     data.setdefault("status", "draft")
     payload = EditorialArticlePayload.model_validate(data)
     sanitized_html = sanitize_editorial_article_html(payload.body_html)

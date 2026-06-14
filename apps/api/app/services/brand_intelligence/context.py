@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
+    BrandEditorialGuidelines,
     BrandFaqObjections,
     BrandIdentity,
     BrandProductKnowledgeGeneral,
@@ -21,6 +22,7 @@ from app.models.brand_intelligence import (
     BrandVisualIdentity,
 )
 from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
+from app.schemas.brand_editorial_guidelines import BrandEditorialGuidelinesRead
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
 from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
@@ -38,6 +40,10 @@ from app.services.brand_intelligence.faq_objections_normalize import normalize_t
 from app.services.brand_intelligence.faq_objections_service import (
     faq_objections_completion,
     faq_objections_missing_context,
+)
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    editorial_guidelines_completion,
+    editorial_guidelines_missing_context,
 )
 from app.services.brand_intelligence.safe_claims_service import safe_claims_completion
 from app.services.brand_intelligence.score import (
@@ -108,6 +114,13 @@ class BrandIntelligenceContextBuilder:
                 select(BrandFaqObjections).where(BrandFaqObjections.project_id == project_id)
             )
         ).scalar_one_or_none()
+        editorial_guidelines = (
+            await session.execute(
+                select(BrandEditorialGuidelines).where(
+                    BrandEditorialGuidelines.project_id == project_id
+                )
+            )
+        ).scalar_one_or_none()
 
         score = await compute_brand_knowledge_score(session, project_id)
         missing = (
@@ -118,6 +131,11 @@ class BrandIntelligenceContextBuilder:
             + faq_objections_missing_context(
                 BrandFaqObjectionsRead.model_validate(faq_objections)
                 if faq_objections
+                else None
+            )
+            + editorial_guidelines_missing_context(
+                BrandEditorialGuidelinesRead.model_validate(editorial_guidelines)
+                if editorial_guidelines
                 else None
             )
         )
@@ -141,6 +159,11 @@ class BrandIntelligenceContextBuilder:
         faq_objections_read = (
             BrandFaqObjectionsRead.model_validate(faq_objections) if faq_objections else None
         )
+        editorial_guidelines_read = (
+            BrandEditorialGuidelinesRead.model_validate(editorial_guidelines)
+            if editorial_guidelines
+            else None
+        )
         pk_context = build_product_knowledge_context(pk_general, pk_items)
 
         bundle = BrandContextBundleResponse(
@@ -155,6 +178,7 @@ class BrandIntelligenceContextBuilder:
             visual_identity=visual_read,
             safe_claims=safe_claims_read,
             faq_objections=faq_objections_read,
+            editorial_guidelines=editorial_guidelines_read,
             product_knowledge=pk_context,
             voice=None,
             products=[],
@@ -347,6 +371,60 @@ class BrandIntelligenceContextBuilder:
         return "\n".join(parts) if len(parts) > 1 else None
 
     @staticmethod
+    def format_editorial_guidelines_for_prompt(row: BrandEditorialGuidelinesRead) -> str | None:
+        if editorial_guidelines_completion(row) == "empty":
+            return None
+        parts: list[str] = ["EDITORIAL GUIDELINES"]
+        if row.content_philosophy:
+            parts.append(f"Filosofia contenuti: {row.content_philosophy[:500]}")
+        if row.article_length_policy:
+            parts.append(f"Lunghezza e ritmo: {row.article_length_policy[:400]}")
+        if row.reading_style:
+            parts.append(f"Stile lettura: {row.reading_style[:400]}")
+        if row.brand_people:
+            people_lines: list[str] = []
+            for person in row.brand_people:
+                if not person.name.strip():
+                    continue
+                line = f"{person.name} ({person.role})" if person.role else person.name
+                if person.when_to_use:
+                    line += f" — quando usare: {person.when_to_use[:200]}"
+                if person.tone:
+                    line += f" — tono: {person.tone[:150]}"
+                people_lines.append(line)
+            if people_lines:
+                parts.append("Persone del brand:")
+                parts.extend(f"- {p}" for p in people_lines[:10])
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_string_list(
+                "Regole storytelling", row.storytelling_rules
+            )
+        )
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_string_list(
+                "Regole voce autore", row.author_voice_rules
+            )
+        )
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_string_list(
+                "CTA community", row.community_cta_rules
+            )
+        )
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_string_list(
+                "Cose da fare", row.article_dos
+            )
+        )
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_string_list(
+                "Cose da evitare", row.article_donts
+            )
+        )
+        if row.default_article_length:
+            parts.append(f"Lunghezza predefinita: {row.default_article_length}")
+        return "\n".join(parts) if len(parts) > 1 else None
+
+    @staticmethod
     def build_prompt_preview_text(bundle: BrandContextBundleResponse) -> str | None:
         if bundle.primary_source == "minimal" or not bundle.profile:
             return None
@@ -408,6 +486,16 @@ class BrandIntelligenceContextBuilder:
             )
         else:
             blocks.append(f"FAQ & OBJECTIONS\n{_EMPTY_SECTION_LABEL}")
+
+        if bundle.editorial_guidelines:
+            eg_text = BrandIntelligenceContextBuilder.format_editorial_guidelines_for_prompt(
+                bundle.editorial_guidelines
+            )
+            blocks.append(
+                eg_text if eg_text else f"EDITORIAL GUIDELINES\n{_EMPTY_SECTION_LABEL}"
+            )
+        else:
+            blocks.append(f"EDITORIAL GUIDELINES\n{_EMPTY_SECTION_LABEL}")
 
         if bundle.missing_context:
             missing_parts = ["MISSING CONTEXT", *[f"- {m}" for m in bundle.missing_context]]
@@ -495,6 +583,14 @@ class BrandIntelligenceContextBuilder:
                 bundle.faq_objections
             )
 
+        editorial_guidelines_text = None
+        if bundle.editorial_guidelines:
+            editorial_guidelines_text = (
+                BrandIntelligenceContextBuilder.format_editorial_guidelines_for_prompt(
+                    bundle.editorial_guidelines
+                )
+            )
+
         blocks = [profile_text]
         if identity_text and len(identity_text.splitlines()) > 1:
             blocks.append(identity_text)
@@ -506,6 +602,8 @@ class BrandIntelligenceContextBuilder:
             blocks.append(product_knowledge_text)
         if faq_objections_text:
             blocks.append(faq_objections_text)
+        if editorial_guidelines_text:
+            blocks.append(editorial_guidelines_text)
 
         full_text = "\n\n".join(blocks)
         preview_text = BrandIntelligenceContextBuilder.build_prompt_preview_text(bundle)
@@ -516,6 +614,7 @@ class BrandIntelligenceContextBuilder:
             safe_claims=safe_claims_text,
             product_knowledge=product_knowledge_text,
             faq_objections=faq_objections_text,
+            editorial_guidelines=editorial_guidelines_text,
             full_text=full_text,
             preview_text=preview_text,
         )
@@ -551,6 +650,14 @@ class BrandIntelligenceContextBuilder:
                 blocks.append(faq_text)
         elif bundle.prompt_context and bundle.prompt_context.faq_objections:
             blocks.append(bundle.prompt_context.faq_objections)
+        if bundle.editorial_guidelines:
+            eg_text = BrandIntelligenceContextBuilder.format_editorial_guidelines_for_prompt(
+                bundle.editorial_guidelines
+            )
+            if eg_text:
+                blocks.append(eg_text)
+        elif bundle.prompt_context and bundle.prompt_context.editorial_guidelines:
+            blocks.append(bundle.prompt_context.editorial_guidelines)
         return "\n\n".join(blocks)
 
     @staticmethod

@@ -1,19 +1,45 @@
 # Brand Intelligence
 
-Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.6** aggiunge la sezione modulare **FAQ & Objections**.
+Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.4.7-alpha** aggiunge **Editorial Guidelines**; **v0.3.6** aggiunge **FAQ & Objections**.
 
-## Strategia v0.3.6 — FAQ & Objections
+## Strategia v0.4.7 — Editorial Guidelines
 
-La UI espone otto tab:
+La UI espone nove tab (Overview + 7 moduli + AI Context):
 
-1. **Overview** — card stato moduli (inclusa FAQ & Objections)
-2. **Brand Profile** — fonti, enrich, profilo ufficiale + Avvisi fonti esterne
+1. **Overview** — card stato moduli (inclusa Editorial Guidelines)
+2. **Brand Profile**
 3. **Brand Identity**
 4. **Visual Identity**
 5. **Safe Claims & Red Flags**
 6. **Product Knowledge**
-7. **FAQ & Objections** — import file scoped, proposta modificabile, dati ufficiali
-8. **AI Context** — anteprima `promptContext`
+7. **FAQ & Objections**
+8. **Editorial Guidelines** — filosofia contenuti, persone brand, regole editoriali
+9. **AI Context** — anteprima `promptContext`
+
+### Cosa raccoglie Editorial Guidelines
+
+| Campo | Contenuto |
+|-------|-----------|
+| Filosofia contenuti | Come scrivere per il brand (non solo SEO) |
+| Politica lunghezza | Ritmo e lunghezza articoli |
+| Stile lettura | Tono e approccio al lettore |
+| Persone del brand | Nome, ruolo, quando citarli, tono (prefill Davide, Filippo, Salvo) |
+| Regole storytelling | Linee guida narrative |
+| CTA community | Inviti morbidi a commentare/scrivere |
+| Cose da fare / evitare | Do & don't editoriali |
+| Lunghezza predefinita | `breve` \| `medio` \| `approfondito` |
+
+**Fonte per:** Blog (Article Generator), PED, Ads, Email, Social — via `promptContext.editorialGuidelines`.
+
+### Endpoint
+
+- `GET/PUT /brand-intelligence/editorial-guidelines`
+
+Tabella: `brand_editorial_guidelines` (1:1 project). Migration `029`.
+
+## Strategia v0.3.6 — FAQ & Objections
+
+La UI espone le sezioni modulari sopra (senza Editorial Guidelines in v0.3.6).
 
 ### Cosa raccoglie FAQ & Objections
 

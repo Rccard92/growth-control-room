@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.7-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added Brand Intelligence **Editorial Guidelines** section (DB, API, UI, AI context)
+- Article Generator uses Editorial Guidelines for shorter, human, community-oriented drafts
+- Extended `article_payload` with author signature, community CTA, reading time and length profile
+- Safe Claims remain absolute priority over editorial tone
+
 ## [0.4.6-alpha] - 2026-06-14
 
 Tipo: Alpha patch

@@ -54,6 +54,30 @@ def test_normalize_editorial_article_payload_sanitizes_body() -> None:
     assert "utile" in payload.body_html
 
 
+def test_normalize_editorial_article_payload_new_metadata_fields() -> None:
+    raw = {
+        **_sample_ai_article(),
+        "authorName": "A cura di Davide",
+        "authorRole": "coordinatore produzione",
+        "communityCta": "Scrivici nei commenti",
+        "contentLengthProfile": "medio",
+    }
+    payload = normalize_editorial_article_payload(raw)
+    assert payload.author_name == "A cura di Davide"
+    assert payload.author_role == "coordinatore produzione"
+    assert payload.community_cta == "Scrivici nei commenti"
+    assert payload.content_length_profile == "medio"
+
+
+def test_enrich_article_payload_reading_time() -> None:
+    from app.services.content.editorial_article_service import _enrich_article_payload
+
+    payload = normalize_editorial_article_payload(_sample_ai_article())
+    enriched = _enrich_article_payload(payload)
+    assert enriched.estimated_reading_time.endswith("min")
+    assert enriched.content_length_profile in ("breve", "medio", "approfondito")
+
+
 def test_generate_editorial_article_brief_not_approved() -> None:
     project_id = uuid4()
     item_id = uuid4()

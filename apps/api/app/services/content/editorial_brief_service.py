@@ -27,6 +27,9 @@ from app.services.ai.openai_client import (
 )
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.brand_intelligence.faq_objections_service import faq_objections_completion
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    editorial_guidelines_completion,
+)
 from app.services.brand_intelligence.identity_service import identity_has_minimum
 from app.services.brand_intelligence.product_knowledge_context import (
     get_product_knowledge_prompt_for_entity,
@@ -141,6 +144,12 @@ def build_brand_context_used(
         used.append("Product Knowledge")
     if bundle.faq_objections and faq_objections_completion(bundle.faq_objections) != "empty":
         used.append("FAQ & Objections")
+    editorial_guidelines = getattr(bundle, "editorial_guidelines", None)
+    if (
+        editorial_guidelines
+        and editorial_guidelines_completion(editorial_guidelines) != "empty"
+    ):
+        used.append("Editorial Guidelines")
     return used
 
 

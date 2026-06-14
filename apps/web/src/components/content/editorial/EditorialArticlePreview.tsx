@@ -31,7 +31,12 @@ export function EditorialArticlePreview({ value }: EditorialArticlePreviewProps)
         )}
         {value.cta && (
           <p className="editorial-article-preview__cta">
-            <strong>CTA:</strong> {value.cta}
+            <strong>CTA commerciale:</strong> {value.cta}
+          </p>
+        )}
+        {value.communityCta && (
+          <p className="editorial-article-preview__cta">
+            <strong>CTA community:</strong> {value.communityCta}
           </p>
         )}
         {value.linkedProducts.length > 0 && (
@@ -61,6 +66,33 @@ export function EditorialArticlePreview({ value }: EditorialArticlePreviewProps)
             <dt>Meta description</dt>
             <dd>{value.metaDescription || "—"}</dd>
           </div>
+          {(value.authorName || value.authorRole) && (
+            <div>
+              <dt>Autore / firma</dt>
+              <dd>
+                {value.authorName || "—"}
+                {value.authorRole ? ` — ${value.authorRole}` : ""}
+              </dd>
+            </div>
+          )}
+          {value.estimatedReadingTime && (
+            <div>
+              <dt>Tempo lettura stimato</dt>
+              <dd>{value.estimatedReadingTime}</dd>
+            </div>
+          )}
+          {value.contentLengthProfile && (
+            <div>
+              <dt>Profilo lunghezza</dt>
+              <dd>{value.contentLengthProfile}</dd>
+            </div>
+          )}
+          {value.communityCta && (
+            <div>
+              <dt>CTA community</dt>
+              <dd>{value.communityCta}</dd>
+            </div>
+          )}
           {value.tags.length > 0 && (
             <div>
               <dt>Tags</dt>

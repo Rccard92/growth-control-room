@@ -13,6 +13,7 @@ from app.models.brand_intelligence import (
     BrandClaimRule,
     BrandContentPillar,
     BrandExtractedFact,
+    BrandEditorialGuidelines,
     BrandFaqObjections,
     BrandIdentity,
     BrandProductKnowledge,
@@ -62,6 +63,10 @@ from app.services.brand_intelligence.product_knowledge_general_service import ge
 from app.services.brand_intelligence.faq_objections_service import (
     faq_objections_completion,
     faq_objections_missing_fields,
+)
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    editorial_guidelines_completion,
+    editorial_guidelines_missing_fields,
 )
 from app.services.brand_intelligence.score import (
     SECTION_LABELS,
@@ -468,6 +473,13 @@ async def build_overview(
             select(BrandFaqObjections).where(BrandFaqObjections.project_id == project_id)
         )
     ).scalar_one_or_none()
+    editorial_guidelines = (
+        await session.execute(
+            select(BrandEditorialGuidelines).where(
+                BrandEditorialGuidelines.project_id == project_id
+            )
+        )
+    ).scalar_one_or_none()
 
     sections = [
         BrandModuleStatus(
@@ -519,6 +531,13 @@ async def build_overview(
             status=faq_objections_completion(faq_objections),
             missing_fields=faq_objections_missing_fields(faq_objections),
             updated_at=faq_objections.updated_at if faq_objections else None,
+        ),
+        BrandModuleStatus(
+            key="editorialGuidelines",
+            label=SECTION_LABELS["editorialGuidelines"],
+            status=editorial_guidelines_completion(editorial_guidelines),
+            missing_fields=editorial_guidelines_missing_fields(editorial_guidelines),
+            updated_at=editorial_guidelines.updated_at if editorial_guidelines else None,
         ),
     ]
 

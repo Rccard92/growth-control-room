@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
+    EditorialArticlePayload,
     EditorialArticleUpdateRequest,
     normalize_editorial_article_payload,
 )
@@ -68,14 +69,128 @@ _ARTICLE_JSON_SCHEMA = """{
   "tags": ["string"],
   "linkedProducts": ["string"],
   "cta": "string",
+  "authorName": "string",
+  "authorRole": "string",
+  "communityCta": "string",
+  "contentLengthProfile": "breve|medio|approfondito",
   "warnings": ["string"]
 }"""
 
+_ARTICLE_TYPE_INSTRUCTIONS: dict[str, str] = {
+    "educational_article": (
+        "Articolo educativo: breve, chiaro, concreto — rispondi a un dubbio reale "
+        "del cliente senza prolissità SEO."
+    ),
+    "product_guide": (
+        "Guida prodotto: utile e pratica, non enciclopedica — collega benefici reali "
+        "al catalogo con CTA soft."
+    ),
+    "recipe": (
+        "Ricetta: pratica e semplice — passaggi chiari, prodotto collegato come "
+        "ingrediente o abbinamento."
+    ),
+    "faq_objection_article": (
+        "Articolo FAQ/obiezioni: risposta diretta e rassicurante — tono umano, "
+        "max 4-6 FAQ solo se utili."
+    ),
+    "brand_storytelling": (
+        "Storytelling brand: più narrativo e umano — valori e dietro le quinte, "
+        "zero claim inventati."
+    ),
+    "product_comparison": (
+        "Confronto prodotti: criteri oggettivi, breve e utile — evita attacchi a competitor."
+    ),
+    "seasonal_article": (
+        "Articolo stagionale: angolo legato al periodo, concreto e non prolisso."
+    ),
+}
 
-def _build_article_system_prompt(brand_context: str | None, brand_guardrails: str) -> str:
+_EDITORIAL_HUMAN_RULES = """
+REGOLE EDITORIALI (obbligatorie):
+- Non scrivere articoli lunghi solo per SEO; evita ripetizioni e riempitivi.
+- Target 700-1100 parole (salvo brief esplicito diverso o profilo lunghezza approfondito).
+- Max 5-7 sezioni H2 principali; max 4-6 FAQ solo se davvero utili.
+- Tono morbido, familiare, concreto — valore reale per i dubbi dei clienti.
+- Aggiungi nota umana / firma brand quando coerente (es. A cura di Davide, Filippo, Salvo).
+- NON inventare citazioni dirette o storie personali non presenti nel contesto brand.
+- Usa le persone del brand solo se coerenti col tema dell'articolo.
+- CTA finale community (scrivere, commentare, social, domande) — morbida, non aggressiva.
+- communityCta è distinta da cta (community vs commerciale).
+- Safe Claims restano prioritari assoluti su tutto.
+"""
+
+
+def _count_words_from_html(html: str) -> int:
+    import re
+
+    text = re.sub(r"<[^>]+>", " ", html or "")
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return 0
+    return len(text.split())
+
+
+def _derive_reading_time(word_count: int) -> str:
+    if word_count <= 0:
+        return ""
+    minutes = max(1, round(word_count / 200))
+    return f"{minutes} min"
+
+
+def _derive_content_length_profile(
+    word_count: int,
+    default_length: str | None,
+) -> str:
+    if word_count <= 0:
+        return default_length or "medio"
+    if word_count < 700:
+        return "breve"
+    if word_count <= 1100:
+        return "medio"
+    return "approfondito"
+
+
+def _enrich_article_payload(
+    payload: EditorialArticlePayload,
+    *,
+    default_length: str | None = None,
+) -> EditorialArticlePayload:
+    word_count = _count_words_from_html(payload.body_html)
+
+    updates: dict = {}
+    if not payload.estimated_reading_time.strip():
+        updates["estimated_reading_time"] = _derive_reading_time(word_count)
+    if payload.content_length_profile is None:
+        updates["content_length_profile"] = _derive_content_length_profile(
+            word_count, default_length
+        )
+    if updates:
+        return payload.model_copy(update=updates)
+    return payload
+
+
+def _build_article_system_prompt(
+    brand_context: str | None,
+    brand_guardrails: str,
+    *,
+    default_article_length: str | None = None,
+) -> str:
+    length_note = ""
+    if default_article_length == "approfondito":
+        length_note = (
+            "\nProfilo lunghezza predefinito: approfondito — puoi superare 1100 parole "
+            "solo se il brief lo richiede esplicitamente."
+        )
+    elif default_article_length == "breve":
+        length_note = (
+            "\nProfilo lunghezza predefinito: breve — punta a 500-800 parole, "
+            "massima chiarezza."
+        )
+
     base = (
-        "Sei un redattore SEO per ecommerce Shopify. "
-        "Genera un articolo blog completo in italiano a partire dal brief SEO approvato. "
+        "Sei un redattore per ecommerce Shopify. "
+        "Genera un articolo blog in italiano a partire dal brief SEO approvato. "
+        "Scrivi come un essere umano: concreto, utile, non prolisso. "
         "Rispetta Safe Claims con priorità assoluta: non inventare claim medici, "
         "non promettere cure o guarigioni, non attaccare competitor, non divulgare process secrets. "
         "Usa il tono del brand dal contesto. "
@@ -83,6 +198,8 @@ def _build_article_system_prompt(brand_context: str | None, brand_guardrails: st
         "Nessuno script, iframe o style inline. "
         "Segui la struttura H2/H3 del brief. "
         "Includi prodotti da linkare e FAQ solo se presenti e sensati nel brief. "
+        f"{_EDITORIAL_HUMAN_RULES}"
+        f"{length_note}\n"
         "Rispondi SOLO con JSON valido.\n\n"
         f"{brand_guardrails}"
     )
@@ -150,12 +267,24 @@ async def generate_editorial_article_core(
             brand_ctx = f"{brand_ctx}\n\n{pk}" if brand_ctx else pk
 
     bi_warnings = build_bi_warnings(bundle)
-    type_instruction = _CONTENT_TYPE_INSTRUCTIONS.get(
+    type_instruction = _ARTICLE_TYPE_INSTRUCTIONS.get(
         item.content_type,
-        "Contenuto editoriale generico: articolo blog SEO.",
+        _CONTENT_TYPE_INSTRUCTIONS.get(
+            item.content_type,
+            "Contenuto editoriale generico: articolo blog chiaro e umano.",
+        ),
+    )
+    default_length = (
+        bundle.editorial_guidelines.default_article_length
+        if getattr(bundle, "editorial_guidelines", None)
+        else None
     )
     skill = load_seo_skill_context()
-    system_prompt = _build_article_system_prompt(brand_ctx, skill.brand_guardrails)
+    system_prompt = _build_article_system_prompt(
+        brand_ctx,
+        skill.brand_guardrails,
+        default_article_length=default_length,
+    )
     user_prompt = _build_article_user_prompt(item, type_instruction)
 
     try:
@@ -165,6 +294,10 @@ async def generate_editorial_article_core(
             timeout=120.0,
         )
         payload = normalize_editorial_article_payload(parsed)
+        payload = _enrich_article_payload(
+            payload,
+            default_length=default_length,
+        )
     except OpenAINotConfiguredError:
         raise ArticleGenerationError(
             "AI non configurata. Inserisci OPENAI_API_KEY per generare l'articolo.",
@@ -221,6 +354,7 @@ async def update_editorial_article(
     item = await get_editorial_item(session, project_id, item_id)
     try:
         payload = normalize_editorial_article_payload(request.article_payload)
+        payload = _enrich_article_payload(payload)
     except ValidationError as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,

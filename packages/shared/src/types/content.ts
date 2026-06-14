@@ -612,6 +612,11 @@ export interface EditorialArticlePayload {
   tags: string[];
   linkedProducts: string[];
   cta: string;
+  authorName?: string;
+  authorRole?: string;
+  communityCta?: string;
+  estimatedReadingTime?: string;
+  contentLengthProfile?: "breve" | "medio" | "approfondito";
   status: "draft";
   warnings: string[];
   brandContextUsed: string[];
