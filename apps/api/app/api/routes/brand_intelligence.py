@@ -45,6 +45,13 @@ from app.schemas.brand_safe_claims import (
     BrandSafeClaimsRead,
     BrandSafeClaimsUpdate,
 )
+from app.schemas.brand_faq_objections import (
+    BrandFaqObjectionsApplyProposalRequest,
+    BrandFaqObjectionsApplyProposalResponse,
+    BrandFaqObjectionsImportResponse,
+    BrandFaqObjectionsRead,
+    BrandFaqObjectionsUpdate,
+)
 from app.schemas.brand_profile_v1 import (
     BrandProfileApplyProposalRequest,
     BrandProfileEnrichRequest,
@@ -174,6 +181,12 @@ from app.services.brand_intelligence.safe_claims_service import (
     apply_safe_claims_proposal,
     get_safe_claims,
     upsert_safe_claims,
+)
+from app.services.brand_intelligence.faq_objections_import import import_faq_objections_from_file
+from app.services.brand_intelligence.faq_objections_service import (
+    apply_faq_objections_proposal,
+    get_faq_objections,
+    upsert_faq_objections,
 )
 from app.services.brand_intelligence.visual_extraction import extract_visual_from_website
 from app.services.brand_intelligence.visual_identity_service import (
@@ -484,6 +497,74 @@ async def apply_brand_safe_claims_proposal(
     return BrandSafeClaimsApplyProposalResponse(
         safe_claims=BrandSafeClaimsRead.model_validate(row),
         message="Safe Claims aggiornati.",
+    )
+
+
+@router.get(
+    "/{project_id}/brand-intelligence/faq-objections",
+    response_model=BrandFaqObjectionsRead,
+    response_model_by_alias=True,
+)
+async def get_brand_faq_objections(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> BrandFaqObjectionsRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await get_faq_objections(session, project_id)
+    return BrandFaqObjectionsRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/brand-intelligence/faq-objections",
+    response_model=BrandFaqObjectionsRead,
+    response_model_by_alias=True,
+)
+async def update_brand_faq_objections(
+    project_id: UUID,
+    payload: BrandFaqObjectionsUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> BrandFaqObjectionsRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await upsert_faq_objections(session, project_id, payload)
+    return BrandFaqObjectionsRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/faq-objections/import-file",
+    response_model=BrandFaqObjectionsImportResponse,
+    response_model_by_alias=True,
+)
+async def import_brand_faq_objections_file(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> BrandFaqObjectionsImportResponse:
+    await get_project_in_default_workspace(project_id, session)
+    data = await file.read()
+    return await import_faq_objections_from_file(
+        session,
+        project_id,
+        filename=file.filename or "document",
+        content_type=file.content_type,
+        data=data,
+    )
+
+
+@router.post(
+    "/{project_id}/brand-intelligence/faq-objections/apply-proposal",
+    response_model=BrandFaqObjectionsApplyProposalResponse,
+    response_model_by_alias=True,
+)
+async def apply_brand_faq_objections_proposal(
+    project_id: UUID,
+    payload: BrandFaqObjectionsApplyProposalRequest,
+    session: AsyncSession = Depends(get_db),
+) -> BrandFaqObjectionsApplyProposalResponse:
+    await get_project_in_default_workspace(project_id, session)
+    row = await apply_faq_objections_proposal(session, project_id, payload.proposal)
+    return BrandFaqObjectionsApplyProposalResponse(
+        faq_objections=BrandFaqObjectionsRead.model_validate(row),
+        message="FAQ & Objections aggiornati.",
     )
 
 

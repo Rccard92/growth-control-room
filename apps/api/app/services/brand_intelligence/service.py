@@ -13,6 +13,7 @@ from app.models.brand_intelligence import (
     BrandClaimRule,
     BrandContentPillar,
     BrandExtractedFact,
+    BrandFaqObjections,
     BrandIdentity,
     BrandProductKnowledge,
     BrandProductKnowledgeGeneral,
@@ -58,6 +59,10 @@ from app.services.brand_intelligence.visual_identity_service import (
 )
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
+from app.services.brand_intelligence.faq_objections_service import (
+    faq_objections_completion,
+    faq_objections_missing_fields,
+)
 from app.services.brand_intelligence.score import (
     SECTION_LABELS,
     compute_brand_knowledge_score,
@@ -458,6 +463,11 @@ async def build_overview(
             )
         ).scalars().all()
     )
+    faq_objections = (
+        await session.execute(
+            select(BrandFaqObjections).where(BrandFaqObjections.project_id == project_id)
+        )
+    ).scalar_one_or_none()
 
     sections = [
         BrandModuleStatus(
@@ -502,6 +512,13 @@ async def build_overview(
                 if pk_general and general_has_content(pk_general)
                 else (pk_items[0].updated_at if pk_items else None)
             ),
+        ),
+        BrandModuleStatus(
+            key="faqObjections",
+            label=SECTION_LABELS["faqObjections"],
+            status=faq_objections_completion(faq_objections),
+            missing_fields=faq_objections_missing_fields(faq_objections),
+            updated_at=faq_objections.updated_at if faq_objections else None,
         ),
     ]
 

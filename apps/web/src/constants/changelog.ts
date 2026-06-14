@@ -7,9 +7,20 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.3.5-alpha";
+export const GCR_VERSION = "0.3.6-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.6-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Nuova sezione FAQ & Objections in Brand Intelligence",
+      "Import singolo file scoped per FAQ, obiezioni e insight social",
+      "BrandContextBuilder include faqObjections in promptContext",
+      "Product SEO può usare il contesto FAQ in modo non distruttivo",
+    ],
+  },
   {
     version: "0.3.5-alpha",
     date: "2026-06-13",

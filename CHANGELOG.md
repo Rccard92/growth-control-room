@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.6-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added modular FAQ & Objections section in Brand Intelligence
+- Added single-file FAQ import (scoped AI extraction, no auto-save)
+- Added FAQ & Objections to BrandContextBuilder (`promptContext.faqObjections`, `fullText`)
+- Product SEO can consume FAQ context non-destructively when section is populated
+
 ## [0.3.5-alpha] - 2026-06-13
 
 Tipo: Alpha minor

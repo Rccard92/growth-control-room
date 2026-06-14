@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         BrandContentPillar,
         BrandExtractedFact,
         BrandExternalSource,
+        BrandFaqObjections,
         BrandIdentity,
         BrandImportBatch,
         BrandIntelligenceBrief,
@@ -85,6 +86,11 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         uselist=False,
     )
     brand_safe_claims: Mapped["BrandSafeClaims | None"] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    brand_faq_objections: Mapped["BrandFaqObjections | None"] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         uselist=False,

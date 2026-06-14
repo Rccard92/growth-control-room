@@ -312,6 +312,64 @@ export interface BrandSafeClaimsApplyProposalResponse {
   message: string;
 }
 
+export interface FaqEntry {
+  question: string;
+  answer: string;
+}
+
+export interface SocialCommentInsight {
+  insight: string;
+  doubt: string;
+  suggestedReply?: string | null;
+}
+
+export interface BrandFaqObjections {
+  id: string;
+  projectId: string;
+  generalFaq?: FaqEntry[] | null;
+  productProcessQuestions?: FaqEntry[] | null;
+  purchaseShippingQuestions?: FaqEntry[] | null;
+  objections?: string[] | null;
+  mythsMisconceptions?: string[] | null;
+  recommendedAnswers?: string[] | null;
+  contentOpportunities?: string[] | null;
+  socialCommentInsights?: SocialCommentInsight[] | null;
+  notes?: string | null;
+  lastImportSource?: string | null;
+  lastConfidence?: number | null;
+  warnings?: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandFaqObjectionsProposal {
+  generalFaq?: FaqEntry[] | null;
+  productProcessQuestions?: FaqEntry[] | null;
+  purchaseShippingQuestions?: FaqEntry[] | null;
+  objections?: string[] | null;
+  mythsMisconceptions?: string[] | null;
+  recommendedAnswers?: string[] | null;
+  contentOpportunities?: string[] | null;
+  socialCommentInsights?: SocialCommentInsight[] | null;
+  notes?: string | null;
+}
+
+export interface BrandFaqObjectionsImportResponse {
+  proposal: BrandFaqObjectionsProposal;
+  confidence: number;
+  warnings: string[];
+  sourceSummary: string;
+}
+
+export interface BrandFaqObjectionsApplyProposalRequest {
+  proposal: BrandFaqObjectionsProposal;
+}
+
+export interface BrandFaqObjectionsApplyProposalResponse {
+  faqObjections: BrandFaqObjections;
+  message: string;
+}
+
 export interface BrandProductKnowledgeGeneral {
   id: string;
   projectId: string;
@@ -966,6 +1024,7 @@ export interface BrandPromptContext {
   visualIdentity?: string | null;
   safeClaims?: string | null;
   productKnowledge?: string | null;
+  faqObjections?: string | null;
   fullText?: string | null;
   previewText?: string | null;
 }
@@ -982,6 +1041,7 @@ export interface BrandContextBundle {
   brandIdentity?: BrandIdentity | null;
   visualIdentity?: BrandVisualIdentity | null;
   safeClaims?: BrandSafeClaims | null;
+  faqObjections?: BrandFaqObjections | null;
   productKnowledge?: BrandProductKnowledgeContext | null;
   voice?: BrandVoice | null;
   products: BrandProductKnowledge[];
@@ -1002,4 +1062,5 @@ export type BrandIntelligenceTab =
   | "visualIdentity"
   | "safeClaims"
   | "productKnowledge"
+  | "faqObjections"
   | "aiContext";

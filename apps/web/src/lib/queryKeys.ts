@@ -48,6 +48,8 @@ export const queryKeys = {
     visualIdentity: (projectId: string) =>
       ["brandIntelligence", projectId, "visualIdentity"] as const,
     safeClaims: (projectId: string) => ["brandIntelligence", projectId, "safeClaims"] as const,
+    faqObjections: (projectId: string) =>
+      ["brandIntelligence", projectId, "faqObjections"] as const,
     productKnowledgeGeneral: (projectId: string) =>
       ["brandIntelligence", projectId, "productKnowledgeGeneral"] as const,
     productKnowledgeItems: (projectId: string) =>

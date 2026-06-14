@@ -14,6 +14,10 @@ import type {
   BrandSafeClaimsApplyProposalRequest,
   BrandSafeClaimsApplyProposalResponse,
   BrandSafeClaimsImportResponse,
+  BrandFaqObjections,
+  BrandFaqObjectionsApplyProposalRequest,
+  BrandFaqObjectionsApplyProposalResponse,
+  BrandFaqObjectionsImportResponse,
   BrandProductKnowledgeGeneral,
   BrandProductKnowledgeGeneralApplyProposalRequest,
   BrandProductKnowledgeGeneralApplyProposalResponse,
@@ -221,6 +225,52 @@ export function applyBrandSafeClaimsProposal(
 ): Promise<BrandSafeClaimsApplyProposalResponse> {
   return apiFetch<BrandSafeClaimsApplyProposalResponse>(
     `/api/projects/${projectId}/brand-intelligence/safe-claims/apply-proposal`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function getFaqObjections(projectId: string): Promise<BrandFaqObjections> {
+  return apiFetch<BrandFaqObjections>(
+    `/api/projects/${projectId}/brand-intelligence/faq-objections`,
+  );
+}
+
+export function updateFaqObjections(
+  projectId: string,
+  data: Partial<BrandFaqObjections>,
+): Promise<BrandFaqObjections> {
+  return apiFetch<BrandFaqObjections>(
+    `/api/projects/${projectId}/brand-intelligence/faq-objections`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function importFaqObjectionsFromFile(
+  projectId: string,
+  file: File,
+): Promise<BrandFaqObjectionsImportResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiUploadForm<BrandFaqObjectionsImportResponse>(
+    `/api/projects/${projectId}/brand-intelligence/faq-objections/import-file`,
+    formData,
+  );
+}
+
+export function applyFaqObjectionsProposal(
+  projectId: string,
+  data: BrandFaqObjectionsApplyProposalRequest,
+): Promise<BrandFaqObjectionsApplyProposalResponse> {
+  return apiFetch<BrandFaqObjectionsApplyProposalResponse>(
+    `/api/projects/${projectId}/brand-intelligence/faq-objections/apply-proposal`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

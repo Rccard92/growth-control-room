@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
+    BrandFaqObjections,
     BrandIdentity,
     BrandProductKnowledgeGeneral,
     BrandProductKnowledgeItem,
@@ -19,6 +20,7 @@ from app.models.brand_intelligence import (
     BrandSafeClaims,
     BrandVisualIdentity,
 )
+from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
 from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
@@ -32,6 +34,10 @@ from app.services.brand_intelligence.product_knowledge_context import (
     format_product_knowledge_preview,
 )
 from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
+from app.services.brand_intelligence.faq_objections_service import (
+    faq_objections_completion,
+    faq_objections_missing_context,
+)
 from app.services.brand_intelligence.safe_claims_service import safe_claims_completion
 from app.services.brand_intelligence.score import (
     compute_brand_knowledge_score,
@@ -96,6 +102,11 @@ class BrandIntelligenceContextBuilder:
                 )
             ).scalars().all()
         )
+        faq_objections = (
+            await session.execute(
+                select(BrandFaqObjections).where(BrandFaqObjections.project_id == project_id)
+            )
+        ).scalar_one_or_none()
 
         score = await compute_brand_knowledge_score(session, project_id)
         missing = (
@@ -103,6 +114,11 @@ class BrandIntelligenceContextBuilder:
             + identity_missing_context(identity)
             + visual_missing_context(visual)
             + safe_claims_missing_context(safe_claims)
+            + faq_objections_missing_context(
+                BrandFaqObjectionsRead.model_validate(faq_objections)
+                if faq_objections
+                else None
+            )
         )
         if safe_claims_completion(safe_claims) == "empty":
             missing.append(
@@ -121,6 +137,9 @@ class BrandIntelligenceContextBuilder:
         safe_claims_read = (
             BrandSafeClaimsRead.model_validate(safe_claims) if safe_claims else None
         )
+        faq_objections_read = (
+            BrandFaqObjectionsRead.model_validate(faq_objections) if faq_objections else None
+        )
         pk_context = build_product_knowledge_context(pk_general, pk_items)
 
         bundle = BrandContextBundleResponse(
@@ -134,6 +153,7 @@ class BrandIntelligenceContextBuilder:
             brand_identity=identity_read,
             visual_identity=visual_read,
             safe_claims=safe_claims_read,
+            faq_objections=faq_objections_read,
             product_knowledge=pk_context,
             voice=None,
             products=[],
@@ -267,6 +287,76 @@ class BrandIntelligenceContextBuilder:
         return bool(text and len(text.splitlines()) > 1)
 
     @staticmethod
+    def _format_faq_entries(label: str, entries: list | None) -> list[str]:
+        if not entries:
+            return []
+        lines = [f"{label}:"]
+        for entry in entries:
+            question = getattr(entry, "question", None) or (
+                entry.get("question") if isinstance(entry, dict) else ""
+            )
+            answer = getattr(entry, "answer", None) or (
+                entry.get("answer") if isinstance(entry, dict) else ""
+            )
+            q = (question or "").strip()
+            a = (answer or "").strip()
+            if not q:
+                continue
+            if a:
+                lines.append(f"- Domanda: {q} | Risposta: {a}")
+            else:
+                lines.append(f"- Domanda: {q}")
+        return lines if len(lines) > 1 else []
+
+    @staticmethod
+    def format_faq_objections_for_prompt(row: BrandFaqObjectionsRead) -> str | None:
+        if faq_objections_completion(row) == "empty":
+            return None
+        parts: list[str] = ["FAQ & OBJECTIONS"]
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_faq_entries(
+                "FAQ generali", row.general_faq
+            )
+        )
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_faq_entries(
+                "Domande prodotto/processo", row.product_process_questions
+            )
+        )
+        parts.extend(
+            BrandIntelligenceContextBuilder._format_faq_entries(
+                "Domande acquisto/spedizione", row.purchase_shipping_questions
+            )
+        )
+        if row.objections:
+            parts.append("Obiezioni frequenti:")
+            parts.extend(f"- {o}" for o in row.objections[:20])
+        if row.myths_misconceptions:
+            parts.append("Falsi miti:")
+            parts.extend(f"- {m}" for m in row.myths_misconceptions[:20])
+        if row.recommended_answers:
+            parts.append("Risposte consigliate:")
+            parts.extend(f"- {r}" for r in row.recommended_answers[:20])
+        if row.content_opportunities:
+            parts.append("Opportunità contenuto:")
+            parts.extend(f"- {c}" for c in row.content_opportunities[:15])
+        if row.social_comment_insights:
+            parts.append("Insight commenti social:")
+            for insight in row.social_comment_insights[:15]:
+                doubt = (insight.doubt or "").strip()
+                text = (insight.insight or "").strip()
+                reply = (insight.suggested_reply or "").strip()
+                line = f"- Dubbio: {doubt}" if doubt else "- Insight:"
+                if text:
+                    line += f" {text}"
+                if reply:
+                    line += f" | Risposta: {reply}"
+                parts.append(line)
+        if row.notes:
+            parts.append(f"Note: {row.notes[:400]}")
+        return "\n".join(parts) if len(parts) > 1 else None
+
+    @staticmethod
     def build_prompt_preview_text(bundle: BrandContextBundleResponse) -> str | None:
         if bundle.primary_source == "minimal" or not bundle.profile:
             return None
@@ -318,6 +408,16 @@ class BrandIntelligenceContextBuilder:
             )
         else:
             blocks.append(f"PRODUCT KNOWLEDGE\n{_EMPTY_SECTION_LABEL}")
+
+        if bundle.faq_objections:
+            faq_text = BrandIntelligenceContextBuilder.format_faq_objections_for_prompt(
+                bundle.faq_objections
+            )
+            blocks.append(
+                faq_text if faq_text else f"FAQ & OBJECTIONS\n{_EMPTY_SECTION_LABEL}"
+            )
+        else:
+            blocks.append(f"FAQ & OBJECTIONS\n{_EMPTY_SECTION_LABEL}")
 
         if bundle.missing_context:
             missing_parts = ["MISSING CONTEXT", *[f"- {m}" for m in bundle.missing_context]]
@@ -399,6 +499,12 @@ class BrandIntelligenceContextBuilder:
             if pk_blocks:
                 product_knowledge_text = "\n\n".join(pk_blocks)
 
+        faq_objections_text = None
+        if bundle.faq_objections:
+            faq_objections_text = BrandIntelligenceContextBuilder.format_faq_objections_for_prompt(
+                bundle.faq_objections
+            )
+
         blocks = [profile_text]
         if identity_text and len(identity_text.splitlines()) > 1:
             blocks.append(identity_text)
@@ -408,6 +514,8 @@ class BrandIntelligenceContextBuilder:
             blocks.append(safe_claims_text)
         if product_knowledge_text:
             blocks.append(product_knowledge_text)
+        if faq_objections_text:
+            blocks.append(faq_objections_text)
 
         full_text = "\n\n".join(blocks)
         preview_text = BrandIntelligenceContextBuilder.build_prompt_preview_text(bundle)
@@ -417,6 +525,7 @@ class BrandIntelligenceContextBuilder:
             visual_identity=visual_text,
             safe_claims=safe_claims_text,
             product_knowledge=product_knowledge_text,
+            faq_objections=faq_objections_text,
             full_text=full_text,
             preview_text=preview_text,
         )
@@ -444,6 +553,14 @@ class BrandIntelligenceContextBuilder:
             blocks.append(bundle.prompt_context.safe_claims)
         if bundle.prompt_context and bundle.prompt_context.product_knowledge:
             blocks.append(bundle.prompt_context.product_knowledge)
+        if bundle.faq_objections:
+            faq_text = BrandIntelligenceContextBuilder.format_faq_objections_for_prompt(
+                bundle.faq_objections
+            )
+            if faq_text:
+                blocks.append(faq_text)
+        elif bundle.prompt_context and bundle.prompt_context.faq_objections:
+            blocks.append(bundle.prompt_context.faq_objections)
         return "\n\n".join(blocks)
 
     @staticmethod

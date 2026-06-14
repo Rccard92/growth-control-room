@@ -130,6 +130,37 @@ class BrandSafeClaims(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="brand_safe_claims")
 
 
+class BrandFaqObjections(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "brand_faq_objections"
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_faq_objections_project_id"),)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    general_faq: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    product_process_questions: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    purchase_shipping_questions: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    objections: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    myths_misconceptions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    recommended_answers: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    content_opportunities: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    social_comment_insights: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_import_source: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warnings: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="brand_faq_objections")
+
+
 class BrandProductKnowledgeGeneral(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "brand_product_knowledge_general"
     __table_args__ = (

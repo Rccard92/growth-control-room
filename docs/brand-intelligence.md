@@ -1,20 +1,56 @@
 # Brand Intelligence
 
-Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.5** aggiunge la tab **AI Context Preview** e sposta gli avvisi fonti esterne in Brand Profile.
+Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.3.6** aggiunge la sezione modulare **FAQ & Objections**.
+
+## Strategia v0.3.6 — FAQ & Objections
+
+La UI espone otto tab:
+
+1. **Overview** — card stato moduli (inclusa FAQ & Objections)
+2. **Brand Profile** — fonti, enrich, profilo ufficiale + Avvisi fonti esterne
+3. **Brand Identity**
+4. **Visual Identity**
+5. **Safe Claims & Red Flags**
+6. **Product Knowledge**
+7. **FAQ & Objections** — import file scoped, proposta modificabile, dati ufficiali
+8. **AI Context** — anteprima `promptContext`
+
+### Cosa raccoglie FAQ & Objections
+
+| Campo | Contenuto |
+|-------|-----------|
+| FAQ generali | Domande frequenti sul brand |
+| Domande prodotto/processo | Ingredienti, produzione, uso |
+| Domande acquisto/spedizione | Ordini, pagamenti, resi |
+| Obiezioni | Dubbi ricorrenti dei clienti |
+| Falsi miti | Fraintendimenti da correggere |
+| Risposte consigliate | Solo se presenti o deducibili dal file |
+| Opportunità contenuto | Spunti PED/blog/social/email |
+| Insight social | Dubbi da commenti social |
+
+**Differenza concettuale:** le FAQ rispondono a domande; le obiezioni esprimono resistenze; i falsi miti sono credenze errate; le opportunità contenuto sono spunti editoriali derivati.
+
+### Import singolo file (scoped)
+
+1. Carica **un solo file** (PDF, DOCX, TXT, MD)
+2. L'AI estrae **solo** FAQ/obiezioni — non Identity, Safe Claims, Product Knowledge, PED o blog
+3. Restituisce proposta modificabile (`proposal`, `confidence`, `warnings`) — **nessun auto-save**
+4. L'utente applica con **Applica proposta** → `POST .../faq-objections/apply-proposal`
+5. Merge non distruttivo: campi assenti nella proposta non cancellano dati esistenti
+
+### Endpoint
+
+- `GET/PUT /brand-intelligence/faq-objections`
+- `POST /brand-intelligence/faq-objections/import-file`
+- `POST /brand-intelligence/faq-objections/apply-proposal`
+
+Tabella: `brand_faq_objections` (1:1 project). Migration `025`.
 
 ## Strategia v0.3.5 — AI Context Preview
 
-La UI espone sette tab:
+La sezione AI Context Preview (tab 8) mostra `promptContext.previewText` e include il blocco FAQ & Objections quando compilato.
 
-1. **Overview** — card stato moduli (senza warning tecnici fonti esterne)
-2. **Brand Profile** — fonti, enrich, profilo ufficiale + **Avvisi fonti esterne** (collassabile)
-3. **Brand Identity** — form manuale + import da 1 file
-4. **Visual Identity** — logo, palette, font + estrazione da sito
-5. **Safe Claims & Red Flags**
-6. **Product Knowledge**
-7. **AI Context** — anteprima `promptContext.previewText`, copia contesto, sezioni mancanti
-
-`GET /brand-intelligence/context` restituisce `promptContext.fullText` (moduli AI) e `promptContext.previewText` (UI). Parametro opzionale `?format=prompt`.
+`GET /brand-intelligence/context` restituisce `promptContext.fullText` (moduli AI) e `faqObjections` nel bundle.
 
 ## Strategia v0.3.4 — Product Knowledge
 

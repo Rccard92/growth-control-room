@@ -297,3 +297,58 @@ def test_format_item_for_prompt_ai_import() -> None:
     assert "Prodotto: Miele di Limone" in text
     assert "Origine: Sicilia" in text
     assert "Gusto/Profumo: Agrumato" in text
+
+
+def test_build_prompt_context_includes_faq_objections() -> None:
+    from app.schemas.brand_faq_objections import BrandFaqObjectionsRead, FaqEntry
+
+    faq_read = BrandFaqObjectionsRead(
+        id=uuid4(),
+        project_id=_PID,
+        general_faq=[FaqEntry(question="Spedite in Italia?", answer="Sì, in 48h")],
+        objections=["Il prezzo è alto"],
+        recommended_answers=["Spiega il valore artigianale"],
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+    bundle = BrandContextBundleResponse(
+        brand_context_version="v1",
+        primary_source="brand_profile",
+        profile=BrandProfileRead(
+            id=uuid4(),
+            project_id=_PID,
+            brand_name="Acme",
+            short_description="Artisan brand",
+            created_at=_NOW,
+            updated_at=_NOW,
+        ),
+        faq_objections=faq_read,
+        products=[],
+        categories=[],
+        audience=[],
+        claims=[],
+        content_pillars=[],
+        guardrails=[],
+        assets=[],
+        knowledge_score=_score(80),
+    )
+    prompt_ctx = BrandIntelligenceContextBuilder.build_prompt_context(bundle)
+    assert prompt_ctx is not None
+    assert prompt_ctx.faq_objections is not None
+    assert "FAQ & OBJECTIONS" in prompt_ctx.faq_objections
+    assert "Spedite in Italia?" in prompt_ctx.faq_objections
+    assert "Il prezzo è alto" in prompt_ctx.faq_objections
+    assert "FAQ & OBJECTIONS" in (prompt_ctx.full_text or "")
+    assert "FAQ & OBJECTIONS" in (prompt_ctx.preview_text or "")
+
+
+def test_format_faq_objections_empty_returns_none() -> None:
+    from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
+
+    empty = BrandFaqObjectionsRead(
+        id=uuid4(),
+        project_id=_PID,
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+    assert BrandIntelligenceContextBuilder.format_faq_objections_for_prompt(empty) is None

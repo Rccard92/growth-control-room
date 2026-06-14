@@ -12,6 +12,7 @@ const SECTION_LABELS: Record<string, string> = {
   visualIdentity: "Visual Identity",
   safeClaims: "Safe Claims",
   productKnowledge: "Product Knowledge",
+  faqObjections: "FAQ & Objections",
 };
 
 function getIncludedSections(context: BrandContextBundle): string[] {
@@ -29,6 +30,7 @@ function getIncludedSections(context: BrandContextBundle): string[] {
   }
   if (pc.safeClaims) included.push(SECTION_LABELS.safeClaims);
   if (pc.productKnowledge) included.push(SECTION_LABELS.productKnowledge);
+  if (pc.faqObjections) included.push(SECTION_LABELS.faqObjections);
   return included;
 }
 
@@ -42,6 +44,7 @@ function getEmptySections(context: BrandContextBundle): string[] {
     empty.push(SECTION_LABELS.visualIdentity);
   }
   if (!pc?.productKnowledge) empty.push(SECTION_LABELS.productKnowledge);
+  if (!pc?.faqObjections) empty.push(SECTION_LABELS.faqObjections);
   return empty;
 }
 

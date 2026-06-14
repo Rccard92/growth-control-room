@@ -4,6 +4,7 @@ import {
   applyBrandIdentityProposal,
   applyBrandProfileProposal,
   applyBrandSafeClaimsProposal,
+  applyFaqObjectionsProposal,
   applyProductKnowledgeGeneralProposal,
   applyProductKnowledgeItemsImportProposal,
   applyVisualProposal,
@@ -16,17 +17,20 @@ import {
   getBrandIntelligenceOverview,
   getBrandProfile,
   getBrandSafeClaims,
+  getFaqObjections,
   getBrandVisualIdentity,
   getProductKnowledgeGeneral,
   getProductKnowledgeItems,
   getProductKnowledgeShopifyProducts,
   importBrandIdentityFromFile,
   importBrandSafeClaimsFromFile,
+  importFaqObjectionsFromFile,
   importProductKnowledgeGeneralFromFile,
   importProductKnowledgeItemsFromFile,
   updateBrandIdentity,
   updateBrandProfile,
   updateBrandSafeClaims,
+  updateFaqObjections,
   updateBrandVisualIdentity,
   updateProductKnowledgeGeneral,
   updateProductKnowledgeItem,
@@ -44,6 +48,9 @@ function invalidateBrand(projectId: string, qc: ReturnType<typeof useQueryClient
   });
   void qc.invalidateQueries({
     queryKey: queryKeys.brandIntelligence.safeClaims(projectId),
+  });
+  void qc.invalidateQueries({
+    queryKey: queryKeys.brandIntelligence.faqObjections(projectId),
   });
   void qc.invalidateQueries({
     queryKey: queryKeys.brandIntelligence.productKnowledgeGeneral(projectId),
@@ -208,6 +215,41 @@ export function useApplyBrandSafeClaimsProposal(projectId: string) {
       applyBrandSafeClaimsProposal(projectId, data),
     onSuccess: (data) => {
       qc.setQueryData(queryKeys.brandIntelligence.safeClaims(projectId), data.safeClaims);
+      invalidateBrand(projectId, qc);
+    },
+  });
+}
+
+export function useFaqObjections(projectId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.brandIntelligence.faqObjections(projectId ?? ""),
+    queryFn: () => getFaqObjections(projectId!),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useUpdateFaqObjections(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof updateFaqObjections>[1]) =>
+      updateFaqObjections(projectId, data),
+    onSuccess: () => invalidateBrand(projectId, qc),
+  });
+}
+
+export function useImportFaqObjectionsFromFile(projectId: string) {
+  return useMutation({
+    mutationFn: (file: File) => importFaqObjectionsFromFile(projectId, file),
+  });
+}
+
+export function useApplyFaqObjectionsProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof applyFaqObjectionsProposal>[1]) =>
+      applyFaqObjectionsProposal(projectId, data),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.brandIntelligence.faqObjections(projectId), data.faqObjections);
       invalidateBrand(projectId, qc);
     },
   });
