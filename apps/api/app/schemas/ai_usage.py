@@ -65,6 +65,12 @@ class AiUsageLogRead(BaseModel):
     prompt_preview: str | None = Field(serialization_alias="promptPreview")
     output_preview: str | None = Field(serialization_alias="outputPreview")
     prompt_cache_key: str | None = Field(serialization_alias="promptCacheKey")
+    context_profile: str | None = Field(default=None, serialization_alias="contextProfile")
+    context_hash: str | None = Field(default=None, serialization_alias="contextHash")
+    context_chars: int | None = Field(default=None, serialization_alias="contextChars")
+    context_blocks_used: list[str] | None = Field(
+        default=None, serialization_alias="contextBlocksUsed"
+    )
     response_id: str | None = Field(serialization_alias="responseId")
     error_type: str | None = Field(serialization_alias="errorType")
     error_message: str | None = Field(serialization_alias="errorMessage")

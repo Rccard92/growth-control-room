@@ -17,10 +17,11 @@ from app.services.ai.openai_client import (
 )
 from app.services.content.seo_current_values import normalize_proposal_values
 from app.services.content.seo_proposal_diff import compute_changed_proposed
-from app.services.ai.context_builder import (
-    AiTaskType,
-    build_ai_context_for_task,
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
     build_prompt_cache_key,
+    enrich_ai_metadata,
 )
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
@@ -278,17 +279,20 @@ async def generate_seo_proposal(
     reasoning: list[Any]
 
     skill_ctx = load_seo_skill_context()
-    task_type = (
-        AiTaskType.PRODUCT_SEO_PROPOSAL
+    profile = (
+        AiContextProfile.PRODUCT_SEO_FULL
         if entity_type == "product"
-        else AiTaskType.COLLECTION_SEO_PROPOSAL
+        else AiContextProfile.COLLECTION_SEO_FULL
     )
-    brand_ctx, ctx_hash = await build_ai_context_for_task(
+    ctx = await build_context_for_profile(
         session,
         store.project_id,
-        task_type,
-        shopify_product_id=entity_id if entity_type == "product" else None,
+        profile,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        options={"shopify_product_id": entity_id} if entity_type == "product" else None,
     )
+    brand_ctx = ctx.context_text
 
     if use_ai and is_openai_configured():
         system_prompt = _ai_system_prompt(
@@ -302,17 +306,20 @@ async def generate_seo_proposal(
             mode=mode,
         )
         seo_module = "product_seo" if entity_type == "product" else "content_seo"
-        cache_key = build_prompt_cache_key(store.project_id, seo_module, ctx_hash)
+        cache_key = build_prompt_cache_key(store.project_id, seo_module, ctx.context_hash)
         try:
             proposed = await generate_structured_json(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                metadata=AiRequestMetadata(
-                    project_id=store.project_id,
-                    module=seo_module,
-                    operation="generate_proposal",
-                    entity_type=entity_type,
-                    entity_id=entity_id,
+                metadata=enrich_ai_metadata(
+                    AiRequestMetadata(
+                        project_id=store.project_id,
+                        module=seo_module,
+                        operation="generate_proposal",
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                    ),
+                    ctx,
                 ),
                 prompt_cache_key=cache_key,
             )

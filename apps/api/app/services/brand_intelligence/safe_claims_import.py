@@ -16,6 +16,7 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
 
 logger = logging.getLogger(__name__)
@@ -97,8 +98,6 @@ async def import_safe_claims_from_file(
     content_type: str | None,
     data: bytes,
 ) -> BrandSafeClaimsImportResponse:
-    del session, project_id  # no DB write on import preview
-
     if not filename or not filename.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -136,17 +135,24 @@ async def import_safe_claims_from_file(
     )
 
     try:
-        parsed = await generate_structured_json(
-            system_prompt=SAFE_CLAIMS_IMPORT_SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            timeout=90.0,
-            metadata=AiRequestMetadata(
+        metadata, _ctx = await brand_import_metadata(
+            session,
+            project_id,
+            AiRequestMetadata(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="import_safe_claims",
                 entity_type="brand_section",
                 entity_id="safe_claims",
             ),
+            section="safe_claims",
+            instructions="Estrazione Safe Claims e Red Flags da documento",
+        )
+        parsed = await generate_structured_json(
+            system_prompt=SAFE_CLAIMS_IMPORT_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            timeout=90.0,
+            metadata=metadata,
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

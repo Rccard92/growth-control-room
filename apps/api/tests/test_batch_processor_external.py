@@ -24,4 +24,4 @@ def test_batch_processor_progress_ranges() -> None:
     source = _BATCH_PROCESSOR.read_text(encoding="utf-8")
     assert "progress_percent=35" in source
     assert "progress_percent=50" in source
-    assert "progress_percent=75" in source
+    assert "progress_percent=73" in source

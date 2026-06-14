@@ -26,10 +26,11 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-from app.services.ai.context_builder import (
-    AiTaskType,
-    build_ai_context_for_task,
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
     build_prompt_cache_key,
+    enrich_ai_metadata,
 )
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.brand_intelligence.faq_objections_service import faq_objections_completion
@@ -240,12 +241,25 @@ async def generate_editorial_brief_core(
 
     item = await get_editorial_item(session, project_id, item_id)
     bundle = await BrandIntelligenceContextBuilder.build_brand_context(session, project_id)
-    brand_ctx, ctx_hash = await build_ai_context_for_task(
+    ctx = await build_context_for_profile(
         session,
         project_id,
-        AiTaskType.BLOG_BRIEF,
-        shopify_product_id=item.linked_shopify_product_id,
+        AiContextProfile.BLOG_BRIEF,
+        entity_type="editorial_item",
+        entity_id=str(item_id),
+        options={
+            "shopify_product_id": str(item.linked_shopify_product_id)
+            if item.linked_shopify_product_id
+            else None,
+            "editorial_item": {
+                "title": item.title,
+                "content_type": item.content_type,
+                "primary_keyword": item.primary_keyword,
+                "notes": item.notes,
+            },
+        },
     )
+    brand_ctx = ctx.context_text
 
     product_pk_appended = bool(
         item.linked_shopify_product_id and brand_ctx and "PRODUCT KNOWLEDGE" in (brand_ctx or "")
@@ -265,15 +279,18 @@ async def generate_editorial_brief_core(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             timeout=90.0,
-            metadata=AiRequestMetadata(
-                project_id=project_id,
-                module="blog_brief",
-                operation="batch_brief_item" if job_id else "generate_brief",
-                entity_type="editorial_item",
-                entity_id=str(item_id),
-                job_id=job_id,
+            metadata=enrich_ai_metadata(
+                AiRequestMetadata(
+                    project_id=project_id,
+                    module="blog_brief",
+                    operation="batch_brief_item" if job_id else "generate_brief",
+                    entity_type="editorial_item",
+                    entity_id=str(item_id),
+                    job_id=job_id,
+                ),
+                ctx,
             ),
-            prompt_cache_key=build_prompt_cache_key(project_id, "blog_brief", ctx_hash),
+            prompt_cache_key=build_prompt_cache_key(project_id, "blog_brief", ctx.context_hash),
         )
         payload = normalize_editorial_brief_payload(parsed)
     except OpenAINotConfiguredError:

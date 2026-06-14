@@ -50,6 +50,10 @@ export interface AiUsageLog {
   promptPreview: string | null;
   outputPreview: string | null;
   promptCacheKey: string | null;
+  contextProfile: string | null;
+  contextHash: string | null;
+  contextChars: number | null;
+  contextBlocksUsed: string[] | null;
   responseId: string | null;
   errorType: string | null;
   errorMessage: string | null;

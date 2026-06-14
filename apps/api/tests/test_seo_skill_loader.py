@@ -53,7 +53,7 @@ def test_get_seo_skill_metadata() -> None:
     assert d["name"] == "GCR Shopify SEO Skill"
     assert d["version"] == "1.0.0"
     assert "claude-seo" in d["attribution"]
-    assert len(d["score_rule_categories"]) == 7
+    assert len(d["score_rule_categories"]) == 6
     assert len(d["external_skills"]) >= 4
 
 

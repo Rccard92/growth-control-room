@@ -29,6 +29,7 @@ from app.services.brand_intelligence.document_extraction import (
 )
 from app.services.brand_intelligence.external_sources_service import fetch_batch_external_sources
 from app.services.brand_intelligence.source_fetcher import format_external_source_for_prompt
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -269,9 +270,24 @@ async def process_batch(batch_id: UUID) -> None:
                 )
 
                 try:
+                    metadata, ctx = await brand_import_metadata(
+                        session,
+                        project_id,
+                        AiRequestMetadata(
+                            project_id=project_id,
+                            module="brand_intelligence",
+                            operation="batch_extract_document",
+                            entity_type="brand_section",
+                            entity_id=str(doc.id),
+                            job_id=str(batch_id),
+                        ),
+                        section="batch_extract_document",
+                        snapshot=bi_summary,
+                        instructions="Estrazione facts strutturati da documento batch",
+                    )
                     user_prompt = (
                         f"{batch_header}\n\n"
-                        f"Existing Brand Intelligence (official data, read-only context):\n{bi_summary}\n\n"
+                        f"{ctx.context_text}\n\n"
                         f"External sources (fetched public content):\n{external_block}\n\n"
                         f"Filename: {doc.filename}\n"
                         f"Content-Type: {doc.content_type}\n\n"
@@ -281,14 +297,7 @@ async def process_batch(batch_id: UUID) -> None:
                         system_prompt=EXTRACTION_SYSTEM_PROMPT,
                         user_prompt=user_prompt,
                         timeout=90.0,
-                        metadata=AiRequestMetadata(
-                            project_id=project_id,
-                            module="brand_intelligence",
-                            operation="batch_extract_document",
-                            entity_type="brand_section",
-                            entity_id=str(doc.id),
-                            job_id=str(batch_id),
-                        ),
+                        metadata=metadata,
                     )
                     raw_facts = parsed.get("facts") or []
                     if not isinstance(raw_facts, list):
@@ -350,16 +359,10 @@ async def process_batch(batch_id: UUID) -> None:
                         commit=True,
                     )
                     try:
-                        user_prompt = (
-                            f"{batch_header}\n\n"
-                            f"Existing Brand Intelligence:\n{bi_summary}\n\n"
-                            f"External sources only (no uploaded files):\n{external_block}"
-                        )
-                        parsed = await generate_structured_json(
-                            system_prompt=EXTRACTION_SYSTEM_PROMPT,
-                            user_prompt=user_prompt,
-                            timeout=90.0,
-                            metadata=AiRequestMetadata(
+                        metadata, ctx = await brand_import_metadata(
+                            session,
+                            project_id,
+                            AiRequestMetadata(
                                 project_id=project_id,
                                 module="brand_intelligence",
                                 operation="batch_extract_external",
@@ -367,6 +370,20 @@ async def process_batch(batch_id: UUID) -> None:
                                 entity_id="external_sources",
                                 job_id=str(batch_id),
                             ),
+                            section="batch_extract_external",
+                            snapshot=bi_summary,
+                            instructions="Estrazione facts da fonti esterne",
+                        )
+                        user_prompt = (
+                            f"{batch_header}\n\n"
+                            f"{ctx.context_text}\n\n"
+                            f"External sources only (no uploaded files):\n{external_block}"
+                        )
+                        parsed = await generate_structured_json(
+                            system_prompt=EXTRACTION_SYSTEM_PROMPT,
+                            user_prompt=user_prompt,
+                            timeout=90.0,
+                            metadata=metadata,
                         )
                         raw_facts = parsed.get("facts") or []
                         now = datetime.now(timezone.utc)

@@ -16,9 +16,22 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
 
 logger = logging.getLogger(__name__)
+
+_IDENTITY_IMPORT_SCHEMA = """{
+  "positioning": "...",
+  "brandValues": [],
+  "differentiators": [],
+  "productionPrinciples": [],
+  "qualityPrinciples": [],
+  "trustElements": [],
+  "whatBrandIs": "...",
+  "whatBrandIsNot": "...",
+  "storytellingNotes": "..."
+}"""
 
 IDENTITY_IMPORT_SYSTEM_PROMPT = """Sei un assistente che estrae SOLO la Brand Identity da un documento.
 Rispondi SOLO in JSON valido con i campi richiesti.
@@ -100,8 +113,6 @@ async def import_identity_from_file(
     content_type: str | None,
     data: bytes,
 ) -> BrandIdentityImportResponse:
-    del session, project_id  # no DB write on import preview
-
     if not filename or not filename.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -139,17 +150,25 @@ async def import_identity_from_file(
     )
 
     try:
-        parsed = await generate_structured_json(
-            system_prompt=IDENTITY_IMPORT_SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            timeout=90.0,
-            metadata=AiRequestMetadata(
+        metadata, _ctx = await brand_import_metadata(
+            session,
+            project_id,
+            AiRequestMetadata(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="import_identity",
                 entity_type="brand_section",
                 entity_id="identity",
             ),
+            section="identity",
+            schema=_IDENTITY_IMPORT_SCHEMA,
+            instructions="Estrazione Brand Identity da documento singolo",
+        )
+        parsed = await generate_structured_json(
+            system_prompt=IDENTITY_IMPORT_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            timeout=90.0,
+            metadata=metadata,
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

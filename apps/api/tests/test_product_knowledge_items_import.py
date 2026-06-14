@@ -107,7 +107,7 @@ def test_import_items_success_mock_ai() -> None:
         }
         captured: dict = {}
 
-        async def fake_generate(*, system_prompt: str, user_prompt: str, timeout: float):
+        async def fake_generate(*, system_prompt: str, user_prompt: str, timeout: float, **kwargs):
             captured["system_prompt"] = system_prompt
             return ai_response
 

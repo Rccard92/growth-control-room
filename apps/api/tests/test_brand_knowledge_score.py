@@ -96,6 +96,8 @@ def test_section_labels_five_modules() -> None:
         "visualIdentity",
         "safeClaims",
         "productKnowledge",
+        "faqObjections",
+        "editorialGuidelines",
     }
 
 

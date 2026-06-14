@@ -1,6 +1,13 @@
 # Brand Intelligence
 
-Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.4.7-alpha** aggiunge **Editorial Guidelines**; **v0.3.6** aggiunge **FAQ & Objections**.
+Brand Intelligence è la knowledge base del brand in Growth Control Room. **v0.5.2-alpha** introduce **AI Context Profiles**: BI resta fonte centrale, ma i moduli AI ricevono solo le slice compatte necessarie al task (via `build_context_for_profile()`). **v0.4.7-alpha** aggiunge **Editorial Guidelines**; **v0.3.6** aggiunge **FAQ & Objections**.
+
+## AI Context Profiles (0.5.2-alpha)
+
+- **Fonte dati:** `BrandIntelligenceContextBuilder.build_brand_context()` — invariato.
+- **Consumo AI:** `apps/api/app/services/ai/context_profiles.py` — profili per task (SEO field, blog brief, article, import BI, ecc.).
+- **Safe Claims** inclusi nei profili a rischio claim; **Editorial Guidelines** solo dove serve (brief/articolo).
+- **Monitoraggio:** AI Costs mostra profilo, caratteri contesto e blocchi usati per ogni richiesta.
 
 ## Strategia v0.4.7 — Editorial Guidelines
 

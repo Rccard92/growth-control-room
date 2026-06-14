@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import BrandExtractedFact, BrandSourceDocument
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -121,6 +122,19 @@ async def run_ai_extraction(
     await session.commit()
 
     try:
+        metadata, _ctx = await brand_import_metadata(
+            session,
+            project_id,
+            AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="extract_document",
+                entity_type="brand_section",
+                entity_id=str(document_id),
+            ),
+            section="document_extraction",
+            instructions="Classificazione documento ed estrazione facts",
+        )
         user_prompt = (
             f"Filename: {doc.filename}\n"
             f"Content-Type: {doc.content_type}\n\n"
@@ -130,13 +144,7 @@ async def run_ai_extraction(
             system_prompt=EXTRACTION_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=90.0,
-            metadata=AiRequestMetadata(
-                project_id=project_id,
-                module="brand_intelligence",
-                operation="extract_document",
-                entity_type="brand_section",
-                entity_id=str(document_id),
-            ),
+            metadata=metadata,
         )
     except OpenAINotConfiguredError:
         doc.extraction_status = "failed"

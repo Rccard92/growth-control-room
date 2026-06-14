@@ -201,7 +201,7 @@ def test_generate_editorial_article_success() -> None:
                 return_value=row,
             ):
                 with patch(
-                    "app.services.content.editorial_article_service.BrandIntelligenceContextBuilder.build_brand_context",
+                    "app.services.ai.context_profiles.BrandIntelligenceContextBuilder.build_brand_context",
                     new_callable=AsyncMock,
                     return_value=SimpleNamespace(
                         brand_identity=None,
@@ -210,25 +210,39 @@ def test_generate_editorial_article_success() -> None:
                         faq_objections=None,
                         profile=None,
                         prompt_context=None,
+                        editorial_guidelines=None,
                     ),
                 ):
                     with patch(
-                        "app.services.content.editorial_article_service.BrandIntelligenceContextBuilder.format_for_prompt",
-                        return_value="BRAND CONTEXT",
+                        "app.services.content.editorial_article_service.BrandIntelligenceContextBuilder.build_brand_context",
+                        new_callable=AsyncMock,
+                        return_value=SimpleNamespace(
+                            brand_identity=None,
+                            safe_claims=None,
+                            product_knowledge=None,
+                            faq_objections=None,
+                            profile=None,
+                            prompt_context=None,
+                            editorial_guidelines=None,
+                        ),
                     ):
                         with patch(
-                            "app.services.content.editorial_article_service.get_product_knowledge_prompt_for_entity",
-                            new_callable=AsyncMock,
-                            return_value="PK",
+                            "app.services.content.editorial_article_service.BrandIntelligenceContextBuilder.format_for_prompt",
+                            return_value="BRAND CONTEXT",
                         ):
                             with patch(
-                                "app.services.content.editorial_article_service.generate_structured_json",
+                                "app.services.content.editorial_article_service.get_product_knowledge_prompt_for_entity",
                                 new_callable=AsyncMock,
-                                return_value=_sample_ai_article(),
+                                return_value="PK",
                             ):
-                                result = await generate_editorial_article_core(
-                                    mock_session, project_id, item_id
-                                )
+                                with patch(
+                                    "app.services.content.editorial_article_service.generate_structured_json",
+                                    new_callable=AsyncMock,
+                                    return_value=_sample_ai_article(),
+                                ):
+                                    result = await generate_editorial_article_core(
+                                        mock_session, project_id, item_id
+                                    )
         assert result.status == "draft_review"
         assert result.article_payload is not None
         assert result.article_payload["title"] == "Guida olio EVO"

@@ -27,6 +27,7 @@ from app.schemas.section_drafts import (
     SectionDraftWarnings,
     validate_draft_payload,
 )
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -348,12 +349,30 @@ async def synthesize_section(
     if batch.declared_website_url:
         batch_header += f"Declared website URL: {batch.declared_website_url}\n"
 
+    bi_summary = build_bi_summary(snapshot)
+    metadata, ctx = await brand_import_metadata(
+        session,
+        project_id,
+        AiRequestMetadata(
+            project_id=project_id,
+            module="brand_intelligence",
+            operation="synthesize_section",
+            entity_type="brand_section",
+            entity_id=section_key,
+            job_id=str(batch_id),
+        ),
+        section=section_key,
+        schema=SECTION_PAYLOAD_HINTS.get(section_key, "{}"),
+        snapshot=bi_summary,
+        existing=json.dumps(official_json, ensure_ascii=False)[:3000],
+        instructions="Sintesi draft sezione Brand Intelligence da facts estratti",
+    )
+
     user_prompt = (
         f"Section: {section_key}\n"
         f"Expected draft_payload shape example: {SECTION_PAYLOAD_HINTS.get(section_key, '{}')}\n\n"
         f"{batch_header}\n"
-        f"Existing official Brand Intelligence (read-only):\n{json.dumps(official_json, ensure_ascii=False)}\n\n"
-        f"Brand summary:\n{build_bi_summary(snapshot)}\n\n"
+        f"{ctx.context_text}\n\n"
         f"Extracted facts for this section:\n{_format_facts_for_prompt(section_facts)}\n\n"
         f"External sources (public URLs — cite source_external_ids when used):\n{external_block}\n\n"
         f"Document summaries:\n"
@@ -371,14 +390,7 @@ async def synthesize_section(
             system_prompt=SYNTHESIS_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=120.0,
-            metadata=AiRequestMetadata(
-                project_id=project_id,
-                module="brand_intelligence",
-                operation="synthesize_section",
-                entity_type="brand_section",
-                entity_id=section_key,
-                job_id=str(batch_id),
-            ),
+            metadata=metadata,
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

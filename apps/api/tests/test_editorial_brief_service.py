@@ -136,11 +136,12 @@ def test_generate_editorial_brief_success() -> None:
         status="idea",
     )
     bundle = SimpleNamespace(
-        profile=SimpleNamespace(brand_name="Brand"),
+        profile=SimpleNamespace(brand_name="Brand", short_description="Desc"),
         brand_identity=None,
         safe_claims=None,
         product_knowledge=None,
         faq_objections=None,
+        editorial_guidelines=None,
         prompt_context=None,
     )
     mock_session = AsyncMock()
@@ -154,6 +155,10 @@ def test_generate_editorial_brief_success() -> None:
             patch(
                 "app.services.content.editorial_brief_service.get_editorial_item",
                 new=AsyncMock(return_value=row),
+            ),
+            patch(
+                "app.services.ai.context_profiles.BrandIntelligenceContextBuilder.build_brand_context",
+                new=AsyncMock(return_value=bundle),
             ),
             patch(
                 "app.services.content.editorial_brief_service.BrandIntelligenceContextBuilder.build_brand_context",
@@ -215,6 +220,7 @@ def test_generate_editorial_brief_ai_failure_no_commit() -> None:
         product_knowledge=None,
         faq_objections=None,
         profile=None,
+        editorial_guidelines=None,
         prompt_context=None,
     )
     mock_session = AsyncMock()
@@ -228,6 +234,10 @@ def test_generate_editorial_brief_ai_failure_no_commit() -> None:
             patch(
                 "app.services.content.editorial_brief_service.get_editorial_item",
                 new=AsyncMock(return_value=row),
+            ),
+            patch(
+                "app.services.ai.context_profiles.BrandIntelligenceContextBuilder.build_brand_context",
+                new=AsyncMock(return_value=bundle),
             ),
             patch(
                 "app.services.content.editorial_brief_service.BrandIntelligenceContextBuilder.build_brand_context",

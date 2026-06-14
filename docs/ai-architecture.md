@@ -5,7 +5,7 @@
 **Regola obbligatoria:** tutte le chiamate OpenAI devono passare da `apps/api/app/services/ai/ai_client.py` tramite `generate_structured_json()`.
 
 - **Nessun service** deve importare `AsyncOpenAI` o chiamare l'API OpenAI direttamente.
-- Ogni richiesta richiede `AiRequestMetadata`: `project_id`, `module`, `operation` (+ opzionali `entity_type`, `entity_id`, `job_id`).
+- Ogni richiesta richiede `AiRequestMetadata`: `project_id`, `module`, `operation` (+ opzionali `entity_type`, `entity_id`, `job_id`, `context_profile`, `context_hash`, `context_chars`, `context_blocks_used`).
 - Ogni richiesta viene persistita in **`ai_usage_logs`** (`AiUsageLog`): token, costo stimato, durata, hash prompt (no prompt completo).
 - Pricing modelli: `apps/api/app/services/ai/pricing.py` (file versionato, aggiornabile senza migration).
 - Preview prompt/output solo se `AI_LOG_PROMPT_PREVIEW=true` (max 500 caratteri).
@@ -23,8 +23,33 @@ Errore budget → HTTP 429 con messaggio leggibile. UI: pagina **AI Costs** + ba
 
 ### Compact context e prompt caching
 
-- `build_ai_context_for_task()` in `apps/api/app/services/ai/context_builder.py` — contesto brand ridotto per task (SEO field vs blog brief vs article).
-- `prompt_cache_key = project:{id}:ctx:{hash}:module:{module}` — prefix stabile; istruzioni statiche + brand nel **system**, dati variabili nel **user**.
+- **`build_context_for_profile()`** in `apps/api/app/services/ai/context_profiles.py` — **unica via ufficiale** per costruire contesto AI operativo (0.5.2-alpha).
+- `build_ai_context_for_task()` in `context_builder.py` è uno shim deprecato verso i profili.
+- `prompt_cache_key = project:{id}:ctx:{hash}:module:{module}` — prefix stabile; ordine contesto: profilo statico → blocchi brand → dati entità → schema output.
+
+### AI Context Profiles (0.5.2-alpha)
+
+**Regola architetturale:** nessun modulo AI deve costruire prompt con Brand Intelligence raw direttamente. Ogni modulo deve dichiarare un `AiContextProfile`.
+
+Flusso:
+
+```
+BrandIntelligenceContextBuilder → AI Context Profiles → ai_client → AiUsageLog
+```
+
+| Profilo | Uso tipico |
+|---------|------------|
+| `minimal` | Task piccoli, enrichment profilo |
+| `image_alt` | Alt immagini prodotto/collection |
+| `product_seo_field` / `collection_seo_field` | Singolo campo SEO |
+| `product_seo_full` / `collection_seo_full` | Proposta SEO completa |
+| `blog_brief` | Brief editoriale |
+| `article_draft` | Articolo da brief approvato |
+| `brand_import` | Import/estrazione/sintesi BI |
+| `compliance_review` | Revisione claim |
+| `generic` | Fallback esplicito |
+
+Ogni profilo restituisce `contextText`, `contextBlocksUsed`, `warnings`, `contextHash`. `AiRequestMetadata` e `AiUsageLog` tracciano `context_profile`, `context_hash`, `context_chars`, `context_blocks_used`.
 
 ### Moduli tracciati
 
@@ -56,9 +81,9 @@ prompt_block = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
 8. **Safe Claims ha priorità** su FAQ e Editorial Guidelines: non usare altre sezioni per claim non consentiti
 9. **AI Context Preview** (tab UI): mostra `promptContext.previewText`
 
-**Regola fonte unica:** tutti i moduli AI brand-facing devono usare `BrandIntelligenceContextBuilder` e non leggere direttamente le tabelle Brand Intelligence.
+**Regola fonte unica:** `BrandIntelligenceContextBuilder` resta la fonte centrale dei dati brand. I moduli AI **non** usano `format_for_prompt()` / `fullText` raw: ricevono slice compatte tramite **AI Context Profiles** (`context_profiles.py`). Vedi [Architettura AI](ai-architecture.md#ai-context-profiles-052-alpha).
 
-Content SEO e Product SEO usano `get_prompt_context()` → `fullText` (non `previewText`). Se FAQ & Objections è vuota, il comportamento resta invariato.
+Content SEO e Product SEO usano profili dedicati (`product_seo_field`, `blog_brief`, `article_draft`, ecc.). Se FAQ & Objections è vuota, il comportamento resta invariato.
 
 ### Blog Brief Generator (implementato — Content SEO Editorial 0.4.1-alpha, aggiornato 0.4.8-alpha)
 

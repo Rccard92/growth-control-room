@@ -18,6 +18,7 @@ from app.models.brand_intelligence import (
     BrandSourceDocument,
 )
 from app.schemas.brand_brief import build_markdown_summary, sanitize_brief_payload
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -222,11 +223,10 @@ async def generate_brief_from_batch(
     )
 
     try:
-        parsed = await generate_structured_json(
-            system_prompt=BRIEF_SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            timeout=120.0,
-            metadata=AiRequestMetadata(
+        metadata, _ctx = await brand_import_metadata(
+            session,
+            project_id,
+            AiRequestMetadata(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="generate_brief_from_batch",
@@ -234,6 +234,15 @@ async def generate_brief_from_batch(
                 entity_id="intelligence_brief",
                 job_id=str(batch_id),
             ),
+            section="intelligence_brief",
+            snapshot=official_summary,
+            instructions="Sintesi Brand Intelligence Brief da batch import",
+        )
+        parsed = await generate_structured_json(
+            system_prompt=BRIEF_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            timeout=120.0,
+            metadata=metadata,
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

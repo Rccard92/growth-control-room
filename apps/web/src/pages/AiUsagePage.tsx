@@ -37,6 +37,29 @@ function formatTokens(n: number): string {
   return n.toLocaleString("it-IT");
 }
 
+function formatContextBlocks(blocks: string[] | null | undefined): string {
+  if (!blocks?.length) return "—";
+  const labels: Record<string, string> = {
+    brand_profile: "Brand Profile",
+    brand_identity: "Brand Identity",
+    visual_identity: "Visual Identity",
+    tone: "Tono",
+    safe_claims: "Safe Claims",
+    product_knowledge_general: "Product Knowledge (generale)",
+    product_knowledge_specific: "Product Knowledge (specifica)",
+    faq_objections: "FAQ & Obiezioni",
+    faq_selected: "FAQ selezionate",
+    editorial_guidelines: "Editorial Guidelines",
+    editorial_item: "Item editoriale",
+    approved_brief: "Brief approvato",
+    entity_product: "Prodotto",
+    entity_collection: "Collection",
+    brand_import_schema: "Schema import",
+    text_to_review: "Testo da valutare",
+  };
+  return blocks.map((b) => labels[b] ?? b).join(", ");
+}
+
 function LogDetailModal({
   open,
   projectId,
@@ -68,7 +91,19 @@ function LogDetailModal({
             <div><dt>Costo stimato</dt><dd>{formatCost(log.estimatedTotalCost)}</dd></div>
             <div><dt>Durata</dt><dd>{log.durationMs != null ? `${log.durationMs} ms` : "—"}</dd></div>
             <div><dt>Response ID</dt><dd>{log.responseId ?? "—"}</dd></div>
+            <div><dt>Context profile</dt><dd>{log.contextProfile ?? "—"}</dd></div>
+            <div><dt>Context chars</dt><dd>{log.contextChars != null ? formatTokens(log.contextChars) : "—"}</dd></div>
+            <div><dt>Context hash</dt><dd>{log.contextHash ?? "—"}</dd></div>
+            <div><dt>Blocchi contesto</dt><dd>{formatContextBlocks(log.contextBlocksUsed)}</dd></div>
           </dl>
+          {log.contextProfile && (
+            <div className="ai-usage-detail__insight gcr-alert gcr-alert--info">
+              Questo task ha usato il profilo: <strong>{log.contextProfile}</strong>
+              {log.contextBlocksUsed && log.contextBlocksUsed.length > 0 && (
+                <> — Blocchi usati: {formatContextBlocks(log.contextBlocksUsed)}</>
+              )}
+            </div>
+          )}
           {log.promptPreview && (
             <div className="ai-usage-detail__block">
               <h4>Prompt preview</h4>
@@ -249,6 +284,7 @@ export function AiUsagePage() {
                     <tr>
                       <th>Data/ora</th>
                       <th>Modulo</th>
+                      <th>Profilo</th>
                       <th>Operazione</th>
                       <th>Modello</th>
                       <th>In</th>
@@ -268,6 +304,7 @@ export function AiUsagePage() {
                       >
                         <td>{new Date(row.createdAt).toLocaleString("it-IT")}</td>
                         <td>{row.module}</td>
+                        <td>{row.contextProfile ?? "—"}</td>
                         <td>{row.operation}</td>
                         <td>{row.model}</td>
                         <td>{row.inputTokens}</td>

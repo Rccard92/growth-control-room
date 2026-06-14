@@ -162,8 +162,8 @@ def test_process_brief_batch_job_partial_failed() -> None:
 
     session.execute = execute
 
-    async def generate_side_effect(sess, pid, iid):
-        del sess, pid
+    async def generate_side_effect(sess, pid, iid, **kwargs):
+        del sess, pid, kwargs
         if iid == item_fail:
             raise BriefGenerationError("Brief non generato per questo contenuto.")
 

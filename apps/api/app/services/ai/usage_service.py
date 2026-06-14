@@ -52,6 +52,10 @@ class UsageLogInput:
     prompt_preview: str | None = None
     output_preview: str | None = None
     prompt_cache_key: str | None = None
+    context_profile: str | None = None
+    context_hash: str | None = None
+    context_chars: int | None = None
+    context_blocks_used: list[str] | None = None
     response_id: str | None = None
     error_type: str | None = None
     error_message: str | None = None
@@ -96,6 +100,10 @@ async def record_usage_log(session: AsyncSession, data: UsageLogInput) -> AiUsag
         prompt_preview=truncate_preview(data.prompt_preview),
         output_preview=truncate_preview(data.output_preview),
         prompt_cache_key=data.prompt_cache_key,
+        context_profile=data.context_profile,
+        context_hash=data.context_hash,
+        context_chars=data.context_chars,
+        context_blocks_used=data.context_blocks_used,
         response_id=data.response_id,
         error_type=data.error_type,
         error_message=truncate_preview(data.error_message, max_len=1000),

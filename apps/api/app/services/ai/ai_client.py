@@ -50,6 +50,10 @@ class AiRequestMetadata(BaseModel):
     entity_type: str | None = None
     entity_id: str | None = None
     job_id: str | None = None
+    context_profile: str | None = None
+    context_hash: str | None = None
+    context_chars: int | None = None
+    context_blocks_used: list[str] | None = None
 
 
 def is_openai_configured() -> bool:
@@ -65,6 +69,15 @@ def _client() -> AsyncOpenAI:
 def _hash_prompt(system_prompt: str, user_prompt: str) -> str:
     payload = f"{system_prompt}\n---\n{user_prompt}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _context_fields_from_metadata(metadata: AiRequestMetadata) -> dict[str, Any]:
+    return {
+        "context_profile": metadata.context_profile,
+        "context_hash": metadata.context_hash,
+        "context_chars": metadata.context_chars,
+        "context_blocks_used": metadata.context_blocks_used,
+    }
 
 
 def _extract_usage(response: Any) -> dict[str, int]:
@@ -183,6 +196,7 @@ async def generate_structured_json(
                 prompt_cache_key=prompt_cache_key,
                 error_type=error_type,
                 error_message=error_message,
+                **_context_fields_from_metadata(metadata),
             )
         )
         raise OpenAIRequestError("Richiesta OpenAI non riuscita") from exc
@@ -211,6 +225,7 @@ async def generate_structured_json(
                 response_id=getattr(response, "id", None) if response else None,
                 error_type=error_type,
                 error_message=error_message,
+                **_context_fields_from_metadata(metadata),
             )
         )
         raise OpenAIRequestError(error_message) from exc
@@ -271,6 +286,7 @@ async def generate_structured_json(
             output_preview=output_preview,
             prompt_cache_key=prompt_cache_key,
             response_id=getattr(response, "id", None),
+            **_context_fields_from_metadata(metadata),
         )
     )
 

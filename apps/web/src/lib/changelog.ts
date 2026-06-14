@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.2-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Added AI Context Profiles",
+      "Reduced unnecessary Brand Intelligence payloads per AI task",
+      "Added context profile metadata to AI Usage Monitor",
+      "Prepared prompt structure for better caching and lower token usage",
+    ],
+  },
+  {
     version: "0.5.1-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

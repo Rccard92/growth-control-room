@@ -32,10 +32,11 @@ from app.services.content.seo_proposal_engine import (
     product_current_values,
 )
 from app.services.content.seo_skill_loader import load_seo_skill_context
-from app.services.ai.context_builder import (
-    AiTaskType,
-    build_ai_context_for_task,
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
     build_prompt_cache_key,
+    enrich_ai_metadata,
 )
 from app.services.shopify.metafield_merge import build_product_metafields_merged
 from app.services.shopify.metafield_utils import (
@@ -413,34 +414,36 @@ async def generate_seo_proposal_field(
 
     skill_ctx = load_seo_skill_context()
     if field == "imageAlt":
-        task_type = (
-            AiTaskType.PRODUCT_SEO_ALT
-            if entity_type == "product"
-            else AiTaskType.COLLECTION_SEO_FIELD
-        )
+        profile = AiContextProfile.IMAGE_ALT
     else:
-        task_type = (
-            AiTaskType.PRODUCT_SEO_FIELD
+        profile = (
+            AiContextProfile.PRODUCT_SEO_FIELD
             if entity_type == "product"
-            else AiTaskType.COLLECTION_SEO_FIELD
+            else AiContextProfile.COLLECTION_SEO_FIELD
         )
-    brand_ctx, ctx_hash = await build_ai_context_for_task(
+    ctx = await build_context_for_profile(
         session,
         store.project_id,
-        task_type,
-        shopify_product_id=entity_id if entity_type == "product" else None,
+        profile,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        options={"shopify_product_id": entity_id} if entity_type == "product" else None,
     )
+    brand_ctx = ctx.context_text
     value: Any
     reasoning: str
     risk_level: str
     seo_module = "product_seo" if entity_type == "product" else "content_seo"
-    cache_key = build_prompt_cache_key(store.project_id, seo_module, ctx_hash)
-    ai_metadata = AiRequestMetadata(
-        project_id=store.project_id,
-        module=seo_module,
-        operation="generate_field",
-        entity_type=entity_type,
-        entity_id=entity_id,
+    cache_key = build_prompt_cache_key(store.project_id, seo_module, ctx.context_hash)
+    ai_metadata = enrich_ai_metadata(
+        AiRequestMetadata(
+            project_id=store.project_id,
+            module=seo_module,
+            operation="generate_field",
+            entity_type=entity_type,
+            entity_id=entity_id,
+        ),
+        ctx,
     )
 
     if field == "metafield" and metafield_ctx is not None:

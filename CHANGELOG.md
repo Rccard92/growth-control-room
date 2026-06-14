@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.2-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added AI Context Profiles
+- Reduced unnecessary Brand Intelligence payloads per AI task
+- Added context profile metadata to AI Usage Monitor
+- Prepared prompt structure for better caching and lower token usage
+
 ## [0.5.1-alpha] - 2026-06-13
 
 Tipo: Alpha patch

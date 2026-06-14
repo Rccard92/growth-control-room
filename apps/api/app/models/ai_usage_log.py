@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin
@@ -45,6 +45,10 @@ class AiUsageLog(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     prompt_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
     output_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
     prompt_cache_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    context_profile: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    context_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    context_chars: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    context_blocks_used: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     response_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

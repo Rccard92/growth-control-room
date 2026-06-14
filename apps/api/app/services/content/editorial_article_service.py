@@ -28,10 +28,11 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-from app.services.ai.context_builder import (
-    AiTaskType,
-    build_ai_context_for_task,
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
     build_prompt_cache_key,
+    enrich_ai_metadata,
 )
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.brand_intelligence.product_knowledge_context import (
@@ -305,13 +306,20 @@ async def generate_editorial_article_core(
         )
 
     bundle = await BrandIntelligenceContextBuilder.build_brand_context(session, project_id)
-    brand_ctx, ctx_hash = await build_ai_context_for_task(
+    ctx = await build_context_for_profile(
         session,
         project_id,
-        AiTaskType.ARTICLE_GENERATOR,
-        shopify_product_id=item.linked_shopify_product_id,
-        brief_payload=item.brief_payload,
+        AiContextProfile.ARTICLE_DRAFT,
+        entity_type="editorial_item",
+        entity_id=str(item_id),
+        options={
+            "shopify_product_id": str(item.linked_shopify_product_id)
+            if item.linked_shopify_product_id
+            else None,
+            "brief_payload": item.brief_payload,
+        },
     )
+    brand_ctx = ctx.context_text
 
     product_pk_appended = bool(
         item.linked_shopify_product_id and brand_ctx and "PRODUCT KNOWLEDGE" in (brand_ctx or "")
@@ -343,14 +351,19 @@ async def generate_editorial_article_core(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             timeout=120.0,
-            metadata=AiRequestMetadata(
-                project_id=project_id,
-                module="article_generator",
-                operation="generate_article",
-                entity_type="editorial_item",
-                entity_id=str(item_id),
+            metadata=enrich_ai_metadata(
+                AiRequestMetadata(
+                    project_id=project_id,
+                    module="article_generator",
+                    operation="generate_article",
+                    entity_type="editorial_item",
+                    entity_id=str(item_id),
+                ),
+                ctx,
             ),
-            prompt_cache_key=build_prompt_cache_key(project_id, "article_generator", ctx_hash),
+            prompt_cache_key=build_prompt_cache_key(
+                project_id, "article_generator", ctx.context_hash
+            ),
         )
         payload = normalize_editorial_article_payload(parsed)
         payload = _apply_brief_author_to_payload(

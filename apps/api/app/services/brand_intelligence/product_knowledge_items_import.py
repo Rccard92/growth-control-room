@@ -20,6 +20,7 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.brand_intelligence.product_knowledge_general_import import _load_safe_claims_block
 from app.services.brand_intelligence.product_knowledge_shopify_match import suggest_shopify_matches
 from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
@@ -241,17 +242,24 @@ async def import_items_from_file(
     )
 
     try:
-        parsed = await generate_structured_json(
-            system_prompt=ITEMS_IMPORT_SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            timeout=90.0,
-            metadata=AiRequestMetadata(
+        metadata, _ctx = await brand_import_metadata(
+            session,
+            project_id,
+            AiRequestMetadata(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="import_product_knowledge_items",
                 entity_type="brand_section",
                 entity_id="product_knowledge_items",
             ),
+            section="product_knowledge_items",
+            instructions="Estrazione Product Knowledge specifica prodotti da documento",
+        )
+        parsed = await generate_structured_json(
+            system_prompt=ITEMS_IMPORT_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            timeout=90.0,
+            metadata=metadata,
         )
     except OpenAINotConfiguredError:
         raise HTTPException(
