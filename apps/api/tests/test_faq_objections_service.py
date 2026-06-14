@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from app.schemas.brand_faq_objections import BrandFaqObjectionsProposal, FaqEntry
+from app.schemas.brand_faq_objections import BrandFaqObjectionsProposal
 from app.services.brand_intelligence.faq_objections_service import (
     apply_faq_objections_proposal,
     faq_objections_completion,
@@ -94,7 +94,7 @@ def test_apply_faq_objections_proposal_merge_non_destructive() -> None:
     asyncio.run(run())
 
 
-def test_apply_faq_objections_proposal_writes_faq() -> None:
+def test_apply_faq_objections_proposal_writes_faq_strings() -> None:
     row = SimpleNamespace(
         general_faq=None,
         product_process_questions=None,
@@ -108,9 +108,9 @@ def test_apply_faq_objections_proposal_writes_faq() -> None:
     )
     mock_session = AsyncMock()
     proposal = BrandFaqObjectionsProposal(
-        general_faq=[FaqEntry(question="Come ordino?", answer="Dal sito")],
+        general_faq=["Domanda: Come ordino?\nRisposta: Dal sito"],
         objections=["Costa troppo"],
-        recommended_answers=["Spiega il valore artigianale"],
+        recommended_answers=["Obiezione: Costa troppo\nRisposta consigliata: Valore artigianale"],
     )
 
     async def run() -> None:
@@ -119,7 +119,12 @@ def test_apply_faq_objections_proposal_writes_faq() -> None:
             new=AsyncMock(return_value=row),
         ):
             result = await apply_faq_objections_proposal(mock_session, uuid4(), proposal)
-            assert result.general_faq == [{"question": "Come ordino?", "answer": "Dal sito"}]
+            assert result.general_faq == [
+                {"question": "Come ordino?", "answer": "Dal sito"}
+            ]
             assert result.objections == ["Costa troppo"]
+            assert result.recommended_answers == [
+                "Obiezione: Costa troppo\nRisposta consigliata: Valore artigianale"
+            ]
 
     asyncio.run(run())

@@ -3,6 +3,13 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.3.7-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed FAQ & Objections import normalization for object-based AI outputs
+- Prevented backend 500 on flexible FAQ proposal structures
+
 ## [0.3.6-alpha] - 2026-06-13
 
 Tipo: Alpha minor

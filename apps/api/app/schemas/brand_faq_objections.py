@@ -83,15 +83,15 @@ class BrandFaqObjectionsUpdate(BaseModel):
 class BrandFaqObjectionsProposal(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    general_faq: list[FaqEntry] | None = Field(
+    general_faq: list[str] | None = Field(
         default=None, validation_alias="generalFaq", serialization_alias="generalFaq"
     )
-    product_process_questions: list[FaqEntry] | None = Field(
+    product_process_questions: list[str] | None = Field(
         default=None,
         validation_alias="productProcessQuestions",
         serialization_alias="productProcessQuestions",
     )
-    purchase_shipping_questions: list[FaqEntry] | None = Field(
+    purchase_shipping_questions: list[str] | None = Field(
         default=None,
         validation_alias="purchaseShippingQuestions",
         serialization_alias="purchaseShippingQuestions",
@@ -108,7 +108,7 @@ class BrandFaqObjectionsProposal(BaseModel):
         validation_alias="contentOpportunities",
         serialization_alias="contentOpportunities",
     )
-    social_comment_insights: list[SocialCommentInsight] | None = Field(
+    social_comment_insights: list[str] | None = Field(
         default=None,
         validation_alias="socialCommentInsights",
         serialization_alias="socialCommentInsights",

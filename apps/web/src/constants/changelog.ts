@@ -7,9 +7,18 @@ export interface ChangelogRelease {
   items: string[];
 }
 
-export const GCR_VERSION = "0.3.6-alpha";
+export const GCR_VERSION = "0.3.7-alpha";
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
+  {
+    version: "0.3.7-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fix normalizzazione import FAQ quando l'AI restituisce oggetti invece di stringhe",
+      "Import FAQ non va più in 500: errori di validazione restituiscono 422 leggibile",
+    ],
+  },
   {
     version: "0.3.6-alpha",
     date: "2026-06-13",
