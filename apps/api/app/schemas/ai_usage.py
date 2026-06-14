@@ -44,6 +44,9 @@ class AiUsageSummaryResponse(BaseModel):
     by_operation: list[AiUsageBreakdownItem] = Field(serialization_alias="byOperation")
     by_model: list[AiUsageBreakdownItem] = Field(serialization_alias="byModel")
     by_tier: list[AiUsageBreakdownItem] = Field(default_factory=list, serialization_alias="byTier")
+    by_operation_key: list[AiUsageBreakdownItem] = Field(
+        default_factory=list, serialization_alias="byOperationKey"
+    )
     by_day: list[AiUsageBreakdownItem] = Field(serialization_alias="byDay")
     routing_insights: AiRoutingInsights | None = Field(
         default=None, serialization_alias="routingInsights"
@@ -92,6 +95,7 @@ class AiUsageLogRead(BaseModel):
     max_output_tokens: int | None = Field(default=None, serialization_alias="maxOutputTokens")
     temperature: float | None = None
     reasoning_effort: str | None = Field(default=None, serialization_alias="reasoningEffort")
+    operation_key: str | None = Field(default=None, serialization_alias="operationKey")
     response_id: str | None = Field(serialization_alias="responseId")
     error_type: str | None = Field(serialization_alias="errorType")
     error_message: str | None = Field(serialization_alias="errorMessage")

@@ -210,6 +210,7 @@ async def enrich_brand_profile(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="enrich_profile",
+                operation_key="brand_profile_enrichment",
                 entity_type="brand_section",
                 entity_id="profile",
             ),

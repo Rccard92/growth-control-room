@@ -142,6 +142,7 @@ async def import_safe_claims_from_file(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="import_safe_claims",
+                operation_key="safe_claims_import",
                 entity_type="brand_section",
                 entity_id="safe_claims",
             ),

@@ -356,6 +356,7 @@ async def generate_editorial_article_core(
                     project_id=project_id,
                     module="article_generator",
                     operation="generate_article",
+                    operation_key="article_draft_generation",
                     entity_type="editorial_item",
                     entity_id=str(item_id),
                 ),

@@ -55,6 +55,7 @@ class AiRequestMetadata(BaseModel):
     context_hash: str | None = None
     context_chars: int | None = None
     context_blocks_used: list[str] | None = None
+    operation_key: str | None = None
 
 
 def is_openai_configured() -> bool:
@@ -84,6 +85,7 @@ def _context_fields_from_metadata(metadata: AiRequestMetadata) -> dict[str, Any]
 def _model_policy_fields(
     resolved: AiResolvedModel,
     requested_model: str | None,
+    metadata: AiRequestMetadata,
 ) -> dict[str, Any]:
     return {
         "model_tier": resolved.tier,
@@ -92,6 +94,7 @@ def _model_policy_fields(
         "max_output_tokens": resolved.max_output_tokens,
         "temperature": Decimal(str(resolved.temperature)),
         "reasoning_effort": resolved.reasoning_effort,
+        "operation_key": resolved.operation_key or metadata.operation_key,
     }
 
 
@@ -229,7 +232,7 @@ def _base_log_input(
         prompt_preview=prompt_preview,
         prompt_cache_key=prompt_cache_key,
         **_context_fields_from_metadata(metadata),
-        **_model_policy_fields(resolved, requested_model),
+        **_model_policy_fields(resolved, requested_model, metadata),
         **extra,
     )
 
@@ -243,11 +246,18 @@ async def generate_structured_json(
     model: str | None = None,
     prompt_cache_key: str | None = None,
 ) -> dict[str, Any]:
-    resolved = resolve_ai_model(
-        metadata,
-        context_profile=metadata.context_profile,
-        requested_model=model,
-    )
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        await check_budget_before_request(session, metadata.project_id)
+        resolved = await resolve_ai_model(
+            session,
+            metadata,
+            project_id=metadata.project_id,
+            context_profile=metadata.context_profile,
+            requested_model=model,
+        )
+        await session.commit()
+
     if resolved.warning:
         logger.info(
             "AI model policy warning (project=%s module=%s): %s",
@@ -261,11 +271,6 @@ async def generate_structured_json(
     prompt_preview = None
     if settings.ai_log_prompt_preview:
         prompt_preview = truncate_preview(f"[system]\n{system_prompt}\n\n[user]\n{user_prompt}")
-
-    session_factory = get_session_factory()
-    async with session_factory() as session:
-        await check_budget_before_request(session, metadata.project_id)
-        await session.commit()
 
     started = time.perf_counter()
     response = None
@@ -291,7 +296,11 @@ async def generate_structured_json(
                 and active_resolved.policy_source != "schema_fallback_retry"
             ):
                 schema_retried = True
-                active_resolved = resolve_standard_fallback()
+                async with session_factory() as retry_session:
+                    active_resolved = await resolve_standard_fallback(
+                        retry_session, metadata.project_id
+                    )
+                    await retry_session.commit()
                 logger.warning(
                     "Schema parse failed; retry with standard tier (project=%s module=%s)",
                     metadata.project_id,

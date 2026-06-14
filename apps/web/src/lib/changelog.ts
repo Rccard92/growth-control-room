@@ -9,6 +9,18 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.4-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Added configurable AI Model Settings panel in AI Costs",
+      "Added AI Operation Registry for all AI touchpoints",
+      "Model routing from project/global DB settings before env fallback",
+      "Fixed AI Usage summary routingInsights validation error",
+      "operation_key on usage logs and byOperationKey summary breakdown",
+    ],
+  },
+  {
     version: "0.5.3-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

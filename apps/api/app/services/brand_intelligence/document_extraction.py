@@ -129,6 +129,7 @@ async def run_ai_extraction(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="extract_document",
+                operation_key="brand_document_extraction",
                 entity_type="brand_section",
                 entity_id=str(document_id),
             ),

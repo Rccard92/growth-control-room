@@ -98,4 +98,7 @@ export const queryKeys = {
     estimate: (projectId: string, operation: string, count: number) =>
       ["aiUsage", projectId, "estimate", operation, count] as const,
   },
+  aiModelSettings: {
+    list: (projectId: string) => ["aiModelSettings", projectId] as const,
+  },
 };

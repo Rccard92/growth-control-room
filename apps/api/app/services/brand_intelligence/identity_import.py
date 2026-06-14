@@ -157,6 +157,7 @@ async def import_identity_from_file(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="import_identity",
+                operation_key="brand_identity_import",
                 entity_type="brand_section",
                 entity_id="identity",
             ),

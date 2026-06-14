@@ -126,8 +126,8 @@ def test_summary_by_module_operation_day() -> None:
         assert len(summary["byOperation"]) == 2
         assert len(summary["byDay"]) == 1
         assert len(summary["byTier"]) == 2
-        assert summary["routingInsights"]["requestsByTier"]["standard"] == 1
-        assert summary["routingInsights"]["requestsByTier"]["cheap"] == 1
+        assert summary["routingInsights"]["requests_by_tier"]["standard"] == 1
+        assert summary["routingInsights"]["requests_by_tier"]["cheap"] == 1
 
     asyncio.run(run())
 
@@ -207,6 +207,9 @@ def test_log_success_request_mock_openai() -> None:
         session_factory = MagicMock()
         session = AsyncMock()
         session.commit = AsyncMock()
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+        )
         session.__aenter__ = AsyncMock(return_value=session)
         session.__aexit__ = AsyncMock(return_value=None)
         session_factory.return_value = session
@@ -251,6 +254,9 @@ def test_log_failed_request() -> None:
         session_factory = MagicMock()
         session = AsyncMock()
         session.commit = AsyncMock()
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+        )
         session.__aenter__ = AsyncMock(return_value=session)
         session.__aexit__ = AsyncMock(return_value=None)
         session_factory.return_value = session
@@ -323,6 +329,7 @@ def test_apply_log_filters_use_naive_datetimes() -> None:
         operation=None,
         model=None,
         model_tier=None,
+        operation_key=None,
         status=None,
     )
     compiled = str(filtered.compile(compile_kwargs={"literal_binds": True}))

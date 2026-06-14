@@ -230,6 +230,7 @@ async def generate_brief_from_batch(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="generate_brief_from_batch",
+                operation_key="brand_brief_synthesis",
                 entity_type="brand_section",
                 entity_id="intelligence_brief",
                 job_id=str(batch_id),

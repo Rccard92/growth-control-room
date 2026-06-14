@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
+    from app.models.ai_model_setting import AiModelSetting
     from app.models.ai_run import AiRun
     from app.models.ai_usage_log import AiUsageLog
     from app.models.alert import Alert
@@ -66,6 +67,10 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     ai_usage_logs: Mapped[list["AiUsageLog"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    ai_model_settings: Mapped[list["AiModelSetting"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

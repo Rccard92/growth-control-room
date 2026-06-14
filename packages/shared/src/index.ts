@@ -8,6 +8,14 @@ export type {
   AiUsageEstimate,
   AiUsageFilters,
 } from "./types/ai-usage";
+export type {
+  AiAvailableModelItem,
+  AiAvailableModelsResponse,
+  AiModelSettingItem,
+  AiModelSettingMutationResponse,
+  AiModelSettingsListResponse,
+  AiModelSettingUpdateInput,
+} from "./types/ai-model-settings";
 export type { Project, CreateProjectInput, ProjectStatus } from "./types/project";
 export type {
   DateRangePreset,

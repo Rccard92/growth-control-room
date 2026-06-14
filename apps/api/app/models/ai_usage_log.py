@@ -55,6 +55,7 @@ class AiUsageLog(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     max_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     temperature: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)
     reasoning_effort: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    operation_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     response_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

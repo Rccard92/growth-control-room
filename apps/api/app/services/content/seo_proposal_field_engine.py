@@ -435,11 +435,20 @@ async def generate_seo_proposal_field(
     risk_level: str
     seo_module = "product_seo" if entity_type == "product" else "content_seo"
     cache_key = build_prompt_cache_key(store.project_id, seo_module, ctx.context_hash)
+    if field == "imageAlt":
+        seo_operation_key = (
+            "product_image_alt" if entity_type == "product" else "collection_image_alt"
+        )
+    elif entity_type == "product":
+        seo_operation_key = "product_seo_field"
+    else:
+        seo_operation_key = "collection_seo_field"
     ai_metadata = enrich_ai_metadata(
         AiRequestMetadata(
             project_id=store.project_id,
             module=seo_module,
             operation="generate_field",
+            operation_key=seo_operation_key,
             entity_type=(
                 "product_image"
                 if field == "imageAlt" and entity_type == "product"

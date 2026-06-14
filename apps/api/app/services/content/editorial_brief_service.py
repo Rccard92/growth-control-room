@@ -284,6 +284,7 @@ async def generate_editorial_brief_core(
                     project_id=project_id,
                     module="blog_brief",
                     operation="batch_brief_item" if job_id else "generate_brief",
+                    operation_key="blog_brief_batch_item" if job_id else "blog_brief_generation",
                     entity_type="editorial_item",
                     entity_id=str(item_id),
                     job_id=job_id,

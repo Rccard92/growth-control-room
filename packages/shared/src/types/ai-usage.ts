@@ -29,6 +29,7 @@ export interface AiUsageSummary {
   byOperation: AiUsageBreakdownItem[];
   byModel: AiUsageBreakdownItem[];
   byTier: AiUsageBreakdownItem[];
+  byOperationKey: AiUsageBreakdownItem[];
   byDay: AiUsageBreakdownItem[];
   routingInsights?: AiRoutingInsights;
   projectCount?: number;
@@ -71,6 +72,7 @@ export interface AiUsageLog {
   maxOutputTokens: number | null;
   temperature: number | null;
   reasoningEffort: string | null;
+  operationKey: string | null;
   responseId: string | null;
   errorType: string | null;
   errorMessage: string | null;
@@ -108,6 +110,7 @@ export interface AiUsageFilters {
   operation?: string;
   model?: string;
   modelTier?: string;
+  operationKey?: string;
   status?: string;
   limit?: number;
   offset?: number;

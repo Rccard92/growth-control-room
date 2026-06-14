@@ -30,7 +30,7 @@ Guida rapida per ridurre i costi OpenAI senza degradare la qualità dei contenut
 
 | Env | Ruolo |
 |-----|-------|
-| `OPENAI_MODEL` | Fallback globale (es. `gpt-4o-mini`) |
+| `OPENAI_MODEL` | Fallback legacy finale (non modello operativo primario) |
 | `OPENAI_MODEL_CHEAP` | Tier cheap (default: `OPENAI_MODEL`) |
 | `OPENAI_MODEL_STANDARD` | Tier standard (default: `OPENAI_MODEL`) |
 | `OPENAI_MODEL_PREMIUM` | Tier premium (default: `gpt-4o`) |
@@ -38,6 +38,17 @@ Guida rapida per ridurre i costi OpenAI senza degradare la qualità dei contenut
 | `OPENAI_MODEL_FALLBACK` | Ripiego se tier non risolvibile |
 | `AI_DAILY_BUDGET_USD` / `AI_MONTHLY_BUDGET_USD` | Guardrail budget |
 | `AI_ENABLE_MODEL_FALLBACK_ON_SCHEMA_ERROR` | Retry standard su errori JSON |
+
+## Come cambiare modello da UI
+
+1. Apri **AI Costs** nel progetto
+2. Tab **Model Settings**
+3. Trova il punto AI (es. `product_image_alt`)
+4. Clic **Modifica** → scegli modello (select o input libero), tier, max tokens, temperature
+5. **Salva** — la prossima generazione usa il nuovo modello senza redeploy Railway
+6. **Ripristina** torna al consigliato registry/env
+
+Banner in pagina: le variabili Railway sono solo default/fallback.
 
 ## Verifica in AI Costs
 

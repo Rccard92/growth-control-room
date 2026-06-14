@@ -316,6 +316,11 @@ async def generate_seo_proposal(
                         project_id=store.project_id,
                         module=seo_module,
                         operation="generate_proposal",
+                        operation_key=(
+                            "product_seo_full_proposal"
+                            if entity_type == "product"
+                            else "collection_seo_full_proposal"
+                        ),
                         entity_type=entity_type,
                         entity_id=entity_id,
                     ),

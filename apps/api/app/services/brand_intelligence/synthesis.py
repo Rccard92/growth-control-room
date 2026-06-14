@@ -357,6 +357,7 @@ async def synthesize_section(
             project_id=project_id,
             module="brand_intelligence",
             operation="synthesize_section",
+            operation_key="brand_synthesis",
             entity_type="brand_section",
             entity_id=section_key,
             job_id=str(batch_id),

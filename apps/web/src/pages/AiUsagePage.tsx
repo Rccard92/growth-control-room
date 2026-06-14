@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import type { AiUsageLog } from "@gcr/shared";
+import { AiModelSettingsPanel } from "../components/AiModelSettingsPanel";
 import { PageHeader } from "../components/PageHeader";
 import { MetricCard } from "../components/MetricCard";
 import { DateRangeSelector } from "../components/DateRangeSelector";
@@ -36,6 +37,29 @@ const TIER_OPTIONS = [
   { value: "reasoning", label: "Reasoning" },
   { value: "fallback", label: "Fallback" },
 ];
+
+type AiUsageTab = "overview" | "logs" | "settings" | "budget";
+
+const TAB_OPTIONS: { id: AiUsageTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "logs", label: "Logs" },
+  { id: "settings", label: "Model Settings" },
+  { id: "budget", label: "Budget" },
+];
+
+function formatPolicySource(source: string | null): string {
+  if (!source) return "sconosciuta";
+  const map: Record<string, string> = {
+    project_setting: "impostazione progetto",
+    global_setting: "impostazione globale",
+    registry_default: "consigliato registry",
+    env_fallback: "fallback env tier",
+    legacy_openai_model: "OPENAI_MODEL legacy",
+    schema_fallback_retry: "retry schema fallback",
+    explicit_override: "override esplicito",
+  };
+  return map[source] ?? source;
+}
 
 function formatCost(value: number | null | undefined): string {
   if (value == null) return "—";
@@ -90,6 +114,7 @@ function LogDetailModal({
           <dl className="ai-usage-detail__grid">
             <div><dt>Modulo</dt><dd>{log.module}</dd></div>
             <div><dt>Operazione</dt><dd>{log.operation}</dd></div>
+            <div><dt>Operation key</dt><dd>{log.operationKey ?? "—"}</dd></div>
             <div><dt>Modello</dt><dd>{log.model}</dd></div>
             <div><dt>Stato</dt><dd>{log.status}</dd></div>
             <div><dt>Entity</dt><dd>{log.entityType ?? "—"} {log.entityId ?? ""}</dd></div>
@@ -109,6 +134,17 @@ function LogDetailModal({
             <div><dt>Context hash</dt><dd>{log.contextHash ?? "—"}</dd></div>
             <div><dt>Blocchi contesto</dt><dd>{formatContextBlocks(log.contextBlocksUsed)}</dd></div>
           </dl>
+          {(log.operationKey || log.modelPolicySource) && (
+            <div className="ai-usage-detail__insight gcr-alert gcr-alert--info">
+              Questa richiesta ha usato il modello <strong>{log.model}</strong>
+              {log.operationKey && (
+                <> perché <strong>{log.operationKey}</strong> usa setting {formatPolicySource(log.modelPolicySource)}</>
+              )}
+              {!log.operationKey && log.modelPolicySource && (
+                <> (policy: {formatPolicySource(log.modelPolicySource)})</>
+              )}
+            </div>
+          )}
           {log.contextProfile && (
             <div className="ai-usage-detail__insight gcr-alert gcr-alert--info">
               Questo task ha usato il profilo: <strong>{log.contextProfile}</strong>
@@ -153,6 +189,7 @@ export function AiUsagePage() {
   const [operationFilter, setOperationFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
   const [tierFilter, setTierFilter] = useState("");
+  const [activeTab, setActiveTab] = useState<AiUsageTab>("overview");
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
   const filters = useMemo(
@@ -220,6 +257,20 @@ export function AiUsagePage() {
         </div>
       )}
 
+      <div className="ai-usage-page__tabs">
+        {TAB_OPTIONS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`ai-usage-page__tab${activeTab === tab.id ? " ai-usage-page__tab--active" : ""}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab !== "settings" && (
       <div className="ai-usage-page__toolbar">
         <DateRangeSelector value={dateRange} onChange={setDateRange} />
         <select
@@ -257,12 +308,29 @@ export function AiUsagePage() {
           ))}
         </select>
       </div>
+      )}
 
-      {summaryQuery.isLoading ? (
+      {activeTab === "settings" && <AiModelSettingsPanel projectId={projectId} />}
+
+      {activeTab === "budget" && budgetQuery.data && (
+        <div className="gcr-card">
+          <h3 className="gcr-card__title">Budget AI</h3>
+          <dl className="ai-usage-detail__grid">
+            <div><dt>Speso oggi</dt><dd>${budgetQuery.data.dailySpent.toFixed(2)}</dd></div>
+            <div><dt>Speso mese</dt><dd>${budgetQuery.data.monthlySpent.toFixed(2)}</dd></div>
+            <div><dt>Budget giornaliero</dt><dd>{budgetQuery.data.dailyBudgetUsd != null ? `$${budgetQuery.data.dailyBudgetUsd}` : "—"}</dd></div>
+            <div><dt>Budget mensile</dt><dd>{budgetQuery.data.monthlyBudgetUsd != null ? `$${budgetQuery.data.monthlyBudgetUsd}` : "—"}</dd></div>
+            <div><dt>Vicino al limite</dt><dd>{budgetQuery.data.nearLimit ? "Sì" : "No"}</dd></div>
+            <div><dt>Bloccato</dt><dd>{budgetQuery.data.blocked ? "Sì" : "No"}</dd></div>
+          </dl>
+        </div>
+      )}
+
+      {activeTab === "overview" && summaryQuery.isLoading ? (
         <div className="gcr-skeleton ai-usage-page__skeleton" />
-      ) : summaryQuery.isError ? (
+      ) : activeTab === "overview" && summaryQuery.isError ? (
         <div className="gcr-alert gcr-alert--error">Impossibile caricare i dati AI usage.</div>
-      ) : summary ? (
+      ) : activeTab === "overview" && summary ? (
         <>
           <div className="gcr-grid gcr-grid--4 ai-usage-page__kpis">
             <MetricCard label="Costo stimato periodo" value={formatCost(summary.totalEstimatedCost)} />
@@ -374,62 +442,59 @@ export function AiUsagePage() {
             </div>
           )}
 
-          <div className="gcr-card ai-usage-page__table-card">
-            <h3 className="gcr-card__title">Ultime richieste AI</h3>
-            {logs.length === 0 ? (
-              <p className="gcr-card__description">Nessuna richiesta registrata nel periodo.</p>
-            ) : (
-              <div className="ai-usage-table-wrap">
-                <table className="ai-usage-table">
-                  <thead>
-                    <tr>
-                      <th>Data/ora</th>
-                      <th>Modulo</th>
-                      <th>Profilo</th>
-                      <th>Tier</th>
-                      <th>Operazione</th>
-                      <th>Modello</th>
-                      <th>In</th>
-                      <th>Out</th>
-                      <th>Cached</th>
-                      <th>Costo</th>
-                      <th>Stato</th>
-                      <th>Durata</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map((row: AiUsageLog) => (
-                      <tr
-                        key={row.id}
-                        className="ai-usage-table__row"
-                        onClick={() => setSelectedLogId(row.id)}
-                      >
-                        <td>{new Date(row.createdAt).toLocaleString("it-IT")}</td>
-                        <td>{row.module}</td>
-                        <td>{row.contextProfile ?? "—"}</td>
-                        <td>{row.modelTier ?? "—"}</td>
-                        <td>{row.operation}</td>
-                        <td>{row.model}</td>
-                        <td>{row.inputTokens}</td>
-                        <td>{row.outputTokens}</td>
-                        <td>{row.cachedInputTokens}</td>
-                        <td>{formatCost(row.estimatedTotalCost)}</td>
-                        <td>
-                          <StatusBadge
-                            variant={row.status === "success" ? "active" : "error"}
-                            label={row.status === "success" ? "OK" : "Errore"}
-                          />
-                        </td>
-                        <td>{row.durationMs != null ? `${row.durationMs}ms` : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </>
       ) : null}
+
+      {activeTab === "logs" && (
+        <div className="gcr-card ai-usage-page__table-card">
+          <h3 className="gcr-card__title">Richieste AI</h3>
+          {logsQuery.isLoading ? (
+            <div className="gcr-skeleton" style={{ height: 120 }} />
+          ) : logs.length === 0 ? (
+            <p className="gcr-card__description">Nessuna richiesta registrata nel periodo.</p>
+          ) : (
+            <div className="ai-usage-table-wrap">
+              <table className="ai-usage-table">
+                <thead>
+                  <tr>
+                    <th>Data/ora</th>
+                    <th>Operation key</th>
+                    <th>Modulo</th>
+                    <th>Profilo</th>
+                    <th>Tier</th>
+                    <th>Modello</th>
+                    <th>Costo</th>
+                    <th>Stato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((row: AiUsageLog) => (
+                    <tr
+                      key={row.id}
+                      className="ai-usage-table__row"
+                      onClick={() => setSelectedLogId(row.id)}
+                    >
+                      <td>{new Date(row.createdAt).toLocaleString("it-IT")}</td>
+                      <td>{row.operationKey ?? "—"}</td>
+                      <td>{row.module}</td>
+                      <td>{row.contextProfile ?? "—"}</td>
+                      <td>{row.modelTier ?? "—"}</td>
+                      <td>{row.model}</td>
+                      <td>{formatCost(row.estimatedTotalCost)}</td>
+                      <td>
+                        <StatusBadge
+                          variant={row.status === "success" ? "active" : "error"}
+                          label={row.status === "success" ? "OK" : "Errore"}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <LogDetailModal
         open={Boolean(selectedLogId)}

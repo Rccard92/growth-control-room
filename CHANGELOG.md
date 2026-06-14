@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.4-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added configurable AI Model Settings panel in AI Costs (per-operation model/tier/tokens/temperature)
+- Added AI Operation Registry with implemented and planned operation keys
+- Model routing resolves from project/global DB settings before env fallback
+- Fixed AI Usage summary 500: routingInsights camelCase/snake_case schema mismatch
+- Extended AiUsageLog with operation_key; summary breakdown byOperationKey
+- Migration 033: ai_model_settings table
+
 ## [0.5.3-alpha] - 2026-06-13
 
 Tipo: Alpha patch

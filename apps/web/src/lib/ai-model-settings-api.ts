@@ -1,0 +1,47 @@
+import type {
+  AiAvailableModelsResponse,
+  AiModelSettingMutationResponse,
+  AiModelSettingsListResponse,
+  AiModelSettingUpdateInput,
+} from "@gcr/shared";
+import { apiFetch } from "./api";
+
+export function getAiModelSettings(projectId: string): Promise<AiModelSettingsListResponse> {
+  return apiFetch<AiModelSettingsListResponse>(
+    `/api/projects/${projectId}/ai-model-settings`,
+  );
+}
+
+export function updateAiModelSetting(
+  projectId: string,
+  operationKey: string,
+  body: AiModelSettingUpdateInput,
+): Promise<AiModelSettingMutationResponse> {
+  return apiFetch<AiModelSettingMutationResponse>(
+    `/api/projects/${projectId}/ai-model-settings/${operationKey}`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
+export function resetAiModelSetting(
+  projectId: string,
+  operationKey: string,
+): Promise<AiModelSettingMutationResponse> {
+  return apiFetch<AiModelSettingMutationResponse>(
+    `/api/projects/${projectId}/ai-model-settings/${operationKey}/reset`,
+    { method: "POST" },
+  );
+}
+
+export function seedAiModelDefaults(projectId: string): Promise<{
+  globalCreated: number;
+  projectCreated: number;
+}> {
+  return apiFetch(`/api/projects/${projectId}/ai-model-settings/seed-defaults`, {
+    method: "POST",
+  });
+}
+
+export function getAvailableAiModels(): Promise<AiAvailableModelsResponse> {
+  return apiFetch<AiAvailableModelsResponse>("/api/ai-model-settings/available-models");
+}

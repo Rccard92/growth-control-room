@@ -80,6 +80,27 @@ Opzioni:
 
 Vedi anche [Ottimizzazione costi AI](cost-optimization.md).
 
+### AI Operation Registry e Model Settings (0.5.4-alpha)
+
+**Registry:** `apps/api/app/services/ai/operation_registry.py` elenca ogni punto AI del tool (`operation_key`, tier consigliato, token, temperature, qualità, stato `implemented|planned|non_ai`).
+
+**DB:** tabella `ai_model_settings` — override per progetto o globali (`project_id` nullable). Seed iniziale da registry + env Railway.
+
+**Ordine risoluzione modello** in `resolve_ai_model()`:
+
+1. Setting manuale progetto per `operation_key`
+2. Setting globale per `operation_key`
+3. Registry default + env tier
+4. `OPENAI_MODEL_FALLBACK`
+5. `OPENAI_MODEL` legacy
+6. Errore se nessun modello disponibile
+
+`OPENAI_MODEL` Railway **non** comanda più tutte le richieste: serve solo come fallback finale e seed iniziale. Le scelte operative vivono in **AI Costs → Model Settings**.
+
+`AiRequestMetadata.operation_key` è obbligatorio sui call site implementati; se assente, inferenza da `module+operation+context_profile` con warning (no crash).
+
+API: `GET/PUT/POST /api/projects/{id}/ai-model-settings`, `GET /api/ai-model-settings/available-models`.
+
 ### Moduli tracciati
 
 `brand_intelligence`, `product_seo`, `content_seo`, `blog_brief`, `article_generator` (+ operazioni batch BI/editorial).

@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.services.ai.operation_registry import (
+    get_operation,
+    infer_operation_key,
+    resolve_registry_model,
+)
 
 if TYPE_CHECKING:
     from app.services.ai.ai_client import AiRequestMetadata
+
+logger = logging.getLogger(__name__)
 
 
 class AiModelTier(str, Enum):
@@ -69,10 +79,12 @@ class AiModelPolicyRule(BaseModel):
 
 class AiResolvedModel(BaseModel):
     model: str
-    tier: str = Field(serialization_alias="tier")
+    tier: str
     max_output_tokens: int
     temperature: float
     reasoning_effort: str | None = None
+    fallback_model: str | None = None
+    operation_key: str | None = None
     policy_source: str
     warning: str | None = None
 
@@ -146,84 +158,210 @@ def _profile_params(profile: str | None) -> dict[str, object]:
     return PROFILE_PARAMS["generic"]
 
 
-def resolve_standard_fallback() -> AiResolvedModel:
+def _legacy_fallback_model() -> str | None:
+    if settings.openai_model_fallback and str(settings.openai_model_fallback).strip():
+        return str(settings.openai_model_fallback).strip()
+    if settings.openai_model and str(settings.openai_model).strip():
+        return str(settings.openai_model).strip()
+    return None
+
+
+def _resolve_from_registry(operation_key: str) -> AiResolvedModel | None:
+    op = get_operation(operation_key)
+    if op is None:
+        return None
+    tier = AiModelTier(op.recommended_tier)
+    model = resolve_registry_model(op) or tier_to_model_name(tier)
+    if not model:
+        return None
+    return AiResolvedModel(
+        model=model,
+        tier=tier.value,
+        max_output_tokens=op.recommended_max_output_tokens,
+        temperature=op.recommended_temperature,
+        fallback_model=_legacy_fallback_model(),
+        operation_key=operation_key,
+        policy_source="registry_default",
+        warning=None,
+    )
+
+
+async def resolve_standard_fallback(
+    session: AsyncSession,
+    project_id: UUID,
+) -> AiResolvedModel:
+    from app.services.ai.model_settings_service import (
+        get_effective_setting_with_source,
+        seed_default_settings,
+    )
+
     """Resolve standard tier for schema-error retry."""
-    tier = AiModelTier.STANDARD
-    model = tier_to_model_name(tier) or settings.openai_model
+    await seed_default_settings(session, project_id=None, source="env_seed")
+    setting = await get_effective_setting_with_source(session, project_id, "blog_brief_generation")
+    if setting[0] and setting[0].enabled:
+        row = setting[0]
+        return AiResolvedModel(
+            model=row.model,
+            tier=row.model_tier,
+            max_output_tokens=row.max_output_tokens or 2000,
+            temperature=float(row.temperature or 0.45),
+            reasoning_effort=row.reasoning_effort,
+            fallback_model=row.fallback_model,
+            operation_key="blog_brief_generation",
+            policy_source="schema_fallback_retry",
+            warning=None,
+        )
     params = PROFILE_PARAMS["generic"]
+    tier = AiModelTier.STANDARD
+    model = tier_to_model_name(tier) or _legacy_fallback_model()
+    if not model:
+        raise ValueError("Nessun modello AI disponibile per schema fallback")
     return AiResolvedModel(
         model=model,
         tier=tier.value,
         max_output_tokens=int(params["max_output_tokens"]),
         temperature=float(params["temperature"]),
+        fallback_model=_legacy_fallback_model(),
+        operation_key=None,
         policy_source="schema_fallback_retry",
         warning=None,
     )
 
 
-def resolve_ai_model(
+def _resolve_operation_key(
     metadata: AiRequestMetadata,
     *,
+    context_profile: str | None,
+    operation_key: str | None,
+) -> tuple[str | None, list[str]]:
+    warnings: list[str] = []
+    if operation_key:
+        return operation_key, warnings
+    if metadata.operation_key:
+        return metadata.operation_key, warnings
+    inferred = infer_operation_key(
+        metadata.module,
+        metadata.operation,
+        context_profile or metadata.context_profile,
+        metadata.entity_type,
+    )
+    if inferred:
+        warnings.append(f"operation_key mancante; inferito '{inferred}'")
+        return inferred, warnings
+    warnings.append("operation_key mancante e non inferibile")
+    return None, warnings
+
+
+async def resolve_ai_model(
+    session: AsyncSession,
+    metadata: AiRequestMetadata,
+    *,
+    project_id: UUID,
     context_profile: str | None = None,
+    operation_key: str | None = None,
     requested_model: str | None = None,
     task_complexity: str | None = None,
 ) -> AiResolvedModel:
-    del task_complexity  # reserved for future complexity hints
+    del task_complexity
+    from app.services.ai.model_settings_service import (
+        compute_guardrail_warnings,
+        get_effective_setting_with_source,
+        seed_default_settings,
+    )
 
     profile = context_profile or metadata.context_profile
     warnings: list[str] = []
-    policy_source = "context_profile"
+
+    resolved_key, key_warnings = _resolve_operation_key(
+        metadata,
+        context_profile=profile,
+        operation_key=operation_key,
+    )
+    warnings.extend(key_warnings)
+    if resolved_key:
+        for w in key_warnings:
+            logger.warning("AI routing: %s (project=%s module=%s)", w, project_id, metadata.module)
+
+    await seed_default_settings(session, project_id=None, source="env_seed")
+
+    if requested_model and str(requested_model).strip() and settings.ai_allow_model_override:
+        model = str(requested_model).strip()
+        tier = infer_tier_from_model(model).value
+        params = _profile_params(profile)
+        op = get_operation(resolved_key) if resolved_key else None
+        guardrails = compute_guardrail_warnings(op, model_tier=tier, model_name=model) if op else []
+        warnings.extend(guardrails)
+        return AiResolvedModel(
+            model=model,
+            tier=tier,
+            max_output_tokens=int(params.get("max_output_tokens", 2000)),
+            temperature=float(params.get("temperature", 0.45)),
+            operation_key=resolved_key,
+            policy_source="explicit_override",
+            fallback_model=_legacy_fallback_model(),
+            warning="; ".join(warnings) if warnings else None,
+        )
+
+    if resolved_key:
+        setting_row, source = await get_effective_setting_with_source(
+            session, project_id, resolved_key
+        )
+        if setting_row is not None and source:
+            op = get_operation(resolved_key)
+            guardrails = compute_guardrail_warnings(
+                op,
+                model_tier=setting_row.model_tier,
+                model_name=setting_row.model,
+            )
+            warnings.extend(guardrails)
+            return AiResolvedModel(
+                model=setting_row.model,
+                tier=setting_row.model_tier,
+                max_output_tokens=setting_row.max_output_tokens or 2000,
+                temperature=float(setting_row.temperature or 0.45),
+                reasoning_effort=setting_row.reasoning_effort,
+                fallback_model=setting_row.fallback_model,
+                operation_key=resolved_key,
+                policy_source=source,
+                warning="; ".join(warnings) if warnings else None,
+            )
+
+    if resolved_key:
+        registry_resolved = _resolve_from_registry(resolved_key)
+        if registry_resolved:
+            op = get_operation(resolved_key)
+            guardrails = compute_guardrail_warnings(
+                op,
+                model_tier=registry_resolved.tier,
+                model_name=registry_resolved.model,
+            )
+            warnings.extend(guardrails)
+            registry_resolved.warning = "; ".join(warnings) if warnings else None
+            return registry_resolved
+
     tier = _profile_tier(profile)
     params = _profile_params(profile)
+    model = tier_to_model_name(tier)
+    policy_source = "env_fallback"
+    if not model:
+        model = _legacy_fallback_model()
+        policy_source = "legacy_openai_model"
+    if not model:
+        raise ValueError(
+            "Nessun modello AI configurato. Imposta AI Model Settings o variabili env tier."
+        )
 
-    if requested_model and str(requested_model).strip():
-        if settings.ai_allow_model_override:
-            model = str(requested_model).strip()
-            inferred = infer_tier_from_model(model)
-            expected = _profile_tier(profile)
-            policy_source = "explicit_override"
-            if expected == AiModelTier.CHEAP and inferred in (
-                AiModelTier.PREMIUM,
-                AiModelTier.REASONING,
-            ):
-                warnings.append(
-                    f"Override premium/reasoning su profilo cheap ({profile or 'unknown'})"
-                )
-            tier = inferred
-            max_tokens = int(params.get("max_output_tokens", 2000))
-            temperature = float(params.get("temperature", 0.45))
-        else:
-            warnings.append("Model override ignorato: AI_ALLOW_MODEL_OVERRIDE=false")
-            model = tier_to_model_name(tier) or settings.openai_model
-            max_tokens = int(params["max_output_tokens"])
-            temperature = float(params["temperature"])
-            policy_source = "context_profile"
-    else:
-        model = tier_to_model_name(tier)
-        if not model:
-            fallback_tier = AiModelTier.FALLBACK
-            model = tier_to_model_name(fallback_tier) or settings.openai_model
-            warnings.append(f"Modello non configurato per tier {tier.value}; uso fallback")
-            tier = fallback_tier
-            policy_source = "fallback"
-        max_tokens = int(params["max_output_tokens"])
-        temperature = float(params["temperature"])
-
-    reasoning_effort: str | None = None
-    if tier == AiModelTier.REASONING and settings.openai_model_reasoning:
-        reasoning_effort = "medium"
-    elif params.get("reasoning_if_available") and tier != AiModelTier.REASONING:
-        pass
-
-    if not profile:
-        policy_source = "fallback"
+    op = get_operation(resolved_key) if resolved_key else None
+    guardrails = compute_guardrail_warnings(op, model_tier=tier.value, model_name=model) if op else []
+    warnings.extend(guardrails)
 
     return AiResolvedModel(
         model=model,
         tier=tier.value,
-        max_output_tokens=max_tokens,
-        temperature=temperature,
-        reasoning_effort=reasoning_effort,
+        max_output_tokens=int(params["max_output_tokens"]),
+        temperature=float(params["temperature"]),
+        fallback_model=_legacy_fallback_model(),
+        operation_key=resolved_key,
         policy_source=policy_source,
         warning="; ".join(warnings) if warnings else None,
     )

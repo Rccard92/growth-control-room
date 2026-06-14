@@ -59,9 +59,10 @@ def _to_summary_response(data: dict) -> AiUsageSummaryResponse:
         by_operation=breakdown(data["byOperation"]),
         by_model=breakdown(data["byModel"]),
         by_tier=breakdown(data.get("byTier", [])),
+        by_operation_key=breakdown(data.get("byOperationKey", [])),
         by_day=breakdown(data["byDay"], use_date=True),
         routing_insights=(
-            AiRoutingInsights(**data["routingInsights"])
+            AiRoutingInsights.model_validate(data["routingInsights"])
             if data.get("routingInsights")
             else None
         ),
@@ -107,6 +108,7 @@ def _log_to_read(row) -> AiUsageLogRead:
         max_output_tokens=row.max_output_tokens,
         temperature=float(row.temperature) if row.temperature is not None else None,
         reasoning_effort=row.reasoning_effort,
+        operation_key=row.operation_key,
         response_id=row.response_id,
         error_type=row.error_type,
         error_message=row.error_message,
@@ -127,6 +129,7 @@ async def project_ai_usage_summary(
     operation: str | None = None,
     model: str | None = None,
     model_tier: str | None = Query(default=None, alias="modelTier"),
+    operation_key: str | None = Query(default=None, alias="operationKey"),
     session: AsyncSession = Depends(get_db),
 ) -> AiUsageSummaryResponse:
     await get_project_in_default_workspace(project_id, session)
@@ -139,6 +142,7 @@ async def project_ai_usage_summary(
         operation=operation,
         model=model,
         model_tier=model_tier,
+        operation_key=operation_key,
     )
     return _to_summary_response(data)
 
@@ -156,6 +160,7 @@ async def project_ai_usage_logs(
     operation: str | None = None,
     model: str | None = None,
     model_tier: str | None = Query(default=None, alias="modelTier"),
+    operation_key: str | None = Query(default=None, alias="operationKey"),
     status: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -171,6 +176,7 @@ async def project_ai_usage_logs(
         operation=operation,
         model=model,
         model_tier=model_tier,
+        operation_key=operation_key,
         status=status,
         limit=limit,
         offset=offset,

@@ -57,6 +57,7 @@ class UsageLogInput:
     context_hash: str | None = None
     context_chars: int | None = None
     context_blocks_used: list[str] | None = None
+    operation_key: str | None = None
     model_tier: str | None = None
     model_policy_source: str | None = None
     requested_model: str | None = None
@@ -111,6 +112,7 @@ async def record_usage_log(session: AsyncSession, data: UsageLogInput) -> AiUsag
         context_hash=data.context_hash,
         context_chars=data.context_chars,
         context_blocks_used=data.context_blocks_used,
+        operation_key=data.operation_key,
         model_tier=data.model_tier,
         model_policy_source=data.model_policy_source,
         requested_model=data.requested_model,
@@ -192,6 +194,7 @@ def _apply_log_filters(
     operation: str | None,
     model: str | None,
     model_tier: str | None,
+    operation_key: str | None,
     status: str | None,
 ):
     if project_id is not None:
@@ -208,6 +211,8 @@ def _apply_log_filters(
         stmt = stmt.where(AiUsageLog.model == model)
     if model_tier:
         stmt = stmt.where(AiUsageLog.model_tier == model_tier)
+    if operation_key:
+        stmt = stmt.where(AiUsageLog.operation_key == operation_key)
     if status:
         stmt = stmt.where(AiUsageLog.status == status)
     return stmt
@@ -238,12 +243,12 @@ def _compute_routing_insights(rows: list[AiUsageLog], by_tier: dict[str, dict[st
         if tier_to_model_name(tier) is None:
             unconfigured.append(tier.value)
     return {
-        "costByTier": cost_by_tier,
-        "requestsByTier": requests_by_tier,
-        "premiumOnCheapProfileCount": premium_on_cheap,
-        "explicitOverrideCount": explicit_override,
-        "unconfiguredModelWarnings": unconfigured,
-        "schemaFallbackRetryCount": schema_fallback,
+        "cost_by_tier": cost_by_tier,
+        "requests_by_tier": requests_by_tier,
+        "premium_on_cheap_profile_count": premium_on_cheap,
+        "explicit_override_count": explicit_override,
+        "unconfigured_model_warnings": unconfigured,
+        "schema_fallback_retry_count": schema_fallback,
     }
 
 
@@ -257,6 +262,7 @@ async def get_usage_summary(
     operation: str | None = None,
     model: str | None = None,
     model_tier: str | None = None,
+    operation_key: str | None = None,
 ) -> dict[str, Any]:
     base = select(AiUsageLog).where(AiUsageLog.project_id == project_id)
     base = _apply_log_filters(
@@ -268,6 +274,7 @@ async def get_usage_summary(
         operation=operation,
         model=model,
         model_tier=model_tier,
+        operation_key=operation_key,
         status=None,
     )
 
@@ -283,6 +290,7 @@ async def get_usage_summary(
     by_operation: dict[str, dict[str, Any]] = {}
     by_model: dict[str, dict[str, Any]] = {}
     by_tier: dict[str, dict[str, Any]] = {}
+    by_operation_key: dict[str, dict[str, Any]] = {}
     by_day: dict[str, dict[str, Any]] = {}
 
     for row in rows:
@@ -320,6 +328,18 @@ async def get_usage_summary(
         by_tier[tier_key]["estimatedCost"] += cost
         by_tier[tier_key]["inputTokens"] += row.input_tokens
 
+        op_key = getattr(row, "operation_key", None) or "unknown"
+        if op_key not in by_operation_key:
+            by_operation_key[op_key] = {
+                "key": op_key,
+                "requests": 0,
+                "estimatedCost": 0.0,
+                "inputTokens": 0,
+            }
+        by_operation_key[op_key]["requests"] += 1
+        by_operation_key[op_key]["estimatedCost"] += cost
+        by_operation_key[op_key]["inputTokens"] += row.input_tokens
+
         day_key = row.created_at.date().isoformat()
         if day_key not in by_day:
             by_day[day_key] = {"date": day_key, "requests": 0, "estimatedCost": 0.0}
@@ -338,6 +358,9 @@ async def get_usage_summary(
         "byOperation": sorted(by_operation.values(), key=lambda x: x["estimatedCost"], reverse=True),
         "byModel": sorted(by_model.values(), key=lambda x: x["estimatedCost"], reverse=True),
         "byTier": sorted(by_tier.values(), key=lambda x: x["estimatedCost"], reverse=True),
+        "byOperationKey": sorted(
+            by_operation_key.values(), key=lambda x: x["estimatedCost"], reverse=True
+        ),
         "byDay": sorted(by_day.values(), key=lambda x: x["date"]),
         "routingInsights": _compute_routing_insights(rows, by_tier),
     }
@@ -353,6 +376,7 @@ async def list_usage_logs(
     operation: str | None = None,
     model: str | None = None,
     model_tier: str | None = None,
+    operation_key: str | None = None,
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -367,6 +391,7 @@ async def list_usage_logs(
         operation=operation,
         model=model,
         model_tier=model_tier,
+        operation_key=operation_key,
         status=status,
     )
 
@@ -380,6 +405,7 @@ async def list_usage_logs(
         operation=operation,
         model=model,
         model_tier=model_tier,
+        operation_key=operation_key,
         status=status,
     )
     total = int((await session.execute(count_stmt)).scalar_one())
@@ -507,15 +533,16 @@ async def get_global_usage_summary(
         "byOperation": {},
         "byModel": {},
         "byTier": {},
+        "byOperationKey": {},
         "byDay": {},
         "projectCount": len(project_ids),
         "routingInsights": {
-            "costByTier": {},
-            "requestsByTier": {},
-            "premiumOnCheapProfileCount": 0,
-            "explicitOverrideCount": 0,
-            "unconfiguredModelWarnings": [],
-            "schemaFallbackRetryCount": 0,
+            "cost_by_tier": {},
+            "requests_by_tier": {},
+            "premium_on_cheap_profile_count": 0,
+            "explicit_override_count": 0,
+            "unconfigured_model_warnings": [],
+            "schema_fallback_retry_count": 0,
         },
     }
 
@@ -536,6 +563,7 @@ async def get_global_usage_summary(
             ("byOperation", summary["byOperation"]),
             ("byModel", summary["byModel"]),
             ("byTier", summary["byTier"]),
+            ("byOperationKey", summary.get("byOperationKey", [])),
             ("byDay", summary["byDay"]),
         ):
             bucket: dict = merged[bucket_name]
@@ -551,20 +579,24 @@ async def get_global_usage_summary(
 
         insights = summary.get("routingInsights") or {}
         merged_insights = merged["routingInsights"]
-        for tier, cost in (insights.get("costByTier") or {}).items():
-            merged_insights["costByTier"][tier] = merged_insights["costByTier"].get(tier, 0.0) + cost
-        for tier, count in (insights.get("requestsByTier") or {}).items():
-            merged_insights["requestsByTier"][tier] = (
-                merged_insights["requestsByTier"].get(tier, 0) + count
+        for tier, cost in (insights.get("cost_by_tier") or {}).items():
+            merged_insights["cost_by_tier"][tier] = merged_insights["cost_by_tier"].get(tier, 0.0) + cost
+        for tier, count in (insights.get("requests_by_tier") or {}).items():
+            merged_insights["requests_by_tier"][tier] = (
+                merged_insights["requests_by_tier"].get(tier, 0) + count
             )
-        merged_insights["premiumOnCheapProfileCount"] += insights.get("premiumOnCheapProfileCount", 0)
-        merged_insights["explicitOverrideCount"] += insights.get("explicitOverrideCount", 0)
-        merged_insights["schemaFallbackRetryCount"] += insights.get("schemaFallbackRetryCount", 0)
-        for warning in insights.get("unconfiguredModelWarnings") or []:
-            if warning not in merged_insights["unconfiguredModelWarnings"]:
-                merged_insights["unconfiguredModelWarnings"].append(warning)
+        merged_insights["premium_on_cheap_profile_count"] += insights.get(
+            "premium_on_cheap_profile_count", 0
+        )
+        merged_insights["explicit_override_count"] += insights.get("explicit_override_count", 0)
+        merged_insights["schema_fallback_retry_count"] += insights.get(
+            "schema_fallback_retry_count", 0
+        )
+        for warning in insights.get("unconfigured_model_warnings") or []:
+            if warning not in merged_insights["unconfigured_model_warnings"]:
+                merged_insights["unconfigured_model_warnings"].append(warning)
 
-    for bucket_name in ("byModule", "byOperation", "byModel", "byTier"):
+    for bucket_name in ("byModule", "byOperation", "byModel", "byTier", "byOperationKey"):
         merged[bucket_name] = sorted(
             merged[bucket_name].values(),
             key=lambda x: x.get("estimatedCost", 0),

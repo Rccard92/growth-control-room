@@ -1,3 +1,4 @@
+from app.models.ai_model_setting import AiModelSetting
 from app.models.ai_run import AiRun
 from app.models.ai_usage_log import AiUsageLog
 from app.models.alert import Alert
@@ -53,6 +54,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 
 __all__ = [
+    "AiModelSetting",
     "AiRun",
     "AiUsageLog",
     "Alert",

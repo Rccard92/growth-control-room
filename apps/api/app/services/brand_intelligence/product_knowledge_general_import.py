@@ -177,6 +177,7 @@ async def import_general_from_file(
                 project_id=project_id,
                 module="brand_intelligence",
                 operation="import_product_knowledge_general",
+                operation_key="product_knowledge_general_import",
                 entity_type="brand_section",
                 entity_id="product_knowledge_general",
             ),
