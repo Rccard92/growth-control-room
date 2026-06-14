@@ -2,7 +2,12 @@ import { useState } from "react";
 import { EditorialCalendar } from "./EditorialCalendar";
 import { EditorialItemModal } from "./EditorialItemModal";
 import { EditorialPlanWizard } from "./EditorialPlanWizard";
-import { useEditorialItems } from "../../../hooks/useContentSeoEditorial";
+import { EditorialBatchBriefModal } from "./EditorialBatchBriefModal";
+import { hasEditorialBrief } from "./editorial-brief-utils";
+import {
+  useEditorialItems,
+  useStartEditorialBriefBatch,
+} from "../../../hooks/useContentSeoEditorial";
 import type { ContentSeoEditorialItem } from "@gcr/shared";
 
 function currentMonth(): string {
@@ -22,11 +27,41 @@ export function ContentSeoEditorialRoom({
   const [month, setMonth] = useState(currentMonth);
   const [selectedItem, setSelectedItem] = useState<ContentSeoEditorialItem | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batchJobId, setBatchJobId] = useState<string | null>(null);
+  const [batchAlert, setBatchAlert] = useState<string | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useEditorialItems(projectId, month);
   const allItemsQuery = useEditorialItems(projectId);
+  const batchMutation = useStartEditorialBriefBatch(projectId);
   const items = data?.items ?? [];
   const allItems = allItemsQuery.data?.items ?? [];
+
+  const ideaWithoutBriefCount = items.filter(
+    (i) => i.status === "idea" && !hasEditorialBrief(i.briefPayload),
+  ).length;
+
+  async function handleStartBatch() {
+    setBatchAlert(null);
+    if (ideaWithoutBriefCount === 0) {
+      setBatchAlert("Nessun contenuto in stato Idea da elaborare.");
+      return;
+    }
+    try {
+      const job = await batchMutation.mutateAsync({ month, onlyStatus: "idea" });
+      setBatchJobId(job.jobId);
+      setBatchModalOpen(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("AI non configurata")) {
+        setBatchAlert("AI non configurata. Inserisci OPENAI_API_KEY per generare i brief.");
+      } else if (msg.includes("Nessun contenuto")) {
+        setBatchAlert("Nessun contenuto in stato Idea da elaborare.");
+      } else {
+        setBatchAlert("Impossibile avviare la generazione massiva. Riprova più tardi.");
+      }
+    }
+  }
 
   return (
     <div className="editorial-room">
@@ -37,14 +72,28 @@ export function ContentSeoEditorialRoom({
             Pianifica articoli blog e ricette, genera brief SEO con Brand Intelligence e approva prima della scrittura.
           </p>
         </div>
-        <button
-          type="button"
-          className="gcr-btn gcr-btn--primary"
-          onClick={() => setWizardOpen(true)}
-        >
-          Crea piano editoriale
-        </button>
+        <div className="editorial-room__toolbar-actions">
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary"
+            disabled={batchMutation.isPending}
+            onClick={() => void handleStartBatch()}
+          >
+            {batchMutation.isPending ? "Avvio…" : "Genera tutti i brief"}
+          </button>
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--primary"
+            onClick={() => setWizardOpen(true)}
+          >
+            Crea piano editoriale
+          </button>
+        </div>
       </div>
+
+      {batchAlert && (
+        <div className="gcr-alert gcr-alert--warning">{batchAlert}</div>
+      )}
 
       {isError && (
         <div className="gcr-alert gcr-alert--error">
@@ -96,6 +145,17 @@ export function ContentSeoEditorialRoom({
         shopifyConnected={shopifyConnected}
         onClose={() => setWizardOpen(false)}
         onConfirmed={() => void refetch()}
+      />
+
+      <EditorialBatchBriefModal
+        open={batchModalOpen}
+        projectId={projectId}
+        jobId={batchJobId}
+        onClose={() => setBatchModalOpen(false)}
+        onComplete={() => {
+          void refetch();
+          void allItemsQuery.refetch();
+        }}
       />
     </div>
   );

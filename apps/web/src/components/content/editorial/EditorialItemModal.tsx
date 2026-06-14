@@ -19,6 +19,8 @@ import { AppModal } from "../../ui/AppModal";
 import { AppSelect } from "../../ui/AppSelect";
 import { AppDatePicker } from "../../ui/AppDatePicker";
 import { AppCheckbox } from "../../ui/AppCheckbox";
+import { AutoResizeTextarea } from "../../ui/AutoResizeTextarea";
+import { EditorialStatusBadge } from "./EditorialStatusLegend";
 import {
   useDeleteEditorialItem,
   useGenerateEditorialBrief,
@@ -74,10 +76,12 @@ export function EditorialItemModal({
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"detail" | "brief">("detail");
 
   useEffect(() => {
     if (!item) return;
     const date = item.plannedDate.slice(0, 10);
+    setActiveTab("detail");
     setTitle(item.title);
     setPlannedDate(date);
     setOriginalPlannedDate(date);
@@ -218,8 +222,11 @@ export function EditorialItemModal({
     try {
       const updated = await generateBriefMutation.mutateAsync(item.id);
       syncItem(updated);
+      setActiveTab("brief");
+      setSuccess("Brief generato.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Errore durante la generazione del brief.");
+      console.error(e);
+      setError("Brief non generato per questo contenuto.");
     }
   }
 
@@ -250,30 +257,76 @@ export function EditorialItemModal({
   ].join(" · ");
 
   const isSaving = updateMutation.isPending || rescheduleMutation.isPending;
+  const itemHasBrief = hasEditorialBrief(item.briefPayload ?? null);
 
-  const footer = (
-    <>
-      <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
-        Chiudi
-      </button>
-      <button
-        type="button"
-        className="gcr-btn gcr-btn--danger"
-        disabled={deleteMutation.isPending}
-        onClick={() => void handleDelete()}
-      >
-        Elimina
-      </button>
-      <button
-        type="button"
-        className="gcr-btn gcr-btn--primary"
-        disabled={isSaving || !title.trim()}
-        onClick={() => void handleSave()}
-      >
-        {isSaving ? "Salvataggio…" : "Salva item"}
-      </button>
-    </>
-  );
+  const footer =
+    activeTab === "detail" ? (
+      <>
+        <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
+          Chiudi
+        </button>
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--danger"
+          disabled={deleteMutation.isPending}
+          onClick={() => void handleDelete()}
+        >
+          Elimina
+        </button>
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--primary"
+          disabled={isSaving || !title.trim()}
+          onClick={() => void handleSave()}
+        >
+          {isSaving ? "Salvataggio…" : "Salva item"}
+        </button>
+      </>
+    ) : (
+      <>
+        <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
+          Chiudi
+        </button>
+        {!hasBrief && (
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--primary"
+            disabled={generateBriefMutation.isPending}
+            onClick={() => void handleGenerateBrief()}
+          >
+            {generateBriefMutation.isPending ? "Generazione…" : "Genera brief"}
+          </button>
+        )}
+        {hasBrief && (
+          <>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--ghost"
+              disabled={generateBriefMutation.isPending}
+              onClick={() => void handleGenerateBrief()}
+            >
+              {generateBriefMutation.isPending ? "Rigenerazione…" : "Rigenera brief"}
+            </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary"
+              disabled={updateBriefMutation.isPending}
+              onClick={() => void handleSaveBrief(false)}
+            >
+              Salva brief
+            </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              disabled={updateBriefMutation.isPending}
+              onClick={() => void handleSaveBrief(true)}
+            >
+              Approva brief
+            </button>
+          </>
+        )}
+      </>
+    );
 
   return (
     <AppModal
@@ -289,130 +342,132 @@ export function EditorialItemModal({
         {warning && <div className="gcr-alert gcr-alert--warning">{warning}</div>}
         {success && <div className="gcr-alert gcr-alert--success">{success}</div>}
 
-        <section className="editorial-item-modal__section">
-          <label className="gcr-field">
-            <span className="gcr-field__label">Titolo</span>
-            <input
-              className="gcr-input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+        <div className="editorial-item-modal__tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "detail"}
+            className={[
+              "editorial-item-modal__tab",
+              activeTab === "detail" ? "editorial-item-modal__tab--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setActiveTab("detail")}
+          >
+            Dettaglio
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "brief"}
+            className={[
+              "editorial-item-modal__tab",
+              activeTab === "brief" ? "editorial-item-modal__tab--active" : "",
+              itemHasBrief ? "editorial-item-modal__tab--has-content" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setActiveTab("brief")}
+          >
+            Brief SEO
+          </button>
+        </div>
+
+        {activeTab === "detail" && (
+          <section className="editorial-item-modal__section">
+            <label className="gcr-field">
+              <span className="gcr-field__label">Titolo</span>
+              <input
+                className="gcr-input"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </label>
+
+            <AppDatePicker
+              label="Data pianificata"
+              value={plannedDate}
+              onChange={setPlannedDate}
             />
-          </label>
 
-          <AppDatePicker
-            label="Data pianificata"
-            value={plannedDate}
-            onChange={setPlannedDate}
-          />
+            {showCascadeOption && (
+              <AppCheckbox
+                variant="card"
+                checked={cascadeReschedule}
+                onChange={setCascadeReschedule}
+                label="Riprogramma anche i contenuti successivi mantenendo la frequenza del piano"
+                description="Se attivo, tutti i contenuti successivi verranno spostati dello stesso numero di giorni."
+              />
+            )}
 
-          {showCascadeOption && (
-            <AppCheckbox
-              variant="card"
-              checked={cascadeReschedule}
-              onChange={setCascadeReschedule}
-              label="Riprogramma anche i contenuti successivi mantenendo la frequenza del piano"
-              description="Se attivo, tutti i contenuti successivi verranno spostati dello stesso numero di giorni."
+            <AppSelect
+              label="Stato"
+              value={status}
+              options={statusOptions}
+              onChange={(v) => setStatus(v as ContentSeoEditorialStatus)}
             />
-          )}
 
-          <AppSelect
-            label="Stato"
-            value={status}
-            options={statusOptions}
-            onChange={(v) => setStatus(v as ContentSeoEditorialStatus)}
-          />
-
-          <AppSelect
-            label="Obiettivo"
-            value={objective}
-            options={objectiveOptions}
-            onChange={(v) => setObjective(v as ContentSeoEditorialObjective | "")}
-          />
-
-          <label className="gcr-field">
-            <span className="gcr-field__label">Keyword principale</span>
-            <input
-              className="gcr-input"
-              value={primaryKeyword}
-              onChange={(e) => setPrimaryKeyword(e.target.value)}
+            <AppSelect
+              label="Obiettivo"
+              value={objective}
+              options={objectiveOptions}
+              onChange={(v) => setObjective(v as ContentSeoEditorialObjective | "")}
             />
-          </label>
 
-          <label className="gcr-field">
-            <span className="gcr-field__label">Keyword secondarie (separate da virgola)</span>
-            <input
-              className="gcr-input"
-              value={secondaryKeywords}
-              onChange={(e) => setSecondaryKeywords(e.target.value)}
-            />
-          </label>
+            <label className="gcr-field">
+              <span className="gcr-field__label">Keyword principale</span>
+              <input
+                className="gcr-input"
+                value={primaryKeyword}
+                onChange={(e) => setPrimaryKeyword(e.target.value)}
+              />
+            </label>
 
-          <label className="gcr-field">
-            <span className="gcr-field__label">Note</span>
-            <textarea
-              className="gcr-input"
-              rows={3}
+            <label className="gcr-field">
+              <span className="gcr-field__label">Keyword secondarie (separate da virgola)</span>
+              <input
+                className="gcr-input"
+                value={secondaryKeywords}
+                onChange={(e) => setSecondaryKeywords(e.target.value)}
+              />
+            </label>
+
+            <AutoResizeTextarea
+              label="Note"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={setNotes}
+              minRows={2}
+              maxRows={12}
             />
-          </label>
 
-          {item.linkedShopifyProductTitle && (
-            <p className="editorial-item-modal__linked">
-              Prodotto collegato: <strong>{item.linkedShopifyProductTitle}</strong>
-            </p>
-          )}
-        </section>
-
-        <section className="editorial-item-modal__section editorial-item-modal__brief">
-          <h4>Brief SEO</h4>
-          {hasBrief ? (
-            <EditorialBriefEditor value={brief!} onChange={setBrief} />
-          ) : (
-            <p className="gcr-card__description">Brief SEO non ancora generato</p>
-          )}
-
-          <div className="editorial-item-modal__brief-actions">
-            {!hasBrief && (
-              <button
-                type="button"
-                className="gcr-btn gcr-btn--primary"
-                disabled={generateBriefMutation.isPending}
-                onClick={() => void handleGenerateBrief()}
-              >
-                {generateBriefMutation.isPending ? "Generazione…" : "Genera brief"}
-              </button>
+            {item.linkedShopifyProductTitle && (
+              <p className="editorial-item-modal__linked">
+                Prodotto collegato: <strong>{item.linkedShopifyProductTitle}</strong>
+              </p>
             )}
-            {hasBrief && (
-              <>
-                <button
-                  type="button"
-                  className="gcr-btn gcr-btn--secondary"
-                  disabled={updateBriefMutation.isPending}
-                  onClick={() => void handleSaveBrief(false)}
-                >
-                  Salva brief
-                </button>
-                <button
-                  type="button"
-                  className="gcr-btn gcr-btn--primary"
-                  disabled={updateBriefMutation.isPending}
-                  onClick={() => void handleSaveBrief(true)}
-                >
-                  Approva brief
-                </button>
-                <button
-                  type="button"
-                  className="gcr-btn gcr-btn--ghost"
-                  disabled={generateBriefMutation.isPending}
-                  onClick={() => void handleGenerateBrief()}
-                >
-                  {generateBriefMutation.isPending ? "Rigenerazione…" : "Rigenera brief"}
-                </button>
-              </>
+          </section>
+        )}
+
+        {activeTab === "brief" && (
+          <section className="editorial-item-modal__section editorial-item-modal__brief-tab">
+            <div className="editorial-item-modal__brief-status">
+              <span className="gcr-field__label">Stato brief</span>
+              <EditorialStatusBadge status={status} />
+            </div>
+
+            {hasBrief ? (
+              <EditorialBriefEditor value={brief!} onChange={setBrief} />
+            ) : (
+              <div className="editorial-item-modal__brief-empty gcr-card">
+                <p className="gcr-card__description">
+                  Brief SEO non ancora generato. Genera il brief usando Brand Intelligence,
+                  prodotto collegato e Safe Claims.
+                </p>
+              </div>
             )}
-          </div>
-        </section>
+          </section>
+        )}
       </div>
     </AppModal>
   );

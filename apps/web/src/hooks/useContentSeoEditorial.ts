@@ -11,8 +11,10 @@ import {
   deleteEditorialItem,
   generateEditorialBrief,
   generateEditorialCalendar,
+  getEditorialBriefBatchJob,
   getEditorialItems,
   rescheduleEditorialItem,
+  startEditorialBriefBatch,
   updateEditorialBrief,
   updateEditorialItem,
 } from "../lib/content-api";
@@ -120,5 +122,29 @@ export function useUpdateEditorialBrief(projectId: string) {
       data: EditorialBriefUpdateRequest;
     }) => updateEditorialBrief(projectId, itemId, data),
     onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useStartEditorialBriefBatch(projectId: string) {
+  return useMutation({
+    mutationFn: (data: { month: string; onlyStatus?: string }) =>
+      startEditorialBriefBatch(projectId, data),
+  });
+}
+
+export function useEditorialBriefBatchJob(
+  projectId: string,
+  jobId: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: queryKeys.contentSeo.editorialBriefJob(projectId, jobId ?? ""),
+    queryFn: () => getEditorialBriefBatchJob(projectId, jobId!),
+    enabled: enabled && Boolean(jobId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "pending" || status === "running") return 2000;
+      return false;
+    },
   });
 }

@@ -551,6 +551,28 @@ export interface EditorialItemRescheduleResponse {
   warning?: string | null;
 }
 
+export interface EditorialBriefBatchStartRequest {
+  month: string;
+  onlyStatus?: string;
+}
+
+export interface EditorialBriefBatchJobError {
+  itemId: string;
+  title: string;
+  message: string;
+}
+
+export interface EditorialBriefBatchJobResponse {
+  jobId: string;
+  status: string;
+  totalItems: number;
+  completedItems: number;
+  failedItems: number;
+  currentItemTitle?: string | null;
+  progressPercent: number;
+  errors: EditorialBriefBatchJobError[];
+}
+
 export interface EditorialBriefPayload {
   proposedTitle: string;
   searchIntent: string;

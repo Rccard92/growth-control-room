@@ -15,6 +15,8 @@ from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemRead,
     ContentSeoEditorialItemUpdate,
     EditorialBriefUpdateRequest,
+    EditorialBriefBatchJobResponse,
+    EditorialBriefBatchStartRequest,
     EditorialItemRescheduleRequest,
     EditorialItemRescheduleResponse,
     EditorialPlanGenerateRequest,
@@ -54,6 +56,11 @@ from app.services.content.editorial_item_service import (
 from app.services.content.editorial_brief_service import (
     generate_editorial_brief,
     update_editorial_brief,
+)
+from app.services.content.editorial_brief_batch_service import (
+    get_brief_batch_job,
+    job_to_response,
+    start_brief_batch_job,
 )
 from app.services.content.editorial_plan_service import generate_editorial_calendar
 from app.services.content.analyze import run_content_seo_analyze
@@ -948,3 +955,32 @@ async def update_content_seo_editorial_brief(
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-briefs/generate-batch",
+    response_model=EditorialBriefBatchJobResponse,
+    response_model_by_alias=True,
+)
+async def generate_content_seo_editorial_briefs_batch(
+    project_id: UUID,
+    payload: EditorialBriefBatchStartRequest,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialBriefBatchJobResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await start_brief_batch_job(session, project_id, payload)
+
+
+@router.get(
+    "/{project_id}/content/seo/editorial-briefs/jobs/{job_id}",
+    response_model=EditorialBriefBatchJobResponse,
+    response_model_by_alias=True,
+)
+async def get_content_seo_editorial_brief_batch_job(
+    project_id: UUID,
+    job_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialBriefBatchJobResponse:
+    await get_project_in_default_workspace(project_id, session)
+    job = await get_brief_batch_job(session, project_id, job_id)
+    return job_to_response(job)

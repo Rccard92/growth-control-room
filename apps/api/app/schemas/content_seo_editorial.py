@@ -263,6 +263,36 @@ class EditorialItemRescheduleResponse(BaseModel):
     warning: str | None = None
 
 
+class EditorialBriefBatchStartRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    month: str
+    only_status: str = Field(default="idea", validation_alias="onlyStatus")
+
+
+class EditorialBriefBatchJobError(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    item_id: UUID = Field(serialization_alias="itemId")
+    title: str
+    message: str
+
+
+class EditorialBriefBatchJobResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    job_id: UUID = Field(serialization_alias="jobId")
+    status: str
+    total_items: int = Field(serialization_alias="totalItems")
+    completed_items: int = Field(serialization_alias="completedItems")
+    failed_items: int = Field(serialization_alias="failedItems")
+    current_item_title: str | None = Field(
+        default=None, serialization_alias="currentItemTitle"
+    )
+    progress_percent: int = Field(serialization_alias="progressPercent")
+    errors: list[EditorialBriefBatchJobError] = Field(default_factory=list)
+
+
 BriefUpdateStatus = Literal["brief_pending", "brief_approved"]
 
 

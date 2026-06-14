@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import type { EditorialBriefPayload } from "@gcr/shared";
+import { AutoResizeTextarea } from "../../ui/AutoResizeTextarea";
 import { listToTextarea, textareaToList } from "./editorial-brief-utils";
 
 interface EditorialBriefEditorProps {
@@ -7,28 +9,44 @@ interface EditorialBriefEditorProps {
   readOnlyWarnings?: boolean;
 }
 
-function ListTextarea({
+function BriefSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="editorial-brief-section gcr-card">
+      <h5 className="editorial-brief-section__title">{title}</h5>
+      <div className="editorial-brief-section__body">{children}</div>
+    </section>
+  );
+}
+
+function ListField({
   label,
   value,
   onChange,
-  rows = 4,
+  minRows = 3,
+  maxRows = 12,
 }: {
   label: string;
   value: string[];
   onChange: (next: string[]) => void;
-  rows?: number;
+  minRows?: number;
+  maxRows?: number;
 }) {
   return (
-    <label className="gcr-field">
-      <span className="gcr-field__label">{label}</span>
-      <textarea
-        className="gcr-input editorial-brief-editor__list"
-        rows={rows}
-        value={listToTextarea(value)}
-        onChange={(e) => onChange(textareaToList(e.target.value))}
-        placeholder="Un elemento per riga"
-      />
-    </label>
+    <AutoResizeTextarea
+      label={label}
+      value={listToTextarea(value)}
+      onChange={(text) => onChange(textareaToList(text))}
+      minRows={minRows}
+      maxRows={maxRows}
+      placeholder="Un elemento per riga"
+      className="editorial-brief-editor__list"
+    />
   );
 }
 
@@ -43,137 +61,146 @@ export function EditorialBriefEditor({
 
   return (
     <div className="editorial-brief-editor">
-      <label className="gcr-field">
-        <span className="gcr-field__label">Titolo proposto</span>
-        <input
-          className="gcr-input"
-          value={value.proposedTitle}
-          onChange={(e) => patch({ proposedTitle: e.target.value })}
-        />
-      </label>
-
-      <label className="gcr-field">
-        <span className="gcr-field__label">Intento di ricerca</span>
-        <input
-          className="gcr-input"
-          value={value.searchIntent}
-          onChange={(e) => patch({ searchIntent: e.target.value })}
-        />
-      </label>
-
-      <label className="gcr-field">
-        <span className="gcr-field__label">Target</span>
-        <input
-          className="gcr-input"
-          value={value.targetAudience}
-          onChange={(e) => patch({ targetAudience: e.target.value })}
-        />
-      </label>
-
-      <label className="gcr-field">
-        <span className="gcr-field__label">Keyword principale</span>
-        <input
-          className="gcr-input"
-          value={value.primaryKeyword}
-          onChange={(e) => patch({ primaryKeyword: e.target.value })}
-        />
-      </label>
-
-      <ListTextarea
-        label="Keyword secondarie"
-        value={value.secondaryKeywords}
-        onChange={(secondaryKeywords) => patch({ secondaryKeywords })}
-        rows={2}
-      />
-
-      <label className="gcr-field">
-        <span className="gcr-field__label">Angolo contenuto</span>
-        <textarea
-          className="gcr-input"
-          rows={2}
+      <BriefSection title="Strategia">
+        <label className="gcr-field">
+          <span className="gcr-field__label">Titolo proposto</span>
+          <input
+            className="gcr-input"
+            value={value.proposedTitle}
+            onChange={(e) => patch({ proposedTitle: e.target.value })}
+          />
+        </label>
+        <label className="gcr-field">
+          <span className="gcr-field__label">Intento di ricerca</span>
+          <input
+            className="gcr-input"
+            value={value.searchIntent}
+            onChange={(e) => patch({ searchIntent: e.target.value })}
+          />
+        </label>
+        <label className="gcr-field">
+          <span className="gcr-field__label">Target</span>
+          <input
+            className="gcr-input"
+            value={value.targetAudience}
+            onChange={(e) => patch({ targetAudience: e.target.value })}
+          />
+        </label>
+        <AutoResizeTextarea
+          label="Angolo contenuto"
           value={value.contentAngle}
-          onChange={(e) => patch({ contentAngle: e.target.value })}
+          onChange={(contentAngle) => patch({ contentAngle })}
+          minRows={2}
+          maxRows={8}
         />
-      </label>
+      </BriefSection>
 
-      <ListTextarea
-        label="Struttura H2/H3"
-        value={value.h2H3Structure}
-        onChange={(h2H3Structure) => patch({ h2H3Structure })}
-      />
-
-      <ListTextarea
-        label="Prodotti da linkare"
-        value={value.productsToLink}
-        onChange={(productsToLink) => patch({ productsToLink })}
-        rows={3}
-      />
-
-      <ListTextarea
-        label="FAQ da includere"
-        value={value.faqToInclude}
-        onChange={(faqToInclude) => patch({ faqToInclude })}
-        rows={3}
-      />
-
-      <ListTextarea
-        label="Claim da evitare"
-        value={value.claimsToAvoid}
-        onChange={(claimsToAvoid) => patch({ claimsToAvoid })}
-        rows={3}
-      />
-
-      <ListTextarea
-        label="Claim sicuri da usare"
-        value={value.safeClaimsToUse}
-        onChange={(safeClaimsToUse) => patch({ safeClaimsToUse })}
-        rows={3}
-      />
-
-      <label className="gcr-field">
-        <span className="gcr-field__label">CTA consigliata</span>
-        <input
-          className="gcr-input"
-          value={value.recommendedCta}
-          onChange={(e) => patch({ recommendedCta: e.target.value })}
+      <BriefSection title="Keyword">
+        <label className="gcr-field">
+          <span className="gcr-field__label">Keyword principale</span>
+          <input
+            className="gcr-input"
+            value={value.primaryKeyword}
+            onChange={(e) => patch({ primaryKeyword: e.target.value })}
+          />
+        </label>
+        <ListField
+          label="Keyword secondarie"
+          value={value.secondaryKeywords}
+          onChange={(secondaryKeywords) => patch({ secondaryKeywords })}
+          minRows={2}
         />
-      </label>
+      </BriefSection>
 
-      <label className="gcr-field">
-        <span className="gcr-field__label">Meta title</span>
-        <input
-          className="gcr-input"
-          value={value.metaTitle}
-          onChange={(e) => patch({ metaTitle: e.target.value })}
+      <BriefSection title="Struttura">
+        <ListField
+          label="Struttura H2/H3"
+          value={value.h2H3Structure}
+          onChange={(h2H3Structure) => patch({ h2H3Structure })}
         />
-      </label>
+      </BriefSection>
 
-      <label className="gcr-field">
-        <span className="gcr-field__label">Meta description</span>
-        <textarea
-          className="gcr-input"
-          rows={3}
+      <BriefSection title="Collegamenti e contenuti da includere">
+        <ListField
+          label="Prodotti da linkare"
+          value={value.productsToLink}
+          onChange={(productsToLink) => patch({ productsToLink })}
+          minRows={2}
+        />
+        <ListField
+          label="FAQ da includere"
+          value={value.faqToInclude}
+          onChange={(faqToInclude) => patch({ faqToInclude })}
+          minRows={2}
+        />
+        <ListField
+          label="Suggerimenti internal link"
+          value={value.internalLinksSuggestions}
+          onChange={(internalLinksSuggestions) => patch({ internalLinksSuggestions })}
+          minRows={2}
+        />
+      </BriefSection>
+
+      <BriefSection title="Compliance e CTA">
+        <ListField
+          label="Claim da evitare"
+          value={value.claimsToAvoid}
+          onChange={(claimsToAvoid) => patch({ claimsToAvoid })}
+          minRows={2}
+        />
+        <ListField
+          label="Claim sicuri da usare"
+          value={value.safeClaimsToUse}
+          onChange={(safeClaimsToUse) => patch({ safeClaimsToUse })}
+          minRows={2}
+        />
+        <label className="gcr-field">
+          <span className="gcr-field__label">CTA consigliata</span>
+          <input
+            className="gcr-input"
+            value={value.recommendedCta}
+            onChange={(e) => patch({ recommendedCta: e.target.value })}
+          />
+        </label>
+      </BriefSection>
+
+      <BriefSection title="Metadata">
+        <label className="gcr-field">
+          <span className="gcr-field__label">Meta title</span>
+          <input
+            className="gcr-input"
+            value={value.metaTitle}
+            onChange={(e) => patch({ metaTitle: e.target.value })}
+          />
+        </label>
+        <AutoResizeTextarea
+          label="Meta description"
           value={value.metaDescription}
-          onChange={(e) => patch({ metaDescription: e.target.value })}
+          onChange={(metaDescription) => patch({ metaDescription })}
+          minRows={2}
+          maxRows={8}
         />
-      </label>
+      </BriefSection>
 
-      <ListTextarea
-        label="Suggerimenti internal link"
-        value={value.internalLinksSuggestions}
-        onChange={(internalLinksSuggestions) => patch({ internalLinksSuggestions })}
-        rows={3}
-      />
-
-      <label className="gcr-field">
-        <span className="gcr-field__label">Note operative</span>
-        <textarea
-          className="gcr-input"
-          rows={3}
+      <BriefSection title="Note e warning">
+        <AutoResizeTextarea
+          label="Note operative"
           value={value.notes}
-          onChange={(e) => patch({ notes: e.target.value })}
+          onChange={(notes) => patch({ notes })}
+          minRows={2}
+          maxRows={10}
         />
-      </label>
+        {readOnlyWarnings && value.warnings.length > 0 && (
+          <div className="gcr-alert gcr-alert--warning editorial-brief-editor__warnings">
+            <span className="gcr-field__label">Warning</span>
+            <ul>
+              {value.warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </BriefSection>
 
       {value.brandContextUsed.length > 0 && (
         <div className="editorial-brief-editor__meta">
@@ -181,17 +208,6 @@ export function EditorialBriefEditor({
           <ul className="editorial-brief-editor__tags">
             {value.brandContextUsed.map((tag) => (
               <li key={tag}>{tag}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {readOnlyWarnings && value.warnings.length > 0 && (
-        <div className="gcr-alert gcr-alert--warn editorial-brief-editor__warnings">
-          <span className="gcr-field__label">Warning</span>
-          <ul>
-            {value.warnings.map((w) => (
-              <li key={w}>{w}</li>
             ))}
           </ul>
         </div>

@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         BrandVoice,
     )
     from app.models.content_seo_editorial import ContentSeoEditorialItem
+    from app.models.content_seo_brief_job import ContentSeoBriefGenerationJob
     from app.models.integration import Integration
     from app.models.shopify import ShopifyStore
     from app.models.workspace import Workspace
@@ -166,6 +167,10 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     content_seo_editorial_items: Mapped[list["ContentSeoEditorialItem"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    content_seo_brief_jobs: Mapped[list["ContentSeoBriefGenerationJob"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

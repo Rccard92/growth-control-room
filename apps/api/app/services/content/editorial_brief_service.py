@@ -38,6 +38,14 @@ from app.services.content.seo_skill_loader import load_seo_skill_context
 
 logger = logging.getLogger(__name__)
 
+
+class BriefGenerationError(Exception):
+    """Domain error for brief generation (batch-safe, no HTTP)."""
+
+    def __init__(self, message: str, *, ai_not_configured: bool = False) -> None:
+        super().__init__(message)
+        self.ai_not_configured = ai_not_configured
+
 _CONTENT_TYPE_INSTRUCTIONS: dict[str, str] = {
     "educational_article": (
         "Articolo educativo: focus su intento informativo, guida pratica, "
@@ -173,15 +181,15 @@ def _build_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> 
     )
 
 
-async def generate_editorial_brief(
+async def generate_editorial_brief_core(
     session: AsyncSession,
     project_id: UUID,
     item_id: UUID,
 ) -> ContentSeoEditorialItem:
     if not is_openai_configured():
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI non configurata. Inserisci OPENAI_API_KEY per generare il brief.",
+        raise BriefGenerationError(
+            "AI non configurata. Inserisci OPENAI_API_KEY per generare il brief.",
+            ai_not_configured=True,
         )
 
     item = await get_editorial_item(session, project_id, item_id)
@@ -216,16 +224,13 @@ async def generate_editorial_brief(
         )
         payload = normalize_editorial_brief_payload(parsed)
     except OpenAINotConfiguredError:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI non configurata. Inserisci OPENAI_API_KEY per generare il brief.",
+        raise BriefGenerationError(
+            "AI non configurata. Inserisci OPENAI_API_KEY per generare il brief.",
+            ai_not_configured=True,
         ) from None
     except (OpenAIRequestError, ValidationError, ValueError) as exc:
         logger.warning("Editorial brief generation failed for %s: %s", item_id, exc)
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            detail="Generazione brief non riuscita. Riprova più tardi o verifica la configurazione AI.",
-        ) from exc
+        raise BriefGenerationError("Brief non generato per questo contenuto.") from exc
 
     context_used = build_brand_context_used(bundle, product_pk_appended=product_pk_appended)
     merged_warnings = list(dict.fromkeys([*bi_warnings, *payload.warnings]))
@@ -237,6 +242,25 @@ async def generate_editorial_brief(
     await session.commit()
     await session.refresh(item)
     return item
+
+
+async def generate_editorial_brief(
+    session: AsyncSession,
+    project_id: UUID,
+    item_id: UUID,
+) -> ContentSeoEditorialItem:
+    try:
+        return await generate_editorial_brief_core(session, project_id, item_id)
+    except BriefGenerationError as exc:
+        if exc.ai_not_configured:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(exc),
+            ) from exc
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail="Generazione brief non riuscita. Riprova più tardi o verifica la configurazione AI.",
+        ) from exc
 
 
 async def update_editorial_brief(

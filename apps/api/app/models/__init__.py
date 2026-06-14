@@ -29,6 +29,7 @@ from app.models.integration_credential import IntegrationCredential
 from app.models.project import Project
 from app.models.seo_optimizer import SeoChangeLog, SeoEntityAnalysis, SeoOptimizationProposal
 from app.models.content_seo_editorial import ContentSeoEditorialItem
+from app.models.content_seo_brief_job import ContentSeoBriefGenerationJob
 from app.models.content_seo import (
     ContentBrief,
     ContentOpportunity,
@@ -81,6 +82,7 @@ __all__ = [
     "SeoEntityAnalysis",
     "SeoOptimizationProposal",
     "ContentSeoEditorialItem",
+    "ContentSeoBriefGenerationJob",
     "ContentBrief",
     "ContentOpportunity",
     "SeoAuditIssue",
