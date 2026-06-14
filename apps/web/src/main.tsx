@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import "@xyflow/react/dist/style.css";
 import "./styles/tokens.css";
+import "./styles/ui.css";
 import "./index.css";
 import "./styles/foundation.css";
 import "./styles/shopify-dashboard.css";

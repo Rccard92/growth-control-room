@@ -10,6 +10,7 @@ import type {
   ModuleCompletionStatus,
 } from "@gcr/shared";
 import { SeoEditModal } from "../content/optimizer/SeoEditModal";
+import { AppSelect } from "../ui/AppSelect";
 import {
   useApplyProductKnowledgeGeneralProposal,
   useApplyProductKnowledgeItemsImportProposal,
@@ -73,6 +74,12 @@ const MISSING_FIELD_LABELS: Record<string, string> = {
 
 type ItemFormValues = Partial<BrandProductKnowledgeItem> | Partial<BrandProductKnowledgeItemProposal>;
 
+const PRIORITY_OPTIONS = [
+  { value: "high", label: "Alta" },
+  { value: "medium", label: "Media" },
+  { value: "low", label: "Bassa" },
+];
+
 function renderItemFields(
   form: ItemFormValues,
   setForm: (next: ItemFormValues) => void,
@@ -96,18 +103,13 @@ function renderItemFields(
           onChange={(e) => setForm({ ...form, productLine: e.target.value })}
         />
       </div>
-      <div className="gcr-field">
-        <label htmlFor={`${idPrefix}-priority`}>Priorità commerciale</label>
-        <select
-          id={`${idPrefix}-priority`}
-          value={form.priority ?? "medium"}
-          onChange={(e) => setForm({ ...form, priority: e.target.value })}
-        >
-          <option value="high">Alta</option>
-          <option value="medium">Media</option>
-          <option value="low">Bassa</option>
-        </select>
-      </div>
+      <AppSelect
+        id={`${idPrefix}-priority`}
+        label="Priorità commerciale"
+        value={form.priority ?? "medium"}
+        options={PRIORITY_OPTIONS}
+        onChange={(v) => setForm({ ...form, priority: v })}
+      />
       {(
         [
           ["strategicDescription", "Descrizione strategica", 4],
@@ -495,20 +497,20 @@ function ItemProposalAccordion({
             )}
           </div>
           {shopifyConnected && (
-            <div className="gcr-field bi-form-grid--full">
-              <label htmlFor={`proposal-shopify-${proposal.clientKey}`}>Prodotto Shopify</label>
-              <select
+            <>
+              <AppSelect
                 id={`proposal-shopify-${proposal.clientKey}`}
+                label="Prodotto Shopify"
                 value={selectedShopifyId}
-                onChange={(e) => handleShopifyChange(e.target.value)}
-              >
-                <option value="">Nessun collegamento</option>
-                {shopifyProducts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title} (@{p.handle})
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "Nessun collegamento" },
+                  ...shopifyProducts.map((p) => ({
+                    value: p.id,
+                    label: `${p.title} (@${p.handle})`,
+                  })),
+                ]}
+                onChange={handleShopifyChange}
+              />
               {proposal.suggestedShopifyTitle && !proposal.shopifyProductId && (
                 <p className="bi-panel__subtitle">
                   Match suggerito: {proposal.suggestedShopifyTitle}
@@ -516,7 +518,7 @@ function ItemProposalAccordion({
                     && ` (${(proposal.shopifyMatchConfidence * 100).toFixed(0)}%)`}
                 </p>
               )}
-            </div>
+            </>
           )}
           <div className="bi-form-grid">
             {renderItemFields(

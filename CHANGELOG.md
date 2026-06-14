@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.2-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Replaced editorial plan drawer with centered modal (opaque overlay, no side drawer)
+- Added reusable AppModal component for centered dialogs
+- Added reusable dark AppSelect component with portal menu
+- Improved dropdown consistency in Content SEO wizard/drawer and Brand Intelligence Product Knowledge
+
 ## [0.4.1-alpha] - 2026-06-13
 
 Tipo: Alpha minor

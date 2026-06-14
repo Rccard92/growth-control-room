@@ -16,6 +16,7 @@ import {
   parseEditorialBriefPayload,
 } from "./editorial-brief-utils";
 import { EditorialStatusBadge } from "./EditorialStatusLegend";
+import { AppSelect } from "../../ui/AppSelect";
 import {
   useDeleteEditorialItem,
   useGenerateEditorialBrief,
@@ -78,6 +79,17 @@ export function EditorialItemDrawer({
 
   const currentItem = item;
   const hasBrief = Boolean(brief);
+
+  const statusOptions = Object.entries(CONTENT_SEO_EDITORIAL_STATUS_LABELS).map(
+    ([value, label]) => ({ value, label }),
+  );
+  const objectiveOptions = [
+    { value: "", label: "—" },
+    ...Object.entries(CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS).map(([value, label]) => ({
+      value,
+      label,
+    })),
+  ];
 
   function syncItem(updated: ContentSeoEditorialItem) {
     onItemUpdated?.(updated);
@@ -204,38 +216,19 @@ export function EditorialItemDrawer({
             />
           </label>
 
-          <label className="gcr-field">
-            <span className="gcr-field__label">Stato</span>
-            <select
-              className="gcr-input"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as ContentSeoEditorialStatus)}
-            >
-              {Object.entries(CONTENT_SEO_EDITORIAL_STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AppSelect
+            label="Stato"
+            value={status}
+            options={statusOptions}
+            onChange={(v) => setStatus(v as ContentSeoEditorialStatus)}
+          />
 
-          <label className="gcr-field">
-            <span className="gcr-field__label">Obiettivo</span>
-            <select
-              className="gcr-input"
-              value={objective}
-              onChange={(e) =>
-                setObjective(e.target.value as ContentSeoEditorialObjective | "")
-              }
-            >
-              <option value="">—</option>
-              {Object.entries(CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AppSelect
+            label="Obiettivo"
+            value={objective}
+            options={objectiveOptions}
+            onChange={(v) => setObjective(v as ContentSeoEditorialObjective | "")}
+          />
 
           <label className="gcr-field">
             <span className="gcr-field__label">Keyword principale</span>
