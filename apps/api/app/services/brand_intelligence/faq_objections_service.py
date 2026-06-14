@@ -2,22 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+import logging
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import BrandFaqObjections
-from app.schemas.brand_faq_objections import (
-    BrandFaqObjectionsProposal,
-    BrandFaqObjectionsUpdate,
-    FaqEntry,
-    SocialCommentInsight,
-)
+from app.schemas.brand_faq_objections import BrandFaqObjectionsProposal, BrandFaqObjectionsUpdate
+from app.services.brand_intelligence.faq_objections_normalize import normalize_to_string_list
 
 if TYPE_CHECKING:
     from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
+
+logger = logging.getLogger(__name__)
 
 CompletionStatus = Literal["complete", "partial", "empty"]
 
@@ -32,6 +31,16 @@ _LIST_FIELDS = (
     "recommended_answers",
     "content_opportunities",
 )
+_STRING_LIST_FIELDS = (
+    "general_faq",
+    "product_process_questions",
+    "purchase_shipping_questions",
+    "objections",
+    "myths_misconceptions",
+    "recommended_answers",
+    "content_opportunities",
+    "social_comment_insights",
+)
 
 
 def _has_text(value: str | None) -> bool:
@@ -42,35 +51,16 @@ def _has_list(value: list | None) -> bool:
     return bool(value and len(value) > 0)
 
 
-def _has_faq(value: list[FaqEntry | dict[str, Any]] | None) -> bool:
+def _has_string_list(value: list[str] | None) -> bool:
     if not value:
         return False
-    for entry in value:
-        if isinstance(entry, FaqEntry):
-            if _has_text(entry.question):
-                return True
-        elif isinstance(entry, dict) and _has_text(entry.get("question")):
-            return True
-    return False
-
-
-def _has_social_insights(value: list[SocialCommentInsight | dict[str, Any]] | None) -> bool:
-    if not value:
-        return False
-    for entry in value:
-        if isinstance(entry, SocialCommentInsight):
-            if _has_text(entry.insight) or _has_text(entry.doubt):
-                return True
-        elif isinstance(entry, dict):
-            if _has_text(entry.get("insight")) or _has_text(entry.get("doubt")):
-                return True
-    return False
+    return any(_has_text(item) for item in value)
 
 
 def _any_faq_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
     if not row:
         return False
-    return any(_has_faq(getattr(row, field)) for field in _FAQ_FIELDS)
+    return any(_has_string_list(getattr(row, field)) for field in _FAQ_FIELDS)
 
 
 def _any_content_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
@@ -80,7 +70,7 @@ def _any_content_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | 
         return True
     if any(_has_list(getattr(row, field)) for field in _LIST_FIELDS):
         return True
-    if _has_social_insights(row.social_comment_insights):
+    if _has_string_list(row.social_comment_insights):
         return True
     return _has_text(row.notes)
 
@@ -135,146 +125,24 @@ def _apply_string_field(row: BrandFaqObjections, attr: str, value: str | None) -
         setattr(row, attr, value.strip())
 
 
-def _apply_list_field(row: BrandFaqObjections, attr: str, value: list | None) -> None:
-    if _has_list(value):
-        setattr(row, attr, value)
-
-
-def _faq_to_dicts(value: list[FaqEntry] | None) -> list[dict[str, str]] | None:
-    if not value:
-        return None
-    out: list[dict[str, str]] = []
-    for entry in value:
-        q = (entry.question or "").strip()
-        a = (entry.answer or "").strip()
-        if q:
-            out.append({"question": q, "answer": a})
-    return out if out else None
-
-
-def _parse_faq_string_block(text: str) -> dict[str, str] | None:
-    stripped = text.strip()
-    if not stripped:
-        return None
-
-    lower = stripped.lower()
-    if lower.startswith("domanda:"):
-        lines = stripped.split("\n")
-        question = lines[0].split(":", 1)[-1].strip()
-        answer = ""
-        for line in lines[1:]:
-            if line.lower().startswith("risposta:"):
-                answer = line.split(":", 1)[-1].strip()
-                break
-        if question:
-            return {"question": question, "answer": answer}
-        return None
-
-    if "|" in stripped:
-        question, _, answer = stripped.partition("|")
-        q = question.strip()
-        if q:
-            return {"question": q, "answer": answer.strip()}
-
-    return {"question": stripped, "answer": ""}
-
-
-def _faq_strings_to_dicts(value: list[str] | None) -> list[dict[str, str]] | None:
-    if not value:
-        return None
-    out: list[dict[str, str]] = []
-    for block in value:
-        parsed = _parse_faq_string_block(block)
-        if parsed:
-            out.append(parsed)
-    return out if out else None
-
-
-def _parse_social_string(text: str) -> dict[str, str | None] | None:
-    stripped = text.strip()
-    if not stripped:
-        return None
-
-    insight = ""
-    doubt = ""
-    reply: str | None = None
-
-    if "|" in stripped:
-        parts = [p.strip() for p in stripped.split("|")]
-        for part in parts:
-            lower = part.lower()
-            if lower.startswith("insight:"):
-                insight = part.split(":", 1)[-1].strip()
-            elif lower.startswith("dubbio:"):
-                doubt = part.split(":", 1)[-1].strip()
-            elif lower.startswith("risposta:"):
-                reply = part.split(":", 1)[-1].strip() or None
-            elif not insight:
-                insight = part
-            elif not doubt:
-                doubt = part
-            elif reply is None:
-                reply = part or None
-    else:
-        insight = stripped
-
-    if insight or doubt:
-        return {"insight": insight, "doubt": doubt, "suggestedReply": reply}
-    return None
-
-
-def _social_strings_to_dicts(value: list[str] | None) -> list[dict[str, str | None]] | None:
-    if not value:
-        return None
-    out: list[dict[str, str | None]] = []
-    for block in value:
-        parsed = _parse_social_string(block)
-        if parsed:
-            out.append(parsed)
-    return out if out else None
-
-
-def _apply_faq_field(row: BrandFaqObjections, attr: str, value: list[FaqEntry] | None) -> None:
-    normalized = _faq_to_dicts(value)
+def _apply_string_list_field(row: BrandFaqObjections, attr: str, value: list[str] | None) -> None:
+    if value is None:
+        return
+    normalized = normalize_to_string_list(value)
     if normalized:
         setattr(row, attr, normalized)
 
 
-def _social_to_dicts(
-    value: list[SocialCommentInsight] | None,
-) -> list[dict[str, str | None]] | None:
-    if not value:
-        return None
-    out: list[dict[str, str | None]] = []
-    for entry in value:
-        insight = (entry.insight or "").strip()
-        doubt = (entry.doubt or "").strip()
-        reply = (entry.suggested_reply or "").strip() or None
-        if insight or doubt:
-            out.append({"insight": insight, "doubt": doubt, "suggestedReply": reply})
-    return out if out else None
-
-
-def _apply_faq_strings_field(
-    row: BrandFaqObjections, attr: str, value: list[str] | None
-) -> None:
-    normalized = _faq_strings_to_dicts(value)
-    if normalized:
-        setattr(row, attr, normalized)
-
-
-def _apply_social_strings_field(row: BrandFaqObjections, value: list[str] | None) -> None:
-    normalized = _social_strings_to_dicts(value)
-    if normalized:
-        row.social_comment_insights = normalized
-
-
-def _apply_social_field(
-    row: BrandFaqObjections, value: list[SocialCommentInsight] | None
-) -> None:
-    normalized = _social_to_dicts(value)
-    if normalized:
-        row.social_comment_insights = normalized
+def _merge_warnings(row: BrandFaqObjections, warnings: list[str]) -> None:
+    if not warnings:
+        return
+    existing = list(row.warnings or [])
+    for warning in warnings:
+        if warning not in existing:
+            existing.append(warning)
+    row.warnings = existing
+    for warning in warnings:
+        logger.warning("FAQ & Objections normalization: %s", warning)
 
 
 async def _get_or_create_faq_objections(
@@ -304,14 +172,18 @@ async def upsert_faq_objections(
 ) -> BrandFaqObjections:
     row = await _get_or_create_faq_objections(session, project_id)
     data = payload.model_dump(exclude_unset=True)
+    all_warnings: list[str] = []
+
     for key, value in data.items():
-        if key in _FAQ_FIELDS and value is not None:
-            normalized = _faq_to_dicts(value)
+        if key in _STRING_LIST_FIELDS:
+            field_warnings: list[str] = []
+            normalized = normalize_to_string_list(value, field_warnings)
             setattr(row, key, normalized)
-        elif key == "social_comment_insights" and value is not None:
-            row.social_comment_insights = _social_to_dicts(value)
+            all_warnings.extend(field_warnings)
         else:
             setattr(row, key, value)
+
+    _merge_warnings(row, all_warnings)
     await session.commit()
     await session.refresh(row)
     return row
@@ -325,14 +197,14 @@ async def apply_faq_objections_proposal(
     row = await _get_or_create_faq_objections(session, project_id)
 
     _apply_string_field(row, "notes", proposal.notes)
-    _apply_faq_strings_field(row, "general_faq", proposal.general_faq)
-    _apply_faq_strings_field(row, "product_process_questions", proposal.product_process_questions)
-    _apply_faq_strings_field(row, "purchase_shipping_questions", proposal.purchase_shipping_questions)
-    _apply_list_field(row, "objections", proposal.objections)
-    _apply_list_field(row, "myths_misconceptions", proposal.myths_misconceptions)
-    _apply_list_field(row, "recommended_answers", proposal.recommended_answers)
-    _apply_list_field(row, "content_opportunities", proposal.content_opportunities)
-    _apply_social_strings_field(row, proposal.social_comment_insights)
+    _apply_string_list_field(row, "general_faq", proposal.general_faq)
+    _apply_string_list_field(row, "product_process_questions", proposal.product_process_questions)
+    _apply_string_list_field(row, "purchase_shipping_questions", proposal.purchase_shipping_questions)
+    _apply_string_list_field(row, "objections", proposal.objections)
+    _apply_string_list_field(row, "myths_misconceptions", proposal.myths_misconceptions)
+    _apply_string_list_field(row, "recommended_answers", proposal.recommended_answers)
+    _apply_string_list_field(row, "content_opportunities", proposal.content_opportunities)
+    _apply_string_list_field(row, "social_comment_insights", proposal.social_comment_insights)
 
     await session.commit()
     await session.refresh(row)

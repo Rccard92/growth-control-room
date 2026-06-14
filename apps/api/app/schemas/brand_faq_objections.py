@@ -1,7 +1,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.services.brand_intelligence.faq_objections_normalize import normalize_to_string_list
 
 
 class FaqEntry(BaseModel):
@@ -21,16 +23,22 @@ class SocialCommentInsight(BaseModel):
     )
 
 
+def _coerce_string_list(value: object | None) -> list[str] | None:
+    if value is None:
+        return None
+    return normalize_to_string_list(value)
+
+
 class BrandFaqObjectionsRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID
     project_id: UUID = Field(serialization_alias="projectId")
-    general_faq: list[FaqEntry] | None = Field(default=None, serialization_alias="generalFaq")
-    product_process_questions: list[FaqEntry] | None = Field(
+    general_faq: list[str] | None = Field(default=None, serialization_alias="generalFaq")
+    product_process_questions: list[str] | None = Field(
         default=None, serialization_alias="productProcessQuestions"
     )
-    purchase_shipping_questions: list[FaqEntry] | None = Field(
+    purchase_shipping_questions: list[str] | None = Field(
         default=None, serialization_alias="purchaseShippingQuestions"
     )
     objections: list[str] | None = None
@@ -43,7 +51,7 @@ class BrandFaqObjectionsRead(BaseModel):
     content_opportunities: list[str] | None = Field(
         default=None, serialization_alias="contentOpportunities"
     )
-    social_comment_insights: list[SocialCommentInsight] | None = Field(
+    social_comment_insights: list[str] | None = Field(
         default=None, serialization_alias="socialCommentInsights"
     )
     notes: str | None = None
@@ -53,15 +61,30 @@ class BrandFaqObjectionsRead(BaseModel):
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
+    @field_validator(
+        "general_faq",
+        "product_process_questions",
+        "purchase_shipping_questions",
+        "objections",
+        "myths_misconceptions",
+        "recommended_answers",
+        "content_opportunities",
+        "social_comment_insights",
+        mode="before",
+    )
+    @classmethod
+    def _normalize_list_fields(cls, value: object | None) -> list[str] | None:
+        return _coerce_string_list(value)
+
 
 class BrandFaqObjectionsUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    general_faq: list[FaqEntry] | None = Field(default=None, validation_alias="generalFaq")
-    product_process_questions: list[FaqEntry] | None = Field(
+    general_faq: list[str] | None = Field(default=None, validation_alias="generalFaq")
+    product_process_questions: list[str] | None = Field(
         default=None, validation_alias="productProcessQuestions"
     )
-    purchase_shipping_questions: list[FaqEntry] | None = Field(
+    purchase_shipping_questions: list[str] | None = Field(
         default=None, validation_alias="purchaseShippingQuestions"
     )
     objections: list[str] | None = None
@@ -74,10 +97,27 @@ class BrandFaqObjectionsUpdate(BaseModel):
     content_opportunities: list[str] | None = Field(
         default=None, validation_alias="contentOpportunities"
     )
-    social_comment_insights: list[SocialCommentInsight] | None = Field(
+    social_comment_insights: list[str] | None = Field(
         default=None, validation_alias="socialCommentInsights"
     )
     notes: str | None = None
+
+    @field_validator(
+        "general_faq",
+        "product_process_questions",
+        "purchase_shipping_questions",
+        "objections",
+        "myths_misconceptions",
+        "recommended_answers",
+        "content_opportunities",
+        "social_comment_insights",
+        mode="before",
+    )
+    @classmethod
+    def _normalize_list_fields(cls, value: object | None) -> list[str] | None:
+        if value is None:
+            return None
+        return normalize_to_string_list(value)
 
 
 class BrandFaqObjectionsProposal(BaseModel):

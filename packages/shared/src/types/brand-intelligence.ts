@@ -326,14 +326,14 @@ export interface SocialCommentInsight {
 export interface BrandFaqObjections {
   id: string;
   projectId: string;
-  generalFaq?: FaqEntry[] | null;
-  productProcessQuestions?: FaqEntry[] | null;
-  purchaseShippingQuestions?: FaqEntry[] | null;
+  generalFaq?: string[] | null;
+  productProcessQuestions?: string[] | null;
+  purchaseShippingQuestions?: string[] | null;
   objections?: string[] | null;
   mythsMisconceptions?: string[] | null;
   recommendedAnswers?: string[] | null;
   contentOpportunities?: string[] | null;
-  socialCommentInsights?: SocialCommentInsight[] | null;
+  socialCommentInsights?: string[] | null;
   notes?: string | null;
   lastImportSource?: string | null;
   lastConfidence?: number | null;

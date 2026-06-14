@@ -300,12 +300,12 @@ def test_format_item_for_prompt_ai_import() -> None:
 
 
 def test_build_prompt_context_includes_faq_objections() -> None:
-    from app.schemas.brand_faq_objections import BrandFaqObjectionsRead, FaqEntry
+    from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
 
     faq_read = BrandFaqObjectionsRead(
         id=uuid4(),
         project_id=_PID,
-        general_faq=[FaqEntry(question="Spedite in Italia?", answer="Sì, in 48h")],
+        general_faq=["Domanda: Spedite in Italia?\nRisposta: Sì, in 48h"],
         objections=["Il prezzo è alto"],
         recommended_answers=["Spiega il valore artigianale"],
         created_at=_NOW,

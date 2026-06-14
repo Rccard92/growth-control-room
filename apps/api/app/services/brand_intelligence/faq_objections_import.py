@@ -23,6 +23,14 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
+from app.services.brand_intelligence.faq_objections_normalize import (
+    dedupe_strings,
+    format_faq_block,
+    format_myth_block,
+    format_objection_answer_block,
+    format_social_block,
+    serialize_unknown_object,
+)
 from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
 
 logger = logging.getLogger(__name__)
@@ -84,18 +92,6 @@ def _soft_cap(value: str, max_len: int = _MAX_STRING_LEN) -> str:
     return value[:max_len] + "…"
 
 
-def _dedupe_strings(items: list[str]) -> list[str]:
-    seen: set[str] = set()
-    out: list[str] = []
-    for item in items:
-        trimmed = item.strip()
-        if not trimmed or trimmed in seen:
-            continue
-        seen.add(trimmed)
-        out.append(_soft_cap(trimmed))
-    return out
-
-
 def _pick_field(data: dict[str, object], *aliases: str) -> object | None:
     for key in aliases:
         if key in data:
@@ -111,54 +107,6 @@ def _get_str_field(data: dict[str, object], *keys: str) -> str:
             if trimmed:
                 return trimmed
     return ""
-
-
-def _format_faq_block(question: str, answer: str) -> str:
-    q = question.strip()
-    a = answer.strip()
-    if not q:
-        return ""
-    if a:
-        return f"Domanda: {q}\nRisposta: {a}"
-    return f"Domanda: {q}"
-
-
-def _format_myth_block(myth: str, correction: str) -> str:
-    m = myth.strip()
-    c = correction.strip()
-    if not m:
-        return ""
-    if c:
-        return f"Mito: {m}\nCorrezione: {c}"
-    return f"Mito: {m}"
-
-
-def _format_objection_answer_block(objection: str, answer: str) -> str:
-    o = objection.strip()
-    a = answer.strip()
-    if not o:
-        return ""
-    if a:
-        return f"Obiezione: {o}\nRisposta consigliata: {a}"
-    return f"Obiezione: {o}"
-
-
-def _format_social_block(insight: str, doubt: str, reply: str) -> str:
-    parts: list[str] = []
-    if insight.strip():
-        parts.append(f"Insight: {insight.strip()}")
-    if doubt.strip():
-        parts.append(f"Dubbio: {doubt.strip()}")
-    if reply.strip():
-        parts.append(f"Risposta: {reply.strip()}")
-    return " | ".join(parts)
-
-
-def _serialize_unknown_object(item: dict[str, object]) -> str:
-    try:
-        return json.dumps(item, ensure_ascii=False, sort_keys=True)
-    except (TypeError, ValueError):
-        return str(item)
 
 
 def _expand_list_item(
@@ -199,7 +147,7 @@ def _expand_list_item(
     value = _get_str_field(item, "value", "valore")
 
     if field_kind == "faq" and (question or answer):
-        block = _format_faq_block(question, answer)
+        block = format_faq_block(question, answer)
         if block:
             primary.append(block)
         return primary, recommended_extra, warnings
@@ -208,7 +156,7 @@ def _expand_list_item(
         if objection:
             primary.append(objection)
         if objection and answer:
-            block = _format_objection_answer_block(objection, answer)
+            block = format_objection_answer_block(objection, answer)
             if block:
                 recommended_extra.append(block)
         elif answer:
@@ -216,19 +164,19 @@ def _expand_list_item(
         return primary, recommended_extra, warnings
 
     if field_kind == "myths" and (myth or correction):
-        block = _format_myth_block(myth, correction)
+        block = format_myth_block(myth, correction)
         if block:
             primary.append(block)
         return primary, recommended_extra, warnings
 
     if field_kind == "social" and (insight or doubt or suggested_reply):
-        block = _format_social_block(insight, doubt, suggested_reply)
+        block = format_social_block(insight, doubt, suggested_reply)
         if block:
             primary.append(block)
         return primary, recommended_extra, warnings
 
     if question or answer:
-        block = _format_faq_block(question, answer)
+        block = format_faq_block(question, answer)
         if block:
             primary.append(block)
         return primary, recommended_extra, warnings
@@ -236,19 +184,19 @@ def _expand_list_item(
     if objection:
         primary.append(objection)
         if answer:
-            block = _format_objection_answer_block(objection, answer)
+            block = format_objection_answer_block(objection, answer)
             if block:
                 recommended_extra.append(block)
         return primary, recommended_extra, warnings
 
     if myth or correction:
-        block = _format_myth_block(myth, correction)
+        block = format_myth_block(myth, correction)
         if block:
             primary.append(block)
         return primary, recommended_extra, warnings
 
     if insight or doubt or suggested_reply:
-        block = _format_social_block(insight, doubt, suggested_reply)
+        block = format_social_block(insight, doubt, suggested_reply)
         if block:
             primary.append(block)
         return primary, recommended_extra, warnings
@@ -271,7 +219,7 @@ def _expand_list_item(
 
     if item:
         warnings.append("Elemento oggetto non riconosciuto serializzato come testo.")
-        primary.append(_serialize_unknown_object(item))
+        primary.append(serialize_unknown_object(item))
 
     return primary, recommended_extra, warnings
 
@@ -362,7 +310,7 @@ def normalize_faq_objections_ai_output(
         raw_field = _pick_field(raw, *aliases)
         primary, spillover, field_warnings = _normalize_field_list(raw_field, field_kind)
         warnings.extend(field_warnings)
-        result[field_key] = _dedupe_strings(primary)
+        result[field_key] = dedupe_strings(primary)
         if field_kind == "objections":
             recommended_accumulator.extend(spillover)
 
@@ -373,7 +321,7 @@ def normalize_faq_objections_ai_output(
     warnings.extend(rec_warnings)
     recommended_accumulator.extend(rec_primary)
     recommended_accumulator.extend(rec_spillover)
-    result["recommended_answers"] = _dedupe_strings(recommended_accumulator)
+    result["recommended_answers"] = dedupe_strings(recommended_accumulator)
 
     notes_raw = _pick_field(raw, "notes", "note")
     if isinstance(notes_raw, str):

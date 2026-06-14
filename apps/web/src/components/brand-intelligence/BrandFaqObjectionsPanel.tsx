@@ -3,8 +3,6 @@ import type {
   BrandFaqObjections,
   BrandFaqObjectionsImportResponse,
   BrandFaqObjectionsProposal,
-  FaqEntry,
-  SocialCommentInsight,
 } from "@gcr/shared";
 import {
   useApplyFaqObjectionsProposal,
@@ -22,28 +20,18 @@ const ACCEPTED_EXTENSIONS = ".pdf,.docx,.txt,.md";
 const NORMALIZE_ERROR_MESSAGE =
   "Il file è stato letto, ma la proposta non è stata normalizzata correttamente. Riprova o usa un file più strutturato.";
 
-const LIST_FIELDS = [
+const OFFICIAL_LIST_FIELDS = [
+  ["generalFaq", "FAQ generali (una voce per riga, es. Domanda: ... / Risposta: ...)"],
+  ["productProcessQuestions", "Domande prodotto/processo (una voce per riga)"],
+  ["purchaseShippingQuestions", "Domande acquisto/spedizione (una voce per riga)"],
   ["objections", "Obiezioni frequenti (uno per riga)"],
   ["mythsMisconceptions", "Falsi miti / fraintendimenti (uno per riga)"],
   ["recommendedAnswers", "Risposte consigliate (uno per riga)"],
   ["contentOpportunities", "Opportunità contenuto (uno per riga)"],
+  ["socialCommentInsights", "Insight commenti social (uno per riga)"],
 ] as const;
 
-const FAQ_FIELDS = [
-  ["generalFaq", "FAQ generali (una voce per riga, es. Domanda: ... / Risposta: ...)"],
-  ["productProcessQuestions", "Domande prodotto/processo (una voce per riga)"],
-  ["purchaseShippingQuestions", "Domande acquisto/spedizione (una voce per riga)"],
-] as const;
-
-const PROPOSAL_LIST_FIELDS = [
-  ...FAQ_FIELDS,
-  ...LIST_FIELDS,
-  ["socialCommentInsights", "Insight commenti social (uno per riga)"] as const,
-] as const;
-
-type ListFieldKey = (typeof LIST_FIELDS)[number][0];
-type FaqFieldKey = (typeof FAQ_FIELDS)[number][0];
-type ProposalListFieldKey = (typeof PROPOSAL_LIST_FIELDS)[number][0];
+type OfficialListFieldKey = (typeof OFFICIAL_LIST_FIELDS)[number][0];
 
 function linesToList(text: string): string[] {
   return text
@@ -56,50 +44,88 @@ function listToLines(list: string[] | null | undefined): string {
   return (list ?? []).join("\n");
 }
 
-function faqToLines(faq: FaqEntry[] | null | undefined): string {
-  return (faq ?? [])
-    .map((e) => `${e.question}${e.answer ? ` | ${e.answer}` : ""}`)
-    .join("\n");
+function coerceLegacyItem(item: unknown): string | null {
+  if (typeof item === "string") {
+    const trimmed = item.trim();
+    return trimmed || null;
+  }
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const record = item as Record<string, unknown>;
+  const question = [record.question, record.domanda].find((v) => typeof v === "string") as
+    | string
+    | undefined;
+  const answer = [record.answer, record.risposta, record.response].find(
+    (v) => typeof v === "string",
+  ) as string | undefined;
+  if (question?.trim()) {
+    const q = question.trim();
+    const a = answer?.trim() ?? "";
+    return a ? `Domanda: ${q}\nRisposta: ${a}` : `Domanda: ${q}`;
+  }
+  const objection = [record.objection, record.obiezione].find((v) => typeof v === "string") as
+    | string
+    | undefined;
+  const objectionAnswer = [record.answer, record.risposta].find((v) => typeof v === "string") as
+    | string
+    | undefined;
+  if (objection?.trim()) {
+    const o = objection.trim();
+    const a = objectionAnswer?.trim() ?? "";
+    return a ? `Obiezione: ${o}\nRisposta consigliata: ${a}` : o;
+  }
+  const myth = [record.myth, record.mito].find((v) => typeof v === "string") as string | undefined;
+  const correction = [record.correction, record.correzione].find((v) => typeof v === "string") as
+    | string
+    | undefined;
+  if (myth?.trim()) {
+    const m = myth.trim();
+    const c = correction?.trim() ?? "";
+    return c ? `Mito: ${m}\nCorrezione: ${c}` : `Mito: ${m}`;
+  }
+  const insight = typeof record.insight === "string" ? record.insight.trim() : "";
+  const doubt = [record.doubt, record.dubbio].find((v) => typeof v === "string") as
+    | string
+    | undefined;
+  const reply = [record.suggestedReply, record.suggested_reply, record.reply].find(
+    (v) => typeof v === "string",
+  ) as string | undefined;
+  if (insight || doubt?.trim() || reply?.trim()) {
+    const parts: string[] = [];
+    if (insight) parts.push(`Insight: ${insight}`);
+    if (doubt?.trim()) parts.push(`Dubbio: ${doubt.trim()}`);
+    if (reply?.trim()) parts.push(`Risposta: ${reply.trim()}`);
+    return parts.join(" | ");
+  }
+  const text = [record.text, record.testo, record.content].find((v) => typeof v === "string") as
+    | string
+    | undefined;
+  if (text?.trim()) return text.trim();
+  const value = [record.value, record.valore].find((v) => typeof v === "string") as
+    | string
+    | undefined;
+  if (value?.trim()) return value.trim();
+  return null;
 }
 
-function linesToFaq(text: string): FaqEntry[] {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [question, ...rest] = line.split("|");
-      return {
-        question: (question ?? "").trim(),
-        answer: rest.join("|").trim(),
-      };
-    })
-    .filter((e) => e.question);
-}
-
-function socialToLines(insights: SocialCommentInsight[] | null | undefined): string {
-  return (insights ?? [])
-    .map((s) => {
-      const parts = [s.insight, s.doubt, s.suggestedReply ?? ""].filter(Boolean);
-      return parts.join(" | ");
-    })
-    .join("\n");
-}
-
-function linesToSocial(text: string): SocialCommentInsight[] {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [insight, doubt, suggestedReply] = line.split("|").map((p) => p.trim());
-      return {
-        insight: insight ?? "",
-        doubt: doubt ?? "",
-        suggestedReply: suggestedReply || null,
-      };
-    })
-    .filter((s) => s.insight || s.doubt);
+function coerceStringList(value: unknown): string[] {
+  if (!value) return [];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    const text = coerceLegacyItem(item);
+    if (text && !seen.has(text)) {
+      seen.add(text);
+      out.push(text);
+    }
+  }
+  return out;
 }
 
 type OfficialFormState = Partial<BrandFaqObjections>;
@@ -107,14 +133,14 @@ type ProposalFormState = Partial<BrandFaqObjectionsProposal>;
 
 function rowToOfficialForm(row: BrandFaqObjections): OfficialFormState {
   return {
-    generalFaq: row.generalFaq ?? [],
-    productProcessQuestions: row.productProcessQuestions ?? [],
-    purchaseShippingQuestions: row.purchaseShippingQuestions ?? [],
-    objections: row.objections ?? [],
-    mythsMisconceptions: row.mythsMisconceptions ?? [],
-    recommendedAnswers: row.recommendedAnswers ?? [],
-    contentOpportunities: row.contentOpportunities ?? [],
-    socialCommentInsights: row.socialCommentInsights ?? [],
+    generalFaq: coerceStringList(row.generalFaq),
+    productProcessQuestions: coerceStringList(row.productProcessQuestions),
+    purchaseShippingQuestions: coerceStringList(row.purchaseShippingQuestions),
+    objections: coerceStringList(row.objections),
+    mythsMisconceptions: coerceStringList(row.mythsMisconceptions),
+    recommendedAnswers: coerceStringList(row.recommendedAnswers),
+    contentOpportunities: coerceStringList(row.contentOpportunities),
+    socialCommentInsights: coerceStringList(row.socialCommentInsights),
     notes: row.notes ?? "",
   };
 }
@@ -204,6 +230,40 @@ function mapImportError(message: string): string {
   return message;
 }
 
+function renderListFields<T extends OfficialFormState | ProposalFormState>(
+  fields: readonly (readonly [string, string])[],
+  values: T,
+  onChange: (next: T) => void,
+  idPrefix: string,
+) {
+  return (
+    <div className="bi-form-grid">
+      {fields.map(([key, label]) => (
+        <div className="gcr-field bi-form-grid--full" key={key}>
+          <label htmlFor={`${idPrefix}-${key}`}>{label}</label>
+          <textarea
+            id={`${idPrefix}-${key}`}
+            rows={key === "socialCommentInsights" ? 3 : 4}
+            value={listToLines(values[key as OfficialListFieldKey] as string[] | undefined)}
+            onChange={(e) =>
+              onChange({ ...values, [key]: linesToList(e.target.value) })
+            }
+          />
+        </div>
+      ))}
+      <div className="gcr-field bi-form-grid--full">
+        <label htmlFor={`${idPrefix}-notes`}>Note</label>
+        <textarea
+          id={`${idPrefix}-notes`}
+          rows={3}
+          value={values.notes ?? ""}
+          onChange={(e) => onChange({ ...values, notes: e.target.value })}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function BrandFaqObjectionsPanel({ projectId }: BrandFaqObjectionsPanelProps) {
   const { data: faqObjections, isLoading } = useFaqObjections(projectId);
   const update = useUpdateFaqObjections(projectId);
@@ -285,98 +345,6 @@ export function BrandFaqObjectionsPanel({ projectId }: BrandFaqObjectionsPanelPr
     });
   }
 
-  function renderProposalFields(
-    values: ProposalFormState,
-    onChange: (next: ProposalFormState) => void,
-    idPrefix: string,
-  ) {
-    return (
-      <div className="bi-form-grid">
-        {PROPOSAL_LIST_FIELDS.map(([key, label]) => (
-          <div className="gcr-field bi-form-grid--full" key={key}>
-            <label htmlFor={`${idPrefix}-${key}`}>{label}</label>
-            <textarea
-              id={`${idPrefix}-${key}`}
-              rows={key === "socialCommentInsights" ? 3 : 4}
-              value={listToLines(values[key as ProposalListFieldKey] as string[] | undefined)}
-              onChange={(e) =>
-                onChange({ ...values, [key]: linesToList(e.target.value) })
-              }
-            />
-          </div>
-        ))}
-        <div className="gcr-field bi-form-grid--full">
-          <label htmlFor={`${idPrefix}-notes`}>Note</label>
-          <textarea
-            id={`${idPrefix}-notes`}
-            rows={3}
-            value={values.notes ?? ""}
-            onChange={(e) => onChange({ ...values, notes: e.target.value })}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  function renderOfficialFields(
-    values: OfficialFormState,
-    onChange: (next: OfficialFormState) => void,
-    idPrefix: string,
-  ) {
-    return (
-      <div className="bi-form-grid">
-        {FAQ_FIELDS.map(([key, label]) => (
-          <div className="gcr-field bi-form-grid--full" key={key}>
-            <label htmlFor={`${idPrefix}-${key}`}>{label}</label>
-            <textarea
-              id={`${idPrefix}-${key}`}
-              rows={4}
-              value={faqToLines(values[key as FaqFieldKey] as FaqEntry[] | undefined)}
-              onChange={(e) =>
-                onChange({ ...values, [key]: linesToFaq(e.target.value) })
-              }
-            />
-          </div>
-        ))}
-        {LIST_FIELDS.map(([key, label]) => (
-          <div className="gcr-field bi-form-grid--full" key={key}>
-            <label htmlFor={`${idPrefix}-${key}`}>{label}</label>
-            <textarea
-              id={`${idPrefix}-${key}`}
-              rows={3}
-              value={listToLines(values[key as ListFieldKey] as string[] | undefined)}
-              onChange={(e) =>
-                onChange({ ...values, [key]: linesToList(e.target.value) })
-              }
-            />
-          </div>
-        ))}
-        <div className="gcr-field bi-form-grid--full">
-          <label htmlFor={`${idPrefix}-socialCommentInsights`}>
-            Insight commenti social (insight | dubbio | risposta opzionale)
-          </label>
-          <textarea
-            id={`${idPrefix}-socialCommentInsights`}
-            rows={3}
-            value={socialToLines(values.socialCommentInsights)}
-            onChange={(e) =>
-              onChange({ ...values, socialCommentInsights: linesToSocial(e.target.value) })
-            }
-          />
-        </div>
-        <div className="gcr-field bi-form-grid--full">
-          <label htmlFor={`${idPrefix}-notes`}>Note</label>
-          <textarea
-            id={`${idPrefix}-notes`}
-            rows={3}
-            value={values.notes ?? ""}
-            onChange={(e) => onChange({ ...values, notes: e.target.value })}
-          />
-        </div>
-      </div>
-    );
-  }
-
   if (isLoading) return <p className="bi-panel__subtitle">Caricamento…</p>;
 
   return (
@@ -444,9 +412,12 @@ export function BrandFaqObjectionsPanel({ projectId }: BrandFaqObjectionsPanelPr
               )}
             </p>
           )}
-          {renderProposalFields(proposalToForm(proposal), (next) => {
-            setProposal(formToProposal(next));
-          }, "proposal")}
+          {renderListFields(
+            OFFICIAL_LIST_FIELDS,
+            proposalToForm(proposal),
+            (next) => setProposal(formToProposal(next)),
+            "proposal",
+          )}
           <div className="bi-profile-block__actions">
             <button
               type="button"
@@ -482,7 +453,7 @@ export function BrandFaqObjectionsPanel({ projectId }: BrandFaqObjectionsPanelPr
           Content SEO, PED, blog, social).
         </p>
         <form onSubmit={handleSave}>
-          {renderOfficialFields(officialForm, setOfficialForm, "official")}
+          {renderListFields(OFFICIAL_LIST_FIELDS, officialForm, setOfficialForm, "official")}
           <div className="bi-profile-block__actions">
             <button
               type="submit"

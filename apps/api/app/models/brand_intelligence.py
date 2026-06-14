@@ -139,18 +139,18 @@ class BrandFaqObjections(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("projects.id", ondelete="CASCADE"),
         index=True,
     )
-    general_faq: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
-    product_process_questions: Mapped[list[dict[str, Any]] | None] = mapped_column(
+    general_faq: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    product_process_questions: Mapped[list[str] | None] = mapped_column(
         JSONB, nullable=True
     )
-    purchase_shipping_questions: Mapped[list[dict[str, Any]] | None] = mapped_column(
+    purchase_shipping_questions: Mapped[list[str] | None] = mapped_column(
         JSONB, nullable=True
     )
     objections: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     myths_misconceptions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     recommended_answers: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     content_opportunities: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
-    social_comment_insights: Mapped[list[dict[str, Any]] | None] = mapped_column(
+    social_comment_insights: Mapped[list[str] | None] = mapped_column(
         JSONB, nullable=True
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

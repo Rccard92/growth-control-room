@@ -287,25 +287,14 @@ class BrandIntelligenceContextBuilder:
         return bool(text and len(text.splitlines()) > 1)
 
     @staticmethod
-    def _format_faq_entries(label: str, entries: list | None) -> list[str]:
-        if not entries:
+    def _format_string_list(label: str, items: list[str] | None) -> list[str]:
+        if not items:
             return []
         lines = [f"{label}:"]
-        for entry in entries:
-            question = getattr(entry, "question", None) or (
-                entry.get("question") if isinstance(entry, dict) else ""
-            )
-            answer = getattr(entry, "answer", None) or (
-                entry.get("answer") if isinstance(entry, dict) else ""
-            )
-            q = (question or "").strip()
-            a = (answer or "").strip()
-            if not q:
-                continue
-            if a:
-                lines.append(f"- Domanda: {q} | Risposta: {a}")
-            else:
-                lines.append(f"- Domanda: {q}")
+        for item in items:
+            text = (item or "").strip()
+            if text:
+                lines.append(f"- {text}")
         return lines if len(lines) > 1 else []
 
     @staticmethod
@@ -314,17 +303,17 @@ class BrandIntelligenceContextBuilder:
             return None
         parts: list[str] = ["FAQ & OBJECTIONS"]
         parts.extend(
-            BrandIntelligenceContextBuilder._format_faq_entries(
+            BrandIntelligenceContextBuilder._format_string_list(
                 "FAQ generali", row.general_faq
             )
         )
         parts.extend(
-            BrandIntelligenceContextBuilder._format_faq_entries(
+            BrandIntelligenceContextBuilder._format_string_list(
                 "Domande prodotto/processo", row.product_process_questions
             )
         )
         parts.extend(
-            BrandIntelligenceContextBuilder._format_faq_entries(
+            BrandIntelligenceContextBuilder._format_string_list(
                 "Domande acquisto/spedizione", row.purchase_shipping_questions
             )
         )
@@ -342,16 +331,7 @@ class BrandIntelligenceContextBuilder:
             parts.extend(f"- {c}" for c in row.content_opportunities[:15])
         if row.social_comment_insights:
             parts.append("Insight commenti social:")
-            for insight in row.social_comment_insights[:15]:
-                doubt = (insight.doubt or "").strip()
-                text = (insight.insight or "").strip()
-                reply = (insight.suggested_reply or "").strip()
-                line = f"- Dubbio: {doubt}" if doubt else "- Insight:"
-                if text:
-                    line += f" {text}"
-                if reply:
-                    line += f" | Risposta: {reply}"
-                parts.append(line)
+            parts.extend(f"- {s}" for s in row.social_comment_insights[:15] if (s or "").strip())
         if row.notes:
             parts.append(f"Note: {row.notes[:400]}")
         return "\n".join(parts) if len(parts) > 1 else None
