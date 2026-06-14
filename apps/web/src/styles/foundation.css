@@ -541,6 +541,18 @@
   border: 1px solid rgba(248, 113, 113, 0.25);
 }
 
+.gcr-alert--warning {
+  color: #fcd34d;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.gcr-alert--success {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
 /* Login */
 .gcr-login {
   min-height: 100vh;

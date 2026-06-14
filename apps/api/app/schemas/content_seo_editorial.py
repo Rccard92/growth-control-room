@@ -248,6 +248,21 @@ class EditorialPlanGenerateResponse(BaseModel):
     message: str = "Piano editoriale generato."
 
 
+class EditorialItemRescheduleRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    planned_date: date = Field(validation_alias="plannedDate")
+    cascade: bool = False
+
+
+class EditorialItemRescheduleResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[ContentSeoEditorialItemRead]
+    delta_days: int = Field(serialization_alias="deltaDays")
+    warning: str | None = None
+
+
 BriefUpdateStatus = Literal["brief_pending", "brief_approved"]
 
 

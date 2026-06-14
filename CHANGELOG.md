@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.4-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Improved compact editorial date picker
+- Replaced editorial item drawer with centered modal
+- Removed redundant status legend from editorial calendar
+- Added optional cascade rescheduling for editorial items
+
 ## [0.4.3-alpha] - 2026-06-13
 
 Tipo: Alpha patch

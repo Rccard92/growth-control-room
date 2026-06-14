@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { EditorialCalendar } from "./EditorialCalendar";
-import { EditorialItemDrawer } from "./EditorialItemDrawer";
+import { EditorialItemModal } from "./EditorialItemModal";
 import { EditorialPlanWizard } from "./EditorialPlanWizard";
-import { EditorialStatusLegend } from "./EditorialStatusLegend";
 import { useEditorialItems } from "../../../hooks/useContentSeoEditorial";
 import type { ContentSeoEditorialItem } from "@gcr/shared";
 
@@ -25,7 +24,9 @@ export function ContentSeoEditorialRoom({
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useEditorialItems(projectId, month);
+  const allItemsQuery = useEditorialItems(projectId);
   const items = data?.items ?? [];
+  const allItems = allItemsQuery.data?.items ?? [];
 
   return (
     <div className="editorial-room">
@@ -44,8 +45,6 @@ export function ContentSeoEditorialRoom({
           Crea piano editoriale
         </button>
       </div>
-
-      <EditorialStatusLegend />
 
       {isError && (
         <div className="gcr-alert gcr-alert--error">
@@ -78,14 +77,16 @@ export function ContentSeoEditorialRoom({
         />
       )}
 
-      <EditorialItemDrawer
+      <EditorialItemModal
         open={Boolean(selectedItem)}
         item={selectedItem}
         projectId={projectId}
+        allItems={allItems}
         onClose={() => setSelectedItem(null)}
         onItemUpdated={(updated) => {
           setSelectedItem(updated);
           void refetch();
+          void allItemsQuery.refetch();
         }}
       />
 

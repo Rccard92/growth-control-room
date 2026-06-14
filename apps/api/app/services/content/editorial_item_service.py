@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -14,6 +14,7 @@ from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemCreate,
     ContentSeoEditorialItemUpdate,
+    EditorialItemRescheduleRequest,
 )
 
 
@@ -127,3 +128,60 @@ async def delete_editorial_item(
     row = await get_editorial_item(session, project_id, item_id)
     await session.delete(row)
     await session.commit()
+
+
+async def _duplicate_planned_date_warning(
+    session: AsyncSession,
+    project_id: UUID,
+) -> str | None:
+    rows = (
+        await session.execute(
+            select(ContentSeoEditorialItem.planned_date).where(
+                ContentSeoEditorialItem.project_id == project_id
+            )
+        )
+    ).scalars().all()
+    if len(rows) != len(set(rows)):
+        return "Alcuni contenuti potrebbero cadere nello stesso giorno."
+    return None
+
+
+async def reschedule_editorial_item(
+    session: AsyncSession,
+    project_id: UUID,
+    item_id: UUID,
+    payload: EditorialItemRescheduleRequest,
+) -> tuple[list[ContentSeoEditorialItem], int, str | None]:
+    row = await get_editorial_item(session, project_id, item_id)
+    old_date = row.planned_date
+    new_date = payload.planned_date
+    delta = (new_date - old_date).days
+
+    row.planned_date = new_date
+    updated: list[ContentSeoEditorialItem] = [row]
+
+    if payload.cascade and delta != 0:
+        following = (
+            await session.execute(
+                select(ContentSeoEditorialItem)
+                .where(
+                    ContentSeoEditorialItem.project_id == project_id,
+                    ContentSeoEditorialItem.planned_date > old_date,
+                    ContentSeoEditorialItem.id != item_id,
+                )
+                .order_by(
+                    ContentSeoEditorialItem.planned_date.asc(),
+                    ContentSeoEditorialItem.created_at.asc(),
+                )
+            )
+        ).scalars().all()
+        for item in following:
+            item.planned_date = item.planned_date + timedelta(days=delta)
+            updated.append(item)
+
+    await session.commit()
+    for item in updated:
+        await session.refresh(item)
+
+    warning = await _duplicate_planned_date_warning(session, project_id)
+    return updated, delta, warning

@@ -135,6 +135,8 @@ export type {
   ContentSeoEditorialItemListResponse,
   EditorialPlanGenerateRequest,
   EditorialPlanGenerateResponse,
+  EditorialItemRescheduleRequest,
+  EditorialItemRescheduleResponse,
   EditorialBriefPayload,
   EditorialBriefUpdateRequest,
   EditorialBriefUpdateStatus,

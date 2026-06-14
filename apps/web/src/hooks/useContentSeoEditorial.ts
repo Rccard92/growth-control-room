@@ -3,6 +3,7 @@ import type {
   ContentSeoEditorialItemCreate,
   ContentSeoEditorialItemUpdate,
   EditorialBriefUpdateRequest,
+  EditorialItemRescheduleRequest,
   EditorialPlanGenerateRequest,
 } from "@gcr/shared";
 import {
@@ -11,6 +12,7 @@ import {
   generateEditorialBrief,
   generateEditorialCalendar,
   getEditorialItems,
+  rescheduleEditorialItem,
   updateEditorialBrief,
   updateEditorialItem,
 } from "../lib/content-api";
@@ -45,6 +47,22 @@ export function useUpdateEditorialItem(projectId: string) {
       itemId: string;
       data: ContentSeoEditorialItemUpdate;
     }) => updateEditorialItem(projectId, itemId, data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["contentSeo", projectId, "editorialItems"] });
+    },
+  });
+}
+
+export function useRescheduleEditorialItem(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      data,
+    }: {
+      itemId: string;
+      data: EditorialItemRescheduleRequest;
+    }) => rescheduleEditorialItem(projectId, itemId, data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["contentSeo", projectId, "editorialItems"] });
     },

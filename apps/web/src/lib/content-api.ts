@@ -22,6 +22,8 @@ import type {
   ContentSeoEditorialItemUpdate,
   EditorialPlanGenerateRequest,
   EditorialPlanGenerateResponse,
+  EditorialItemRescheduleRequest,
+  EditorialItemRescheduleResponse,
   EditorialBriefUpdateRequest,
 } from "@gcr/shared";
 import { apiFetch, jsonBody } from "./api";
@@ -316,6 +318,17 @@ export function updateEditorialItem(
   return apiFetch<ContentSeoEditorialItem>(
     `/api/projects/${projectId}/content/seo/editorial-items/${itemId}`,
     { method: "PUT", ...jsonBody(data) },
+  );
+}
+
+export function rescheduleEditorialItem(
+  projectId: string,
+  itemId: string,
+  data: EditorialItemRescheduleRequest,
+): Promise<EditorialItemRescheduleResponse> {
+  return apiFetch<EditorialItemRescheduleResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/reschedule`,
+    { method: "POST", ...jsonBody(data) },
   );
 }
 

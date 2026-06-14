@@ -15,6 +15,8 @@ from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemRead,
     ContentSeoEditorialItemUpdate,
     EditorialBriefUpdateRequest,
+    EditorialItemRescheduleRequest,
+    EditorialItemRescheduleResponse,
     EditorialPlanGenerateRequest,
     EditorialPlanGenerateResponse,
 )
@@ -46,6 +48,7 @@ from app.services.content.editorial_item_service import (
     delete_editorial_item,
     get_editorial_item,
     list_editorial_items,
+    reschedule_editorial_item,
     update_editorial_item,
 )
 from app.services.content.editorial_brief_service import (
@@ -846,6 +849,28 @@ async def update_content_seo_editorial_item(
     await get_project_in_default_workspace(project_id, session)
     row = await update_editorial_item(session, project_id, item_id, payload)
     return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/reschedule",
+    response_model=EditorialItemRescheduleResponse,
+    response_model_by_alias=True,
+)
+async def reschedule_content_seo_editorial_item(
+    project_id: UUID,
+    item_id: UUID,
+    payload: EditorialItemRescheduleRequest,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialItemRescheduleResponse:
+    await get_project_in_default_workspace(project_id, session)
+    rows, delta_days, warning = await reschedule_editorial_item(
+        session, project_id, item_id, payload
+    )
+    return EditorialItemRescheduleResponse(
+        items=[ContentSeoEditorialItemRead.model_validate(r) for r in rows],
+        delta_days=delta_days,
+        warning=warning,
+    )
 
 
 @router.delete(

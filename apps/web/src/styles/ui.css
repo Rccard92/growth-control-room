@@ -381,7 +381,12 @@
 .app-date-picker-menu {
   position: fixed;
   z-index: 300;
-  padding: 0.75rem;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: min(320px, calc(100vh - 16px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0.5rem;
   background: var(--gcr-surface-opaque-elevated);
   border: 1px solid var(--gcr-border-strong);
   border-radius: var(--gcr-radius-sm);
@@ -392,12 +397,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
 }
 
 .app-date-picker-menu__title {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--gcr-text);
 }
@@ -406,10 +411,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   padding: 0;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   line-height: 1;
   color: var(--gcr-text-muted);
   background: transparent;
@@ -427,33 +432,35 @@
 
 .app-date-picker-menu__weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.15rem;
-  margin-bottom: 0.35rem;
+  grid-template-columns: repeat(7, 34px);
+  gap: 0.1rem;
+  margin-bottom: 0.25rem;
+  justify-content: center;
 }
 
 .app-date-picker-menu__weekday {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 500;
   text-align: center;
   color: var(--gcr-text-muted);
-  padding: 0.25rem 0;
+  padding: 0.15rem 0;
 }
 
 .app-date-picker-menu__grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.15rem;
+  grid-template-columns: repeat(7, 34px);
+  gap: 0.1rem;
+  justify-content: center;
 }
 
 .app-date-picker-day {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  aspect-ratio: 1;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-family: inherit;
   color: var(--gcr-text);
   background: transparent;

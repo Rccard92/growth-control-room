@@ -540,6 +540,17 @@ export interface EditorialPlanGenerateResponse {
   message: string;
 }
 
+export interface EditorialItemRescheduleRequest {
+  plannedDate: string;
+  cascade?: boolean;
+}
+
+export interface EditorialItemRescheduleResponse {
+  items: ContentSeoEditorialItem[];
+  deltaDays: number;
+  warning?: string | null;
+}
+
 export interface EditorialBriefPayload {
   proposedTitle: string;
   searchIntent: string;

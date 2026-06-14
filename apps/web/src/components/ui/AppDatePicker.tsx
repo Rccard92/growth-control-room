@@ -71,6 +71,8 @@ function isAfter(date: Date, max: Date): boolean {
   return d > m;
 }
 
+const MENU_WIDTH = 320;
+
 export function AppDatePicker({
   id: idProp,
   label,
@@ -88,10 +90,16 @@ export function AppDatePicker({
     const parsed = parseDate(value);
     return parsed ?? new Date();
   });
-  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; width: number }>({
+  const [menuStyle, setMenuStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    placement: "below" | "above";
+  }>({
     top: 0,
     left: 0,
-    width: 0,
+    width: MENU_WIDTH,
+    placement: "below",
   });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -102,26 +110,51 @@ export function AppDatePicker({
   const today = useMemo(() => new Date(), []);
 
   const updatePosition = useCallback(() => {
-    const el = triggerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const menuHeight = menu?.offsetHeight ?? 280;
+    const gap = 4;
+    const viewportPadding = 8;
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const placement =
+      spaceBelow < menuHeight + gap + viewportPadding && spaceAbove > spaceBelow
+        ? "above"
+        : "below";
+
+    const top =
+      placement === "above"
+        ? rect.top - menuHeight - gap
+        : rect.bottom + gap;
+
+    let left = rect.left;
+    const maxLeft = window.innerWidth - MENU_WIDTH - viewportPadding;
+    left = Math.max(viewportPadding, Math.min(left, maxLeft));
+
     setMenuStyle({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: Math.max(rect.width, 280),
+      top,
+      left,
+      width: MENU_WIDTH,
+      placement,
     });
   }, []);
 
   useLayoutEffect(() => {
     if (!open) return;
     updatePosition();
+    const raf = requestAnimationFrame(updatePosition);
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open, updatePosition]);
+  }, [open, updatePosition, viewMonth]);
 
   useEffect(() => {
     if (!open) return;
@@ -191,7 +224,14 @@ export function AppDatePicker({
       ? createPortal(
           <div
             ref={menuRef}
-            className="app-date-picker-menu"
+            className={[
+              "app-date-picker-menu",
+              menuStyle.placement === "above"
+                ? "app-date-picker-menu--above"
+                : "app-date-picker-menu--below",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             role="dialog"
             aria-label="Calendario"
             style={{
