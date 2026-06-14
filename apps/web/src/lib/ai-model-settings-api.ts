@@ -5,7 +5,7 @@ import type {
   AiModelSettingsListResponse,
   AiModelSettingUpdateInput,
 } from "@gcr/shared";
-import { apiFetch } from "./api";
+import { apiFetch, jsonBody } from "./api";
 
 export function getAiModelSettings(projectId: string): Promise<AiModelSettingsListResponse> {
   return apiFetch<AiModelSettingsListResponse>(
@@ -20,7 +20,7 @@ export function updateAiModelSetting(
 ): Promise<AiModelSettingMutationResponse> {
   return apiFetch<AiModelSettingMutationResponse>(
     `/api/projects/${projectId}/ai-model-settings/${operationKey}`,
-    { method: "PUT", body: JSON.stringify(body) },
+    { method: "PUT", ...jsonBody(body) },
   );
 }
 

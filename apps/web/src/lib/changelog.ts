@@ -9,6 +9,16 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.7-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed AI Model Settings save payload",
+      "Model changes now persist correctly from the UI",
+      "Improved error feedback for invalid model setting requests",
+    ],
+  },
+  {
     version: "0.5.6-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

@@ -173,6 +173,10 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
   );
   const [confirmAction, setConfirmAction] = useState<"gcr" | "railway" | null>(null);
   const [savingAll, setSavingAll] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const implemented = useMemo(
     () => (data?.items ?? []).filter((i) => i.status === "implemented"),
@@ -245,12 +249,27 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
   const handleSaveRow = (operationKey: string) => {
     const model = drafts[operationKey]?.trim();
     if (!model) return;
-    updateMutation.mutate({ operationKey, body: { model } });
+    setSaveFeedback(null);
+    updateMutation.mutate(
+      { operationKey, body: { model } },
+      {
+        onSuccess: () => {
+          setSaveFeedback({ type: "success", message: "Modello aggiornato" });
+        },
+        onError: (err) => {
+          setSaveFeedback({
+            type: "error",
+            message: err instanceof Error ? err.message : "Errore salvataggio modello",
+          });
+        },
+      },
+    );
   };
 
   const runSaveAll = async () => {
     if (dirtyKeys.length === 0) return;
     setSavingAll(true);
+    setSaveFeedback(null);
     try {
       for (const key of dirtyKeys) {
         const model = drafts[key]?.trim();
@@ -258,6 +277,12 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
         await updateAiModelSetting(projectId, key, { model });
       }
       await qc.invalidateQueries({ queryKey: queryKeys.aiModelSettings.list(projectId) });
+      setSaveFeedback({ type: "success", message: "Modelli aggiornati" });
+    } catch (err) {
+      setSaveFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Errore salvataggio modello",
+      });
     } finally {
       setSavingAll(false);
     }
@@ -302,6 +327,17 @@ export function AiModelSettingsPanel({ projectId }: { projectId: string }) {
           Salva tutte le modifiche{dirtyKeys.length > 0 ? ` (${dirtyKeys.length})` : ""}
         </button>
       </div>
+
+      {saveFeedback && (
+        <div
+          className={`gcr-alert ${
+            saveFeedback.type === "success" ? "gcr-alert--success" : "gcr-alert--error"
+          }`}
+          role="status"
+        >
+          {saveFeedback.message}
+        </div>
+      )}
 
       {(data?.unpricedModels?.length ?? 0) > 0 && (
         <div className="gcr-alert gcr-alert--warning ai-models-panel__pricing-banner">

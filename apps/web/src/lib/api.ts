@@ -43,9 +43,28 @@ function buildFetchError(path: string, status: number, text: string): Error {
 
   if (text) {
     try {
-      const json = JSON.parse(text) as { detail?: string };
+      const json = JSON.parse(text) as {
+        detail?: string | Array<{ loc?: unknown[]; msg?: string; input?: unknown }>;
+      };
       if (typeof json.detail === "string") {
         return new Error(json.detail);
+      }
+      if (status === 422 && Array.isArray(json.detail) && json.detail.length > 0) {
+        const bodyError = json.detail.find(
+          (item) => Array.isArray(item.loc) && item.loc[0] === "body",
+        );
+        if (
+          path.includes("ai-model-settings")
+          && bodyError
+          && typeof bodyError.input === "string"
+          && bodyError.input.trim().startsWith("{")
+        ) {
+          return new Error("Errore salvataggio modello: payload non valido");
+        }
+        const firstMsg = json.detail.find((item) => typeof item.msg === "string")?.msg;
+        if (firstMsg) {
+          return new Error(firstMsg);
+        }
       }
     } catch {
       // fall through to generic message

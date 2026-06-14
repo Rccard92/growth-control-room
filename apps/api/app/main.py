@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.api.routes import debug, projects
+from app.api.validation_helpers import is_json_string_body_validation_error
 from app.core.config import settings
 from app.db.session import close_db, init_db
 from app.services.ai.exceptions import AiBudgetExceededError, AiSingleRequestBlockedError
@@ -36,6 +38,19 @@ app.add_middleware(
 app.include_router(projects.router, prefix="/api")
 app.include_router(debug.router, prefix="/api")
 app.include_router(api_router, prefix="/api")
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    errors = exc.errors()
+    if is_json_string_body_validation_error(errors):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "Request body must be a JSON object, not a JSON string."},
+        )
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(AiBudgetExceededError)

@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from app.api.routes.ai_model_settings import (
     _normalize_setting_item,
     _to_list_response,
+    update_project_ai_model_setting,
 )
+from app.api.validation_helpers import is_json_string_body_validation_error
 from app.schemas.ai_model_settings import (
     AiAvailableModelItem,
     AiModelSettingItemResponse,
+    AiModelSettingUpdateRequest,
 )
 from app.schemas.ai_usage import AiRoutingInsights
 from app.services.ai.model_settings_service import (
@@ -371,3 +374,67 @@ def test_get_available_models_snake_case() -> None:
         assert "pricing_configured" in data["models"][0]
 
     asyncio.run(run())
+
+
+def test_update_request_accepts_object_body() -> None:
+    request = AiModelSettingUpdateRequest.model_validate({"model": "gpt-5.4-mini"})
+    assert request.model == "gpt-5.4-mini"
+
+
+def test_put_ai_model_setting_object_returns_200() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.commit = AsyncMock()
+
+        row = MagicMock()
+        row.model = "gpt-5.4-mini"
+        row.model_tier = "cheap"
+        row.source = "manual"
+
+        with (
+            patch(
+                "app.api.routes.ai_model_settings.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.ai_model_settings.update_project_setting",
+                new_callable=AsyncMock,
+                return_value=row,
+            ) as mock_update,
+        ):
+            result = await update_project_ai_model_setting(
+                project_id,
+                "product_image_alt",
+                AiModelSettingUpdateRequest(model="gpt-5.4-mini"),
+                session=session,
+            )
+
+        assert result.model == "gpt-5.4-mini"
+        assert result.operation_key == "product_image_alt"
+        mock_update.assert_awaited_once()
+        session.commit.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_put_ai_model_setting_string_body_returns_422() -> None:
+    errors = [
+        {
+            "type": "model_attributes_type",
+            "loc": ("body",),
+            "msg": "Input should be a valid dictionary or object to extract fields from",
+            "input": '{"model":"gpt-5.4-mini"}',
+        }
+    ]
+    assert is_json_string_body_validation_error(errors) is True
+
+
+def test_update_request_rejects_string_body() -> None:
+    from pydantic import ValidationError
+
+    try:
+        AiModelSettingUpdateRequest.model_validate('{"model":"gpt-5.4-mini"}')
+        raise AssertionError("expected ValidationError")
+    except ValidationError:
+        pass
