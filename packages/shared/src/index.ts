@@ -135,6 +135,9 @@ export type {
   ContentSeoEditorialItemListResponse,
   EditorialPlanGenerateRequest,
   EditorialPlanGenerateResponse,
+  EditorialBriefPayload,
+  EditorialBriefUpdateRequest,
+  EditorialBriefUpdateStatus,
 } from "./types/content";
 export {
   CONTENT_SEO_EDITORIAL_STATUS_LABELS,

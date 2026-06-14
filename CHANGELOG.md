@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.4.1-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added Blog & Ricette Brief Generator (single-item, OpenAI + Brand Intelligence context)
+- Added editable SEO brief payload stored on `ContentSeoEditorialItem.brief_payload`
+- Added brief approval workflow (`brief_pending` → `brief_approved`) via drawer UI
+- Blog article generation and Shopify publish remain disabled for future steps
+
 ## [0.4.0-alpha] - 2026-06-13
 
 Tipo: Alpha minor

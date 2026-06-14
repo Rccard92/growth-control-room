@@ -33,7 +33,7 @@ export function ContentSeoEditorialRoom({
         <div>
           <h2 className="editorial-room__title">Calendario editoriale</h2>
           <p className="editorial-room__subtitle">
-            Pianifica articoli blog e ricette. La generazione brief e pubblicazione Shopify arriveranno nei prossimi step.
+            Pianifica articoli blog e ricette, genera brief SEO con Brand Intelligence e approva prima della scrittura.
           </p>
         </div>
         <button
@@ -83,6 +83,10 @@ export function ContentSeoEditorialRoom({
         item={selectedItem}
         projectId={projectId}
         onClose={() => setSelectedItem(null)}
+        onItemUpdated={(updated) => {
+          setSelectedItem(updated);
+          void refetch();
+        }}
       />
 
       <EditorialPlanWizard

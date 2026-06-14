@@ -1,17 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   ContentSeoEditorialItem,
   ContentSeoEditorialObjective,
   ContentSeoEditorialStatus,
+  EditorialBriefPayload,
 } from "@gcr/shared";
 import {
   CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS,
   CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS,
   CONTENT_SEO_EDITORIAL_STATUS_LABELS,
 } from "@gcr/shared";
+import { EditorialBriefEditor } from "./EditorialBriefEditor";
+import {
+  hasEditorialBrief,
+  parseEditorialBriefPayload,
+} from "./editorial-brief-utils";
 import { EditorialStatusBadge } from "./EditorialStatusLegend";
 import {
   useDeleteEditorialItem,
+  useGenerateEditorialBrief,
+  useUpdateEditorialBrief,
   useUpdateEditorialItem,
 } from "../../../hooks/useContentSeoEditorial";
 
@@ -20,6 +28,7 @@ interface EditorialItemDrawerProps {
   item: ContentSeoEditorialItem | null;
   projectId: string;
   onClose: () => void;
+  onItemUpdated?: (item: ContentSeoEditorialItem) => void;
 }
 
 export function EditorialItemDrawer({
@@ -27,9 +36,12 @@ export function EditorialItemDrawer({
   item,
   projectId,
   onClose,
+  onItemUpdated,
 }: EditorialItemDrawerProps) {
   const updateMutation = useUpdateEditorialItem(projectId);
   const deleteMutation = useDeleteEditorialItem(projectId);
+  const generateBriefMutation = useGenerateEditorialBrief(projectId);
+  const updateBriefMutation = useUpdateEditorialBrief(projectId);
 
   const [title, setTitle] = useState("");
   const [plannedDate, setPlannedDate] = useState("");
@@ -38,6 +50,8 @@ export function EditorialItemDrawer({
   const [primaryKeyword, setPrimaryKeyword] = useState("");
   const [secondaryKeywords, setSecondaryKeywords] = useState("");
   const [notes, setNotes] = useState("");
+  const [brief, setBrief] = useState<EditorialBriefPayload | null>(null);
+  const [savedBriefSnapshot, setSavedBriefSnapshot] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,17 +63,37 @@ export function EditorialItemDrawer({
     setPrimaryKeyword(item.primaryKeyword ?? "");
     setSecondaryKeywords((item.secondaryKeywords ?? []).join(", "));
     setNotes(item.notes ?? "");
+    const parsed = parseEditorialBriefPayload(item.briefPayload ?? null);
+    setBrief(hasEditorialBrief(item.briefPayload ?? null) ? parsed : null);
+    setSavedBriefSnapshot(JSON.stringify(parsed));
     setError(null);
   }, [item]);
 
+  const briefDirty = useMemo(() => {
+    if (!brief) return false;
+    return JSON.stringify(brief) !== savedBriefSnapshot;
+  }, [brief, savedBriefSnapshot]);
+
   if (!open || !item) return null;
 
-  async function handleSave() {
-    if (!item) return;
+  const currentItem = item;
+  const hasBrief = Boolean(brief);
+
+  function syncItem(updated: ContentSeoEditorialItem) {
+    onItemUpdated?.(updated);
+    setStatus(updated.status);
+    const parsed = parseEditorialBriefPayload(updated.briefPayload ?? null);
+    if (hasEditorialBrief(updated.briefPayload ?? null)) {
+      setBrief(parsed);
+      setSavedBriefSnapshot(JSON.stringify(parsed));
+    }
+  }
+
+  async function handleSaveMetadata() {
     setError(null);
     try {
-      await updateMutation.mutateAsync({
-        itemId: item.id,
+      const updated = await updateMutation.mutateAsync({
+        itemId: currentItem.id,
         data: {
           title: title.trim(),
           plannedDate,
@@ -73,25 +107,58 @@ export function EditorialItemDrawer({
           notes: notes.trim() || null,
         },
       });
-      onClose();
+      syncItem(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Errore durante il salvataggio.");
     }
   }
 
   async function handleDelete() {
-    if (!item) return;
     if (!window.confirm("Eliminare questo item dal calendario?")) return;
     setError(null);
     try {
-      await deleteMutation.mutateAsync(item.id);
+      await deleteMutation.mutateAsync(currentItem.id);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Errore durante l'eliminazione.");
     }
   }
 
-  const hasBrief = Boolean(item.briefPayload && Object.keys(item.briefPayload).length > 0);
+  async function handleGenerateBrief() {
+    if (
+      hasBrief &&
+      briefDirty &&
+      !window.confirm(
+        "Rigenerando perderai le modifiche non salvate. Continuare?",
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      const updated = await generateBriefMutation.mutateAsync(currentItem.id);
+      syncItem(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Errore durante la generazione del brief.");
+    }
+  }
+
+  async function handleSaveBrief(approve = false) {
+    if (!brief) return;
+    setError(null);
+    try {
+      const updated = await updateBriefMutation.mutateAsync({
+        itemId: currentItem.id,
+        data: {
+          briefPayload: brief,
+          status: approve ? "brief_approved" : undefined,
+        },
+      });
+      syncItem(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Errore durante il salvataggio del brief.");
+    }
+  }
 
   return (
     <div className="seo-drawer-backdrop" onClick={onClose} role="presentation">
@@ -104,11 +171,11 @@ export function EditorialItemDrawer({
         <header className="seo-drawer__header">
           <div>
             <p className="gcr-card__label">Item editoriale</p>
-            <h3>{item.title}</h3>
+            <h3>{currentItem.title}</h3>
             <p className="editorial-drawer__type">
-              {CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS[item.contentType]}
+              {CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS[currentItem.contentType]}
             </p>
-            <EditorialStatusBadge status={item.status} />
+            <EditorialStatusBadge status={currentItem.status} />
           </div>
           <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
             Chiudi
@@ -198,9 +265,9 @@ export function EditorialItemDrawer({
             />
           </label>
 
-          {item.linkedShopifyProductTitle && (
+          {currentItem.linkedShopifyProductTitle && (
             <p className="editorial-drawer__linked">
-              Prodotto collegato: <strong>{item.linkedShopifyProductTitle}</strong>
+              Prodotto collegato: <strong>{currentItem.linkedShopifyProductTitle}</strong>
             </p>
           )}
         </section>
@@ -208,13 +275,51 @@ export function EditorialItemDrawer({
         <section className="seo-drawer__section editorial-drawer__brief">
           <h4>Brief SEO</h4>
           {hasBrief ? (
-            <pre className="seo-drawer__json">{JSON.stringify(item.briefPayload, null, 2)}</pre>
+            <EditorialBriefEditor value={brief!} onChange={setBrief} />
           ) : (
             <p className="gcr-card__description">Brief SEO non ancora generato</p>
           )}
-          <button type="button" className="gcr-btn gcr-btn--secondary" disabled title="Prossimo step">
-            Genera brief — prossimo step
-          </button>
+
+          <div className="editorial-drawer__brief-actions">
+            {!hasBrief && (
+              <button
+                type="button"
+                className="gcr-btn gcr-btn--primary"
+                disabled={generateBriefMutation.isPending}
+                onClick={() => void handleGenerateBrief()}
+              >
+                {generateBriefMutation.isPending ? "Generazione…" : "Genera brief"}
+              </button>
+            )}
+            {hasBrief && (
+              <>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--secondary"
+                  disabled={updateBriefMutation.isPending}
+                  onClick={() => void handleSaveBrief(false)}
+                >
+                  Salva brief
+                </button>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--primary"
+                  disabled={updateBriefMutation.isPending}
+                  onClick={() => void handleSaveBrief(true)}
+                >
+                  Approva brief
+                </button>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--ghost"
+                  disabled={generateBriefMutation.isPending}
+                  onClick={() => void handleGenerateBrief()}
+                >
+                  {generateBriefMutation.isPending ? "Rigenerazione…" : "Rigenera brief"}
+                </button>
+              </>
+            )}
+          </div>
         </section>
 
         <div className="seo-drawer__actions">
@@ -222,9 +327,9 @@ export function EditorialItemDrawer({
             type="button"
             className="gcr-btn gcr-btn--primary"
             disabled={updateMutation.isPending || !title.trim()}
-            onClick={() => void handleSave()}
+            onClick={() => void handleSaveMetadata()}
           >
-            Salva
+            Salva item
           </button>
           <button
             type="button"

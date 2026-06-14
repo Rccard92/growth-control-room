@@ -239,3 +239,114 @@ class EditorialPlanGenerateResponse(BaseModel):
     items: list[ContentSeoEditorialItemRead]
     dry_run: bool = Field(serialization_alias="dryRun")
     message: str = "Piano editoriale generato."
+
+
+BriefUpdateStatus = Literal["brief_pending", "brief_approved"]
+
+
+def _coerce_str_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [line.strip() for line in value.splitlines() if line.strip()]
+    if isinstance(value, list):
+        out: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text:
+                out.append(text)
+        return out
+    return []
+
+
+class EditorialBriefPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    proposed_title: str = Field(default="", serialization_alias="proposedTitle")
+    search_intent: str = Field(default="", serialization_alias="searchIntent")
+    target_audience: str = Field(default="", serialization_alias="targetAudience")
+    primary_keyword: str = Field(default="", serialization_alias="primaryKeyword")
+    secondary_keywords: list[str] = Field(
+        default_factory=list, serialization_alias="secondaryKeywords"
+    )
+    content_angle: str = Field(default="", serialization_alias="contentAngle")
+    h2_h3_structure: list[str] = Field(default_factory=list, serialization_alias="h2H3Structure")
+    products_to_link: list[str] = Field(default_factory=list, serialization_alias="productsToLink")
+    faq_to_include: list[str] = Field(default_factory=list, serialization_alias="faqToInclude")
+    claims_to_avoid: list[str] = Field(default_factory=list, serialization_alias="claimsToAvoid")
+    safe_claims_to_use: list[str] = Field(
+        default_factory=list, serialization_alias="safeClaimsToUse"
+    )
+    recommended_cta: str = Field(default="", serialization_alias="recommendedCta")
+    meta_title: str = Field(default="", serialization_alias="metaTitle")
+    meta_description: str = Field(default="", serialization_alias="metaDescription")
+    internal_links_suggestions: list[str] = Field(
+        default_factory=list, serialization_alias="internalLinksSuggestions"
+    )
+    notes: str = ""
+    brand_context_used: list[str] = Field(
+        default_factory=list, serialization_alias="brandContextUsed"
+    )
+    warnings: list[str] = Field(default_factory=list)
+
+
+def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
+    """Sanitize AI or client brief JSON into a typed payload."""
+    data = dict(raw)
+    list_fields = {
+        "secondaryKeywords": "secondary_keywords",
+        "h2H3Structure": "h2_h3_structure",
+        "productsToLink": "products_to_link",
+        "faqToInclude": "faq_to_include",
+        "claimsToAvoid": "claims_to_avoid",
+        "safeClaimsToUse": "safe_claims_to_use",
+        "internalLinksSuggestions": "internal_links_suggestions",
+        "brandContextUsed": "brand_context_used",
+        "warnings": "warnings",
+    }
+    for alias, field in list_fields.items():
+        if alias in data:
+            data[field] = _coerce_str_list(data.pop(alias))
+        elif field in data:
+            data[field] = _coerce_str_list(data[field])
+    str_aliases = {
+        "proposedTitle": "proposed_title",
+        "searchIntent": "search_intent",
+        "targetAudience": "target_audience",
+        "primaryKeyword": "primary_keyword",
+        "contentAngle": "content_angle",
+        "recommendedCta": "recommended_cta",
+        "metaTitle": "meta_title",
+        "metaDescription": "meta_description",
+    }
+    for alias, field in str_aliases.items():
+        if alias in data and field not in data:
+            data[field] = str(data.pop(alias) or "")
+        elif field in data and data[field] is not None:
+            data[field] = str(data[field])
+        else:
+            data.setdefault(field, "")
+    data.setdefault("notes", str(data.get("notes") or ""))
+    return EditorialBriefPayload.model_validate(data)
+
+
+class EditorialBriefUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    brief_payload: dict = Field(validation_alias="briefPayload")
+    status: BriefUpdateStatus | None = None
+
+    @field_validator("brief_payload")
+    @classmethod
+    def validate_brief_object(cls, value: dict) -> dict:
+        if not isinstance(value, dict):
+            raise ValueError("briefPayload deve essere un oggetto JSON.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_approve(self) -> EditorialBriefUpdateRequest:
+        if self.status == "brief_approved" and not self.brief_payload:
+            raise ValueError("Il brief non può essere vuoto per l'approvazione.")
+        return self

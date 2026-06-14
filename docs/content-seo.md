@@ -2,7 +2,7 @@
 
 Modulo **Content SEO** del Growth Control Room: ottimizzazione Shopify (prodotti e categorie) e pianificazione editoriale blog/ricette.
 
-Versione corrente: **0.4.0-alpha** (foundation editoriale).
+Versione corrente: **0.4.1-alpha** (Brief Generator).
 
 ## Struttura UI
 
@@ -61,7 +61,46 @@ La generazione è **rule-based** (nessuna chiamata OpenAI): titoli placeholder d
 
 ### Drawer item
 
-Campi editabili: titolo, data, stato, obiettivo, keyword, note. CTA **«Genera brief — prossimo step»** disabilitata (futuro Brief Generator).
+Campi editabili: titolo, data, stato, obiettivo, keyword, note.
+
+### Brief Generator (0.4.1-alpha)
+
+Workflow: **calendario → genera brief → modifica → salva → approva**.
+
+1. Apri item dal calendario → **Genera brief** (singolo item, no bulk)
+2. Backend usa `BrandIntelligenceContextBuilder` + Product Knowledge prodotto collegato
+3. Brief salvato in `brief_payload` JSONB sull'item; status → `brief_pending`
+4. Editor nel drawer: titolo proposto, intento, struttura H2/H3, meta, claim, FAQ, warning
+5. **Salva brief** — persiste modifiche senza cambiare status (opzionale)
+6. **Approva brief** — `PUT brief` con `status: brief_approved`
+7. **Rigenera brief** — conferma se ci sono modifiche non salvate
+
+**Non generato in questo step:** articolo completo, body HTML, immagini, publish Shopify.
+
+#### Struttura `brief_payload`
+
+```json
+{
+  "proposedTitle": "",
+  "searchIntent": "",
+  "targetAudience": "",
+  "primaryKeyword": "",
+  "secondaryKeywords": [],
+  "contentAngle": "",
+  "h2H3Structure": [],
+  "productsToLink": [],
+  "faqToInclude": [],
+  "claimsToAvoid": [],
+  "safeClaimsToUse": [],
+  "recommendedCta": "",
+  "metaTitle": "",
+  "metaDescription": "",
+  "internalLinksSuggestions": [],
+  "notes": "",
+  "brandContextUsed": [],
+  "warnings": []
+}
+```
 
 ## API
 
@@ -75,6 +114,8 @@ Base: `/api/projects/{project_id}/content/seo/`
 | PUT | `editorial-items/{item_id}` | Update |
 | DELETE | `editorial-items/{item_id}` | Delete |
 | POST | `editorial-plan/generate-calendar` | Body wizard; `?dryRun=true` per anteprima |
+| POST | `editorial-items/{item_id}/generate-brief` | Genera brief AI per singolo item |
+| PUT | `editorial-items/{item_id}/brief` | Salva/approva `briefPayload`; `status` opzionale (`brief_pending` \| `brief_approved`) |
 
 Nessun endpoint editorial richiede Shopify connesso.
 
@@ -82,14 +123,13 @@ Nessun endpoint editorial richiede Shopify connesso.
 
 Tabella: `content_seo_editorial_items` (migration `027`).
 
-Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`. Campi JSONB `brief_payload` / `article_payload` riservati a step futuri.
+Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`. Campo JSONB `brief_payload` per brief SEO; `article_payload` riservato ad Article Generator.
 
-## Roadmap (non in 0.4.0-alpha)
+## Roadmap (step successivi)
 
-1. **Brief Generator** — OpenAI + `BrandContextBuilder` + Safe Claims; approvazione obbligatoria
-2. **Article Generator** — bozze lunghe da brief approvato
-3. **Shopify Publisher** — draft blog/article su Shopify
-4. **Sync/analyze SEO blog** — audit contenuti blog esistenti
+1. **Article Generator** — bozze lunghe da brief con `brief_approved`
+2. **Shopify Publisher** — draft blog/article su Shopify
+3. **Sync/analyze SEO blog** — audit contenuti blog esistenti
 
 ## Test manuali
 
@@ -99,3 +139,4 @@ Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`
 4. Click item → modifica → salva → persistenza dopo reload
 5. Validazioni: date invertite, zero tipi, custom senza giorni → errori leggibili
 6. Senza Shopify: wizard OK, prodotti disabilitati/empty state
+7. Genera brief su item → modifica meta/struttura → salva → reload → approva → badge «Brief approvato»

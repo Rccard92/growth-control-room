@@ -22,6 +22,7 @@ import type {
   ContentSeoEditorialItemUpdate,
   EditorialPlanGenerateRequest,
   EditorialPlanGenerateResponse,
+  EditorialBriefUpdateRequest,
 } from "@gcr/shared";
 import { apiFetch } from "./api";
 
@@ -334,5 +335,26 @@ export function generateEditorialCalendar(
   return apiFetch<EditorialPlanGenerateResponse>(
     `/api/projects/${projectId}/content/seo/editorial-plan/generate-calendar${q}`,
     { method: "POST", body: JSON.stringify(data) },
+  );
+}
+
+export function generateEditorialBrief(
+  projectId: string,
+  itemId: string,
+): Promise<ContentSeoEditorialItem> {
+  return apiFetch<ContentSeoEditorialItem>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/generate-brief`,
+    { method: "POST" },
+  );
+}
+
+export function updateEditorialBrief(
+  projectId: string,
+  itemId: string,
+  data: EditorialBriefUpdateRequest,
+): Promise<ContentSeoEditorialItem> {
+  return apiFetch<ContentSeoEditorialItem>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/brief`,
+    { method: "PUT", body: JSON.stringify(data) },
   );
 }

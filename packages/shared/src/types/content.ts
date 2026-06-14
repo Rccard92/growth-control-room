@@ -538,3 +538,31 @@ export interface EditorialPlanGenerateResponse {
   dryRun: boolean;
   message: string;
 }
+
+export interface EditorialBriefPayload {
+  proposedTitle: string;
+  searchIntent: string;
+  targetAudience: string;
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  contentAngle: string;
+  h2H3Structure: string[];
+  productsToLink: string[];
+  faqToInclude: string[];
+  claimsToAvoid: string[];
+  safeClaimsToUse: string[];
+  recommendedCta: string;
+  metaTitle: string;
+  metaDescription: string;
+  internalLinksSuggestions: string[];
+  notes: string;
+  brandContextUsed: string[];
+  warnings: string[];
+}
+
+export type EditorialBriefUpdateStatus = "brief_pending" | "brief_approved";
+
+export interface EditorialBriefUpdateRequest {
+  briefPayload: EditorialBriefPayload;
+  status?: EditorialBriefUpdateStatus;
+}

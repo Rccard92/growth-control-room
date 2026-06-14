@@ -2,13 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ContentSeoEditorialItemCreate,
   ContentSeoEditorialItemUpdate,
+  EditorialBriefUpdateRequest,
   EditorialPlanGenerateRequest,
 } from "@gcr/shared";
 import {
   createEditorialItem,
   deleteEditorialItem,
+  generateEditorialBrief,
   generateEditorialCalendar,
   getEditorialItems,
+  updateEditorialBrief,
   updateEditorialItem,
 } from "../lib/content-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -73,5 +76,31 @@ export function useGenerateEditorialCalendar(projectId: string) {
         void qc.invalidateQueries({ queryKey: ["contentSeo", projectId, "editorialItems"] });
       }
     },
+  });
+}
+
+function invalidateEditorial(qc: ReturnType<typeof useQueryClient>, projectId: string) {
+  void qc.invalidateQueries({ queryKey: ["contentSeo", projectId, "editorialItems"] });
+}
+
+export function useGenerateEditorialBrief(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => generateEditorialBrief(projectId, itemId),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useUpdateEditorialBrief(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      data,
+    }: {
+      itemId: string;
+      data: EditorialBriefUpdateRequest;
+    }) => updateEditorialBrief(projectId, itemId, data),
+    onSuccess: () => invalidateEditorial(qc, projectId),
   });
 }

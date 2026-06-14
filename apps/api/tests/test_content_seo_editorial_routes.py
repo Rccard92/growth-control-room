@@ -12,3 +12,7 @@ def test_content_seo_editorial_routes_registered() -> None:
     assert "/projects/{project_id}/content/seo/editorial-items" in paths
     assert "/projects/{project_id}/content/seo/editorial-items/{item_id}" in paths
     assert "/projects/{project_id}/content/seo/editorial-plan/generate-calendar" in paths
+    assert (
+        "/projects/{project_id}/content/seo/editorial-items/{item_id}/generate-brief" in paths
+    )
+    assert "/projects/{project_id}/content/seo/editorial-items/{item_id}/brief" in paths

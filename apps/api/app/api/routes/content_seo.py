@@ -14,6 +14,7 @@ from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemListResponse,
     ContentSeoEditorialItemRead,
     ContentSeoEditorialItemUpdate,
+    EditorialBriefUpdateRequest,
     EditorialPlanGenerateRequest,
     EditorialPlanGenerateResponse,
 )
@@ -46,6 +47,10 @@ from app.services.content.editorial_item_service import (
     get_editorial_item,
     list_editorial_items,
     update_editorial_item,
+)
+from app.services.content.editorial_brief_service import (
+    generate_editorial_brief,
+    update_editorial_brief,
 )
 from app.services.content.editorial_plan_service import generate_editorial_calendar
 from app.services.content.analyze import run_content_seo_analyze
@@ -884,3 +889,37 @@ async def generate_content_seo_editorial_calendar(
         dry_run=dry_run,
         message=message,
     )
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/generate-brief",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def generate_content_seo_editorial_brief(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await generate_editorial_brief(session, project_id, item_id)
+    return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.put(
+    "/{project_id}/content/seo/editorial-items/{item_id}/brief",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def update_content_seo_editorial_brief(
+    project_id: UUID,
+    item_id: UUID,
+    payload: EditorialBriefUpdateRequest,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        row = await update_editorial_brief(session, project_id, item_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return ContentSeoEditorialItemRead.model_validate(row)
