@@ -20,6 +20,7 @@ from app.schemas.brand_profile_v1 import (
 )
 from app.schemas.brand_intelligence import BrandProfileRead, BrandProfileUpdate
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -205,6 +206,13 @@ async def enrich_brand_profile(
             system_prompt=ENRICH_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=90.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="enrich_profile",
+                entity_type="brand_section",
+                entity_id="profile",
+            ),
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

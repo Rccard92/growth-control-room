@@ -1,5 +1,37 @@
 # Architettura AI
 
+## Client centralizzato e usage logging (0.5.0-alpha)
+
+**Regola obbligatoria:** tutte le chiamate OpenAI devono passare da `apps/api/app/services/ai/ai_client.py` tramite `generate_structured_json()`.
+
+- **Nessun service** deve importare `AsyncOpenAI` o chiamare l'API OpenAI direttamente.
+- Ogni richiesta richiede `AiRequestMetadata`: `project_id`, `module`, `operation` (+ opzionali `entity_type`, `entity_id`, `job_id`).
+- Ogni richiesta viene persistita in **`ai_usage_logs`** (`AiUsageLog`): token, costo stimato, durata, hash prompt (no prompt completo).
+- Pricing modelli: `apps/api/app/services/ai/pricing.py` (file versionato, aggiornabile senza migration).
+- Preview prompt/output solo se `AI_LOG_PROMPT_PREVIEW=true` (max 500 caratteri).
+
+### Cost guardrails (env)
+
+| Variabile | Effetto |
+|-----------|---------|
+| `AI_DAILY_BUDGET_USD` | Blocca nuove richieste se spesa giornaliera superata |
+| `AI_MONTHLY_BUDGET_USD` | Blocca nuove richieste se spesa mensile superata |
+| `AI_SINGLE_REQUEST_WARN_USD` | Log warning post-richiesta |
+| `AI_SINGLE_REQUEST_BLOCK_USD` | Blocca richiesta se costo stimato supera soglia |
+
+Errore budget → HTTP 429 con messaggio leggibile. UI: pagina **AI Costs** + banner in sidebar projects.
+
+### Compact context e prompt caching
+
+- `build_ai_context_for_task()` in `apps/api/app/services/ai/context_builder.py` — contesto brand ridotto per task (SEO field vs blog brief vs article).
+- `prompt_cache_key = project:{id}:ctx:{hash}:module:{module}` — prefix stabile; istruzioni statiche + brand nel **system**, dati variabili nel **user**.
+
+### Moduli tracciati
+
+`brand_intelligence`, `product_seo`, `content_seo`, `blog_brief`, `article_generator` (+ operazioni batch BI/editorial).
+
+---
+
 ## Regola obbligatoria: Brand Intelligence Context
 
 Ogni modulo AI che genera contenuti rivolti al brand **deve** caricare il contesto brand prima di produrre output.

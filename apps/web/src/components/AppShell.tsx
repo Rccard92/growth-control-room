@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { AiBudgetBanner } from "./ai-usage/AiBudgetBanner";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
@@ -13,6 +14,7 @@ export function AppShell({ showSidebar = false }: AppShellProps) {
       <div className="gcr-shell__body">
         {showSidebar && <Sidebar />}
         <main className="gcr-shell__main">
+          <AiBudgetBanner />
           <Outlet />
         </main>
       </div>

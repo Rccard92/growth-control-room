@@ -4,6 +4,7 @@ import { EditorialItemModal } from "./EditorialItemModal";
 import { EditorialPlanWizard } from "./EditorialPlanWizard";
 import { EditorialBatchBriefModal } from "./EditorialBatchBriefModal";
 import { hasEditorialBrief } from "./editorial-brief-utils";
+import { getAiUsageEstimate } from "../../../lib/ai-usage-api";
 import {
   useEditorialItems,
   useStartEditorialBriefBatch,
@@ -48,12 +49,28 @@ export function ContentSeoEditorialRoom({
       return;
     }
     try {
+      const estimate = await getAiUsageEstimate(
+        projectId,
+        "batch_brief_item",
+        ideaWithoutBriefCount,
+      );
+      if (
+        estimate.estimatedTotalCost != null &&
+        estimate.estimatedTotalCost > 0.5 &&
+        !window.confirm(
+          `Stima costo batch: ~$${estimate.estimatedTotalCost.toFixed(2)} per ${ideaWithoutBriefCount} brief. Continuare?`,
+        )
+      ) {
+        return;
+      }
       const job = await batchMutation.mutateAsync({ month, onlyStatus: "idea" });
       setBatchJobId(job.jobId);
       setBatchModalOpen(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("AI non configurata")) {
+      if (msg.includes("Budget AI")) {
+        setBatchAlert(msg);
+      } else if (msg.includes("AI non configurata")) {
         setBatchAlert("AI non configurata. Inserisci OPENAI_API_KEY per generare i brief.");
       } else if (msg.includes("Nessun contenuto")) {
         setBatchAlert("Nessun contenuto in stato Idea da elaborare.");

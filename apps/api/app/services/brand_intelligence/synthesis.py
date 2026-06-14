@@ -28,6 +28,7 @@ from app.schemas.section_drafts import (
     validate_draft_payload,
 )
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -370,6 +371,14 @@ async def synthesize_section(
             system_prompt=SYNTHESIS_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=120.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="synthesize_section",
+                entity_type="brand_section",
+                entity_id=section_key,
+                job_id=str(batch_id),
+            ),
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

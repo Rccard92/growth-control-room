@@ -1,4 +1,4 @@
-import type { DateRangeParams } from "@gcr/shared";
+import type { AiUsageFilters, DateRangeParams } from "@gcr/shared";
 
 export const queryKeys = {
   projects: {
@@ -87,4 +87,15 @@ export const queryKeys = {
       ["brandIntelligence", projectId, "brief", briefId] as const,
   },
   health: ["health"] as const,
+  aiUsage: {
+    summary: (projectId: string, filters?: AiUsageFilters) =>
+      ["aiUsage", projectId, "summary", filters ?? {}] as const,
+    logs: (projectId: string, filters?: AiUsageFilters) =>
+      ["aiUsage", projectId, "logs", filters ?? {}] as const,
+    logDetail: (projectId: string, logId: string) =>
+      ["aiUsage", projectId, "log", logId] as const,
+    budget: (projectId: string) => ["aiUsage", projectId, "budget"] as const,
+    estimate: (projectId: string, operation: string, count: number) =>
+      ["aiUsage", projectId, "estimate", operation, count] as const,
+  },
 };

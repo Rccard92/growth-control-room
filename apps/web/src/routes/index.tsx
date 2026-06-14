@@ -1,6 +1,7 @@
 ﻿import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { AiBriefPage } from "../pages/AiBriefPage";
+import { AiUsagePage } from "../pages/AiUsagePage";
 import { BrandIntelligencePage } from "../pages/BrandIntelligencePage";
 import { ChangelogPage } from "../pages/ChangelogPage";
 import { ContentPage } from "../pages/ContentPage";
@@ -34,6 +35,7 @@ export function AppRoutes() {
         <Route path="content" element={<ContentPage />} />
         <Route path="changelog" element={<ChangelogPage />} />
         <Route path="ai-brief" element={<AiBriefPage />} />
+        <Route path="ai-costs" element={<AiUsagePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/projects" replace />} />

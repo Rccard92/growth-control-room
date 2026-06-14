@@ -6,6 +6,7 @@ export const PROJECT_NAV = [
   { to: "content", label: "Content SEO", icon: "✎" },
   { to: "changelog", label: "Changelog", icon: "📋" },
   { to: "ai-brief", label: "AI Brief", icon: "✦" },
+  { to: "ai-costs", label: "AI Costs", icon: "◈" },
 ] as const;
 
 export const APP_ROUTES = {
@@ -21,4 +22,5 @@ export const APP_ROUTES = {
   projectContent: (id: string) => `/projects/${id}/content`,
   projectChangelog: (id: string) => `/projects/${id}/changelog`,
   projectAiBrief: (id: string) => `/projects/${id}/ai-brief`,
+  projectAiCosts: (id: string) => `/projects/${id}/ai-costs`,
 } as const;

@@ -204,7 +204,9 @@ async def process_brief_batch_job(job_id: UUID) -> None:
             await session.commit()
 
             try:
-                await generate_editorial_brief_core(session, project_id, item.id)
+                await generate_editorial_brief_core(
+                    session, project_id, item.id, job_id=str(job_id)
+                )
                 job.completed_items += 1
             except BriefGenerationError as exc:
                 job.failed_items += 1

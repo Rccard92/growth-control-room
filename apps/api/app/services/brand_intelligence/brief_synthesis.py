@@ -19,6 +19,7 @@ from app.models.brand_intelligence import (
 )
 from app.schemas.brand_brief import build_markdown_summary, sanitize_brief_payload
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -225,6 +226,14 @@ async def generate_brief_from_batch(
             system_prompt=BRIEF_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=120.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="generate_brief_from_batch",
+                entity_type="brand_section",
+                entity_id="intelligence_brief",
+                job_id=str(batch_id),
+            ),
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

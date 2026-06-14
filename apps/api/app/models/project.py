@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
     from app.models.ai_run import AiRun
+    from app.models.ai_usage_log import AiUsageLog
     from app.models.alert import Alert
     from app.models.brand_intelligence import (
         BrandAiGuardrail,
@@ -61,6 +62,10 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     ai_runs: Mapped[list["AiRun"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    ai_usage_logs: Mapped[list["AiUsageLog"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
     )

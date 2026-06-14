@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.0-alpha] - 2026-06-13
+
+Tipo: Alpha minor
+
+- Added AI Usage Monitor (AI Costs page)
+- Added centralized OpenAI client (`ai_client.py`) with automatic usage logging
+- Added AI token and estimated cost tracking per project/module/operation
+- Added project-level AI budget guardrails (daily/monthly env limits)
+- Added compact brand context builder and prompt cache keys for AI tasks
+
 ## [0.4.9-alpha] - 2026-06-13
 
 Tipo: Alpha patch

@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     frontend_url: str | None = None
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    ai_daily_budget_usd: float | None = None
+    ai_monthly_budget_usd: float | None = None
+    ai_single_request_warn_usd: float | None = None
+    ai_single_request_block_usd: float | None = None
+    ai_log_prompt_preview: bool = False
 
     @model_validator(mode="after")
     def require_database_url(self) -> "Settings":

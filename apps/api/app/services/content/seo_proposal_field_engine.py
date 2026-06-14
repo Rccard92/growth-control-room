@@ -16,6 +16,7 @@ from app.models.shopify import (
 )
 from app.services.content.seo_proposal_manual_service import _product_current_with_metafields
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -31,7 +32,11 @@ from app.services.content.seo_proposal_engine import (
     product_current_values,
 )
 from app.services.content.seo_skill_loader import load_seo_skill_context
-from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
+from app.services.ai.context_builder import (
+    AiTaskType,
+    build_ai_context_for_task,
+    build_prompt_cache_key,
+)
 from app.services.shopify.metafield_merge import build_product_metafields_merged
 from app.services.shopify.metafield_utils import (
     is_ai_generatable_metafield_type,
@@ -407,20 +412,36 @@ async def generate_seo_proposal_field(
         raise ValueError("image_id richiesto per imageAlt prodotto")
 
     skill_ctx = load_seo_skill_context()
-    brand_ctx = await BrandIntelligenceContextBuilder.get_prompt_context(session, store.project_id)
-    if entity_type == "product":
-        from app.services.brand_intelligence.product_knowledge_context import (
-            get_product_knowledge_prompt_for_entity,
+    if field == "imageAlt":
+        task_type = (
+            AiTaskType.PRODUCT_SEO_ALT
+            if entity_type == "product"
+            else AiTaskType.COLLECTION_SEO_FIELD
         )
-
-        product_ctx = await get_product_knowledge_prompt_for_entity(
-            session, store.project_id, shopify_product_id=entity_id
+    else:
+        task_type = (
+            AiTaskType.PRODUCT_SEO_FIELD
+            if entity_type == "product"
+            else AiTaskType.COLLECTION_SEO_FIELD
         )
-        if product_ctx:
-            brand_ctx = f"{brand_ctx}\n\n{product_ctx}" if brand_ctx else product_ctx
+    brand_ctx, ctx_hash = await build_ai_context_for_task(
+        session,
+        store.project_id,
+        task_type,
+        shopify_product_id=entity_id if entity_type == "product" else None,
+    )
     value: Any
     reasoning: str
     risk_level: str
+    seo_module = "product_seo" if entity_type == "product" else "content_seo"
+    cache_key = build_prompt_cache_key(store.project_id, seo_module, ctx_hash)
+    ai_metadata = AiRequestMetadata(
+        project_id=store.project_id,
+        module=seo_module,
+        operation="generate_field",
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
 
     if field == "metafield" and metafield_ctx is not None:
         if use_ai and is_openai_configured():
@@ -442,6 +463,8 @@ async def generate_seo_proposal_field(
                 result = await generate_structured_json(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
+                    metadata=ai_metadata,
+                    prompt_cache_key=cache_key,
                 )
                 value = result.get("value")
                 reasoning = str(result.get("reasoning") or "")
@@ -484,6 +507,8 @@ async def generate_seo_proposal_field(
             result = await generate_structured_json(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
+                metadata=ai_metadata,
+                prompt_cache_key=cache_key,
             )
             value = result.get("value")
             reasoning = str(result.get("reasoning") or "")

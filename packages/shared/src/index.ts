@@ -1,3 +1,12 @@
+export type {
+  AiUsageBreakdownItem,
+  AiUsageSummary,
+  AiUsageLog,
+  AiUsageLogListResponse,
+  AiBudgetStatus,
+  AiUsageEstimate,
+  AiUsageFilters,
+} from "./types/ai-usage";
 export type { Project, CreateProjectInput, ProjectStatus } from "./types/project";
 export type {
   DateRangePreset,

@@ -30,6 +30,7 @@ from app.services.brand_intelligence.document_extraction import (
 from app.services.brand_intelligence.external_sources_service import fetch_batch_external_sources
 from app.services.brand_intelligence.source_fetcher import format_external_source_for_prompt
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -280,6 +281,14 @@ async def process_batch(batch_id: UUID) -> None:
                         system_prompt=EXTRACTION_SYSTEM_PROMPT,
                         user_prompt=user_prompt,
                         timeout=90.0,
+                        metadata=AiRequestMetadata(
+                            project_id=project_id,
+                            module="brand_intelligence",
+                            operation="batch_extract_document",
+                            entity_type="brand_section",
+                            entity_id=str(doc.id),
+                            job_id=str(batch_id),
+                        ),
                     )
                     raw_facts = parsed.get("facts") or []
                     if not isinstance(raw_facts, list):
@@ -350,6 +359,14 @@ async def process_batch(batch_id: UUID) -> None:
                             system_prompt=EXTRACTION_SYSTEM_PROMPT,
                             user_prompt=user_prompt,
                             timeout=90.0,
+                            metadata=AiRequestMetadata(
+                                project_id=project_id,
+                                module="brand_intelligence",
+                                operation="batch_extract_external",
+                                entity_type="brand_section",
+                                entity_id="external_sources",
+                                job_id=str(batch_id),
+                            ),
                         )
                         raw_facts = parsed.get("facts") or []
                         now = datetime.now(timezone.utc)

@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.0-alpha",
+    date: "2026-06-13",
+    type: "Alpha minor",
+    items: [
+      "Added AI Usage Monitor (AI Costs page)",
+      "Added centralized OpenAI client with usage logging",
+      "Added AI token and estimated cost tracking",
+      "Added project-level AI budget guardrails",
+    ],
+  },
+  {
     version: "0.4.9-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

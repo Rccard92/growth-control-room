@@ -20,10 +20,16 @@ from app.schemas.content_seo_editorial import (
     normalize_editorial_brief_payload,
 )
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
     is_openai_configured,
+)
+from app.services.ai.context_builder import (
+    AiTaskType,
+    build_ai_context_for_task,
+    build_prompt_cache_key,
 )
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 from app.services.brand_intelligence.faq_objections_service import faq_objections_completion
@@ -223,6 +229,8 @@ async def generate_editorial_brief_core(
     session: AsyncSession,
     project_id: UUID,
     item_id: UUID,
+    *,
+    job_id: str | None = None,
 ) -> ContentSeoEditorialItem:
     if not is_openai_configured():
         raise BriefGenerationError(
@@ -232,18 +240,16 @@ async def generate_editorial_brief_core(
 
     item = await get_editorial_item(session, project_id, item_id)
     bundle = await BrandIntelligenceContextBuilder.build_brand_context(session, project_id)
-    brand_ctx = BrandIntelligenceContextBuilder.format_for_prompt(bundle)
+    brand_ctx, ctx_hash = await build_ai_context_for_task(
+        session,
+        project_id,
+        AiTaskType.BLOG_BRIEF,
+        shopify_product_id=item.linked_shopify_product_id,
+    )
 
-    product_pk_appended = False
-    if item.linked_shopify_product_id:
-        pk = await get_product_knowledge_prompt_for_entity(
-            session,
-            project_id,
-            shopify_product_id=item.linked_shopify_product_id,
-        )
-        if pk:
-            product_pk_appended = True
-            brand_ctx = f"{brand_ctx}\n\n{pk}" if brand_ctx else pk
+    product_pk_appended = bool(
+        item.linked_shopify_product_id and brand_ctx and "PRODUCT KNOWLEDGE" in (brand_ctx or "")
+    )
 
     bi_warnings = build_bi_warnings(bundle)
     type_instruction = _CONTENT_TYPE_INSTRUCTIONS.get(
@@ -259,6 +265,15 @@ async def generate_editorial_brief_core(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             timeout=90.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="blog_brief",
+                operation="batch_brief_item" if job_id else "generate_brief",
+                entity_type="editorial_item",
+                entity_id=str(item_id),
+                job_id=job_id,
+            ),
+            prompt_cache_key=build_prompt_cache_key(project_id, "blog_brief", ctx_hash),
         )
         payload = normalize_editorial_brief_payload(parsed)
     except OpenAINotConfiguredError:

@@ -18,6 +18,7 @@ from app.schemas.brand_faq_objections import (
     BrandFaqObjectionsProposal,
 )
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -470,6 +471,13 @@ async def import_faq_objections_from_file(
             system_prompt=FAQ_OBJECTIONS_IMPORT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=90.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="import_faq_objections",
+                entity_type="brand_section",
+                entity_id="faq_objections",
+            ),
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

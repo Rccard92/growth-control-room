@@ -1,0 +1,99 @@
+.ai-usage-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-bottom: 2rem;
+}
+
+.ai-usage-page__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.ai-usage-page__toolbar .gcr-input {
+  min-width: 140px;
+}
+
+.ai-usage-page__kpis {
+  margin-top: 0.25rem;
+}
+
+.ai-usage-page__charts {
+  margin-top: 0.5rem;
+}
+
+.ai-usage-page__skeleton {
+  height: 200px;
+  border-radius: var(--gcr-radius, 8px);
+}
+
+.ai-usage-page__budget-banner {
+  margin-bottom: 0.25rem;
+}
+
+.ai-usage-table-wrap {
+  overflow-x: auto;
+}
+
+.ai-usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.ai-usage-table th,
+.ai-usage-table td {
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid var(--gcr-border, rgba(255, 255, 255, 0.08));
+}
+
+.ai-usage-table th {
+  font-weight: 600;
+  color: var(--gcr-text-muted, #94a3b8);
+  white-space: nowrap;
+}
+
+.ai-usage-table__row {
+  cursor: pointer;
+}
+
+.ai-usage-table__row:hover {
+  background: var(--gcr-surface-hover, rgba(255, 255, 255, 0.04));
+}
+
+.ai-usage-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.ai-usage-detail__grid dt {
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted, #94a3b8);
+  margin-bottom: 0.15rem;
+}
+
+.ai-usage-detail__grid dd {
+  margin: 0;
+  font-size: 0.875rem;
+  word-break: break-word;
+}
+
+.ai-usage-detail__block pre {
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+  padding: 0.75rem;
+  background: var(--gcr-surface-2, rgba(0, 0, 0, 0.2));
+  border-radius: 6px;
+}
+
+.ai-budget-banner {
+  margin: 0.75rem 1rem 0;
+}

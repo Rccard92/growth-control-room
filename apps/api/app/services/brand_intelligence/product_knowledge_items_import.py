@@ -14,6 +14,7 @@ from app.schemas.brand_product_knowledge import (
     BrandProductKnowledgeItemsProposal,
 )
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -244,6 +245,13 @@ async def import_items_from_file(
             system_prompt=ITEMS_IMPORT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=90.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="import_product_knowledge_items",
+                entity_type="brand_section",
+                entity_id="product_knowledge_items",
+            ),
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.brand_safe_claims import BrandSafeClaimsImportResponse, BrandSafeClaimsProposal
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -139,6 +140,13 @@ async def import_safe_claims_from_file(
             system_prompt=SAFE_CLAIMS_IMPORT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=90.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="import_safe_claims",
+                entity_type="brand_section",
+                entity_id="safe_claims",
+            ),
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

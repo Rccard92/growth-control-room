@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.brand_identity_visual import BrandIdentityImportResponse, BrandIdentityProposal
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -142,6 +143,13 @@ async def import_identity_from_file(
             system_prompt=IDENTITY_IMPORT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             timeout=90.0,
+            metadata=AiRequestMetadata(
+                project_id=project_id,
+                module="brand_intelligence",
+                operation="import_identity",
+                entity_type="brand_section",
+                entity_id="identity",
+            ),
         )
     except OpenAINotConfiguredError:
         raise HTTPException(

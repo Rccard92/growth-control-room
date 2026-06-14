@@ -9,6 +9,7 @@ from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoEntityAnalysis, SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyStore
 from app.services.ai.openai_client import (
+    AiRequestMetadata,
     OpenAINotConfiguredError,
     OpenAIRequestError,
     generate_structured_json,
@@ -16,7 +17,11 @@ from app.services.ai.openai_client import (
 )
 from app.services.content.seo_current_values import normalize_proposal_values
 from app.services.content.seo_proposal_diff import compute_changed_proposed
-from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
+from app.services.ai.context_builder import (
+    AiTaskType,
+    build_ai_context_for_task,
+    build_prompt_cache_key,
+)
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 
@@ -273,17 +278,17 @@ async def generate_seo_proposal(
     reasoning: list[Any]
 
     skill_ctx = load_seo_skill_context()
-    brand_ctx = await BrandIntelligenceContextBuilder.get_prompt_context(session, store.project_id)
-    if entity_type == "product":
-        from app.services.brand_intelligence.product_knowledge_context import (
-            get_product_knowledge_prompt_for_entity,
-        )
-
-        product_ctx = await get_product_knowledge_prompt_for_entity(
-            session, store.project_id, shopify_product_id=entity_id
-        )
-        if product_ctx:
-            brand_ctx = f"{brand_ctx}\n\n{product_ctx}" if brand_ctx else product_ctx
+    task_type = (
+        AiTaskType.PRODUCT_SEO_PROPOSAL
+        if entity_type == "product"
+        else AiTaskType.COLLECTION_SEO_PROPOSAL
+    )
+    brand_ctx, ctx_hash = await build_ai_context_for_task(
+        session,
+        store.project_id,
+        task_type,
+        shopify_product_id=entity_id if entity_type == "product" else None,
+    )
 
     if use_ai and is_openai_configured():
         system_prompt = _ai_system_prompt(
@@ -296,10 +301,20 @@ async def generate_seo_proposal(
             analysis=analysis,
             mode=mode,
         )
+        seo_module = "product_seo" if entity_type == "product" else "content_seo"
+        cache_key = build_prompt_cache_key(store.project_id, seo_module, ctx_hash)
         try:
             proposed = await generate_structured_json(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
+                metadata=AiRequestMetadata(
+                    project_id=store.project_id,
+                    module=seo_module,
+                    operation="generate_proposal",
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                ),
+                prompt_cache_key=cache_key,
             )
             proposed = normalize_proposal_values(entity_type, proposed)
             if entity_type == "product" and proposed.get("image_alts"):
