@@ -11,6 +11,7 @@ from app.services.content.editorial_publishing_utils import (
     attach_publishing_sync_metadata,
     compute_editorial_article_hash,
     enrich_article_with_hash,
+    is_publishing_stale,
 )
 
 
@@ -99,5 +100,6 @@ def test_sync_publishing_from_article_preserves_blog() -> None:
         assert result.publishing_payload["blogId"] == "blog-uuid"
         assert result.publishing_payload["imageUrl"] == "https://example.com/img.jpg"
         assert result.publishing_payload["sourceArticleHash"] == article.article_hash
+        assert is_publishing_stale(row.article_payload, row.publishing_payload) is False
 
     asyncio.run(run())

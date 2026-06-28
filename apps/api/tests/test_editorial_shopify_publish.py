@@ -15,9 +15,16 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:
 from app.schemas.content_seo_editorial import EditorialPublishShopifyRequest
 from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemRead,
+    EditorialArticlePayload,
     EditorialPublishingUpdateRequest,
+    normalize_editorial_article_payload,
 )
-from app.services.content.editorial_publishing_utils import build_publishing_payload_from_article
+from app.services.content.editorial_publishing_utils import (
+    attach_publishing_sync_metadata,
+    build_publishing_payload_from_article,
+    enrich_article_with_hash,
+    PUBLISHING_STALE_MESSAGE,
+)
 from app.services.content.editorial_publishing_service import update_editorial_publishing
 from app.services.content.editorial_shopify_publish_service import publish_editorial_to_shopify
 
@@ -35,15 +42,31 @@ def _article_payload() -> dict:
     }
 
 
+def _synced_article_and_publishing(*, blog_id: UUID | None = None) -> tuple[dict, dict]:
+    article = enrich_article_with_hash(
+        normalize_editorial_article_payload(_article_payload()),
+        is_new_generation=False,
+    )
+    publishing = build_publishing_payload_from_article(article)
+    if blog_id is not None:
+        publishing = publishing.model_copy(update={"blog_id": str(blog_id)})
+    publishing = attach_publishing_sync_metadata(publishing, article)
+    return (
+        article.model_dump(by_alias=True, mode="json"),
+        publishing.model_dump(by_alias=True, mode="json"),
+    )
+
+
 def _sample_row(*, publishing_payload: dict | None = None) -> SimpleNamespace:
+    article_payload, default_publishing = _synced_article_and_publishing()
     return SimpleNamespace(
         id=uuid4(),
         project_id=uuid4(),
         status="ready_to_publish",
         title="Guida",
         planned_date=date(2026, 6, 15),
-        article_payload=_article_payload(),
-        publishing_payload=publishing_payload,
+        article_payload=article_payload,
+        publishing_payload=publishing_payload if publishing_payload is not None else default_publishing,
         shopify_blog_id=None,
         shopify_article_id=None,
         shopify_article_gid=None,
@@ -79,7 +102,9 @@ def test_save_publishing_payload() -> None:
     project_id = uuid4()
     item_id = uuid4()
     row = _sample_row()
-    publishing = build_publishing_payload_from_article(row.article_payload)
+    publishing = build_publishing_payload_from_article(
+        normalize_editorial_article_payload(row.article_payload),
+    )
     publishing = publishing.model_copy(update={"blog_id": str(uuid4())})
 
     async def run() -> None:
@@ -131,6 +156,35 @@ def test_save_publishing_payload_missing_body_returns_422() -> None:
     asyncio.run(run())
 
 
+def test_publish_stale_payload_returns_409() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+    article_payload, publishing_payload = _synced_article_and_publishing()
+    article_payload["title"] = "Titolo rigenerato"
+    article_payload["articleHash"] = "different-hash"
+    row = _sample_row(publishing_payload=publishing_payload)
+    row.article_payload = article_payload
+
+    async def run() -> None:
+        mock_session = AsyncMock()
+        with patch(
+            "app.services.content.editorial_shopify_publish_service.get_editorial_item",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await publish_editorial_to_shopify(
+                    mock_session,
+                    project_id,
+                    item_id,
+                    EditorialPublishShopifyRequest(mode="draft"),
+                )
+            assert exc.value.status_code == 409
+            assert exc.value.detail == PUBLISHING_STALE_MESSAGE
+
+    asyncio.run(run())
+
+
 def test_publish_missing_write_content_returns_403() -> None:
     project_id = uuid4()
     item_id = uuid4()
@@ -174,9 +228,8 @@ def test_publish_success_draft_sets_gid() -> None:
     project_id = uuid4()
     item_id = uuid4()
     blog_id = uuid4()
-    publishing = build_publishing_payload_from_article(_article_payload())
-    publishing = publishing.model_copy(update={"blog_id": str(blog_id)})
-    row = _sample_row(publishing_payload=publishing.model_dump(by_alias=True))
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    row = _sample_row(publishing_payload=publishing_payload)
     store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
     blog_row = SimpleNamespace(
         id=blog_id,
@@ -260,9 +313,9 @@ def test_publish_update_when_gid_exists() -> None:
     project_id = uuid4()
     item_id = uuid4()
     blog_id = uuid4()
-    publishing = build_publishing_payload_from_article(_article_payload())
-    publishing = publishing.model_copy(update={"blog_id": str(blog_id), "author": "Redazione Test"})
-    row = _sample_row(publishing_payload=publishing.model_dump(by_alias=True))
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    publishing_payload = {**publishing_payload, "author": "Redazione Test"}
+    row = _sample_row(publishing_payload=publishing_payload)
     row.shopify_article_gid = "gid://shopify/Article/55"
     row.shopify_article_id = "55"
     row.publish_status = "draft_created"
@@ -346,9 +399,7 @@ def test_publish_user_errors_keeps_payload() -> None:
     project_id = uuid4()
     item_id = uuid4()
     blog_id = uuid4()
-    publishing = build_publishing_payload_from_article(_article_payload())
-    publishing = publishing.model_copy(update={"blog_id": str(blog_id)})
-    original_payload = publishing.model_dump(by_alias=True)
+    _, original_payload = _synced_article_and_publishing(blog_id=blog_id)
     row = _sample_row(publishing_payload=original_payload)
     store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
     blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
@@ -415,8 +466,16 @@ def test_publish_user_errors_keeps_payload() -> None:
 def test_publish_empty_author_saved_payload_returns_422_before_shopify() -> None:
     project_id = uuid4()
     item_id = uuid4()
-    publishing = build_publishing_payload_from_article(_article_payload())
-    publishing = publishing.model_copy(update={"author": "", "blog_id": str(uuid4())})
+    publishing = build_publishing_payload_from_article(
+        normalize_editorial_article_payload(_article_payload()),
+    )
+    publishing = attach_publishing_sync_metadata(
+        publishing.model_copy(update={"author": "", "blog_id": str(uuid4())}),
+        enrich_article_with_hash(
+            normalize_editorial_article_payload(_article_payload()),
+            is_new_generation=False,
+        ),
+    )
     row = _sample_row(publishing_payload=publishing.model_dump(by_alias=True))
     store = SimpleNamespace(
         id=uuid4(),
@@ -475,9 +534,9 @@ def test_publish_graphql_author_error_returns_422() -> None:
     project_id = uuid4()
     item_id = uuid4()
     blog_id = uuid4()
-    publishing = build_publishing_payload_from_article(_article_payload())
-    publishing = publishing.model_copy(update={"blog_id": str(blog_id), "author": "Redazione Test"})
-    row = _sample_row(publishing_payload=publishing.model_dump(by_alias=True))
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    publishing_payload = {**publishing_payload, "author": "Redazione Test"}
+    row = _sample_row(publishing_payload=publishing_payload)
     store = SimpleNamespace(
         id=uuid4(),
         shop_domain="shop.myshopify.com",
@@ -551,9 +610,9 @@ def test_publish_network_error_returns_502() -> None:
     project_id = uuid4()
     item_id = uuid4()
     blog_id = uuid4()
-    publishing = build_publishing_payload_from_article(_article_payload())
-    publishing = publishing.model_copy(update={"blog_id": str(blog_id), "author": "Redazione Test"})
-    row = _sample_row(publishing_payload=publishing.model_dump(by_alias=True))
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    publishing_payload = {**publishing_payload, "author": "Redazione Test"}
+    row = _sample_row(publishing_payload=publishing_payload)
     store = SimpleNamespace(
         id=uuid4(),
         shop_domain="shop.myshopify.com",

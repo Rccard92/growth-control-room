@@ -29,7 +29,6 @@ import {
 import {
   buildPublishingPayloadFromArticle,
   isPublishingStale,
-  isPublishingSyncUnknown,
   parseEditorialPublishingPayload,
   validatePublishingPayload,
 } from "./editorial-publishing-utils";
@@ -396,6 +395,7 @@ export function EditorialItemModal({
     try {
       const updated = await generateArticleMutation.mutateAsync(item.id);
       syncItem(updated);
+      setStaleDismissed(false);
       setActiveTab("article");
       setArticleView("preview");
       setSuccess("Articolo generato.");
@@ -508,21 +508,13 @@ export function EditorialItemModal({
         : hasShopifyLink
           ? "Pubblicare la bozza Shopify collegata? Sarà visibile nel blog selezionato."
           : "Pubblicare subito questo articolo su Shopify? Sarà visibile nel blog selezionato.";
-      if (!window.confirm(confirmMessage)) {
-        return;
-      }
+    if (!window.confirm(confirmMessage)) {
+      return;
     }
-
-    if (publishingStale && !staleDismissed) {
-      setWarning(
-        "I dati di pubblicazione potrebbero non riflettere l'ultima versione dell'articolo.",
-      );
     }
 
     setError(null);
-    if (!publishingStale || staleDismissed) {
-      setWarning(null);
-    }
+    setWarning(null);
     setSuccess(null);
     try {
       if (publishingDirty) {
@@ -570,13 +562,8 @@ export function EditorialItemModal({
   const itemHasBrief = hasEditorialBrief(item.briefPayload ?? null);
   const itemHasArticle = hasEditorialArticle(item.articlePayload ?? null);
   const hasArticle = Boolean(article);
-  const hasSavedPublishing = Boolean(item.publishingPayload);
-  const publishingStale = isPublishingStale(article, publishing);
-  const publishingSyncUnknown = isPublishingSyncUnknown(
-    article,
-    publishing,
-    hasSavedPublishing,
-  );
+  const publishingStale =
+    item.publishingIsStale ?? isPublishingStale(article, publishing);
   const hasShopifyLink = Boolean(item.shopifyArticleGid);
   const isPublishedOnShopify = item.publishStatus === "published";
   const canWriteContent = scopesData?.canWriteContent ?? false;
@@ -585,7 +572,8 @@ export function EditorialItemModal({
     !canWriteContent ||
     scopesLoading ||
     publishShopifyMutation.isPending ||
-    !publishing?.author.trim();
+    !publishing?.author.trim() ||
+    publishingStale;
 
   const footer =
     activeTab === "detail" ? (
@@ -1003,8 +991,8 @@ export function EditorialItemModal({
               status={status}
               hasArticle={hasArticle}
               publishingStale={publishingStale}
-              publishingSyncUnknown={publishingSyncUnknown}
               staleDismissed={staleDismissed}
+              publishBlockedByStale={publishingStale}
               publishing={publishing}
               onChange={setPublishing}
               onSyncFromArticle={() => void handleSyncPublishingFromArticle()}

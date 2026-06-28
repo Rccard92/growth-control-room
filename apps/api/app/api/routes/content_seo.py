@@ -1030,8 +1030,8 @@ async def generate_content_seo_editorial_article(
     session: AsyncSession = Depends(get_db),
 ) -> ContentSeoEditorialItemRead:
     await get_project_in_default_workspace(project_id, session)
-    row = await generate_editorial_article(session, project_id, item_id)
-    return ContentSeoEditorialItemRead.model_validate(row)
+    await generate_editorial_article(session, project_id, item_id)
+    return await get_editorial_item_read(session, project_id, item_id)
 
 
 @router.put(
@@ -1047,10 +1047,10 @@ async def update_content_seo_editorial_article(
 ) -> ContentSeoEditorialItemRead:
     await get_project_in_default_workspace(project_id, session)
     try:
-        row = await update_editorial_article(session, project_id, item_id, payload)
+        await update_editorial_article(session, project_id, item_id, payload)
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-    return ContentSeoEditorialItemRead.model_validate(row)
+    return await get_editorial_item_read(session, project_id, item_id)
 
 
 @router.get(

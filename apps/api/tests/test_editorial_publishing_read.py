@@ -9,8 +9,9 @@ from uuid import uuid4
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
-from app.schemas.content_seo_editorial import ContentSeoEditorialItemRead
-from app.services.content.editorial_item_service import get_editorial_item_read
+from app.schemas.content_seo_editorial import ContentSeoEditorialItemRead, EditorialArticlePayload
+from app.services.content.editorial_item_service import get_editorial_item_read, serialize_editorial_item_read
+from app.services.content.editorial_publishing_utils import enrich_article_with_hash
 
 
 def _sample_row() -> SimpleNamespace:
@@ -102,3 +103,14 @@ def test_get_editorial_item_read_avoids_stale_updated_at_without_refresh() -> No
             assert result.updated_at == refreshed_at
 
     asyncio.run(run())
+
+
+def test_serialize_editorial_item_read_sets_publishing_is_stale() -> None:
+    row = _sample_row()
+    article = enrich_article_with_hash(
+        EditorialArticlePayload.model_validate({"title": "Guida", "bodyHtml": "<p>Ok</p>"}),
+        is_new_generation=True,
+    )
+    row.article_payload = article.model_dump(by_alias=True, mode="json")
+    result = serialize_editorial_item_read(row)
+    assert result.publishing_is_stale is True

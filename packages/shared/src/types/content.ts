@@ -491,6 +491,7 @@ export interface ContentSeoEditorialItem {
   lastPublishError?: string | null;
   createdAt: string;
   updatedAt: string;
+  publishingIsStale?: boolean;
 }
 
 export interface ContentSeoEditorialItemCreate {

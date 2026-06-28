@@ -126,17 +126,18 @@ export function isPublishingStale(
   if (!article || !publishing) return false;
   const sourceHash = publishing.sourceArticleHash?.trim();
   const articleHash = article.articleHash?.trim();
-  if (!sourceHash || !articleHash) return false;
+  if (!sourceHash || !articleHash) return true;
   return sourceHash !== articleHash;
 }
 
+/** @deprecated Use isPublishingStale — legacy payloads without hash are now treated as stale. */
 export function isPublishingSyncUnknown(
   article: EditorialArticlePayload | null | undefined,
   publishing: EditorialPublishingPayload | null | undefined,
   hasSavedPublishing: boolean,
 ): boolean {
   if (!article || !publishing || !hasSavedPublishing) return false;
-  return !publishing.sourceArticleHash?.trim() || !article.articleHash?.trim();
+  return isPublishingStale(article, publishing);
 }
 
 export function buildPublishingPayloadFromArticle(

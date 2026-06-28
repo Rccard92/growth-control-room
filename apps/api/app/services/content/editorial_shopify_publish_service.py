@@ -26,7 +26,9 @@ from app.services.content.editorial_publishing_utils import (
     build_article_update_input,
     build_publishing_payload_from_article,
     format_shopify_publish_error,
+    is_publishing_stale,
     normalize_publishing_payload,
+    PUBLISHING_STALE_MESSAGE,
     resolve_publishing_author,
     shopify_gid_numeric_id,
     shopify_publish_http_status,
@@ -215,6 +217,12 @@ async def publish_editorial_to_shopify(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail="Genera l'articolo prima di pubblicare su Shopify.",
+        )
+
+    if is_publishing_stale(row.article_payload, row.publishing_payload):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=PUBLISHING_STALE_MESSAGE,
         )
 
     if row.status != "ready_to_publish":

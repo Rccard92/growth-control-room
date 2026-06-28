@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.21-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed stale publication payload after article regeneration",
+      "Added publishing stale detection and blocking guard",
+      "Added sync-from-article flow before Shopify publish/update",
+      "Prevented publishing old article content after regeneration",
+    ],
+  },
+  {
     version: "0.5.20-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

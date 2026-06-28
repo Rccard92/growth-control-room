@@ -20,6 +20,69 @@ HANDLE_CONFLICT_MESSAGE = (
     "Esiste già un articolo Shopify con questo handle. "
     "Cambia handle o collega l'articolo esistente."
 )
+PUBLISHING_STALE_MESSAGE = (
+    "I dati di pubblicazione non sono aggiornati rispetto all'articolo. "
+    "Aggiorna i dati di pubblicazione prima di inviare a Shopify."
+)
+
+
+def _payload_is_present(payload: dict | EditorialArticlePayload | EditorialPublishingPayload | None) -> bool:
+    if payload is None:
+        return False
+    if isinstance(payload, (EditorialArticlePayload, EditorialPublishingPayload)):
+        return True
+    return isinstance(payload, dict) and len(payload) > 0
+
+
+def _read_str_field(
+    payload: dict | EditorialArticlePayload | EditorialPublishingPayload,
+    *keys: str,
+) -> str:
+    if isinstance(payload, EditorialArticlePayload):
+        mapping = {
+            "articleHash": payload.article_hash,
+            "article_hash": payload.article_hash,
+        }
+        for key in keys:
+            if key in mapping:
+                return str(mapping[key] or "").strip()
+        return ""
+    if isinstance(payload, EditorialPublishingPayload):
+        mapping = {
+            "sourceArticleHash": payload.source_article_hash or "",
+            "source_article_hash": payload.source_article_hash or "",
+        }
+        for key in keys:
+            if key in mapping:
+                return str(mapping[key] or "").strip()
+        return ""
+    for key in keys:
+        raw = payload.get(key)
+        if raw is not None and str(raw).strip():
+            return str(raw).strip()
+    return ""
+
+
+def is_publishing_stale(
+    article_payload: dict | EditorialArticlePayload | None,
+    publishing_payload: dict | EditorialPublishingPayload | None,
+) -> bool:
+    """True when article and publishing exist but sync metadata/hash are missing or divergent."""
+    if not _payload_is_present(article_payload) or not _payload_is_present(publishing_payload):
+        return False
+    source_hash = _read_str_field(
+        publishing_payload,  # type: ignore[arg-type]
+        "sourceArticleHash",
+        "source_article_hash",
+    )
+    article_hash = _read_str_field(
+        article_payload,  # type: ignore[arg-type]
+        "articleHash",
+        "article_hash",
+    )
+    if not source_hash or not article_hash:
+        return True
+    return article_hash != source_hash
 
 
 def _article_hash_fields(article: EditorialArticlePayload | dict[str, Any]) -> dict[str, str]:

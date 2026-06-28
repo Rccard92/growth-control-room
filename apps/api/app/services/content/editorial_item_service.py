@@ -17,6 +17,20 @@ from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemUpdate,
     EditorialItemRescheduleRequest,
 )
+from app.services.content.editorial_publishing_utils import is_publishing_stale
+
+
+def serialize_editorial_item_read(row: ContentSeoEditorialItem) -> ContentSeoEditorialItemRead:
+    """Serialize DB row with computed publishingIsStale."""
+    base = ContentSeoEditorialItemRead.model_validate(row)
+    return base.model_copy(
+        update={
+            "publishing_is_stale": is_publishing_stale(
+                row.article_payload,
+                row.publishing_payload,
+            )
+        }
+    )
 
 
 def _month_range(month: str) -> tuple[date, date]:
@@ -79,7 +93,7 @@ async def get_editorial_item_read(
     """Load editorial item and serialize safely after async flush/commit."""
     row = await get_editorial_item(session, project_id, item_id)
     await session.refresh(row)
-    return ContentSeoEditorialItemRead.model_validate(row)
+    return serialize_editorial_item_read(row)
 
 
 async def create_editorial_item(

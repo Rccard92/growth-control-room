@@ -123,6 +123,7 @@ class ContentSeoEditorialItemRead(BaseModel):
     last_publish_error: str | None = Field(default=None, serialization_alias="lastPublishError")
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
+    publishing_is_stale: bool = Field(default=False, serialization_alias="publishingIsStale")
 
 
 class ContentSeoEditorialItemCreate(BaseModel):

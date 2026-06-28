@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.21-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed stale publication payload after article regeneration
+- Added publishing stale detection and blocking guard
+- Added sync-from-article flow before Shopify publish/update
+- Prevented publishing old article content after regeneration
+
 ## [0.5.20-alpha] - 2026-06-13
 
 Tipo: Alpha patch

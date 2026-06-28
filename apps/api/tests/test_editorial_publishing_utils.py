@@ -9,6 +9,7 @@ from app.schemas.content_seo_editorial import EditorialArticlePayload, Editorial
 from app.services.content.editorial_publishing_utils import (
     DEFAULT_AUTHOR_FALLBACK,
     HANDLE_CONFLICT_MESSAGE,
+    PUBLISHING_STALE_MESSAGE,
     attach_publishing_sync_metadata,
     build_article_create_input,
     build_article_update_input,
@@ -17,6 +18,7 @@ from app.services.content.editorial_publishing_utils import (
     enrich_article_with_hash,
     format_handle_conflict_error,
     format_shopify_publish_error,
+    is_publishing_stale,
     merge_article_into_publishing,
     normalize_publishing_payload,
     resolve_publishing_author,
@@ -222,3 +224,34 @@ def test_build_article_update_input_publish_now() -> None:
 
 def test_format_handle_conflict_error() -> None:
     assert format_handle_conflict_error("Handle already taken") == HANDLE_CONFLICT_MESSAGE
+
+
+def test_is_publishing_stale_when_hashes_differ() -> None:
+    article = enrich_article_with_hash(_sample_article(), is_new_generation=True)
+    publishing = build_publishing_payload_from_article(article)
+    publishing = attach_publishing_sync_metadata(publishing, article)
+    stale_article = article.model_copy(update={"title": "Titolo aggiornato"})
+    stale_article = enrich_article_with_hash(stale_article, is_new_generation=False)
+    assert is_publishing_stale(stale_article, publishing) is True
+
+
+def test_is_publishing_stale_when_source_hash_missing() -> None:
+    article = enrich_article_with_hash(_sample_article(), is_new_generation=True)
+    publishing = build_publishing_payload_from_article(article)
+    assert is_publishing_stale(article, publishing) is True
+
+
+def test_is_publishing_stale_false_when_synced() -> None:
+    article = enrich_article_with_hash(_sample_article(), is_new_generation=True)
+    publishing = build_publishing_payload_from_article(article)
+    publishing = attach_publishing_sync_metadata(publishing, article)
+    assert is_publishing_stale(article, publishing) is False
+
+
+def test_is_publishing_stale_false_without_payloads() -> None:
+    assert is_publishing_stale(None, None) is False
+    assert is_publishing_stale(_sample_article(), None) is False
+
+
+def test_publishing_stale_message_constant() -> None:
+    assert "pubblicazione" in PUBLISHING_STALE_MESSAGE.lower()

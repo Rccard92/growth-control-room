@@ -3,7 +3,6 @@ import type { EditorialArticlePayload, EditorialPublishingPayload } from "@gcr/s
 import {
   buildArticleHashCanonical,
   isPublishingStale,
-  isPublishingSyncUnknown,
 } from "./editorial-publishing-utils";
 
 const sampleArticle: EditorialArticlePayload = {
@@ -60,9 +59,13 @@ describe("editorial-publishing-utils sync", () => {
     expect(canonical).toContain('"tags":"a,b"');
   });
 
-  it("isPublishingSyncUnknown se manca sourceArticleHash", () => {
+  it("rileva publishing stale se manca sourceArticleHash", () => {
     expect(
-      isPublishingSyncUnknown(sampleArticle, { ...samplePublishing, sourceArticleHash: null }, true),
+      isPublishingStale(sampleArticle, { ...samplePublishing, sourceArticleHash: null }),
     ).toBe(true);
+  });
+
+  it("non segnala stale senza publishing", () => {
+    expect(isPublishingStale(sampleArticle, null)).toBe(false);
   });
 });

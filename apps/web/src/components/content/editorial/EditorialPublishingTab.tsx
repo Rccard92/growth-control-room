@@ -20,8 +20,8 @@ interface EditorialPublishingTabProps {
   status: ContentSeoEditorialStatus;
   hasArticle: boolean;
   publishingStale: boolean;
-  publishingSyncUnknown: boolean;
   staleDismissed: boolean;
+  publishBlockedByStale?: boolean;
   publishing: EditorialPublishingPayload;
   onChange: (value: EditorialPublishingPayload) => void;
   onSyncFromArticle: () => void;
@@ -41,8 +41,8 @@ export function EditorialPublishingTab({
   status,
   hasArticle,
   publishingStale,
-  publishingSyncUnknown,
   staleDismissed,
+  publishBlockedByStale = false,
   publishing,
   onChange,
   onSyncFromArticle,
@@ -122,7 +122,8 @@ export function EditorialPublishingTab({
       {publishingStale && !staleDismissed && (
         <div className="gcr-alert gcr-alert--warning editorial-publishing-tab__stale-banner">
           <p>
-            L&apos;articolo è stato modificato dopo la preparazione dei dati di pubblicazione.
+            L&apos;articolo è stato modificato dopo la preparazione dei dati di pubblicazione. I
+            dati Shopify potrebbero essere vecchi.
           </p>
           <div className="editorial-publishing-tab__stale-actions">
             <button
@@ -141,13 +142,6 @@ export function EditorialPublishingTab({
               Mantieni dati pubblicazione attuali
             </button>
           </div>
-        </div>
-      )}
-
-      {publishingSyncUnknown && !publishingStale && !staleDismissed && (
-        <div className="gcr-alert gcr-alert--warning">
-          Sincronizzazione articolo/pubblicazione non verificabile. Verifica i contenuti prima di
-          inviare a Shopify.
         </div>
       )}
 
@@ -351,7 +345,7 @@ export function EditorialPublishingTab({
               name={`publish-mode-${item.id}`}
               checked={publishing.mode === "publish_now"}
               onChange={() => handleModeChange("publish_now")}
-              disabled={publishActionsDisabled}
+              disabled={publishActionsDisabled || publishBlockedByStale}
             />
             Pubblica subito
           </label>
