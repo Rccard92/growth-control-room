@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.13-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Improved editorial brief structure control",
+      "Reduced overly long H2/H3 outlines",
+      "Added anti-repetition rules for article generation",
+      "Article Generator now compacts excessive brief structures when needed",
+    ],
+  },
+  {
     version: "0.5.12-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

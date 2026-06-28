@@ -46,6 +46,7 @@ from app.services.content.editorial_brief_service import (
     build_brand_context_used,
 )
 from app.services.content.editorial_item_service import get_editorial_item
+from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 logger = logging.getLogger(__name__)
@@ -87,44 +88,49 @@ _ARTICLE_JSON_SCHEMA = """{
 _ARTICLE_TYPE_INSTRUCTIONS: dict[str, str] = {
     "educational_article": (
         "Articolo educativo: breve, chiaro, concreto — rispondi a un dubbio reale "
-        "del cliente senza prolissità SEO."
+        "del cliente. Target 700-950 parole, max 5 H2, max 3 H3, FAQ finali max 3."
     ),
     "product_guide": (
-        "Guida prodotto: utile e pratica, non enciclopedica — collega benefici reali "
-        "al catalogo con CTA soft."
+        "Guida prodotto: utile e pratica — focus su gusto, uso, conservazione e scelta. "
+        "Target 800-1100 parole, max 5 H2."
     ),
     "recipe": (
-        "Ricetta: pratica e semplice — passaggi chiari, prodotto collegato come "
-        "ingrediente o abbinamento."
+        "Ricetta: pratica e semplice — ingredienti, procedimento, consigli, abbinamento. "
+        "Target 600-900 parole, FAQ opzionali max 2."
     ),
     "faq_objection_article": (
-        "Articolo FAQ/obiezioni: risposta diretta e rassicurante — tono umano, "
-        "max 4-6 FAQ solo se utili."
+        "Articolo FAQ/obiezioni: risposta diretta e rassicurante — target 700-950 parole, "
+        "max 5 H2, max 3 H3, FAQ finali max 3."
     ),
     "brand_storytelling": (
-        "Storytelling brand: più narrativo e umano — valori e dietro le quinte, "
-        "zero claim inventati."
+        "Storytelling brand: più narrativo e umano — meno H2, più racconto. "
+        "Target 700-1000 parole, max 4 H2."
     ),
     "product_comparison": (
-        "Confronto prodotti: criteri oggettivi, breve e utile — evita attacchi a competitor."
+        "Confronto prodotti: criteri oggettivi, utile — evita attacchi a competitor. "
+        "Target 1000-1300 parole se necessario."
     ),
     "seasonal_article": (
-        "Articolo stagionale: angolo legato al periodo, concreto e non prolisso."
+        "Articolo stagionale: angolo legato al periodo, concreto — target 1000-1300 parole "
+        "solo se il tema lo richiede."
     ),
 }
 
 _EDITORIAL_HUMAN_RULES = """
 REGOLE EDITORIALI (obbligatorie):
 - Non scrivere articoli lunghi solo per SEO; evita ripetizioni e riempitivi.
-- Target 700-1100 parole (salvo brief.contentLengthProfile=approfondito o brief esplicito diverso).
-- Max 5-7 sezioni H2 principali; max 4-6 FAQ solo se davvero utili.
+- Rispetta recommendedWordCountMin/Max, maxH2, maxH3 e structureComplexity dal brief.
+- Se la struttura del brief è troppo lunga o ripetitiva, accorpa sezioni simili mantenendo il valore per il lettore.
 - Tono morbido, familiare, concreto — valore reale per i dubbi dei clienti.
+- Niente doppia introduzione: excerpt e primo paragrafo non devono ripetersi.
 - FIRMA AUTORE: segui authorSuggestion del brief. Se vuoto, authorName e authorRole restano vuoti.
+- Senza autore: usa "ci chiedono spesso", "riceviamo spesso questa domanda", "può capitare" — evita prima persona singolare forzata.
 - NON inserire firma nel bodyHtml — solo nei campi authorName/authorRole se previsto dal brief.
 - NON inventare citazioni dirette o opinioni personali non presenti nel contesto brand.
 - NON attribuire opinioni a Davide, Filippo o Salvo se non supportate dalla Brand Intelligence.
-- communityCta: usa communityCtaSuggestion del brief se presente; formula naturale e variata, non ripetitiva.
+- communityCta: usa communityCtaSuggestion del brief se presente; formula naturale e variata, breve.
 - communityCta è distinta da cta (community vs commerciale).
+- Evita di ripetere più volte gli stessi concetti elencati in avoidRepetitions del brief.
 - Safe Claims restano prioritari assoluti su tutto.
 """
 
@@ -244,7 +250,8 @@ def _build_article_system_prompt(
         "Usa il tono del brand dal contesto. "
         "bodyHtml deve usare SOLO tag sicuri: h2, h3, p, ul, ol, li, strong, em, a, blockquote. "
         "Nessuno script, iframe o style inline. "
-        "Segui la struttura H2/H3 del brief. "
+        "Segui la struttura H2/H3 del brief rispettando maxH2 e maxH3. "
+        "Se il brief ha sezioni eccessive o ripetitive, accorpa mantenendo valore per il lettore. "
         "Includi prodotti da linkare e FAQ solo se presenti e sensati nel brief. "
         f"{_EDITORIAL_HUMAN_RULES}"
         f"{length_note}\n"
@@ -271,7 +278,8 @@ def _build_article_user_prompt(item: ContentSeoEditorialItem, type_instruction: 
         "FIRMA E TONO (dal brief):\n"
         "- Se authorSuggestion è vuoto: authorName e authorRole devono restare vuoti.\n"
         "- Se authorSuggestion è valorizzato: compila authorName (es. A cura di ...) e authorRole.\n"
-        "- Usa authorReason, editorialToneNotes, contentLengthProfile e communityCtaSuggestion del brief.\n"
+        "- Usa authorReason, editorialToneNotes, contentLengthProfile, communityCtaSuggestion del brief.\n"
+        "- Rispetta recommendedWordCountMin/Max, maxH2, maxH3, structureComplexity e avoidRepetitions.\n"
         "- Non inserire la firma nel bodyHtml.\n\n"
         "bodyHtml deve essere HTML pulito pronto per anteprima e pubblicazione Shopify futura. "
         "handle: slug URL-friendly in minuscolo con trattini. "
@@ -367,6 +375,19 @@ async def generate_editorial_article_core(
             ),
         )
         payload = normalize_editorial_article_payload(parsed)
+        brief_norm = normalize_editorial_brief_payload(item.brief_payload or {})
+        processed_html, post_warnings = postprocess_editorial_article_html(
+            payload.body_html,
+            payload.excerpt,
+            brief_norm,
+        )
+        if processed_html != payload.body_html or post_warnings:
+            payload = payload.model_copy(
+                update={
+                    "body_html": processed_html,
+                    "warnings": list(dict.fromkeys([*payload.warnings, *post_warnings])),
+                }
+            )
         payload = _apply_brief_author_to_payload(
             payload, item.brief_payload, bundle
         )

@@ -16,6 +16,7 @@ from app.schemas.content_seo_editorial import (
 )
 from app.services.content.editorial_brief_service import (
     build_bi_warnings,
+    enforce_brief_structure,
     generate_editorial_brief,
     update_editorial_brief,
 )
@@ -30,7 +31,9 @@ def _sample_ai_brief() -> dict:
         "primaryKeyword": "olio evo",
         "secondaryKeywords": ["extravergine", "condimento"],
         "contentAngle": "Educare sulla qualità",
-        "h2H3Structure": ["H2: Cos'è l'olio EVO", "H3: Come sceglierlo"],
+        "h2H3Structure": [
+            {"h2": "Cos'è l'olio EVO", "h3": ["Come sceglierlo"]},
+        ],
         "productsToLink": ["Olio classico"],
         "faqToInclude": ["Come conservarlo?"],
         "claimsToAvoid": ["Cura malattie"],
@@ -49,12 +52,56 @@ def test_normalize_editorial_brief_payload_coerces_lists() -> None:
         {
             "proposedTitle": "Titolo",
             "secondaryKeywords": "uno\ndue",
-            "h2H3Structure": ["H2: A"],
+            "h2H3Structure": [{"h2": "A", "h3": []}],
         }
     )
     assert payload.proposed_title == "Titolo"
     assert payload.secondary_keywords == ["uno", "due"]
-    assert payload.h2_h3_structure == ["H2: A"]
+    assert payload.h2_h3_structure[0].h2 == "A"
+
+
+def test_normalize_editorial_brief_payload_structured_h2_h3() -> None:
+    payload = normalize_editorial_brief_payload(
+        {
+            "proposedTitle": "Miele",
+            "h2H3Structure": [
+                {"h2": "Perché il miele cristallizza", "h3": []},
+            ],
+            "recommendedWordCountMin": 700,
+            "recommendedWordCountMax": 950,
+            "structureComplexity": "snella",
+            "maxH2": 5,
+            "maxH3": 3,
+            "avoidRepetitions": ["cristallizzazione è naturale"],
+        }
+    )
+    assert payload.h2_h3_structure[0].h2 == "Perché il miele cristallizza"
+    assert payload.recommended_word_count_min == 700
+    assert payload.structure_complexity == "snella"
+    assert payload.max_h2 == 5
+
+
+def test_enforce_brief_structure_trims_excess() -> None:
+    payload = normalize_editorial_brief_payload(
+        {
+            "proposedTitle": "Perché il miele cristallizza?",
+            "primaryKeyword": "miele cristallizza",
+            "h2H3Structure": [
+                {"h2": f"Sezione {i}", "h3": []} for i in range(7)
+            ],
+            "faqToInclude": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+        }
+    )
+    enforced = enforce_brief_structure(
+        payload,
+        "educational_article",
+        "Perché il miele cristallizza?",
+    )
+    assert len(enforced.h2_h3_structure) <= 5
+    assert len(enforced.faq_to_include) <= 4
+    assert enforced.recommended_word_count_min == 700
+    assert enforced.recommended_word_count_max == 950
+    assert enforced.structure_complexity == "snella"
 
 
 def test_normalize_editorial_brief_payload_editorial_fields() -> None:

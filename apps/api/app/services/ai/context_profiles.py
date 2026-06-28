@@ -262,6 +262,11 @@ def _faq_block(bundle: BrandContextBundleResponse, *, filter_terms: list[str] | 
 
 
 def _format_brief_payload_block(brief_payload: dict[str, Any]) -> str:
+    from app.services.content.editorial_structure_utils import (
+        coerce_h2_h3_structure,
+        format_h2_h3_for_prompt,
+    )
+
     parts: list[str] = ["BRIEF APPROVATO"]
     mapping = [
         ("proposedTitle", "Titolo proposto"),
@@ -274,6 +279,7 @@ def _format_brief_payload_block(brief_payload: dict[str, Any]) -> str:
         ("metaDescription", "Meta description"),
         ("authorSuggestion", "Autore suggerito"),
         ("contentLengthProfile", "Lunghezza"),
+        ("structureComplexity", "Complessità struttura"),
     ]
     for key, label in mapping:
         val = brief_payload.get(key) or brief_payload.get(
@@ -281,15 +287,29 @@ def _format_brief_payload_block(brief_payload: dict[str, Any]) -> str:
         )
         if val and str(val).strip():
             parts.append(f"- {label}: {str(val).strip()[:400]}")
+    word_min = brief_payload.get("recommendedWordCountMin")
+    word_max = brief_payload.get("recommendedWordCountMax")
+    if word_min or word_max:
+        parts.append(f"- Parole consigliate: {word_min or '—'}-{word_max or '—'}")
+    max_h2 = brief_payload.get("maxH2")
+    max_h3 = brief_payload.get("maxH3")
+    if max_h2 or max_h3:
+        parts.append(f"- Max struttura: {max_h2 or '—'} H2, {max_h3 or '—'} H3")
+    h2_raw = brief_payload.get("h2H3Structure")
+    if h2_raw:
+        sections = coerce_h2_h3_structure(h2_raw)
+        if sections:
+            parts.append("Struttura H2/H3:")
+            parts.append(format_h2_h3_for_prompt(sections))
     for list_key, label in [
         ("secondaryKeywords", "Keyword secondarie"),
-        ("h2H3Structure", "Struttura H2/H3"),
         ("productsToLink", "Prodotti da linkare"),
         ("faqToInclude", "FAQ da includere"),
         ("safeClaimsToUse", "Safe claims da usare"),
         ("claimsToAvoid", "Claim da evitare"),
         ("internalLinksSuggestions", "Link interni"),
         ("editorialToneNotes", "Note tono"),
+        ("avoidRepetitions", "Evita ripetizioni"),
     ]:
         items = brief_payload.get(list_key)
         if isinstance(items, list) and items:

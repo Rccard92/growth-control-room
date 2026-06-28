@@ -573,6 +573,11 @@ export interface EditorialBriefBatchJobResponse {
   errors: EditorialBriefBatchJobError[];
 }
 
+export interface BriefH2Section {
+  h2: string;
+  h3: string[];
+}
+
 export interface EditorialBriefPayload {
   proposedTitle: string;
   searchIntent: string;
@@ -580,7 +585,7 @@ export interface EditorialBriefPayload {
   primaryKeyword: string;
   secondaryKeywords: string[];
   contentAngle: string;
-  h2H3Structure: string[];
+  h2H3Structure: BriefH2Section[];
   productsToLink: string[];
   faqToInclude: string[];
   claimsToAvoid: string[];
@@ -597,6 +602,12 @@ export interface EditorialBriefPayload {
   contentLengthProfile?: "" | "breve" | "medio" | "approfondito";
   communityCtaSuggestion?: string;
   editorialToneNotes?: string[];
+  recommendedWordCountMin?: number;
+  recommendedWordCountMax?: number;
+  structureComplexity?: "" | "snella" | "media" | "approfondita";
+  maxH2?: number;
+  maxH3?: number;
+  avoidRepetitions?: string[];
 }
 
 export type EditorialBriefUpdateStatus = "brief_pending" | "brief_approved";

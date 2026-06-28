@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.13-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Improved editorial brief structure control
+- Reduced overly long H2/H3 outlines
+- Added anti-repetition rules for article generation
+- Article Generator now compacts excessive brief structures when needed
+
 ## [0.5.12-alpha] - 2026-06-13
 
 Tipo: Alpha patch

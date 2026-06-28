@@ -69,6 +69,45 @@ def test_normalize_editorial_article_payload_new_metadata_fields() -> None:
     assert payload.content_length_profile == "medio"
 
 
+def test_postprocess_editorial_article_removes_duplicate_intro() -> None:
+    from app.schemas.content_seo_editorial import EditorialBriefPayload
+    from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
+
+    brief = EditorialBriefPayload(
+        proposed_title="Titolo",
+        max_h2=5,
+        max_h3=3,
+        structure_complexity="snella",
+    )
+    excerpt = "Il miele cristallizza per un processo naturale legato al contenuto di zuccheri."
+    body = (
+        "<p>Il miele cristallizza per un processo naturale legato al contenuto di zuccheri.</p>"
+        "<h2>Perché succede</h2><p>Dettaglio utile.</p>"
+    )
+    html, warnings = postprocess_editorial_article_html(body, excerpt, brief)
+    assert "Rimossa introduzione duplicata" in warnings[0]
+    assert html.startswith("<h2>")
+
+
+def test_postprocess_editorial_article_reduces_repetitions() -> None:
+    from app.schemas.content_seo_editorial import EditorialBriefPayload
+    from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
+
+    brief = EditorialBriefPayload(
+        proposed_title="Titolo",
+        avoid_repetitions=["cristallizzazione è naturale"],
+        max_h2=5,
+        max_h3=3,
+    )
+    body = (
+        "<h2>Uno</h2><p>La cristallizzazione è naturale.</p>"
+        "<h2>Due</h2><p>Ancora: la cristallizzazione è naturale.</p>"
+        "<h2>Tre</h2><p>Di nuovo la cristallizzazione è naturale.</p>"
+    )
+    _, warnings = postprocess_editorial_article_html(body, "", brief)
+    assert any("Ridotte ripetizioni" in w for w in warnings)
+
+
 def test_enrich_article_payload_reading_time() -> None:
     from app.services.content.editorial_article_service import _enrich_article_payload
 

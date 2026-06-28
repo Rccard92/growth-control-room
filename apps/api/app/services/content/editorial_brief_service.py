@@ -44,6 +44,11 @@ from app.services.brand_intelligence.product_knowledge_context import (
 from app.services.brand_intelligence.safe_claims_service import safe_claims_has_minimum
 from app.services.brand_intelligence.score import profile_has_minimum
 from app.services.content.editorial_item_service import get_editorial_item
+from app.services.content.editorial_structure_profiles import (
+    default_avoid_repetitions,
+    resolve_structure_profile,
+)
+from app.services.content.editorial_structure_utils import count_h2_h3, trim_structure
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 logger = logging.getLogger(__name__)
@@ -58,34 +63,49 @@ class BriefGenerationError(Exception):
 
 _CONTENT_TYPE_INSTRUCTIONS: dict[str, str] = {
     "educational_article": (
-        "Articolo educativo: focus su intento informativo, guida pratica, "
-        "struttura didattica H2/H3, E-E-A-T senza claim non verificati."
+        "Articolo educativo: rispondi a un dubbio reale del cliente con struttura snella. "
+        "Max 4-5 H2, H3 opzionali (max 2-3 totali), target 700-950 parole. "
+        "No struttura enciclopedica. E-E-A-T senza claim non verificati."
     ),
     "product_guide": (
-        "Guida prodotto: collega benefici reali al catalogo, uso consigliato, "
-        "prodotti da linkare prioritari, CTA soft verso acquisto."
+        "Guida prodotto: focus su gusto, uso, conservazione e scelta. "
+        "Max 5 H2, target 800-1100 parole. CTA soft verso acquisto."
     ),
     "recipe": (
-        "Ricetta/contenuto food: ingredienti, passaggi in H2/H3, "
-        "prodotto collegato come ingrediente o abbinamento, tono ispirazionale."
+        "Ricetta: struttura pratica (ingredienti, procedimento, consigli, abbinamento). "
+        "Max 4 H2, target 600-900 parole. FAQ opzionali max 2."
     ),
     "faq_objection_article": (
-        "Articolo FAQ/obiezioni: rispondi a dubbi reali dal brand, "
-        "sezione FAQ obbligatoria, tono rassicurante, no promesse non supportate."
+        "Articolo FAQ/obiezioni: risposta concreta a un dubbio, struttura compatta. "
+        "Max 4-5 H2, FAQ max 3-4 solo se aggiungono valore, target 700-950 parole."
     ),
     "product_comparison": (
-        "Confronto prodotti: criteri oggettivi, tabella mentale in H2/H3, "
-        "evita attacchi a competitor, confronta solo prodotti del brand se possibile."
+        "Confronto prodotti: solo se il tema lo richiede davvero. "
+        "Max 6 H2 e 5 H3, target 1000-1300 parole. Evita attacchi a competitor."
     ),
     "seasonal_article": (
-        "Articolo stagionale: angolo legato al periodo pianificato, "
-        "riferimenti stagionali nel titolo e nella struttura."
+        "Articolo stagionale: angolo legato al periodo, struttura proporzionata. "
+        "Max 6 H2 se necessario, target 1000-1300 parole."
     ),
     "brand_storytelling": (
-        "Storytelling brand: valori, missione, dietro le quinte; "
-        "emotivo ma fedele al Brand Identity, zero claim inventati."
+        "Storytelling brand: meno H2, più racconto. Max 3-4 H2, target 700-1000 parole. "
+        "Emotivo ma fedele al Brand Identity, zero claim inventati."
     ),
 }
+
+_BRIEF_STRUCTURE_RULES = """
+REGOLE STRUTTURA BRIEF (obbligatorie):
+- Obiettivo editoriale: contenuti utili, leggibili, morbidi e concreti — NON guide SEO enciclopediche.
+- Struttura H2/H3 proporzionata al tipo contenuto e al dubbio del cliente.
+- Per dubbi semplici / educational / FAQ: max 4-5 H2, H3 opzionali (max 2-3 totali), NON mettere H3 sotto ogni H2.
+- Per temi complessi: max 5-6 H2 e max 4-5 H3 solo se davvero necessario.
+- h2H3Structure: array di oggetti { "h2": "titolo sezione", "h3": ["sottosezione opzionale"] } — compatto.
+- Evita sezioni "In sintesi" lunghe se ci sono già FAQ; evita H3 che ripetono il titolo H2.
+- Evita sezioni tecniche inutili e doppioni tra H2, sintesi e FAQ.
+- faqToInclude: max 3-4, solo se aggiungono valore; non ripetere risposte già nel corpo.
+- Compila recommendedWordCountMin, recommendedWordCountMax, structureComplexity (snella|media|approfondita),
+  maxH2, maxH3, avoidRepetitions coerenti con il tipo contenuto.
+"""
 
 _BRIEF_JSON_SCHEMA = """{
   "proposedTitle": "string",
@@ -94,7 +114,7 @@ _BRIEF_JSON_SCHEMA = """{
   "primaryKeyword": "string",
   "secondaryKeywords": ["string"],
   "contentAngle": "string",
-  "h2H3Structure": ["H2: ...", "H3: ..."],
+  "h2H3Structure": [{"h2": "titolo sezione", "h3": ["sottosezione opzionale"]}],
   "productsToLink": ["string"],
   "faqToInclude": ["string"],
   "claimsToAvoid": ["string"],
@@ -109,8 +129,70 @@ _BRIEF_JSON_SCHEMA = """{
   "contentLengthProfile": "breve|medio|approfondito",
   "communityCtaSuggestion": "string",
   "editorialToneNotes": ["string"],
+  "recommendedWordCountMin": 700,
+  "recommendedWordCountMax": 950,
+  "structureComplexity": "snella|media|approfondita",
+  "maxH2": 5,
+  "maxH3": 3,
+  "avoidRepetitions": ["string"],
   "warnings": ["string"]
 }"""
+
+_COMPLEXITY_TO_LENGTH = {
+    "snella": "breve",
+    "media": "medio",
+    "approfondita": "approfondito",
+}
+
+
+def enforce_brief_structure(
+    payload: EditorialBriefPayload,
+    content_type: str,
+    title: str,
+) -> EditorialBriefPayload:
+    """Apply content-type structure limits and fill editorial metadata fields."""
+    profile = resolve_structure_profile(content_type, title)
+    warnings = list(payload.warnings)
+
+    h2_before, h3_before = count_h2_h3(payload.h2_h3_structure)
+    trimmed_structure, structure_trimmed = trim_structure(
+        payload.h2_h3_structure,
+        max_h2=profile.max_h2,
+        max_h3=profile.max_h3,
+    )
+    if structure_trimmed:
+        h2_after, h3_after = count_h2_h3(trimmed_structure)
+        warnings.append(
+            f"Struttura H2/H3 compattata ({h2_before}→{h2_after} H2, {h3_before}→{h3_after} H3)"
+        )
+
+    faq = list(payload.faq_to_include)
+    if len(faq) > profile.max_faq:
+        faq = faq[: profile.max_faq]
+        warnings.append(f"FAQ ridotte a {profile.max_faq} per mantenere il brief snello")
+
+    avoid = list(payload.avoid_repetitions) or default_avoid_repetitions(
+        content_type, payload.primary_keyword
+    )
+    length_profile = (payload.content_length_profile or "").strip()
+    if length_profile not in ("breve", "medio", "approfondito"):
+        length_profile = _COMPLEXITY_TO_LENGTH.get(profile.structure_complexity, "medio")
+
+    return payload.model_copy(
+        update={
+            "h2_h3_structure": trimmed_structure,
+            "faq_to_include": faq,
+            "recommended_word_count_min": profile.word_min,
+            "recommended_word_count_max": profile.word_max,
+            "structure_complexity": profile.structure_complexity,
+            "max_h2": profile.max_h2,
+            "max_h3": profile.max_h3,
+            "avoid_repetitions": avoid,
+            "content_length_profile": length_profile,
+            "warnings": list(dict.fromkeys(warnings)),
+        }
+    )
+
 
 _BRIEF_EDITORIAL_RULES = """
 REGOLE EDITORIALI (dal contesto EDITORIAL GUIDELINES — obbligatorie):
@@ -193,6 +275,7 @@ def _build_system_prompt(brand_context: str | None, content_brief_rules: str) ->
         "Rispetta Safe Claims con priorità assoluta. "
         "Usa le Editorial Guidelines dal contesto brand per tono, lunghezza e firma autore. "
         f"{_BRIEF_EDITORIAL_RULES}"
+        f"{_BRIEF_STRUCTURE_RULES}"
         "Scrivi in italiano. Rispondi SOLO con JSON valido.\n\n"
         f"{content_brief_rules}"
     )
@@ -220,7 +303,8 @@ def _build_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> 
         "In claimsToAvoid inserisci claim vietati dal contesto Safe Claims. "
         "In safeClaimsToUse inserisci solo claim esplicitamente consentiti. "
         "Decidi authorSuggestion in base al tipo contenuto e all'angolo: non forzare sempre una firma. "
-        "Compila authorReason, contentLengthProfile, communityCtaSuggestion e editorialToneNotes. "
+        "Compila authorReason, contentLengthProfile, communityCtaSuggestion, editorialToneNotes, "
+        "recommendedWordCountMin/Max, structureComplexity, maxH2, maxH3 e avoidRepetitions. "
         "Se mancano informazioni, segnalale in warnings.\n\n"
         f"Rispondi con JSON nel seguente schema:\n{_BRIEF_JSON_SCHEMA}"
     )
@@ -294,6 +378,7 @@ async def generate_editorial_brief_core(
             prompt_cache_key=build_prompt_cache_key(project_id, "blog_brief", ctx.context_hash),
         )
         payload = normalize_editorial_brief_payload(parsed)
+        payload = enforce_brief_structure(payload, item.content_type, item.title)
     except OpenAINotConfiguredError:
         raise BriefGenerationError(
             "AI non configurata. Inserisci OPENAI_API_KEY per generare il brief.",

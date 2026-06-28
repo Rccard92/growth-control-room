@@ -162,6 +162,7 @@ export type {
   EditorialBriefBatchStartRequest,
   EditorialBriefBatchJobResponse,
   EditorialBriefBatchJobError,
+  BriefH2Section,
   EditorialBriefPayload,
   EditorialBriefUpdateRequest,
   EditorialBriefUpdateStatus,

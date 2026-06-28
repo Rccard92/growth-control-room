@@ -20,8 +20,11 @@ Classificare prima di scrivere:
 ## Outline H2/H3
 
 - H1 unico (title articolo)
-- H2 per sezioni principali (problema, soluzione, prodotti correlati)
-- H3 per sottosezioni dove serve profondità
+- H2 per sezioni principali — struttura **snella e proporzionata**, non enciclopedica
+- H3 solo dove serve profondità reale; **non** sotto ogni H2
+- Dubbi semplici del cliente: max 4-5 H2, max 2-3 H3 totali, target 700-950 parole
+- Temi complessi: max 5-6 H2, max 4-5 H3, target 1000-1300 parole
+- FAQ nel brief: max 3-4, solo se aggiungono valore; evitare doppioni con H2 e sintesi
 - Improve mode: distinguere "mantieni/rafforza" vs "aggiungi nuovo"
 
 ## Internal linking

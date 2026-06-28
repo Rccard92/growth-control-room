@@ -313,6 +313,13 @@ def _coerce_str_list(value: object) -> list[str]:
     return []
 
 
+class BriefH2Section(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    h2: str = ""
+    h3: list[str] = Field(default_factory=list)
+
+
 class EditorialBriefPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -324,7 +331,9 @@ class EditorialBriefPayload(BaseModel):
         default_factory=list, serialization_alias="secondaryKeywords"
     )
     content_angle: str = Field(default="", serialization_alias="contentAngle")
-    h2_h3_structure: list[str] = Field(default_factory=list, serialization_alias="h2H3Structure")
+    h2_h3_structure: list[BriefH2Section] = Field(
+        default_factory=list, serialization_alias="h2H3Structure"
+    )
     products_to_link: list[str] = Field(default_factory=list, serialization_alias="productsToLink")
     faq_to_include: list[str] = Field(default_factory=list, serialization_alias="faqToInclude")
     claims_to_avoid: list[str] = Field(default_factory=list, serialization_alias="claimsToAvoid")
@@ -351,18 +360,32 @@ class EditorialBriefPayload(BaseModel):
     editorial_tone_notes: list[str] = Field(
         default_factory=list, serialization_alias="editorialToneNotes"
     )
+    recommended_word_count_min: int | None = Field(
+        default=None, serialization_alias="recommendedWordCountMin"
+    )
+    recommended_word_count_max: int | None = Field(
+        default=None, serialization_alias="recommendedWordCountMax"
+    )
+    structure_complexity: str = Field(default="", serialization_alias="structureComplexity")
+    max_h2: int | None = Field(default=None, serialization_alias="maxH2")
+    max_h3: int | None = Field(default=None, serialization_alias="maxH3")
+    avoid_repetitions: list[str] = Field(
+        default_factory=list, serialization_alias="avoidRepetitions"
+    )
 
 
 _VALID_AUTHOR_SUGGESTIONS = frozenset({"", "Davide", "Filippo Leonardi", "Salvo Leonardi"})
 _VALID_CONTENT_LENGTH_PROFILES = frozenset({"", "breve", "medio", "approfondito"})
+_VALID_STRUCTURE_COMPLEXITY = frozenset({"", "snella", "media", "approfondita"})
 
 
 def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
     """Sanitize AI or client brief JSON into a typed payload."""
+    from app.services.content.editorial_structure_utils import coerce_h2_h3_structure
+
     data = dict(raw)
     list_fields = {
         "secondaryKeywords": "secondary_keywords",
-        "h2H3Structure": "h2_h3_structure",
         "productsToLink": "products_to_link",
         "faqToInclude": "faq_to_include",
         "claimsToAvoid": "claims_to_avoid",
@@ -371,12 +394,18 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
         "brandContextUsed": "brand_context_used",
         "warnings": "warnings",
         "editorialToneNotes": "editorial_tone_notes",
+        "avoidRepetitions": "avoid_repetitions",
     }
     for alias, field in list_fields.items():
         if alias in data:
             data[field] = _coerce_str_list(data.pop(alias))
         elif field in data:
             data[field] = _coerce_str_list(data[field])
+
+    h2_raw = data.pop("h2H3Structure", None)
+    if h2_raw is None:
+        h2_raw = data.get("h2_h3_structure")
+    data["h2_h3_structure"] = coerce_h2_h3_structure(h2_raw)
     str_aliases = {
         "proposedTitle": "proposed_title",
         "searchIntent": "search_intent",
@@ -406,6 +435,28 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
     data["content_length_profile"] = (
         profile if profile in _VALID_CONTENT_LENGTH_PROFILES else ""
     )
+    complexity = str(data.get("structure_complexity") or "").strip()
+    if "structureComplexity" in data and "structure_complexity" not in data:
+        complexity = str(data.pop("structureComplexity") or "").strip()
+    data["structure_complexity"] = (
+        complexity if complexity in _VALID_STRUCTURE_COMPLEXITY else ""
+    )
+    for int_alias, int_field in (
+        ("recommendedWordCountMin", "recommended_word_count_min"),
+        ("recommendedWordCountMax", "recommended_word_count_max"),
+        ("maxH2", "max_h2"),
+        ("maxH3", "max_h3"),
+    ):
+        if int_alias in data and int_field not in data:
+            data[int_field] = data.pop(int_alias)
+        val = data.get(int_field)
+        if val is None or val == "":
+            data[int_field] = None
+        else:
+            try:
+                data[int_field] = int(val)
+            except (TypeError, ValueError):
+                data[int_field] = None
     return EditorialBriefPayload.model_validate(data)
 
 

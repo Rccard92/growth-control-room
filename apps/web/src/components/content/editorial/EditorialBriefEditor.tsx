@@ -2,7 +2,13 @@ import type { ReactNode } from "react";
 import type { EditorialBriefPayload } from "@gcr/shared";
 import { AutoResizeTextarea } from "../../ui/AutoResizeTextarea";
 import { AppSelect } from "../../ui/AppSelect";
-import { listToTextarea, textareaToList } from "./editorial-brief-utils";
+import {
+  formatH2H3StructureForEditor,
+  formatStructureComplexityLabel,
+  listToTextarea,
+  parseH2H3StructureFromEditor,
+  textareaToList,
+} from "./editorial-brief-utils";
 
 const AUTHOR_OPTIONS = [
   { value: "", label: "Nessuna firma" },
@@ -128,10 +134,44 @@ export function EditorialBriefEditor({
       </BriefSection>
 
       <BriefSection title="Struttura">
-        <ListField
+        {(value.recommendedWordCountMin != null ||
+          value.recommendedWordCountMax != null ||
+          value.structureComplexity ||
+          value.maxH2 != null ||
+          value.maxH3 != null) && (
+          <div className="editorial-brief-structure-meta gcr-card gcr-card--muted">
+            {value.recommendedWordCountMin != null ||
+            value.recommendedWordCountMax != null ? (
+              <p className="editorial-brief-structure-meta__item">
+                <strong>Lunghezza consigliata:</strong>{" "}
+                {value.recommendedWordCountMin ?? "—"}–{value.recommendedWordCountMax ?? "—"}{" "}
+                parole
+              </p>
+            ) : null}
+            {value.structureComplexity ? (
+              <p className="editorial-brief-structure-meta__item">
+                <strong>Complessità struttura:</strong>{" "}
+                {formatStructureComplexityLabel(value.structureComplexity)}
+              </p>
+            ) : null}
+            {value.maxH2 != null || value.maxH3 != null ? (
+              <p className="editorial-brief-structure-meta__item">
+                <strong>Massimo H2/H3:</strong> {value.maxH2 ?? "—"} H2 · {value.maxH3 ?? "—"}{" "}
+                H3
+              </p>
+            ) : null}
+          </div>
+        )}
+        <AutoResizeTextarea
           label="Struttura H2/H3"
-          value={value.h2H3Structure}
-          onChange={(h2H3Structure) => patch({ h2H3Structure })}
+          value={formatH2H3StructureForEditor(value.h2H3Structure)}
+          onChange={(text) =>
+            patch({ h2H3Structure: parseH2H3StructureFromEditor(text) })
+          }
+          minRows={4}
+          maxRows={14}
+          placeholder={"H2: Titolo sezione\n  H3: Sottosezione opzionale"}
+          className="editorial-brief-editor__list"
         />
       </BriefSection>
 
