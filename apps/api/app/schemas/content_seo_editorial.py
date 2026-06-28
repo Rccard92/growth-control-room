@@ -766,6 +766,11 @@ class EditorialPublishingPayload(BaseModel):
     synced_from_article_at: str | None = Field(
         default=None, serialization_alias="syncedFromArticleAt"
     )
+    shopify_seo_synced: bool | None = Field(default=None, serialization_alias="shopifySeoSynced")
+    shopify_seo_synced_at: str | None = Field(
+        default=None, serialization_alias="shopifySeoSyncedAt"
+    )
+    shopify_seo_error: str | None = Field(default=None, serialization_alias="shopifySeoError")
 
 
 class EditorialPublishingUpdateRequest(BaseModel):

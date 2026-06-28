@@ -46,6 +46,26 @@ export function EditorialQualityPanel({ article }: EditorialQualityPanelProps) {
           <dt>Paragrafi lunghi</dt>
           <dd>{quality.hasLongParagraphs ? "Sì" : "No"}</dd>
         </div>
+        <div>
+          <dt>SEO title</dt>
+          <dd>
+            {quality.hasSeoTitle ? "Sì" : "No"}
+            {quality.hasSeoTitle
+              ? ` (${quality.seoTitleLength} caratteri${quality.seoTitleInRange ? "" : ", fuori target 60"})`
+              : ""}
+          </dd>
+        </div>
+        <div>
+          <dt>Meta description</dt>
+          <dd>
+            {quality.hasMetaDescription ? "Sì" : "No"}
+            {quality.hasMetaDescription
+              ? ` (${quality.metaDescriptionLength} caratteri${
+                  quality.metaDescriptionInRange ? "" : ", fuori target 160"
+                })`
+              : ""}
+          </dd>
+        </div>
       </dl>
       {quality.safeClaimFlags.length > 0 && (
         <div className="editorial-quality-panel__safe-claims">

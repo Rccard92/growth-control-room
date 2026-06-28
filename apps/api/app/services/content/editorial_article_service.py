@@ -255,6 +255,36 @@ def _enrich_article_payload(
     return payload
 
 
+def _ensure_article_seo_fields(payload: EditorialArticlePayload) -> EditorialArticlePayload:
+    """Fill missing SEO fields from title/excerpt when AI output is incomplete."""
+    updates: dict[str, str] = {}
+    warnings = list(payload.warnings)
+    seo_title = payload.seo_title.strip()
+    meta_description = payload.meta_description.strip()
+
+    if not seo_title and payload.title.strip():
+        updates["seo_title"] = payload.title.strip()
+        warnings.append("SEO title generato dal titolo articolo.")
+    if not meta_description:
+        excerpt = payload.excerpt.strip()
+        if excerpt:
+            updates["meta_description"] = excerpt[:160]
+            warnings.append("Meta description generata dall'estratto articolo.")
+    if not updates.get("seo_title") and not seo_title:
+        warnings.append("Articolo SEO incompleto: SEO title mancante.")
+    if not updates.get("meta_description") and not meta_description:
+        warnings.append("Articolo SEO incompleto: meta description mancante.")
+
+    if not updates and warnings == list(payload.warnings):
+        return payload
+    return payload.model_copy(
+        update={
+            **updates,
+            "warnings": list(dict.fromkeys(warnings)),
+        }
+    )
+
+
 def _build_article_system_prompt(
     brand_context: str | None,
     brand_guardrails: str,
@@ -464,6 +494,7 @@ async def generate_editorial_article_core(
             payload,
             default_length=enrich_default or None,
         )
+        payload = _ensure_article_seo_fields(payload)
         quality_warnings, quality_metrics, safe_flags = validate_editorial_article_quality(
             payload.body_html,
             payload,

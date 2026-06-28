@@ -11,9 +11,18 @@ export interface EditorialQualityAnalysis {
   hasCtaBox: boolean;
   hasBodyWrapper: boolean;
   hasLongParagraphs: boolean;
+  hasSeoTitle: boolean;
+  hasMetaDescription: boolean;
+  seoTitleLength: number;
+  metaDescriptionLength: number;
+  seoTitleInRange: boolean;
+  metaDescriptionInRange: boolean;
   safeClaimFlags: EditorialSafeClaimFlag[];
   warnings: string[];
 }
+
+const SEO_TITLE_MAX = 60;
+const META_DESCRIPTION_MAX = 160;
 
 const STRONG_RE = /<strong\b[^>]*>/gi;
 const LIST_RE = /<(?:ul|ol)\b[^>]*>/gi;
@@ -47,6 +56,8 @@ export function analyzeEditorialQuality(
   }
 
   const hasCta = Boolean(article.cta?.trim() || article.communityCta?.trim());
+  const seoTitle = article.seoTitle?.trim() ?? "";
+  const metaDescription = article.metaDescription?.trim() ?? "";
 
   return {
     skillPackUsed: article.skillPackUsed?.trim() || "—",
@@ -59,6 +70,13 @@ export function analyzeEditorialQuality(
     hasCtaBox,
     hasBodyWrapper,
     hasLongParagraphs,
+    hasSeoTitle: Boolean(seoTitle),
+    hasMetaDescription: Boolean(metaDescription),
+    seoTitleLength: seoTitle.length,
+    metaDescriptionLength: metaDescription.length,
+    seoTitleInRange: seoTitle.length > 0 && seoTitle.length <= SEO_TITLE_MAX,
+    metaDescriptionInRange:
+      metaDescription.length > 0 && metaDescription.length <= META_DESCRIPTION_MAX,
     safeClaimFlags: article.safeClaimFlags ?? [],
     warnings: article.warnings ?? [],
   };

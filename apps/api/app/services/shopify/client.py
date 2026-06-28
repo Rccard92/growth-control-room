@@ -208,6 +208,53 @@ def normalize_shop_domain(raw: str) -> str:
     return value
 
 
+_ARTICLE_METAFIELDS_SELECTION = """
+              metafields(first: 10, namespace: "global") {
+                edges {
+                  node {
+                    namespace
+                    key
+                    value
+                    type
+                  }
+                }
+              }
+"""
+
+
+def parse_article_global_seo_metafields(article_node: dict[str, Any]) -> dict[str, str | None]:
+    """Extract global SEO metafields from an Article GraphQL node."""
+    title_tag: str | None = None
+    description_tag: str | None = None
+    metafields_block = article_node.get("metafields") or {}
+    edges = metafields_block.get("edges") or []
+    for edge in edges:
+        node = edge.get("node") if isinstance(edge, dict) else None
+        if not isinstance(node, dict):
+            continue
+        namespace = str(node.get("namespace") or "").strip()
+        key = str(node.get("key") or "").strip()
+        if namespace != "global":
+            continue
+        value = str(node.get("value") or "").strip()
+        if key == "title_tag":
+            title_tag = value or None
+        elif key == "description_tag":
+            description_tag = value or None
+    return {"title_tag": title_tag, "description_tag": description_tag}
+
+
+def article_seo_metafields_match(
+    parsed: dict[str, str | None],
+    *,
+    expected_title: str,
+    expected_description: str,
+) -> bool:
+    title_ok = (parsed.get("title_tag") or "").strip() == expected_title.strip()
+    desc_ok = (parsed.get("description_tag") or "").strip() == expected_description.strip()
+    return title_ok and desc_ok
+
+
 class ShopifyGraphQLClient:
     def __init__(self, shop_domain: str, access_token: str) -> None:
         self.shop_domain = normalize_shop_domain(shop_domain)
@@ -577,21 +624,22 @@ class ShopifyGraphQLClient:
         return all_nodes
 
     async def create_article(self, article_input: dict[str, Any]) -> dict[str, Any]:
-        mutation = """
-        mutation ArticleCreate($article: ArticleCreateInput!) {
-          articleCreate(article: $article) {
-            article {
+        mutation = f"""
+        mutation ArticleCreate($article: ArticleCreateInput!) {{
+          articleCreate(article: $article) {{
+            article {{
               id
               handle
               title
               publishedAt
-            }
-            userErrors {
+              {_ARTICLE_METAFIELDS_SELECTION}
+            }}
+            userErrors {{
               field
               message
-            }
-          }
-        }
+            }}
+          }}
+        }}
         """
         data = await self.execute(mutation, {"article": article_input})
         return data.get("articleCreate") or {}
@@ -601,27 +649,85 @@ class ShopifyGraphQLClient:
         article_gid: str,
         article_input: dict[str, Any],
     ) -> dict[str, Any]:
-        mutation = """
-        mutation ArticleUpdate($id: ID!, $article: ArticleUpdateInput!) {
-          articleUpdate(id: $id, article: $article) {
-            article {
+        mutation = f"""
+        mutation ArticleUpdate($id: ID!, $article: ArticleUpdateInput!) {{
+          articleUpdate(id: $id, article: $article) {{
+            article {{
               id
               handle
               title
               publishedAt
-            }
-            userErrors {
+              {_ARTICLE_METAFIELDS_SELECTION}
+            }}
+            userErrors {{
               field
               message
-            }
-          }
-        }
+            }}
+          }}
+        }}
         """
         data = await self.execute(
             mutation,
             {"id": article_gid, "article": article_input},
         )
         return data.get("articleUpdate") or {}
+
+    async def get_article_global_metafields(self, article_gid: str) -> dict[str, str | None]:
+        query = f"""
+        query ArticleGlobalMetafields($id: ID!) {{
+          article(id: $id) {{
+            id
+            {_ARTICLE_METAFIELDS_SELECTION}
+          }}
+        }}
+        """
+        data = await self.execute(query, {"id": article_gid})
+        article = (data.get("article") or {}) if isinstance(data, dict) else {}
+        return parse_article_global_seo_metafields(article)
+
+    async def sync_article_seo_metafields(
+        self,
+        article_gid: str,
+        metafields: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        from app.services.shopify.metafield_value_format import serialize_metafield_value
+
+        if not metafields:
+            return {"synced": True, "error": None, "userErrors": []}
+
+        inputs: list[dict[str, Any]] = []
+        for entry in metafields:
+            namespace = str(entry.get("namespace") or "").strip()
+            key = str(entry.get("key") or "").strip()
+            type_name = str(entry.get("type") or "").strip()
+            value = str(entry.get("value") or "")
+            if not namespace or not key or not type_name:
+                continue
+            try:
+                serialized = serialize_metafield_value(type_name, value)
+            except ValueError as exc:
+                return {"synced": False, "error": str(exc), "userErrors": []}
+            inputs.append(
+                {
+                    "ownerId": article_gid,
+                    "namespace": namespace,
+                    "key": key,
+                    "type": type_name,
+                    "value": serialized,
+                }
+            )
+
+        if not inputs:
+            return {"synced": False, "error": "Nessun metafield SEO valido.", "userErrors": []}
+
+        data = await self.metafields_set(inputs)
+        user_errors = (data.get("metafieldsSet") or {}).get("userErrors") or []
+        if user_errors:
+            msg = "; ".join(
+                str(err.get("message", "")) for err in user_errors if isinstance(err, dict)
+            )
+            return {"synced": False, "error": msg or "Errore metafieldsSet.", "userErrors": user_errors}
+        return {"synced": True, "error": None, "userErrors": []}
 
     async def find_article_by_handle(
         self,

@@ -29,8 +29,10 @@ import {
 import {
   buildPublishingPayloadFromArticle,
   isPublishingStale,
+  isPublishingSeoComplete,
   parseEditorialPublishingPayload,
   validatePublishingPayload,
+  validatePublishingPayloadWithWarnings,
 } from "./editorial-publishing-utils";
 import { getShopifyScopes } from "../../../lib/shopify-api";
 import { useShopifyStatus } from "../../../hooks/useShopify";
@@ -494,7 +496,10 @@ export function EditorialItemModal({
 
   async function handlePublishShopify(mode: "draft" | "publish_now") {
     if (!item || !publishing) return;
-    const errors = validatePublishingPayload(publishing, { forPublish: true });
+    const { errors, warnings: seoWarnings } = validatePublishingPayloadWithWarnings(
+      publishing,
+      { forPublish: true },
+    );
     if (errors.length > 0) {
       setError(errors.join(" "));
       return;
@@ -514,7 +519,11 @@ export function EditorialItemModal({
     }
 
     setError(null);
-    setWarning(null);
+    if (seoWarnings.length > 0) {
+      setWarning(seoWarnings.join(" "));
+    } else {
+      setWarning(null);
+    }
     setSuccess(null);
     try {
       if (publishingDirty) {
@@ -564,6 +573,7 @@ export function EditorialItemModal({
   const hasArticle = Boolean(article);
   const publishingStale =
     item.publishingIsStale ?? isPublishingStale(article, publishing);
+  const publishSeoIncomplete = !isPublishingSeoComplete(publishing);
   const hasShopifyLink = Boolean(item.shopifyArticleGid);
   const isPublishedOnShopify = item.publishStatus === "published";
   const canWriteContent = scopesData?.canWriteContent ?? false;
@@ -573,7 +583,8 @@ export function EditorialItemModal({
     scopesLoading ||
     publishShopifyMutation.isPending ||
     !publishing?.author.trim() ||
-    publishingStale;
+    publishingStale ||
+    publishSeoIncomplete;
 
   const footer =
     activeTab === "detail" ? (
@@ -993,6 +1004,7 @@ export function EditorialItemModal({
               publishingStale={publishingStale}
               staleDismissed={staleDismissed}
               publishBlockedByStale={publishingStale}
+              publishBlockedBySeo={publishSeoIncomplete}
               publishing={publishing}
               onChange={setPublishing}
               onSyncFromArticle={() => void handleSyncPublishingFromArticle()}

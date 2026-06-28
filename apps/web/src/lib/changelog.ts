@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.24-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Added Shopify article SEO metafields publishing",
+      "SEO title and meta description are now required before Shopify article publish",
+      "Removed invalid Article.seo GraphQL usage",
+      "Added SEO sync status for Shopify editorial publishing",
+    ],
+  },
+  {
     version: "0.5.21-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

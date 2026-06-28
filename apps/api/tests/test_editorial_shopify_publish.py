@@ -57,6 +57,47 @@ def _synced_article_and_publishing(*, blog_id: UUID | None = None) -> tuple[dict
     )
 
 
+def _article_node_with_seo_metafields(
+    *,
+    seo_title: str = "Olio EVO guida",
+    meta_description: str = "Meta desc",
+) -> dict:
+    return {
+        "id": "gid://shopify/Article/55",
+        "handle": "guida-olio-evo",
+        "title": "Guida olio EVO",
+        "metafields": {
+            "edges": [
+                {
+                    "node": {
+                        "namespace": "global",
+                        "key": "title_tag",
+                        "value": seo_title,
+                        "type": "single_line_text_field",
+                    }
+                },
+                {
+                    "node": {
+                        "namespace": "global",
+                        "key": "description_tag",
+                        "value": meta_description,
+                        "type": "multi_line_text_field",
+                    }
+                },
+            ]
+        },
+    }
+
+
+def _configure_mock_client_seo(mock_client: AsyncMock) -> None:
+    mock_client.sync_article_seo_metafields = AsyncMock(
+        return_value={"synced": True, "error": None, "userErrors": []}
+    )
+    mock_client.get_article_global_metafields = AsyncMock(
+        return_value={"title_tag": "Olio EVO guida", "description_tag": "Meta desc"}
+    )
+
+
 def _sample_row(*, publishing_payload: dict | None = None) -> SimpleNamespace:
     article_payload, default_publishing = _synced_article_and_publishing()
     return SimpleNamespace(
@@ -185,10 +226,12 @@ def test_publish_stale_payload_returns_409() -> None:
     asyncio.run(run())
 
 
-def test_publish_missing_write_content_returns_403() -> None:
+def test_publish_missing_seo_returns_422() -> None:
     project_id = uuid4()
     item_id = uuid4()
-    row = _sample_row()
+    _, publishing_payload = _synced_article_and_publishing()
+    publishing_payload = {**publishing_payload, "seoTitle": "", "metaDescription": ""}
+    row = _sample_row(publishing_payload=publishing_payload)
     store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
 
     async def run() -> None:
@@ -206,10 +249,7 @@ def test_publish_missing_write_content_returns_403() -> None:
                 with patch(
                     "app.services.content.editorial_shopify_publish_service.can_publish_with_write_content",
                     new_callable=AsyncMock,
-                    return_value={
-                        "allowed": False,
-                        "message": "Serve il permesso Shopify write_content. Riconnetti Shopify con gli scope aggiornati.",
-                    },
+                    return_value={"allowed": True},
                 ):
                     with pytest.raises(HTTPException) as exc:
                         await publish_editorial_to_shopify(
@@ -218,13 +258,13 @@ def test_publish_missing_write_content_returns_403() -> None:
                             item_id,
                             EditorialPublishShopifyRequest(mode="draft"),
                         )
-                    assert exc.value.status_code == 403
-                    assert "write_content" in str(exc.value.detail)
+                    assert exc.value.status_code == 422
+                    assert "SEO title e meta description" in str(exc.value.detail)
 
     asyncio.run(run())
 
 
-def test_publish_success_draft_sets_gid() -> None:
+def test_publish_missing_write_content_returns_403() -> None:
     project_id = uuid4()
     item_id = uuid4()
     blog_id = uuid4()
@@ -268,14 +308,11 @@ def test_publish_success_draft_sets_gid() -> None:
                     mock_client.find_article_by_handle = AsyncMock(return_value=None)
                     mock_client.create_article = AsyncMock(
                         return_value={
-                            "article": {
-                                "id": "gid://shopify/Article/55",
-                                "handle": "guida-olio-evo",
-                                "title": "Guida olio EVO",
-                            },
+                            "article": _article_node_with_seo_metafields(),
                             "userErrors": [],
                         }
                     )
+                    _configure_mock_client_seo(mock_client)
                     with patch(
                         "app.services.content.editorial_shopify_publish_service.get_shopify_client_for_store",
                         new_callable=AsyncMock,
@@ -363,15 +400,12 @@ def test_publish_update_when_gid_exists() -> None:
                         mock_client.find_article_by_handle = AsyncMock(return_value=None)
                         mock_client.update_article = AsyncMock(
                             return_value={
-                                "article": {
-                                    "id": "gid://shopify/Article/55",
-                                    "handle": "guida-olio-evo",
-                                    "title": "Guida olio EVO",
-                                },
+                                "article": _article_node_with_seo_metafields(),
                                 "userErrors": [],
                             }
                         )
                         mock_client.create_article = AsyncMock()
+                        _configure_mock_client_seo(mock_client)
                         with patch(
                             "app.services.content.editorial_shopify_publish_service.get_shopify_client_for_store",
                             new_callable=AsyncMock,
@@ -391,6 +425,7 @@ def test_publish_update_when_gid_exists() -> None:
                         mock_client.update_article.assert_awaited_once()
                         mock_client.create_article.assert_not_awaited()
                         assert row.shopify_article_gid == "gid://shopify/Article/55"
+                        assert row.publishing_payload.get("shopifySeoSynced") is True
 
     asyncio.run(run())
 

@@ -11,7 +11,10 @@ import { AutoResizeTextarea } from "../../ui/AutoResizeTextarea";
 import { EditorialArticlePreview } from "./EditorialArticlePreview";
 import {
   getPublishStatusLabel,
+  getPublishingSeoWarnings,
   inputToTags,
+  META_DESCRIPTION_MAX,
+  SEO_TITLE_MAX,
   tagsToInput,
 } from "./editorial-publishing-utils";
 
@@ -22,6 +25,7 @@ interface EditorialPublishingTabProps {
   publishingStale: boolean;
   staleDismissed: boolean;
   publishBlockedByStale?: boolean;
+  publishBlockedBySeo?: boolean;
   publishing: EditorialPublishingPayload;
   onChange: (value: EditorialPublishingPayload) => void;
   onSyncFromArticle: () => void;
@@ -43,6 +47,7 @@ export function EditorialPublishingTab({
   publishingStale,
   staleDismissed,
   publishBlockedByStale = false,
+  publishBlockedBySeo = false,
   publishing,
   onChange,
   onSyncFromArticle,
@@ -66,6 +71,9 @@ export function EditorialPublishingTab({
   const publishActionsDisabled = !readyToPublish || publishBlocked;
   const hasShopifyLink = Boolean(item.shopifyArticleGid);
   const shopifyActionVerb = hasShopifyLink ? "aggiornato" : "creato";
+  const seoTitleMissing = !publishing.seoTitle.trim();
+  const metaDescriptionMissing = !publishing.metaDescription.trim();
+  const seoWarnings = getPublishingSeoWarnings(publishing);
 
   function patch(partial: Partial<EditorialPublishingPayload>) {
     onChange({ ...publishing, ...partial });
@@ -117,6 +125,16 @@ export function EditorialPublishingTab({
 
       {item.lastPublishError && (
         <div className="gcr-alert gcr-alert--error">{item.lastPublishError}</div>
+      )}
+
+      {publishing.shopifySeoSynced === true && (
+        <div className="gcr-alert gcr-alert--success">SEO Shopify sincronizzata</div>
+      )}
+
+      {publishing.shopifySeoSynced === false && publishing.shopifySeoError && (
+        <div className="gcr-alert gcr-alert--warning">
+          Articolo creato, ma SEO non sincronizzata: {publishing.shopifySeoError}
+        </div>
       )}
 
       {publishingStale && !staleDismissed && (
@@ -250,21 +268,73 @@ export function EditorialPublishingTab({
 
       <section className="editorial-publishing-tab__section">
         <h4>SEO</h4>
-        <label className="gcr-field">
-          <span className="gcr-field__label">SEO title</span>
+        <p className="editorial-publishing-tab__field-hint">
+          Questi campi vengono inviati a Shopify come metafields SEO dell&apos;articolo.
+        </p>
+        <label
+          className={[
+            "gcr-field",
+            seoTitleMissing ? "editorial-publishing-tab__field--required" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <span className="gcr-field__label">
+            SEO title *{" "}
+            <span className="editorial-publishing-tab__char-count">
+              {publishing.seoTitle.length}/{SEO_TITLE_MAX}
+            </span>
+          </span>
           <input
             className="gcr-input"
             value={publishing.seoTitle}
             onChange={(e) => patch({ seoTitle: e.target.value })}
           />
         </label>
-        <AutoResizeTextarea
-          label="Meta description"
-          value={publishing.metaDescription}
-          onChange={(metaDescription) => patch({ metaDescription })}
-          minRows={2}
-          maxRows={5}
-        />
+        {publishing.seoTitle.length > SEO_TITLE_MAX && (
+          <p className="editorial-publishing-tab__field-warning">
+            SEO title oltre la lunghezza consigliata ({SEO_TITLE_MAX} caratteri).
+          </p>
+        )}
+        <div
+          className={[
+            "gcr-field",
+            metaDescriptionMissing ? "editorial-publishing-tab__field--required" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <span className="gcr-field__label">
+            Meta description *{" "}
+            <span className="editorial-publishing-tab__char-count">
+              {publishing.metaDescription.length}/{META_DESCRIPTION_MAX}
+            </span>
+          </span>
+          <AutoResizeTextarea
+            label=""
+            value={publishing.metaDescription}
+            onChange={(metaDescription) => patch({ metaDescription })}
+            minRows={2}
+            maxRows={5}
+          />
+        </div>
+        {publishing.metaDescription.length > META_DESCRIPTION_MAX && (
+          <p className="editorial-publishing-tab__field-warning">
+            Meta description oltre la lunghezza consigliata ({META_DESCRIPTION_MAX} caratteri).
+          </p>
+        )}
+        {seoWarnings.length > 0 && (
+          <div className="gcr-alert gcr-alert--warning editorial-publishing-tab__seo-warnings">
+            {seoWarnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </div>
+        )}
+        {publishBlockedBySeo && (
+          <p className="editorial-publishing-tab__field-hint editorial-publishing-tab__field-hint--error">
+            Compila SEO title e meta description per abilitare la pubblicazione su Shopify.
+          </p>
+        )}
       </section>
 
       <section className="editorial-publishing-tab__section">
@@ -345,7 +415,7 @@ export function EditorialPublishingTab({
               name={`publish-mode-${item.id}`}
               checked={publishing.mode === "publish_now"}
               onChange={() => handleModeChange("publish_now")}
-              disabled={publishActionsDisabled || publishBlockedByStale}
+              disabled={publishActionsDisabled || publishBlockedByStale || publishBlockedBySeo}
             />
             Pubblica subito
           </label>

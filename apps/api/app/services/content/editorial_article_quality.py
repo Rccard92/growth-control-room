@@ -215,6 +215,21 @@ def validate_editorial_article_quality(
     if _COLD_TITLE_PATTERNS.search(payload.title or ""):
         warnings.append("Titolo potenzialmente freddo/documentale — preferisci un titolo più editoriale.")
 
+    seo_title = (payload.seo_title or "").strip()
+    meta_description = (payload.meta_description or "").strip()
+    if not seo_title:
+        warnings.append("SEO title assente — obbligatorio per pubblicazione Shopify completa.")
+    elif len(seo_title) > 60:
+        warnings.append(f"SEO title lungo ({len(seo_title)} caratteri; consigliati max 60).")
+    if not meta_description:
+        warnings.append(
+            "Meta description assente — obbligatoria per pubblicazione Shopify completa."
+        )
+    elif len(meta_description) > 160:
+        warnings.append(
+            f"Meta description lunga ({len(meta_description)} caratteri; consigliati max 160)."
+        )
+
     safe_flags = scan_editorial_safe_claims(
         html,
         excerpt=payload.excerpt,

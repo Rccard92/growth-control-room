@@ -10,8 +10,10 @@ from app.services.content.editorial_publishing_utils import (
     DEFAULT_AUTHOR_FALLBACK,
     HANDLE_CONFLICT_MESSAGE,
     PUBLISHING_STALE_MESSAGE,
+    SEO_REQUIRED_MESSAGE,
     attach_publishing_sync_metadata,
     build_article_create_input,
+    build_article_seo_metafields,
     build_article_update_input,
     build_publishing_payload_from_article,
     compute_editorial_article_hash,
@@ -24,6 +26,7 @@ from app.services.content.editorial_publishing_utils import (
     resolve_publishing_author,
     shopify_publish_http_status,
     validate_publishing_payload,
+    validate_publishing_seo,
 )
 
 
@@ -255,3 +258,52 @@ def test_is_publishing_stale_false_without_payloads() -> None:
 
 def test_publishing_stale_message_constant() -> None:
     assert "pubblicazione" in PUBLISHING_STALE_MESSAGE.lower()
+
+
+def test_build_article_seo_metafields_global_keys() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    metafields = build_article_seo_metafields(payload)
+    assert len(metafields) == 2
+    keys = {entry["key"] for entry in metafields}
+    assert keys == {"title_tag", "description_tag"}
+    assert all(entry["namespace"] == "global" for entry in metafields)
+
+
+def test_build_article_create_input_has_metafields_not_seo() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    article_input = build_article_create_input(
+        payload,
+        blog_gid="gid://shopify/Blog/99",
+        mode="draft",
+    )
+    assert "seo" not in article_input
+    assert "metafields" in article_input
+    assert len(article_input["metafields"]) == 2
+
+
+def test_build_article_update_input_has_metafields_not_seo() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    update_input = build_article_update_input(payload, mode="draft")
+    assert "seo" not in update_input
+    assert "metafields" in update_input
+
+
+def test_validate_publishing_seo_requires_fields_for_publish() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    payload = payload.model_copy(update={"seo_title": "", "meta_description": ""})
+    errors, warnings = validate_publishing_seo(payload, for_publish=True)
+    assert SEO_REQUIRED_MESSAGE in errors
+    assert warnings == []
+
+
+def test_validate_publishing_seo_length_warnings_only() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    payload = payload.model_copy(
+        update={
+            "seo_title": "x" * 61,
+            "meta_description": "y" * 161,
+        }
+    )
+    errors, warnings = validate_publishing_seo(payload, for_publish=True)
+    assert errors == []
+    assert len(warnings) == 2

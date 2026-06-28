@@ -24,6 +24,16 @@ PUBLISHING_STALE_MESSAGE = (
     "I dati di pubblicazione non sono aggiornati rispetto all'articolo. "
     "Aggiorna i dati di pubblicazione prima di inviare a Shopify."
 )
+SEO_TITLE_RECOMMENDED_MAX = 60
+META_DESCRIPTION_RECOMMENDED_MAX = 160
+SEO_REQUIRED_MESSAGE = (
+    "SEO title e meta description sono obbligatori per pubblicare un articolo completo."
+)
+ARTICLE_SEO_METAFIELD_NAMESPACE = "global"
+ARTICLE_SEO_TITLE_KEY = "title_tag"
+ARTICLE_SEO_DESCRIPTION_KEY = "description_tag"
+ARTICLE_SEO_TITLE_TYPE = "single_line_text_field"
+ARTICLE_SEO_DESCRIPTION_TYPE = "multi_line_text_field"
 
 
 def _payload_is_present(payload: dict | EditorialArticlePayload | EditorialPublishingPayload | None) -> bool:
@@ -228,11 +238,17 @@ def normalize_publishing_payload(raw: dict[str, Any]) -> EditorialPublishingPayl
         ("sourceArticleHash", "source_article_hash"),
         ("sourceArticleUpdatedAt", "source_article_updated_at"),
         ("syncedFromArticleAt", "synced_from_article_at"),
+        ("shopifySeoSyncedAt", "shopify_seo_synced_at"),
+        ("shopifySeoError", "shopify_seo_error"),
     ):
         if alias in data and field not in data:
             data[field] = data.pop(alias)
         elif field in data and data[field] is not None:
             data[field] = str(data[field])
+    if "shopifySeoSynced" in data and "shopify_seo_synced" not in data:
+        data["shopify_seo_synced"] = data.pop("shopifySeoSynced")
+    elif "shopify_seo_synced" in data and data["shopify_seo_synced"] is not None:
+        data["shopify_seo_synced"] = bool(data["shopify_seo_synced"])
     mode = data.get("mode", "draft")
     if mode not in ("draft", "publish_now", "schedule"):
         data["mode"] = "draft"
@@ -338,6 +354,65 @@ def merge_article_into_publishing(
     return base.model_copy(update=updates)
 
 
+def build_article_seo_metafields(payload: EditorialPublishingPayload) -> list[dict[str, str]]:
+    """Build Shopify Article metafields for SEO title and meta description."""
+    metafields: list[dict[str, str]] = []
+    seo_title = payload.seo_title.strip()
+    meta_description = payload.meta_description.strip()
+    if seo_title:
+        metafields.append(
+            {
+                "namespace": ARTICLE_SEO_METAFIELD_NAMESPACE,
+                "key": ARTICLE_SEO_TITLE_KEY,
+                "type": ARTICLE_SEO_TITLE_TYPE,
+                "value": seo_title,
+            }
+        )
+    if meta_description:
+        metafields.append(
+            {
+                "namespace": ARTICLE_SEO_METAFIELD_NAMESPACE,
+                "key": ARTICLE_SEO_DESCRIPTION_KEY,
+                "type": ARTICLE_SEO_DESCRIPTION_TYPE,
+                "value": meta_description,
+            }
+        )
+    return metafields
+
+
+def validate_publishing_seo(
+    payload: EditorialPublishingPayload | dict[str, Any],
+    *,
+    for_publish: bool = False,
+) -> tuple[list[str], list[str]]:
+    normalized = (
+        normalize_publishing_payload(payload)
+        if isinstance(payload, dict)
+        else payload
+    )
+    errors: list[str] = []
+    warnings: list[str] = []
+    seo_title = normalized.seo_title.strip()
+    meta_description = normalized.meta_description.strip()
+
+    if for_publish:
+        if not seo_title or not meta_description:
+            errors.append(SEO_REQUIRED_MESSAGE)
+        if not normalized.handle.strip():
+            errors.append("Handle obbligatorio per pubblicare su Shopify.")
+
+    if seo_title and len(seo_title) > SEO_TITLE_RECOMMENDED_MAX:
+        warnings.append(
+            f"SEO title lungo ({len(seo_title)} caratteri; consigliati max {SEO_TITLE_RECOMMENDED_MAX})."
+        )
+    if meta_description and len(meta_description) > META_DESCRIPTION_RECOMMENDED_MAX:
+        warnings.append(
+            "Meta description lunga "
+            f"({len(meta_description)} caratteri; consigliati max {META_DESCRIPTION_RECOMMENDED_MAX})."
+        )
+    return errors, warnings
+
+
 def validate_publishing_payload(
     payload: EditorialPublishingPayload | dict[str, Any],
     *,
@@ -368,7 +443,43 @@ def validate_publishing_payload(
                 checked = checked.replace(tzinfo=UTC)
             if checked <= datetime.now(UTC):
                 errors.append("La data di pubblicazione programmata deve essere futura.")
+    seo_errors, _seo_warnings = validate_publishing_seo(normalized, for_publish=for_publish)
+    errors.extend(seo_errors)
     return errors
+
+
+def get_publishing_seo_warnings(
+    payload: EditorialPublishingPayload | dict[str, Any],
+) -> list[str]:
+    _, warnings = validate_publishing_seo(payload, for_publish=False)
+    return warnings
+
+
+def validate_publishing_payload_with_warnings(
+    payload: EditorialPublishingPayload | dict[str, Any],
+    *,
+    for_publish: bool = False,
+    scheduled_publish_at: datetime | None = None,
+) -> tuple[list[str], list[str]]:
+    errors = validate_publishing_payload(
+        payload,
+        for_publish=for_publish,
+        scheduled_publish_at=scheduled_publish_at,
+    )
+    _, seo_warnings = validate_publishing_seo(
+        normalize_publishing_payload(payload) if isinstance(payload, dict) else payload,
+        for_publish=for_publish,
+    )
+    return errors, seo_warnings
+
+
+def _attach_seo_metafields_to_input(
+    article_input: dict[str, Any],
+    payload: EditorialPublishingPayload,
+) -> None:
+    metafields = build_article_seo_metafields(payload)
+    if metafields:
+        article_input["metafields"] = metafields
 
 
 def build_article_create_input(
@@ -409,6 +520,7 @@ def build_article_create_input(
     else:
         article_input["isPublished"] = False
 
+    _attach_seo_metafields_to_input(article_input, payload)
     return article_input
 
 
@@ -448,6 +560,7 @@ def build_article_update_input(
     else:
         article_input["isPublished"] = False
 
+    _attach_seo_metafields_to_input(article_input, payload)
     return article_input
 
 

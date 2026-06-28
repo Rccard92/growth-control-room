@@ -747,7 +747,10 @@ export interface EditorialPublishingPayload {
   templateSuffix?: string | null;
   sourceArticleHash?: string | null;
   sourceArticleUpdatedAt?: string | null;
-  syncedFromArticleAt?: string | null;
+    syncedFromArticleAt?: string | null;
+  shopifySeoSynced?: boolean | null;
+  shopifySeoSyncedAt?: string | null;
+  shopifySeoError?: string | null;
 }
 
 export interface EditorialPublishingUpdateRequest {

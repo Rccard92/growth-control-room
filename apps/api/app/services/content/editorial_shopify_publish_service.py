@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -23,9 +24,11 @@ from app.services.content.editorial_publishing_utils import (
     HANDLE_CONFLICT_MESSAGE,
     attach_publishing_sync_metadata,
     build_article_create_input,
+    build_article_seo_metafields,
     build_article_update_input,
     build_publishing_payload_from_article,
     format_shopify_publish_error,
+    get_publishing_seo_warnings,
     is_publishing_stale,
     normalize_publishing_payload,
     PUBLISHING_STALE_MESSAGE,
@@ -34,7 +37,11 @@ from app.services.content.editorial_publishing_utils import (
     shopify_publish_http_status,
     validate_publishing_payload,
 )
-from app.services.shopify.client import ShopifyAPIError
+from app.services.shopify.client import (
+    ShopifyAPIError,
+    article_seo_metafields_match,
+    parse_article_global_seo_metafields,
+)
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
 from app.services.shopify.scopes import can_publish_with_write_content
 
@@ -56,6 +63,78 @@ def _article_author_name(article_payload: dict | None) -> str | None:
         return None
     raw = article_payload.get("authorName") or article_payload.get("author_name")
     return str(raw).strip() if raw else None
+
+
+def _user_errors_mention_metafields(user_errors: list[Any]) -> bool:
+    for err in user_errors:
+        if not isinstance(err, dict):
+            continue
+        fields = err.get("field") or []
+        field_text = " ".join(str(f) for f in fields).lower()
+        message = str(err.get("message", "")).lower()
+        if "metafield" in field_text or "metafield" in message:
+            return True
+    return False
+
+
+def _strip_metafields_from_input(article_input: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in article_input.items() if key != "metafields"}
+
+
+async def _ensure_shopify_seo_synced(
+    client: Any,
+    *,
+    article_gid: str,
+    article_node: dict[str, Any],
+    publishing: EditorialPublishingPayload,
+    warnings: list[str],
+) -> EditorialPublishingPayload:
+    expected_title = publishing.seo_title.strip()
+    expected_description = publishing.meta_description.strip()
+    metafields = build_article_seo_metafields(publishing)
+
+    parsed = parse_article_global_seo_metafields(article_node)
+    if not article_seo_metafields_match(
+        parsed,
+        expected_title=expected_title,
+        expected_description=expected_description,
+    ):
+        sync_result = await client.sync_article_seo_metafields(article_gid, metafields)
+        if sync_result.get("synced"):
+            parsed = await client.get_article_global_metafields(article_gid)
+        else:
+            error = str(sync_result.get("error") or "Errore sincronizzazione SEO Shopify.")
+            warnings.append(f"Articolo creato, ma SEO non sincronizzata: {error}")
+            return publishing.model_copy(
+                update={
+                    "shopify_seo_synced": False,
+                    "shopify_seo_synced_at": None,
+                    "shopify_seo_error": error,
+                }
+            )
+
+    if article_seo_metafields_match(
+        parsed,
+        expected_title=expected_title,
+        expected_description=expected_description,
+    ):
+        return publishing.model_copy(
+            update={
+                "shopify_seo_synced": True,
+                "shopify_seo_synced_at": datetime.now(UTC).isoformat(),
+                "shopify_seo_error": None,
+            }
+        )
+
+    error = "I metafields SEO non corrispondono ai valori attesi dopo la sincronizzazione."
+    warnings.append(f"Articolo creato, ma SEO non sincronizzata: {error}")
+    return publishing.model_copy(
+        update={
+            "shopify_seo_synced": False,
+            "shopify_seo_synced_at": None,
+            "shopify_seo_error": error,
+        }
+    )
 
 
 async def _mark_publish_error(
@@ -288,6 +367,8 @@ async def publish_editorial_to_shopify(
             detail="; ".join(errors),
         )
 
+    warnings.extend(get_publishing_seo_warnings(publishing))
+
     blog_gid, blog_row = await _resolve_blog_gid(session, store.id, publishing)
     existing_gid = (row.shopify_article_gid or "").strip()
 
@@ -312,6 +393,7 @@ async def publish_editorial_to_shopify(
         except ShopifyAPIError as exc:
             await _raise_shopify_publish_error(session, row, exc, request.mode)
         operation_label = "aggiornamento"
+        article_input_for_retry = update_input
     else:
         handle = publishing.handle.strip()
         if handle:
@@ -349,9 +431,23 @@ async def publish_editorial_to_shopify(
         except ShopifyAPIError as exc:
             await _raise_shopify_publish_error(session, row, exc, request.mode)
         operation_label = "creazione"
+        article_input_for_retry = create_input
 
     user_errors = result.get("userErrors") or []
-    if user_errors:
+    article_node = result.get("article") or {}
+    article_gid = article_node.get("id")
+
+    if not article_gid and user_errors and _user_errors_mention_metafields(user_errors):
+        retry_input = _strip_metafields_from_input(article_input_for_retry)
+        if existing_gid:
+            result = await client.update_article(existing_gid, retry_input)
+        else:
+            result = await client.create_article(retry_input)
+        user_errors = result.get("userErrors") or []
+        article_node = result.get("article") or {}
+        article_gid = article_node.get("id")
+
+    if user_errors and not article_gid:
         messages = "; ".join(
             err.get("message", str(err)) for err in user_errors if isinstance(err, dict)
         )
@@ -364,8 +460,13 @@ async def publish_editorial_to_shopify(
             detail=readable,
         )
 
-    article_node = result.get("article") or {}
-    article_gid = article_node.get("id")
+    if user_errors and article_gid:
+        logger.warning(
+            "Editorial publish: article %s created with userErrors: %s",
+            article_gid,
+            user_errors,
+        )
+
     if not article_gid:
         row.publish_status = "publish_error"
         row.last_publish_error = f"Shopify non ha restituito l'articolo dopo la {operation_label}."
@@ -374,6 +475,14 @@ async def publish_editorial_to_shopify(
             status.HTTP_502_BAD_GATEWAY,
             detail=row.last_publish_error,
         )
+
+    publishing = await _ensure_shopify_seo_synced(
+        client,
+        article_gid=article_gid,
+        article_node=article_node,
+        publishing=publishing,
+        warnings=warnings,
+    )
 
     _apply_publish_result_to_row(
         row,

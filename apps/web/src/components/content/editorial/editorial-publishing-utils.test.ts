@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { EditorialArticlePayload, EditorialPublishingPayload } from "@gcr/shared";
 import {
   buildArticleHashCanonical,
+  getPublishingSeoWarnings,
   isPublishingStale,
+  validatePublishingPayload,
 } from "./editorial-publishing-utils";
 
 const sampleArticle: EditorialArticlePayload = {
@@ -67,5 +69,29 @@ describe("editorial-publishing-utils sync", () => {
 
   it("non segnala stale senza publishing", () => {
     expect(isPublishingStale(sampleArticle, null)).toBe(false);
+  });
+
+  it("richiede SEO title e meta description per publish", () => {
+    const payload = {
+      ...samplePublishing,
+      title: "Guida miele",
+      bodyHtml: "<p>Test</p>",
+      author: "Redazione",
+      blogId: "blog-1",
+      handle: "guida-miele",
+      seoTitle: "",
+      metaDescription: "",
+    };
+    const errors = validatePublishingPayload(payload, { forPublish: true });
+    expect(errors.some((e) => e.includes("SEO title e meta description"))).toBe(true);
+  });
+
+  it("avvisa se SEO title oltre soglia", () => {
+    const warnings = getPublishingSeoWarnings({
+      ...samplePublishing,
+      seoTitle: "x".repeat(61),
+      metaDescription: "ok",
+    });
+    expect(warnings.length).toBeGreaterThan(0);
   });
 });

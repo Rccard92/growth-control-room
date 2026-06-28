@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.24-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added Shopify article SEO metafields publishing
+- SEO title and meta description are now required before Shopify article publish
+- Removed invalid Article.seo GraphQL usage
+- Added SEO sync status for Shopify editorial publishing
+
 ## [0.5.21-alpha] - 2026-06-13
 
 Tipo: Alpha patch

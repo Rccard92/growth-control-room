@@ -5,6 +5,10 @@ import type {
 } from "@gcr/shared";
 
 export const DEFAULT_AUTHOR_FALLBACK = "Redazione Solmielato";
+export const SEO_TITLE_MAX = 60;
+export const META_DESCRIPTION_MAX = 160;
+export const SEO_REQUIRED_MESSAGE =
+  "SEO title e meta description sono obbligatori per pubblicare un articolo completo.";
 
 export function emptyEditorialPublishingPayload(): EditorialPublishingPayload {
   return {
@@ -27,6 +31,9 @@ export function emptyEditorialPublishingPayload(): EditorialPublishingPayload {
     sourceArticleHash: null,
     sourceArticleUpdatedAt: null,
     syncedFromArticleAt: null,
+    shopifySeoSynced: null,
+    shopifySeoSyncedAt: null,
+    shopifySeoError: null,
   };
 }
 
@@ -97,6 +104,12 @@ export function parseEditorialPublishingPayload(
       ? String(raw.sourceArticleUpdatedAt)
       : null,
     syncedFromArticleAt: raw.syncedFromArticleAt ? String(raw.syncedFromArticleAt) : null,
+    shopifySeoSynced:
+      raw.shopifySeoSynced === undefined || raw.shopifySeoSynced === null
+        ? null
+        : Boolean(raw.shopifySeoSynced),
+    shopifySeoSyncedAt: raw.shopifySeoSyncedAt ? String(raw.shopifySeoSyncedAt) : null,
+    shopifySeoError: raw.shopifySeoError ? String(raw.shopifySeoError) : null,
   };
 }
 
@@ -176,6 +189,28 @@ export function buildPublishingPayloadFromArticle(
   };
 }
 
+export function getPublishingSeoWarnings(payload: EditorialPublishingPayload): string[] {
+  const warnings: string[] = [];
+  const seoTitle = payload.seoTitle.trim();
+  const metaDescription = payload.metaDescription.trim();
+  if (seoTitle.length > SEO_TITLE_MAX) {
+    warnings.push(
+      `SEO title lungo (${seoTitle.length} caratteri; consigliati max ${SEO_TITLE_MAX}).`,
+    );
+  }
+  if (metaDescription.length > META_DESCRIPTION_MAX) {
+    warnings.push(
+      `Meta description lunga (${metaDescription.length} caratteri; consigliati max ${META_DESCRIPTION_MAX}).`,
+    );
+  }
+  return warnings;
+}
+
+export function isPublishingSeoComplete(payload: EditorialPublishingPayload | null | undefined): boolean {
+  if (!payload) return false;
+  return Boolean(payload.seoTitle.trim() && payload.metaDescription.trim() && payload.handle.trim());
+}
+
 export function validatePublishingPayload(
   payload: EditorialPublishingPayload,
   options?: { forPublish?: boolean },
@@ -189,7 +224,25 @@ export function validatePublishingPayload(
   if (options?.forPublish && !payload.author.trim()) {
     errors.push("Autore obbligatorio per creare l'articolo su Shopify.");
   }
+  if (options?.forPublish) {
+    if (!payload.seoTitle.trim() || !payload.metaDescription.trim()) {
+      errors.push(SEO_REQUIRED_MESSAGE);
+    }
+    if (!payload.handle.trim()) {
+      errors.push("Handle obbligatorio per pubblicare su Shopify.");
+    }
+  }
   return errors;
+}
+
+export function validatePublishingPayloadWithWarnings(
+  payload: EditorialPublishingPayload,
+  options?: { forPublish?: boolean },
+): { errors: string[]; warnings: string[] } {
+  return {
+    errors: validatePublishingPayload(payload, options),
+    warnings: options?.forPublish ? getPublishingSeoWarnings(payload) : [],
+  };
 }
 
 export function tagsToInput(tags: string[]): string {

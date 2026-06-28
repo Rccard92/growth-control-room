@@ -56,4 +56,16 @@ describe("editorial-quality-utils", () => {
     expect(q.safeClaimFlags[0].phrase).toContain("benessere");
     expect(q.safeClaimFlags[0].severity).toBe("medium");
   });
+
+  it("riporta stato SEO title e meta description", () => {
+    const q = analyzeEditorialQuality({
+      ...sampleArticle,
+      seoTitle: "Guida miele artigianale",
+      metaDescription: "Scopri come scegliere il miele.",
+    });
+    expect(q.hasSeoTitle).toBe(true);
+    expect(q.hasMetaDescription).toBe(true);
+    expect(q.seoTitleInRange).toBe(true);
+    expect(q.metaDescriptionInRange).toBe(true);
+  });
 });
