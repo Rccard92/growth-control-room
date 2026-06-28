@@ -55,6 +55,10 @@ from app.services.content.editorial_structure_profiles import (
     resolve_structure_profile,
 )
 from app.services.content.editorial_structure_utils import count_h2_h3, trim_structure
+from app.services.content.editorial_link_context_service import (
+    build_editorial_link_context,
+    format_editorial_link_context_for_prompt,
+)
 from app.services.content.editorial_skill_loader import load_editorial_skill_context
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
@@ -219,6 +223,8 @@ REGOLE EDITORIALI (dal contesto EDITORIAL GUIDELINES — obbligatorie):
 - communityCtaSuggestion: CTA community morbida, distinta da recommendedCta (commerciale).
 - contentLengthProfile: breve|medio|approfondito coerente con guidelines e tipo contenuto.
 - editorialToneNotes: note operative sul tono per il redattore.
+- proposedTitle: titolo editoriale naturale e leggibile — NON freddo/documentale.
+- Evita titoli tipo "Una FAQ semplice", "Guida completa su…"; per FAQ/obiezione non forzare "FAQ" nel titolo.
 - Safe Claims restano prioritari assoluti.
 """
 
@@ -305,8 +311,14 @@ def _build_system_prompt(
     return base
 
 
-def _build_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> str:
+def _build_user_prompt(
+    item: ContentSeoEditorialItem,
+    type_instruction: str,
+    *,
+    link_context_block: str = "",
+) -> str:
     secondary = ", ".join(item.secondary_keywords or []) or "—"
+    link_section = f"\n{link_context_block}\n" if link_context_block else ""
     return (
         f"Genera un brief SEO per questo contenuto editoriale pianificato.\n\n"
         f"TIPO CONTENUTO: {item.content_type}\n"
@@ -318,14 +330,18 @@ def _build_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> 
         f"KEYWORD PRINCIPALE: {item.primary_keyword or '—'}\n"
         f"KEYWORD SECONDARIE: {secondary}\n"
         f"PRODOTTO COLLEGATO: {item.linked_shopify_product_title or '—'}\n"
-        f"NOTE EDITORIALI: {item.notes or '—'}\n\n"
+        f"HANDLE PRODOTTO: {item.linked_shopify_product_handle or '—'}\n"
+        f"NOTE EDITORIALI: {item.notes or '—'}\n"
+        f"{link_section}\n"
         "Il brief deve essere concreto e operativo per un redattore. "
+        "proposedTitle: titolo editoriale naturale (non documentale), keyword integrata con tono umano. "
         "In claimsToAvoid inserisci claim vietati dal contesto Safe Claims. "
         "In safeClaimsToUse inserisci solo claim esplicitamente consentiti. "
         "Decidi authorSuggestion in base al tipo contenuto e all'angolo: non forzare sempre una firma. "
         "Compila authorReason, contentLengthProfile, communityCtaSuggestion, editorialToneNotes, "
         "recommendedWordCountMin/Max, structureComplexity, maxH2, maxH3, avoidRepetitions, "
         "editorialSkillChecklist, suggestedHtmlBlocks, internalLinkingPlan e readabilityNotes. "
+        "internalLinkingPlan: usa solo path da LINK INTERNI VERIFICATI se presenti. "
         "Se mancano informazioni, segnalale in warnings.\n\n"
         f"Rispondi con JSON nel seguente schema:\n{_BRIEF_JSON_SCHEMA}"
     )
@@ -377,12 +393,16 @@ async def generate_editorial_brief_core(
     )
     skill = load_seo_skill_context()
     editorial_skill = load_editorial_skill_context()
+    link_targets = await build_editorial_link_context(session, project_id, item)
+    link_context_block = format_editorial_link_context_for_prompt(link_targets)
     system_prompt = _build_system_prompt(
         brand_ctx,
         skill.content_brief_rules,
         editorial_skill.as_brief_prompt_context(),
     )
-    user_prompt = _build_user_prompt(item, type_instruction)
+    user_prompt = _build_user_prompt(
+        item, type_instruction, link_context_block=link_context_block
+    )
 
     try:
         parsed = await generate_structured_json(

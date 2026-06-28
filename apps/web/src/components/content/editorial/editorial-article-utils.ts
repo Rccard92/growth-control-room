@@ -11,6 +11,7 @@ export function emptyEditorialArticlePayload(): EditorialArticlePayload {
     metaDescription: "",
     tags: [],
     linkedProducts: [],
+    linkedCollections: [],
     cta: "",
     authorName: "",
     authorRole: "",
@@ -60,6 +61,7 @@ export function parseEditorialArticlePayload(
     metaDescription: String(raw.metaDescription ?? ""),
     tags: coerceStringList(raw.tags),
     linkedProducts: coerceStringList(raw.linkedProducts),
+    linkedCollections: coerceStringList(raw.linkedCollections),
     cta: String(raw.cta ?? ""),
     authorName: String(raw.authorName ?? ""),
     authorRole: String(raw.authorRole ?? ""),
@@ -81,6 +83,19 @@ export function parseEditorialArticlePayload(
     htmlBlocksUsed: coerceStringList(raw.htmlBlocksUsed),
     skillPackUsed: String(raw.skillPackUsed ?? ""),
     skillPackVersion: String(raw.skillPackVersion ?? ""),
+    safeClaimFlags: Array.isArray(raw.safeClaimFlags)
+      ? raw.safeClaimFlags
+          .filter((f): f is Record<string, unknown> => Boolean(f) && typeof f === "object")
+          .map((f) => ({
+            severity: (f.severity === "low" || f.severity === "high" ? f.severity : "medium") as
+              | "low"
+              | "medium"
+              | "high",
+            phrase: String(f.phrase ?? ""),
+            reason: String(f.reason ?? ""),
+            suggestion: String(f.suggestion ?? ""),
+          }))
+      : [],
   };
 }
 

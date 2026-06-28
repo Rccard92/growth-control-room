@@ -671,6 +671,13 @@ export interface EditorialBriefUpdateRequest {
   status?: EditorialBriefUpdateStatus;
 }
 
+export interface EditorialSafeClaimFlag {
+  severity: "low" | "medium" | "high";
+  phrase: string;
+  reason: string;
+  suggestion: string;
+}
+
 export interface EditorialArticlePayload {
   title: string;
   handle: string;
@@ -681,6 +688,7 @@ export interface EditorialArticlePayload {
   metaDescription: string;
   tags: string[];
   linkedProducts: string[];
+  linkedCollections?: string[];
   cta: string;
   authorName?: string;
   authorRole?: string;
@@ -697,6 +705,7 @@ export interface EditorialArticlePayload {
   htmlBlocksUsed?: string[];
   skillPackUsed?: string;
   skillPackVersion?: string;
+  safeClaimFlags?: EditorialSafeClaimFlag[];
   aiGeneration?: EditorialAiGenerationSnapshot;
 }
 

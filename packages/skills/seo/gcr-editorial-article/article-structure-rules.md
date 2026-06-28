@@ -51,3 +51,22 @@
 
 - Rispetta `maxH2`, `maxH3`, `recommendedWordCountMin/Max` del brief.
 - Se la struttura del brief è eccessiva, accorpa sezioni simili mantenendo valore per il lettore.
+
+## Titoli editoriali (proposedTitle / title)
+
+- Evita titoli freddi o documentali: "Una FAQ semplice", "Guida completa su…", "Tutto quello che devi sapere".
+- Usa titoli **naturali e leggibili**, con keyword integrata senza tono enciclopedico.
+- Per contenuti FAQ/obiezione: **non** inserire la parola "FAQ" nel titolo se non necessario.
+- Preferisci domande o promesse concrete al lettore.
+
+### Esempi corretti
+
+- "Perché il miele cristallizza? Quando è normale e cosa osservare"
+- "Miele cristallizzato: quando è normale e come capirlo senza errori"
+- "Come capire se un miele è buono senza fermarsi al colore"
+
+### Esempi da evitare
+
+- "Una FAQ semplice sul miele cristallizzato"
+- "Guida enciclopedica alla qualità del miele"
+- "Articolo informativo su miele e cristallizzazione"

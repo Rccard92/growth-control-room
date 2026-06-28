@@ -1998,6 +1998,44 @@
   color: var(--gcr-text-muted);
 }
 
+.editorial-quality-panel__safe-claims {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.editorial-quality-panel__safe-claims ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--gcr-accent-amber, #f59e0b);
+}
+
+.editorial-article-preview__body .gcr-article-body {
+  line-height: 1.65;
+}
+
+.editorial-article-preview__body .gcr-article-body p {
+  margin: 0 0 1rem;
+}
+
+.editorial-article-preview__body .gcr-article-body h2 {
+  margin: 2rem 0 0.75rem;
+  line-height: 1.3;
+}
+
+.editorial-article-preview__body .gcr-article-body ul,
+.editorial-article-preview__body .gcr-article-body ol {
+  margin: 0 0 1.25rem;
+  padding-left: 1.25rem;
+}
+
+.editorial-article-preview__body .gcr-article-body li {
+  margin-bottom: 0.35rem;
+}
+
+.editorial-article-preview__body .gcr-article-body strong {
+  font-weight: 600;
+}
+
 .editorial-article-preview__cta {
   margin: 1.5rem 0 0;
   padding: 0.75rem 1rem;

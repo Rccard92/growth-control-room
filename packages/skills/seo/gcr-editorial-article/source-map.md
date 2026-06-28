@@ -20,4 +20,5 @@
 
 ## Versione
 
+- **v1.1** — 2026-06-13 — raffinamento post-test Shopify (grassetti 6–9, gcr-article-body, link verificati, CTA strutturata, Safe Claims precisi)
 - **v1** — 2026-06-13 — prima release Editorial Article Skill Pack

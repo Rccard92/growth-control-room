@@ -11,7 +11,12 @@ _ALLOWED_TAGS = frozenset(
 )
 _ALLOWED_LINK_ATTRS = frozenset({"href", "title", "rel"})
 _ALLOWED_DIV_CLASSES = frozenset(
-    {"gcr-article-note", "gcr-product-tip", "gcr-article-cta"}
+    {
+        "gcr-article-body",
+        "gcr-article-note",
+        "gcr-product-tip",
+        "gcr-article-cta",
+    }
 )
 _STRIP_TAGS = frozenset({"script", "style", "iframe", "object", "embed"})
 

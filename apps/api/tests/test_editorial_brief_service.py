@@ -209,6 +209,7 @@ def test_generate_editorial_brief_success() -> None:
         secondary_keywords=["evo"],
         linked_shopify_product_id=None,
         linked_shopify_product_title=None,
+        linked_shopify_product_handle=None,
         notes=None,
         brief_payload=None,
         status="idea",
@@ -262,6 +263,10 @@ def test_generate_editorial_brief_success() -> None:
                 new=AsyncMock(return_value=None),
             ),
             patch(
+                "app.services.content.editorial_brief_service.build_editorial_link_context",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
                 "app.services.content.editorial_brief_service.generate_structured_json",
                 new=AsyncMock(return_value=_sample_ai_brief()),
             ),
@@ -299,6 +304,7 @@ def test_generate_editorial_brief_ai_failure_no_commit() -> None:
         secondary_keywords=None,
         linked_shopify_product_id=None,
         linked_shopify_product_title=None,
+        linked_shopify_product_handle=None,
         notes=None,
         brief_payload={"existing": True},
         status="idea",
@@ -339,6 +345,10 @@ def test_generate_editorial_brief_ai_failure_no_commit() -> None:
             patch(
                 "app.services.content.editorial_brief_service.load_seo_skill_context",
                 return_value=SimpleNamespace(content_brief_rules="RULES"),
+            ),
+            patch(
+                "app.services.content.editorial_brief_service.build_editorial_link_context",
+                new=AsyncMock(return_value=[]),
             ),
             patch(
                 "app.services.content.editorial_brief_service.generate_structured_json",

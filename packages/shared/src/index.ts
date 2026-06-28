@@ -170,6 +170,7 @@ export type {
   EditorialBriefUpdateRequest,
   EditorialBriefUpdateStatus,
   EditorialArticlePayload,
+  EditorialSafeClaimFlag,
   EditorialArticleUpdateRequest,
   ArticleUpdateStatus,
   EditorialPublishMode,

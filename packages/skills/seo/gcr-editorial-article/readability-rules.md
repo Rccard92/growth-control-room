@@ -14,13 +14,17 @@
 
 ## Grassetto strategico
 
-- Usa `<strong>` su **frasi chiave**, non su interi paragrafi.
-- Target: **5–10 elementi strong** per articolo (minimo 4, massimo 12).
+- Usa `<strong>` su **concetti chiave brevi**, non su interi paragrafi.
+- Target: **6–9 elementi `<strong>`** per articolo.
+- Warning se superi 10; hard warning se superi 12.
+- **Massimo 1 `<strong>` per paragrafo** `<p>`.
+- **Non** mettere in grassetto frasi troppo lunghe (max ~8 parole dentro `<strong>`).
 - Evidenzia concetti tipo:
   - "la cristallizzazione è naturale"
   - "non indica da sola un difetto"
-  - "la consistenza non basta per giudicare la qualità"
-- NON usare grassetto eccessivo — max 1–2 strong per sezione H2.
+  - "la consistenza non basta"
+  - "filiera chiara e controllata"
+- NON usare grassetto eccessivo — preferire poche evidenze mirate.
 
 ## Box informativi
 
@@ -40,7 +44,7 @@
 
 - Paragrafi brevi e scansionabili
 - Almeno 1 lista puntata
-- Grassetti strategici (non eccessivi)
+- Grassetti strategici: 6–9, max 1 per paragrafo
 - Almeno 1 box note/tip se coerente
-- CTA finale presente
+- CTA finale in box `gcr-article-cta` quando possibile
 - Nessuna doppia introduzione

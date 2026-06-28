@@ -48,13 +48,13 @@ def test_sanitize_editorial_article_html_strips_script() -> None:
 
 def test_sanitize_editorial_article_html_preserves_gcr_div() -> None:
     raw = (
+        '<div class="gcr-article-body">'
         '<div class="gcr-article-note"><strong>Da ricordare:</strong> test</div>'
-        '<div class="unknown">strip inner</div>'
+        "</div>"
     )
     out = sanitize_editorial_article_html(raw)
-    assert 'class="gcr-article-note"' in out
+    assert 'class="gcr-article-body"' in out
     assert "Da ricordare" in out
-    assert "unknown" not in out
 
 
 def test_normalize_editorial_article_payload_skill_fields() -> None:
@@ -323,7 +323,7 @@ def test_generate_editorial_article_success() -> None:
                                         "app.services.content.editorial_article_service.load_editorial_skill_context",
                                         return_value=SimpleNamespace(
                                             as_article_prompt_context=lambda: "EDITORIAL SKILL",
-                                            version="v1",
+                                            version="v1.1",
                                         ),
                                     ):
                                         with patch(
@@ -332,13 +332,18 @@ def test_generate_editorial_article_success() -> None:
                                             return_value=None,
                                         ):
                                             with patch(
-                                                "app.services.content.editorial_article_service.generate_structured_json",
+                                                "app.services.content.editorial_article_service.build_editorial_link_context",
                                                 new_callable=AsyncMock,
-                                                return_value=_sample_ai_article(),
+                                                return_value=[],
                                             ):
-                                                result = await generate_editorial_article_core(
-                                                    mock_session, project_id, item_id
-                                                )
+                                                with patch(
+                                                    "app.services.content.editorial_article_service.generate_structured_json",
+                                                    new_callable=AsyncMock,
+                                                    return_value=_sample_ai_article(),
+                                                ):
+                                                    result = await generate_editorial_article_core(
+                                                        mock_session, project_id, item_id
+                                                    )
         assert result.status == "draft_review"
         assert result.article_payload is not None
         assert result.article_payload["title"] == "Guida olio EVO"

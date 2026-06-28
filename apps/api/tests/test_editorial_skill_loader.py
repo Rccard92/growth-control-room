@@ -22,7 +22,7 @@ def test_load_editorial_skill_context_all_fields() -> None:
     assert ctx.internal_linking_rules
     assert ctx.faq_format_rules
     assert ctx.source_map
-    assert ctx.version == "v1"
+    assert ctx.version == "v1.1"
     assert ctx.loaded_from_files is True
 
 

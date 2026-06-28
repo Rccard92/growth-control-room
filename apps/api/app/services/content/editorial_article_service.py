@@ -19,6 +19,7 @@ from app.schemas.content_seo_editorial import (
     EditorialAiGenerationSnapshot,
     EditorialArticlePayload,
     EditorialArticleUpdateRequest,
+    EditorialSafeClaimFlag,
     normalize_editorial_article_payload,
     normalize_editorial_brief_payload,
 )
@@ -52,10 +53,18 @@ from app.services.content.editorial_ai_usage_service import (
     build_ai_generation_snapshot_from_log,
     fetch_latest_editorial_ai_log,
 )
-from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
+from app.services.content.editorial_article_postprocess import (
+    postprocess_editorial_article_html,
+    wrap_editorial_article_body,
+)
 from app.services.content.editorial_article_quality import (
     extract_readability_checklist,
     validate_editorial_article_quality,
+)
+from app.services.content.editorial_link_context_service import (
+    build_editorial_link_context,
+    format_editorial_link_context_for_prompt,
+    split_link_targets_by_type,
 )
 from app.services.content.editorial_skill_loader import (
     EDITORIAL_SKILL_NAME,
@@ -91,6 +100,7 @@ _ARTICLE_JSON_SCHEMA = """{
   "metaDescription": "string",
   "tags": ["string"],
   "linkedProducts": ["string"],
+  "linkedCollections": ["string"],
   "cta": "string",
   "authorName": "string",
   "authorRole": "string",
@@ -101,7 +111,8 @@ _ARTICLE_JSON_SCHEMA = """{
   "internalLinkSuggestions": ["string"],
   "htmlBlocksUsed": ["string"],
   "skillPackUsed": "gcr-editorial-article",
-  "skillPackVersion": "v1",
+  "skillPackVersion": "v1.1",
+  "safeClaimFlags": [{"severity": "low|medium|high", "phrase": "string", "reason": "string", "suggestion": "string"}],
   "warnings": ["string"]
 }"""
 
@@ -270,9 +281,12 @@ def _build_article_system_prompt(
         "non promettere cure o guarigioni, non attaccare competitor, non divulgare process secrets. "
         "Usa il tono del brand dal contesto. "
         "bodyHtml deve usare tag sicuri: h2, h3, p, ul, ol, li, strong, em, a, blockquote, "
-        "div con classi gcr-article-note, gcr-product-tip, gcr-article-cta. "
-        "Paragrafi brevi (2-4 righe), almeno 1 lista puntata, 5-10 grassetti strategici, "
-        "almeno 1 box Da ricordare o Consiglio Solmielato quando coerente. "
+        "div con classi gcr-article-body (wrapper obbligatorio), gcr-article-note, gcr-product-tip, gcr-article-cta. "
+        "Tutto il contenuto dentro un unico <div class=\"gcr-article-body\">. "
+        "Paragrafi brevi (2-4 righe), almeno 1 lista puntata, 6-9 grassetti strategici (max 1 per paragrafo, frasi brevi), "
+        "almeno 1 box Da ricordare o Consiglio Solmielato, CTA finale in box gcr-article-cta. "
+        "title e seoTitle: titoli editoriali naturali — NON freddi/documentali, no 'FAQ semplice'. "
+        "Max 1-3 link interni solo da LINK INTERNI VERIFICATI. "
         "Nessuno script, iframe o style inline. "
         "Segui la struttura H2/H3 del brief rispettando maxH2 e maxH3. "
         "Segui suggestedHtmlBlocks e internalLinkingPlan del brief. "
@@ -290,15 +304,14 @@ def _build_article_system_prompt(
     return base
 
 
-def _build_article_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> str:
+def _build_article_user_prompt(
+    item: ContentSeoEditorialItem,
+    type_instruction: str,
+    *,
+    link_context_block: str = "",
+) -> str:
     brief_json = json.dumps(item.brief_payload or {}, ensure_ascii=False, indent=2)
-    product_handle = getattr(item, "linked_shopify_product_handle", None) or ""
-    handle_note = (
-        f"HANDLE PRODOTTO COLLEGATO: {product_handle}\n"
-        f"Puoi usare <a href=\"/products/{product_handle}\"> solo se handle reale.\n"
-        if product_handle.strip()
-        else "HANDLE PRODOTTO: non disponibile — NON inventare link /products/ nel bodyHtml.\n"
-    )
+    link_section = f"\n{link_context_block}\n" if link_context_block else ""
     return (
         f"Genera l'articolo completo per questo contenuto editoriale.\n\n"
         f"TIPO CONTENUTO: {item.content_type}\n"
@@ -306,7 +319,8 @@ def _build_article_user_prompt(item: ContentSeoEditorialItem, type_instruction: 
         f"TITOLO PIANIFICATO: {item.title}\n"
         f"DATA PIANIFICATA: {item.planned_date}\n"
         f"PRODOTTO COLLEGATO: {item.linked_shopify_product_title or '—'}\n"
-        f"{handle_note}\n"
+        f"HANDLE PRODOTTO: {getattr(item, 'linked_shopify_product_handle', None) or '—'}\n"
+        f"{link_section}\n"
         f"BRIEF SEO APPROVATO (fonte principale — segui struttura, keyword, claim, FAQ, CTA):\n"
         f"{brief_json}\n\n"
         "FIRMA E TONO (dal brief):\n"
@@ -315,11 +329,13 @@ def _build_article_user_prompt(item: ContentSeoEditorialItem, type_instruction: 
         "- Usa authorReason, editorialToneNotes, contentLengthProfile, communityCtaSuggestion del brief.\n"
         "- Rispetta recommendedWordCountMin/Max, maxH2, maxH3, structureComplexity e avoidRepetitions.\n"
         "- Segui editorialSkillChecklist, suggestedHtmlBlocks, internalLinkingPlan, readabilityNotes.\n"
-        "- Link interni nel bodyHtml SOLO con URL/handle reali; altrimenti internalLinkSuggestions.\n"
+        "- Link interni nel bodyHtml SOLO path da LINK INTERNI VERIFICATI (max 1-3); altrimenti internalLinkSuggestions.\n"
         "- Non inserire la firma nel bodyHtml.\n\n"
-        "bodyHtml deve essere HTML pulito pronto per anteprima e pubblicazione Shopify. "
-        "handle: slug URL-friendly in minuscolo con trattini. "
-        "excerpt: 1-2 frasi introduttive. "
+        "bodyHtml: wrappa tutto in <div class=\"gcr-article-body\">; CTA finale in <div class=\"gcr-article-cta\"> "
+        "con strong + p + a (se path verificato disponibile). "
+        "handle: slug URL-friendly. excerpt: 1-2 frasi. "
+        "title/seoTitle: editoriali e naturali, non documentali. "
+        "linkedProducts e linkedCollections: titoli verificati linkati. "
         "Compila readabilityChecklist, neuromarketingElements, htmlBlocksUsed. "
         "skillPackUsed: gcr-editorial-article. "
         "Se mancano informazioni, segnalale in warnings.\n\n"
@@ -386,13 +402,20 @@ async def generate_editorial_article_core(
     )
     skill = load_seo_skill_context()
     editorial_skill = load_editorial_skill_context()
+    brief_norm = normalize_editorial_brief_payload(item.brief_payload or {})
+    link_targets = await build_editorial_link_context(
+        session, project_id, item, brief_norm
+    )
+    link_context_block = format_editorial_link_context_for_prompt(link_targets)
     system_prompt = _build_article_system_prompt(
         brand_ctx,
         skill.brand_guardrails,
         editorial_skill.as_article_prompt_context(),
         default_article_length=default_length,
     )
-    user_prompt = _build_article_user_prompt(item, type_instruction)
+    user_prompt = _build_article_user_prompt(
+        item, type_instruction, link_context_block=link_context_block
+    )
 
     try:
         parsed = await generate_structured_json(
@@ -415,16 +438,16 @@ async def generate_editorial_article_core(
             ),
         )
         payload = normalize_editorial_article_payload(parsed)
-        brief_norm = normalize_editorial_brief_payload(item.brief_payload or {})
         processed_html, post_warnings = postprocess_editorial_article_html(
             payload.body_html,
             payload.excerpt,
             brief_norm,
         )
-        if processed_html != payload.body_html or post_warnings:
+        wrapped_html = wrap_editorial_article_body(processed_html)
+        if wrapped_html != payload.body_html or post_warnings:
             payload = payload.model_copy(
                 update={
-                    "body_html": processed_html,
+                    "body_html": wrapped_html,
                     "warnings": list(dict.fromkeys([*payload.warnings, *post_warnings])),
                 }
             )
@@ -440,19 +463,29 @@ async def generate_editorial_article_core(
             payload,
             default_length=enrich_default or None,
         )
-        quality_warnings, quality_metrics = validate_editorial_article_quality(
+        quality_warnings, quality_metrics, safe_flags = validate_editorial_article_quality(
             payload.body_html,
             payload,
             brief_norm,
             item.content_type,
+            safe_claims=bundle.safe_claims,
+            has_verified_link_targets=bool(link_targets),
         )
         readability_checklist = extract_readability_checklist(quality_metrics)
         html_blocks = list(quality_metrics.html_blocks_used) or payload.html_blocks_used
+        linked_products, linked_collections = split_link_targets_by_type(link_targets)
+        linked_products_final = payload.linked_products or linked_products
+        linked_collections_final = payload.linked_collections or linked_collections
         payload = payload.model_copy(
             update={
                 "warnings": list(dict.fromkeys([*payload.warnings, *quality_warnings])),
                 "readability_checklist": readability_checklist or payload.readability_checklist,
                 "html_blocks_used": html_blocks,
+                "linked_products": linked_products_final,
+                "linked_collections": linked_collections_final,
+                "safe_claim_flags": [
+                    EditorialSafeClaimFlag.model_validate(f.to_dict()) for f in safe_flags
+                ],
                 "skill_pack_used": payload.skill_pack_used or EDITORIAL_SKILL_NAME,
                 "skill_pack_version": payload.skill_pack_version or editorial_skill.version,
             }

@@ -14,6 +14,7 @@ const ALLOWED_TAGS = new Set([
 
 const ALLOWED_LINK_ATTRS = new Set(["href", "title", "rel"]);
 const ALLOWED_DIV_CLASSES = new Set([
+  "gcr-article-body",
   "gcr-article-note",
   "gcr-product-tip",
   "gcr-article-cta",

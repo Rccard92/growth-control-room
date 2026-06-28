@@ -116,3 +116,19 @@ def postprocess_editorial_article_html(
         warnings.append(f"Sezione FAQ ampia ({faq_count} elementi) — verifica compattezza")
 
     return html.strip(), list(dict.fromkeys(warnings))
+
+
+_BODY_WRAPPER_RE = re.compile(
+    r'<div\s+class="gcr-article-body"[^>]*>',
+    re.IGNORECASE,
+)
+
+
+def wrap_editorial_article_body(html: str) -> str:
+    """Wrap article HTML in gcr-article-body if not already wrapped."""
+    cleaned = (html or "").strip()
+    if not cleaned:
+        return '<div class="gcr-article-body"></div>'
+    if _BODY_WRAPPER_RE.search(cleaned):
+        return cleaned
+    return f'<div class="gcr-article-body">{cleaned}</div>'

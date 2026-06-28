@@ -1,19 +1,24 @@
-import type { EditorialArticlePayload } from "@gcr/shared";
+import type { EditorialArticlePayload, EditorialSafeClaimFlag } from "@gcr/shared";
 
 export interface EditorialQualityAnalysis {
   skillPackUsed: string;
   skillPackVersion: string;
   strongCount: number;
+  strongInRange: boolean;
   listCount: number;
   boxCount: number;
   hasCta: boolean;
+  hasCtaBox: boolean;
+  hasBodyWrapper: boolean;
   hasLongParagraphs: boolean;
+  safeClaimFlags: EditorialSafeClaimFlag[];
   warnings: string[];
 }
 
 const STRONG_RE = /<strong\b[^>]*>/gi;
 const LIST_RE = /<(?:ul|ol)\b[^>]*>/gi;
 const BOX_RE = /<div\s+class="(gcr-article-note|gcr-product-tip|gcr-article-cta)"/gi;
+const BODY_WRAPPER_RE = /<div\s+class="gcr-article-body"/i;
 const P_RE = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
 const STRIP_HTML = /<[^>]+>/g;
 
@@ -30,6 +35,8 @@ export function analyzeEditorialQuality(
   const strongCount = (html.match(STRONG_RE) ?? []).length;
   const listCount = (html.match(LIST_RE) ?? []).length;
   const boxCount = (html.match(BOX_RE) ?? []).length;
+  const hasBodyWrapper = BODY_WRAPPER_RE.test(html);
+  const hasCtaBox = /class="gcr-article-cta"/i.test(html);
 
   let hasLongParagraphs = false;
   for (const match of html.matchAll(P_RE)) {
@@ -45,10 +52,14 @@ export function analyzeEditorialQuality(
     skillPackUsed: article.skillPackUsed?.trim() || "—",
     skillPackVersion: article.skillPackVersion?.trim() || "—",
     strongCount,
+    strongInRange: strongCount >= 6 && strongCount <= 9,
     listCount,
     boxCount,
     hasCta,
+    hasCtaBox,
+    hasBodyWrapper,
     hasLongParagraphs,
+    safeClaimFlags: article.safeClaimFlags ?? [],
     warnings: article.warnings ?? [],
   };
 }

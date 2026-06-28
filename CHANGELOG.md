@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.19-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Refined editorial article skill after Shopify preview test
+- Reduced excessive bold usage (target 6–9 strong tags)
+- Added GCR article body wrapper for Shopify typography
+- Improved internal linking with verified handles
+- Improved Safe Claims warnings with exact phrase feedback
+
 ## [0.5.18-alpha] - 2026-06-13
 
 Tipo: Alpha patch

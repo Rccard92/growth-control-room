@@ -1,6 +1,6 @@
 ---
 name: gcr-editorial-article
-version: "v1"
+version: "v1.1"
 description: >
   Growth Control Room editorial article skill pack.
   Readability, neuromarketing, Shopify HTML formatting and structure rules for blog articles.

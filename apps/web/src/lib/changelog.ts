@@ -9,6 +9,18 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.19-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Refined editorial article skill after Shopify preview test",
+      "Reduced excessive bold usage",
+      "Added GCR article body wrapper for Shopify typography",
+      "Improved internal linking with verified handles",
+      "Improved Safe Claims warnings with exact phrase feedback",
+    ],
+  },
+  {
     version: "0.5.18-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

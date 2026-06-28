@@ -571,6 +571,17 @@ class EditorialBriefUpdateRequest(BaseModel):
 
 ArticleUpdateStatus = Literal["draft_pending", "draft_review", "ready_to_publish"]
 
+SafeClaimSeverity = Literal["low", "medium", "high"]
+
+
+class EditorialSafeClaimFlag(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    severity: SafeClaimSeverity = "medium"
+    phrase: str = ""
+    reason: str = ""
+    suggestion: str = ""
+
 
 class EditorialArticlePayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -585,6 +596,9 @@ class EditorialArticlePayload(BaseModel):
     tags: list[str] = Field(default_factory=list)
     linked_products: list[str] = Field(
         default_factory=list, serialization_alias="linkedProducts"
+    )
+    linked_collections: list[str] = Field(
+        default_factory=list, serialization_alias="linkedCollections"
     )
     cta: str = ""
     author_name: str = Field(default="", serialization_alias="authorName")
@@ -616,6 +630,9 @@ class EditorialArticlePayload(BaseModel):
     )
     skill_pack_used: str = Field(default="", serialization_alias="skillPackUsed")
     skill_pack_version: str = Field(default="", serialization_alias="skillPackVersion")
+    safe_claim_flags: list[EditorialSafeClaimFlag] = Field(
+        default_factory=list, serialization_alias="safeClaimFlags"
+    )
     ai_generation: EditorialAiGenerationSnapshot | None = Field(
         default=None, serialization_alias="aiGeneration"
     )
@@ -629,6 +646,7 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
     list_fields = {
         "tags": "tags",
         "linkedProducts": "linked_products",
+        "linkedCollections": "linked_collections",
         "warnings": "warnings",
         "brandContextUsed": "brand_context_used",
         "readabilityChecklist": "readability_checklist",
@@ -675,6 +693,15 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
     profile = data.get("content_length_profile")
     if profile not in (None, "breve", "medio", "approfondito"):
         data["content_length_profile"] = None
+    if "safeClaimFlags" in data and "safe_claim_flags" not in data:
+        raw_flags = data.pop("safeClaimFlags")
+        if isinstance(raw_flags, list):
+            data["safe_claim_flags"] = [
+                EditorialSafeClaimFlag.model_validate(f) if isinstance(f, dict) else f
+                for f in raw_flags
+            ]
+        else:
+            data["safe_claim_flags"] = []
     data.setdefault("status", "draft")
     payload = EditorialArticlePayload.model_validate(data)
     sanitized_html = sanitize_editorial_article_html(payload.body_html)
