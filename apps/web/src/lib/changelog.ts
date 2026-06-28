@@ -9,6 +9,14 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.12-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed frontend Railway build by syncing pnpm lockfile after web dependency changes",
+    ],
+  },
+  {
     version: "0.5.11-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

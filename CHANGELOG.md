@@ -3,6 +3,12 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.12-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed frontend Railway build by syncing pnpm lockfile after web dependency changes
+
 ## [0.5.11-alpha] - 2026-06-13
 
 Tipo: Alpha patch
