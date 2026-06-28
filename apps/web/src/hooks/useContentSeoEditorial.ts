@@ -4,6 +4,8 @@ import type {
   ContentSeoEditorialItemUpdate,
   EditorialBriefUpdateRequest,
   EditorialArticleUpdateRequest,
+  EditorialPublishingUpdateRequest,
+  EditorialPublishShopifyRequest,
   EditorialItemRescheduleRequest,
   EditorialPlanGenerateRequest,
 } from "@gcr/shared";
@@ -16,10 +18,13 @@ import {
   getEditorialBriefBatchJob,
   getEditorialItemAiUsage,
   getEditorialItems,
+  getShopifyBlogs,
+  publishEditorialShopify,
   rescheduleEditorialItem,
   startEditorialBriefBatch,
   updateEditorialBrief,
   updateEditorialArticle,
+  updateEditorialPublishing,
   updateEditorialItem,
 } from "../lib/content-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -195,6 +200,42 @@ export function useUpdateEditorialArticle(projectId: string) {
       itemId: string;
       data: EditorialArticleUpdateRequest;
     }) => updateEditorialArticle(projectId, itemId, data),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useShopifyBlogs(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.contentSeo.shopifyBlogs(projectId ?? ""),
+    queryFn: () => getShopifyBlogs(projectId!),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useUpdateEditorialPublishing(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      data,
+    }: {
+      itemId: string;
+      data: EditorialPublishingUpdateRequest;
+    }) => updateEditorialPublishing(projectId, itemId, data),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function usePublishEditorialShopify(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      data,
+    }: {
+      itemId: string;
+      data: EditorialPublishShopifyRequest;
+    }) => publishEditorialShopify(projectId, itemId, data),
     onSuccess: () => invalidateEditorial(qc, projectId),
   });
 }

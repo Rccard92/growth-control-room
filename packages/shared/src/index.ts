@@ -172,6 +172,14 @@ export type {
   EditorialArticlePayload,
   EditorialArticleUpdateRequest,
   ArticleUpdateStatus,
+  EditorialPublishMode,
+  EditorialPublishStatus,
+  EditorialPublishingPayload,
+  EditorialPublishingUpdateRequest,
+  EditorialPublishShopifyRequest,
+  EditorialPublishShopifyResponse,
+  ShopifyBlogListItem,
+  ShopifyBlogsListResponse,
 } from "./types/content";
 export {
   CONTENT_SEO_EDITORIAL_STATUS_LABELS,

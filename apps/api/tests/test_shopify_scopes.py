@@ -33,10 +33,11 @@ def test_parse_scope_string() -> None:
 def test_build_scope_result_case_c_granted() -> None:
     result = build_scope_result(
         shop_domain="shop.myshopify.com",
-        configured=["read_products", "write_products"],
-        granted=["read_products", "write_products"],
+        configured=["read_products", "write_products", "write_content"],
+        granted=["read_products", "write_products", "write_content"],
     )
     assert result["can_write_products"] is True
+    assert result["can_write_content"] is True
     assert result["requires_reconnect"] is False
     assert result["missing_scopes"] == []
 

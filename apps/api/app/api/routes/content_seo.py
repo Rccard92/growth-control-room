@@ -26,6 +26,10 @@ from app.schemas.content_seo_editorial import (
     EditorialItemRescheduleResponse,
     EditorialPlanGenerateRequest,
     EditorialPlanGenerateResponse,
+    EditorialPublishingUpdateRequest,
+    EditorialPublishShopifyRequest,
+    EditorialPublishShopifyResponse,
+    ShopifyBlogsListResponse,
 )
 from app.schemas.seo_optimizer import (
     SeoAnalyzeCountResponse,
@@ -73,6 +77,9 @@ from app.services.content.editorial_article_service import (
 )
 from app.services.content.editorial_ai_usage_service import get_editorial_item_ai_usage
 from app.services.content.editorial_plan_service import generate_editorial_calendar
+from app.services.content.editorial_publishing_service import update_editorial_publishing
+from app.services.content.editorial_shopify_blogs_service import list_shopify_blogs_for_project
+from app.services.content.editorial_shopify_publish_service import publish_editorial_to_shopify
 from app.services.content.analyze import run_content_seo_analyze
 from app.services.content.collection_seo_analyzer import analyze_collections_for_store
 from app.services.content.dashboard import build_content_seo_dashboard
@@ -1054,6 +1061,50 @@ async def get_content_seo_editorial_item_ai_usage(
     await get_project_in_default_workspace(project_id, session)
     await get_editorial_item(session, project_id, item_id)
     return await get_editorial_item_ai_usage(session, project_id, item_id)
+
+
+@router.get(
+    "/{project_id}/content/seo/shopify/blogs",
+    response_model=ShopifyBlogsListResponse,
+    response_model_by_alias=True,
+)
+async def list_content_seo_shopify_blogs(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ShopifyBlogsListResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await list_shopify_blogs_for_project(session, project_id)
+
+
+@router.put(
+    "/{project_id}/content/seo/editorial-items/{item_id}/publishing",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def update_content_seo_editorial_publishing(
+    project_id: UUID,
+    item_id: UUID,
+    payload: EditorialPublishingUpdateRequest,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    row = await update_editorial_publishing(session, project_id, item_id, payload)
+    return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/publish-shopify",
+    response_model=EditorialPublishShopifyResponse,
+    response_model_by_alias=True,
+)
+async def publish_content_seo_editorial_shopify(
+    project_id: UUID,
+    item_id: UUID,
+    payload: EditorialPublishShopifyRequest,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialPublishShopifyResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await publish_editorial_to_shopify(session, project_id, item_id, payload)
 
 
 @router.post(

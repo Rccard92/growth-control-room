@@ -42,6 +42,8 @@ export const queryKeys = {
       ["contentSeo", projectId, "editorialItems", month ?? "all"] as const,
     editorialBriefJob: (projectId: string, jobId: string) =>
       ["contentSeo", projectId, "editorialBriefJob", jobId] as const,
+    shopifyBlogs: (projectId: string) =>
+      ["contentSeo", projectId, "shopifyBlogs"] as const,
   },
   brandIntelligence: {
     overview: (projectId: string) => ["brandIntelligence", projectId, "overview"] as const,

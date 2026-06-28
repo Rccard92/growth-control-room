@@ -234,6 +234,25 @@ async def sync_shopify_collections_only(
     return result
 
 
+async def sync_shopify_blogs_only(
+    store: ShopifyStore,
+    client: ShopifyGraphQLClient,
+    session: AsyncSession,
+) -> int:
+    """Sync only blogs for editorial publishing."""
+    count = 0
+    try:
+        blog_nodes = await client.fetch_all_blogs()
+        for node in blog_nodes:
+            await _upsert_blog(session, store.id, node)
+            count += 1
+        await session.commit()
+    except ShopifyAPIError:
+        await session.rollback()
+        raise
+    return count
+
+
 async def sync_shopify_content(
     store: ShopifyStore,
     client: ShopifyGraphQLClient,

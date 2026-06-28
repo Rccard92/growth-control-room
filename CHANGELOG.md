@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.15-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added Publication tab in editorial item modal with pre-filled Shopify form
+- Persistent publishing_payload and controlled articleCreate (draft + publish now)
+- Shopify blog listing with lazy sync and write_content scope verification
+- Schedule mode disabled in v1 (next step)
+
 ## [0.5.14-alpha] - 2026-06-13
 
 Tipo: Alpha patch

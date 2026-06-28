@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -47,8 +47,19 @@ class ContentSeoEditorialItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     brief_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     article_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    publishing_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     shopify_blog_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     shopify_article_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    shopify_article_gid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    shopify_article_admin_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shopify_article_public_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     shopify_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    publish_status: Mapped[str] = mapped_column(String(32), default="not_published", index=True)
+    publish_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    scheduled_publish_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_publish_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="content_seo_editorial_items")

@@ -477,9 +477,18 @@ export interface ContentSeoEditorialItem {
   notes?: string | null;
   briefPayload?: Record<string, unknown> | null;
   articlePayload?: EditorialArticlePayload | null;
+  publishingPayload?: EditorialPublishingPayload | null;
   shopifyBlogId?: string | null;
   shopifyArticleId?: string | null;
+  shopifyArticleGid?: string | null;
+  shopifyArticleAdminUrl?: string | null;
+  shopifyArticlePublicUrl?: string | null;
   shopifyStatus?: string | null;
+  publishStatus?: EditorialPublishStatus;
+  publishMode?: EditorialPublishMode | null;
+  scheduledPublishAt?: string | null;
+  publishedAt?: string | null;
+  lastPublishError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -686,4 +695,60 @@ export type ArticleUpdateStatus = "draft_pending" | "draft_review" | "ready_to_p
 export interface EditorialArticleUpdateRequest {
   articlePayload: EditorialArticlePayload;
   status?: ArticleUpdateStatus;
+}
+
+export type EditorialPublishMode = "draft" | "publish_now" | "schedule";
+
+export type EditorialPublishStatus =
+  | "not_published"
+  | "draft_created"
+  | "published"
+  | "publish_error"
+  | "scheduled";
+
+export interface EditorialPublishingPayload {
+  title: string;
+  handle: string;
+  bodyHtml: string;
+  excerpt: string;
+  seoTitle: string;
+  metaDescription: string;
+  author: string;
+  blogId?: string | null;
+  blogGid?: string | null;
+  tags: string[];
+  imageUrl?: string | null;
+  imageAlt?: string | null;
+  mode: EditorialPublishMode;
+  isPublished: boolean;
+  publishDate?: string | null;
+  templateSuffix?: string | null;
+}
+
+export interface EditorialPublishingUpdateRequest {
+  publishingPayload: EditorialPublishingPayload;
+  publishMode?: EditorialPublishMode;
+  scheduledPublishAt?: string | null;
+}
+
+export interface EditorialPublishShopifyRequest {
+  mode: EditorialPublishMode;
+}
+
+export interface EditorialPublishShopifyResponse {
+  item: ContentSeoEditorialItem;
+  warnings: string[];
+}
+
+export interface ShopifyBlogListItem {
+  id: string;
+  shopifyBlogId: string;
+  gid: string;
+  title: string;
+  handle?: string | null;
+}
+
+export interface ShopifyBlogsListResponse {
+  blogs: ShopifyBlogListItem[];
+  syncRequired: boolean;
 }

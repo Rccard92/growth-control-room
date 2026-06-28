@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type {
   ContentSeoEditorialItem,
   ContentSeoEditorialObjective,
   ContentSeoEditorialStatus,
   EditorialArticlePayload,
   EditorialBriefPayload,
+  EditorialPublishingPayload,
 } from "@gcr/shared";
 import {
   CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS,
@@ -15,6 +17,7 @@ import { EditorialAiGenerationAccordion } from "./EditorialAiGenerationAccordion
 import { EditorialBriefEditor } from "./EditorialBriefEditor";
 import { EditorialArticleEditor } from "./EditorialArticleEditor";
 import { EditorialArticlePreview } from "./EditorialArticlePreview";
+import { EditorialPublishingTab } from "./EditorialPublishingTab";
 import {
   hasEditorialBrief,
   parseEditorialBriefPayload,
@@ -23,6 +26,13 @@ import {
   hasEditorialArticle,
   parseEditorialArticlePayload,
 } from "./editorial-article-utils";
+import {
+  buildPublishingPayloadFromArticle,
+  parseEditorialPublishingPayload,
+  validatePublishingPayload,
+} from "./editorial-publishing-utils";
+import { getShopifyScopes } from "../../../lib/shopify-api";
+import { queryKeys } from "../../../lib/queryKeys";
 import { AppModal } from "../../ui/AppModal";
 import { AppSelect } from "../../ui/AppSelect";
 import { AppDatePicker } from "../../ui/AppDatePicker";
@@ -33,10 +43,13 @@ import {
   useDeleteEditorialItem,
   useGenerateEditorialArticle,
   useGenerateEditorialBrief,
+  usePublishEditorialShopify,
   useRescheduleEditorialItem,
+  useShopifyBlogs,
   useUpdateEditorialArticle,
   useUpdateEditorialBrief,
   useUpdateEditorialItem,
+  useUpdateEditorialPublishing,
 } from "../../../hooks/useContentSeoEditorial";
 
 interface EditorialItemModalProps {
@@ -73,6 +86,15 @@ export function EditorialItemModal({
   const updateBriefMutation = useUpdateEditorialBrief(projectId);
   const generateArticleMutation = useGenerateEditorialArticle(projectId);
   const updateArticleMutation = useUpdateEditorialArticle(projectId);
+  const updatePublishingMutation = useUpdateEditorialPublishing(projectId);
+  const publishShopifyMutation = usePublishEditorialShopify(projectId);
+  const { data: blogsData, isLoading: blogsLoading } = useShopifyBlogs(projectId, open);
+  const { data: scopesData, isLoading: scopesLoading } = useQuery({
+    queryKey: queryKeys.shopify.scopes(projectId),
+    queryFn: () => getShopifyScopes(projectId),
+    enabled: open,
+    retry: false,
+  });
 
   const [title, setTitle] = useState("");
   const [plannedDate, setPlannedDate] = useState("");
@@ -89,10 +111,14 @@ export function EditorialItemModal({
   const [savedArticleSnapshot, setSavedArticleSnapshot] = useState("");
   const [articleView, setArticleView] = useState<"editor" | "preview">("editor");
   const [articleBodyMode, setArticleBodyMode] = useState<"html" | "markdown">("html");
+  const [publishing, setPublishing] = useState<EditorialPublishingPayload | null>(null);
+  const [savedPublishingSnapshot, setSavedPublishingSnapshot] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"detail" | "brief" | "article">("detail");
+  const [activeTab, setActiveTab] = useState<"detail" | "brief" | "article" | "publishing">(
+    "detail",
+  );
   const lastItemIdRef = useRef<string | null>(null);
 
   function hydrateFromItem(source: ContentSeoEditorialItem, resetTab: boolean) {
@@ -117,6 +143,15 @@ export function EditorialItemModal({
     );
     setArticle(hasEditorialArticle(source.articlePayload ?? null) ? parsedArticle : null);
     setSavedArticleSnapshot(JSON.stringify(parsedArticle));
+    const parsedPublishing = source.publishingPayload
+      ? parseEditorialPublishingPayload(
+          source.publishingPayload as unknown as Record<string, unknown>,
+        )
+      : hasEditorialArticle(source.articlePayload ?? null)
+        ? buildPublishingPayloadFromArticle(parsedArticle)
+        : null;
+    setPublishing(parsedPublishing);
+    setSavedPublishingSnapshot(JSON.stringify(parsedPublishing));
     if (resetTab) {
       setArticleView("editor");
       setArticleBodyMode("html");
@@ -146,6 +181,11 @@ export function EditorialItemModal({
     if (!article) return false;
     return JSON.stringify(article) !== savedArticleSnapshot;
   }, [article, savedArticleSnapshot]);
+
+  const publishingDirty = useMemo(() => {
+    if (!publishing) return false;
+    return JSON.stringify(publishing) !== savedPublishingSnapshot;
+  }, [publishing, savedPublishingSnapshot]);
 
   const briefApproved = status === "brief_approved" || item?.status === "brief_approved";
 
@@ -185,6 +225,13 @@ export function EditorialItemModal({
     if (hasEditorialArticle(updated.articlePayload ?? null)) {
       setArticle(parsedArticle);
       setSavedArticleSnapshot(JSON.stringify(parsedArticle));
+    }
+    if (updated.publishingPayload) {
+      const parsedPublishing = parseEditorialPublishingPayload(
+        updated.publishingPayload as unknown as Record<string, unknown>,
+      );
+      setPublishing(parsedPublishing);
+      setSavedPublishingSnapshot(JSON.stringify(parsedPublishing));
     }
   }
 
@@ -302,6 +349,14 @@ export function EditorialItemModal({
   async function handleGenerateArticle() {
     if (!item) return;
     if (
+      item?.publishingPayload &&
+      !window.confirm(
+        "Esiste già un payload di pubblicazione salvato. Rigenerare l'articolo potrebbe richiedere di aggiornarlo. Continuare?",
+      )
+    ) {
+      return;
+    }
+    if (
       article &&
       articleDirty &&
       !window.confirm("Rigenerando perderai le modifiche non salvate. Continuare?")
@@ -352,6 +407,80 @@ export function EditorialItemModal({
     }
   }
 
+  async function handleSavePublishing() {
+    if (!item || !publishing) return;
+    const errors = validatePublishingPayload(publishing);
+    if (errors.length > 0) {
+      setError(errors.join(" "));
+      return;
+    }
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      const updated = await updatePublishingMutation.mutateAsync({
+        itemId: item.id,
+        data: {
+          publishingPayload: publishing,
+          publishMode: publishing.mode,
+        },
+      });
+      syncItem(updated);
+      setSuccess("Impostazioni di pubblicazione salvate.");
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Errore durante il salvataggio della pubblicazione.",
+      );
+    }
+  }
+
+  async function handlePublishShopify(mode: "draft" | "publish_now") {
+    if (!item || !publishing) return;
+    const errors = validatePublishingPayload(publishing, { forPublish: true });
+    if (errors.length > 0) {
+      setError(errors.join(" "));
+      return;
+    }
+    if (mode === "publish_now") {
+      if (
+        !window.confirm(
+          "Pubblicare subito questo articolo su Shopify? Sarà visibile nel blog selezionato.",
+        )
+      ) {
+        return;
+      }
+    }
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      if (publishingDirty) {
+        await updatePublishingMutation.mutateAsync({
+          itemId: item.id,
+          data: {
+            publishingPayload: publishing,
+            publishMode: mode,
+          },
+        });
+      }
+      const result = await publishShopifyMutation.mutateAsync({
+        itemId: item.id,
+        data: { mode },
+      });
+      syncItem(result.item);
+      if (result.warnings.length > 0) {
+        setWarning(result.warnings.join(" "));
+      }
+      setSuccess(
+        mode === "publish_now"
+          ? "Articolo pubblicato su Shopify."
+          : "Bozza creata su Shopify.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Pubblicazione Shopify non riuscita.");
+    }
+  }
+
   if (!item) return null;
 
   const hasBrief = Boolean(brief);
@@ -365,6 +494,12 @@ export function EditorialItemModal({
   const itemHasBrief = hasEditorialBrief(item.briefPayload ?? null);
   const itemHasArticle = hasEditorialArticle(item.articlePayload ?? null);
   const hasArticle = Boolean(article);
+  const canWriteContent = scopesData?.canWriteContent ?? false;
+  const publishActionsDisabled =
+    status !== "ready_to_publish" ||
+    !canWriteContent ||
+    scopesLoading ||
+    publishShopifyMutation.isPending;
 
   const footer =
     activeTab === "detail" ? (
@@ -433,7 +568,7 @@ export function EditorialItemModal({
           </>
         )}
       </>
-    ) : (
+    ) : activeTab === "article" ? (
       <>
         <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
           Chiudi
@@ -476,6 +611,36 @@ export function EditorialItemModal({
             </button>
           </>
         )}
+      </>
+    ) : (
+      <>
+        <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
+          Chiudi
+        </button>
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--secondary"
+          disabled={!publishing || updatePublishingMutation.isPending}
+          onClick={() => void handleSavePublishing()}
+        >
+          {updatePublishingMutation.isPending ? "Salvataggio…" : "Salva publishing"}
+        </button>
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--secondary"
+          disabled={publishActionsDisabled || !publishing}
+          onClick={() => void handlePublishShopify("draft")}
+        >
+          {publishShopifyMutation.isPending ? "Invio…" : "Crea bozza Shopify"}
+        </button>
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--primary"
+          disabled={publishActionsDisabled || !publishing}
+          onClick={() => void handlePublishShopify("publish_now")}
+        >
+          Pubblica subito
+        </button>
       </>
     );
 
@@ -537,6 +702,21 @@ export function EditorialItemModal({
             onClick={() => setActiveTab("article")}
           >
             Articolo & Anteprima
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "publishing"}
+            className={[
+              "editorial-item-modal__tab",
+              activeTab === "publishing" ? "editorial-item-modal__tab--active" : "",
+              itemHasArticle ? "editorial-item-modal__tab--has-content" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setActiveTab("publishing")}
+          >
+            Pubblicazione
           </button>
         </div>
 
@@ -715,6 +895,23 @@ export function EditorialItemModal({
                 />
               </>
             )}
+          </section>
+        )}
+
+        {activeTab === "publishing" && publishing && (
+          <section className="editorial-item-modal__section editorial-publishing-tab-wrap">
+            <EditorialPublishingTab
+              item={item}
+              status={status}
+              hasArticle={hasArticle}
+              publishing={publishing}
+              onChange={setPublishing}
+              blogs={blogsData?.blogs ?? []}
+              blogsLoading={blogsLoading}
+              blogsSyncRequired={blogsData?.syncRequired ?? false}
+              canWriteContent={canWriteContent}
+              scopesLoading={scopesLoading}
+            />
           </section>
         )}
       </div>

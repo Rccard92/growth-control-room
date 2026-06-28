@@ -13,6 +13,7 @@ from app.models.shopify import ShopifyStore
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 
 REQUIRED_FOR_APPLY = ["write_products"]
+REQUIRED_FOR_PUBLISH = ["write_content"]
 SCOPES_CACHE_TTL = timedelta(hours=1)
 
 
@@ -62,27 +63,35 @@ def build_scope_result(
     granted: list[str],
     verify_failed: bool = False,
 ) -> dict[str, Any]:
-    missing = [s for s in REQUIRED_FOR_APPLY if s not in granted]
-    can_write = "write_products" in granted and not verify_failed
+    missing_apply = [s for s in REQUIRED_FOR_APPLY if s not in granted]
+    missing_publish = [s for s in REQUIRED_FOR_PUBLISH if s not in granted]
+    can_write_products = "write_products" in granted and not verify_failed
+    can_write_content = "write_content" in granted and not verify_failed
     requires_reconnect = (
         not verify_failed
-        and "write_products" in configured
-        and "write_products" not in granted
+        and (
+            ("write_products" in configured and "write_products" not in granted)
+            or ("write_content" in configured and "write_content" not in granted)
+        )
+    )
+    message = _scope_message(
+        configured=configured,
+        granted=granted,
+        missing=missing_apply,
+        verify_failed=verify_failed,
     )
     return {
         "shop_domain": shop_domain,
         "configured_scopes": configured,
         "granted_scopes": granted,
         "required_for_apply": list(REQUIRED_FOR_APPLY),
-        "missing_scopes": missing,
-        "can_write_products": can_write,
+        "required_for_publish": list(REQUIRED_FOR_PUBLISH),
+        "missing_scopes": missing_apply,
+        "missing_publish_scopes": missing_publish,
+        "can_write_products": can_write_products,
+        "can_write_content": can_write_content,
         "requires_reconnect": requires_reconnect,
-        "message": _scope_message(
-            configured=configured,
-            granted=granted,
-            missing=missing,
-            verify_failed=verify_failed,
-        ),
+        "message": message,
     }
 
 
@@ -168,5 +177,24 @@ async def can_apply_with_write_products(
         "requires_scope": "write_products",
         "requires_reconnect": result["requires_reconnect"],
         "message": result["message"],
+        **result,
+    }
+
+
+async def can_publish_with_write_content(
+    store: ShopifyStore,
+    session: AsyncSession,
+) -> dict[str, Any]:
+    result = await resolve_shopify_scopes(store, session, force_refresh=True)
+    if result["can_write_content"]:
+        return {"allowed": True, **result}
+    return {
+        "allowed": False,
+        "requires_scope": "write_content",
+        "requires_reconnect": result["requires_reconnect"],
+        "message": (
+            "Serve il permesso Shopify write_content. "
+            "Riconnetti Shopify con gli scope aggiornati."
+        ),
         **result,
     }

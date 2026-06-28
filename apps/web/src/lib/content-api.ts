@@ -29,6 +29,10 @@ import type {
   EditorialBriefBatchJobResponse,
   EditorialArticleUpdateRequest,
   EditorialItemAiUsageResponse,
+  EditorialPublishingUpdateRequest,
+  EditorialPublishShopifyRequest,
+  EditorialPublishShopifyResponse,
+  ShopifyBlogsListResponse,
 } from "@gcr/shared";
 import { apiFetch, jsonBody } from "./api";
 
@@ -422,5 +426,33 @@ export function getEditorialItemAiUsage(
 ): Promise<EditorialItemAiUsageResponse> {
   return apiFetch<EditorialItemAiUsageResponse>(
     `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/ai-usage`,
+  );
+}
+
+export function getShopifyBlogs(projectId: string): Promise<ShopifyBlogsListResponse> {
+  return apiFetch<ShopifyBlogsListResponse>(
+    `/api/projects/${projectId}/content/seo/shopify/blogs`,
+  );
+}
+
+export function updateEditorialPublishing(
+  projectId: string,
+  itemId: string,
+  data: EditorialPublishingUpdateRequest,
+): Promise<ContentSeoEditorialItem> {
+  return apiFetch<ContentSeoEditorialItem>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/publishing`,
+    { method: "PUT", ...jsonBody(data) },
+  );
+}
+
+export function publishEditorialShopify(
+  projectId: string,
+  itemId: string,
+  data: EditorialPublishShopifyRequest,
+): Promise<EditorialPublishShopifyResponse> {
+  return apiFetch<EditorialPublishShopifyResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/publish-shopify`,
+    { method: "POST", ...jsonBody(data) },
   );
 }

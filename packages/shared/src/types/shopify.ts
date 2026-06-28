@@ -27,6 +27,7 @@ export interface ShopifyScopesResponse {
   grantedScopes: string[];
   missingScopes: string[];
   canWriteProducts: boolean;
+  canWriteContent?: boolean;
   requiresReconnect: boolean;
   message: string;
 }

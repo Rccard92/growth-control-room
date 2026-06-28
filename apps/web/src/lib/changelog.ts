@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.15-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Added Publication tab in editorial item modal with pre-filled Shopify form",
+      "Persistent publishing_payload and controlled articleCreate (draft + publish now)",
+      "Shopify blog listing with lazy sync and write_content scope verification",
+      "Schedule mode disabled in v1 (next step)",
+    ],
+  },
+  {
     version: "0.5.14-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

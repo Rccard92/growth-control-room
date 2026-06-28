@@ -576,6 +576,26 @@ class ShopifyGraphQLClient:
 
         return all_nodes
 
+    async def create_article(self, article_input: dict[str, Any]) -> dict[str, Any]:
+        mutation = """
+        mutation ArticleCreate($article: ArticleCreateInput!) {
+          articleCreate(article: $article) {
+            article {
+              id
+              handle
+              title
+              publishedAt
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+        data = await self.execute(mutation, {"article": article_input})
+        return data.get("articleCreate") or {}
+
     def _build_orders_query(self, optional_blocks: dict[str, str]) -> str:
         extra = "\n".join(optional_blocks.values())
         node_fields = f"{ORDER_CORE_FIELDS}\n{extra}"

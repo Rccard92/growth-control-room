@@ -41,6 +41,7 @@ class ShopifyScopesResponse(BaseModel):
     granted_scopes: list[str] = Field(serialization_alias="grantedScopes")
     missing_scopes: list[str] = Field(serialization_alias="missingScopes")
     can_write_products: bool = Field(serialization_alias="canWriteProducts")
+    can_write_content: bool = Field(default=False, serialization_alias="canWriteContent")
     requires_reconnect: bool = Field(serialization_alias="requiresReconnect")
     message: str
 

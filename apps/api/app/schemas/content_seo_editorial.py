@@ -103,9 +103,24 @@ class ContentSeoEditorialItemRead(BaseModel):
     notes: str | None = None
     brief_payload: dict | None = Field(default=None, serialization_alias="briefPayload")
     article_payload: dict | None = Field(default=None, serialization_alias="articlePayload")
+    publishing_payload: dict | None = Field(default=None, serialization_alias="publishingPayload")
     shopify_blog_id: str | None = Field(default=None, serialization_alias="shopifyBlogId")
     shopify_article_id: str | None = Field(default=None, serialization_alias="shopifyArticleId")
+    shopify_article_gid: str | None = Field(default=None, serialization_alias="shopifyArticleGid")
+    shopify_article_admin_url: str | None = Field(
+        default=None, serialization_alias="shopifyArticleAdminUrl"
+    )
+    shopify_article_public_url: str | None = Field(
+        default=None, serialization_alias="shopifyArticlePublicUrl"
+    )
     shopify_status: str | None = Field(default=None, serialization_alias="shopifyStatus")
+    publish_status: str = Field(default="not_published", serialization_alias="publishStatus")
+    publish_mode: str | None = Field(default=None, serialization_alias="publishMode")
+    scheduled_publish_at: datetime | None = Field(
+        default=None, serialization_alias="scheduledPublishAt"
+    )
+    published_at: datetime | None = Field(default=None, serialization_alias="publishedAt")
+    last_publish_error: str | None = Field(default=None, serialization_alias="lastPublishError")
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
@@ -642,3 +657,82 @@ class EditorialArticleUpdateRequest(BaseModel):
         if not isinstance(value, dict):
             raise ValueError("articlePayload deve essere un oggetto JSON.")
         return value
+
+
+EditorialPublishMode = Literal["draft", "publish_now", "schedule"]
+
+EditorialPublishStatus = Literal[
+    "not_published",
+    "draft_created",
+    "published",
+    "publish_error",
+    "scheduled",
+]
+
+
+class EditorialPublishingPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    title: str = ""
+    handle: str = ""
+    body_html: str = Field(default="", serialization_alias="bodyHtml")
+    excerpt: str = ""
+    seo_title: str = Field(default="", serialization_alias="seoTitle")
+    meta_description: str = Field(default="", serialization_alias="metaDescription")
+    author: str = ""
+    blog_id: str | None = Field(default=None, serialization_alias="blogId")
+    blog_gid: str | None = Field(default=None, serialization_alias="blogGid")
+    tags: list[str] = Field(default_factory=list)
+    image_url: str | None = Field(default=None, serialization_alias="imageUrl")
+    image_alt: str | None = Field(default=None, serialization_alias="imageAlt")
+    mode: EditorialPublishMode = "draft"
+    is_published: bool = Field(default=False, serialization_alias="isPublished")
+    publish_date: str | None = Field(default=None, serialization_alias="publishDate")
+    template_suffix: str | None = Field(default=None, serialization_alias="templateSuffix")
+
+
+class EditorialPublishingUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    publishing_payload: dict = Field(validation_alias="publishingPayload")
+    publish_mode: EditorialPublishMode | None = Field(default=None, validation_alias="publishMode")
+    scheduled_publish_at: datetime | None = Field(
+        default=None, validation_alias="scheduledPublishAt"
+    )
+
+    @field_validator("publishing_payload")
+    @classmethod
+    def validate_publishing_object(cls, value: dict) -> dict:
+        if not isinstance(value, dict):
+            raise ValueError("publishingPayload deve essere un oggetto JSON.")
+        return value
+
+
+class EditorialPublishShopifyRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    mode: EditorialPublishMode = "draft"
+
+
+class EditorialPublishShopifyResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    item: ContentSeoEditorialItemRead
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ShopifyBlogListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    shopify_blog_id: str = Field(serialization_alias="shopifyBlogId")
+    gid: str
+    title: str
+    handle: str | None = None
+
+
+class ShopifyBlogsListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    blogs: list[ShopifyBlogListItem] = Field(default_factory=list)
+    sync_required: bool = Field(default=False, serialization_alias="syncRequired")

@@ -128,7 +128,56 @@ Workflow: **brief approvato → genera articolo → modifica → salva bozza →
 
 **Firma autore (0.4.8):** se `authorSuggestion` nel brief è vuoto, `authorName`/`authorRole` restano vuoti (post-processing server-side). Anteprima mostra firma solo se `authorName` valorizzato.
 
-**Non implementato:** pubblicazione Shopify, scheduling, batch articoli, generazione immagini.
+**Non implementato (pre-0.5.15):** pubblicazione Shopify, scheduling, batch articoli, generazione immagini.
+
+### Tab Pubblicazione Shopify (0.5.15-alpha)
+
+Workflow: **articolo pronto → tab Pubblicazione → modifica form precompilato → salva publishing → crea bozza Shopify o pubblica subito**.
+
+**Prerequisiti:** `article_payload` presente; consigliato `status: ready_to_publish`; Shopify connesso con scope **`write_content`** (verificato live via `GET /api/projects/{id}/shopify/scopes`).
+
+1. Tab **Pubblicazione** nel modal item (sempre visibile)
+2. Form precompilato da `article_payload` → salvato in `publishing_payload` JSONB (persistente, separato dall'articolo)
+3. **Salva publishing** — `PUT editorial-items/{id}/publishing` (non chiama Shopify)
+4. **Crea bozza Shopify** — `POST editorial-items/{id}/publish-shopify` con `{ "mode": "draft" }` → GraphQL `articleCreate` con `isPublished: false`
+5. **Pubblica subito** — stesso endpoint con `{ "mode": "publish_now" }` + conferma UI; `isPublished: true`
+
+**Modalità v1:**
+
+| Mode | UI | Backend |
+|------|-----|---------|
+| `draft` | Attivo (default) | Bozza su Shopify |
+| `publish_now` | Attivo + confirm | Pubblicazione immediata |
+| `schedule` | Disabilitato | Prossimo step |
+
+**Blog Shopify:** `GET shopify/blogs` — listing da DB; sync lazy dei blog se tabella vuota (richiede `read_content`).
+
+**Nessun autopublish:** la pubblicazione avviene solo su click esplicito. Rigenerare l'articolo con `publishing_payload` salvato richiede conferma.
+
+**Campi aggiuntivi su item:** `publish_status`, `shopify_article_gid`, URL admin/public, `last_publish_error`.
+
+#### Struttura `publishing_payload`
+
+```json
+{
+  "title": "",
+  "handle": "",
+  "bodyHtml": "",
+  "excerpt": "",
+  "seoTitle": "",
+  "metaDescription": "",
+  "author": "",
+  "blogId": null,
+  "blogGid": null,
+  "tags": [],
+  "imageUrl": null,
+  "imageAlt": null,
+  "mode": "draft",
+  "isPublished": false,
+  "publishDate": null,
+  "templateSuffix": null
+}
+```
 
 #### Struttura `article_payload`
 
@@ -174,18 +223,21 @@ Base: `/api/projects/{project_id}/content/seo/`
 | PUT | `editorial-items/{item_id}/brief` | Salva/approva `briefPayload`; `status` opzionale (`brief_pending` \| `brief_approved`) |
 | POST | `editorial-items/{item_id}/generate-article` | Genera bozza articolo da brief approvato |
 | PUT | `editorial-items/{item_id}/article` | Salva `articlePayload`; `status` opzionale (`draft_pending` \| `draft_review` \| `ready_to_publish`) |
+| GET | `shopify/blogs` | Listing blog Shopify del progetto; sync lazy se vuoto |
+| PUT | `editorial-items/{item_id}/publishing` | Salva `publishingPayload` (no chiamata Shopify) |
+| POST | `editorial-items/{item_id}/publish-shopify` | Crea/pubblica articolo su Shopify (`mode`: `draft` \| `publish_now`) |
 
-Nessun endpoint editorial richiede Shopify connesso.
+Gli endpoint editorial di generazione/salvataggio brief e articolo **non** richiedono Shopify connesso. Publish e listing blog sì.
 
 ## Database
 
-Tabella: `content_seo_editorial_items` (migration `027`).
+Tabella: `content_seo_editorial_items` (migration `027`, publishing `034`).
 
-Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`. Campi JSONB `brief_payload` (brief SEO) e `article_payload` (bozza articolo).
+Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`, `publish_status`. Campi JSONB `brief_payload`, `article_payload`, `publishing_payload`.
 
 ## Roadmap (step successivi)
 
-1. **Shopify Publisher** — draft blog/article su Shopify con conferma esplicita
+1. **Schedule publish** — pubblicazione programmata su Shopify
 2. **Sync/analyze SEO blog** — audit contenuti blog esistenti
 3. **Batch article generation** — generazione massiva bozze (dopo validazione singolo articolo)
 
