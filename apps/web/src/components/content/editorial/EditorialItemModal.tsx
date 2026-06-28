@@ -71,6 +71,13 @@ function formatPlannedDate(value: string): string {
   });
 }
 
+function formatPublishingError(baseMessage: string, error: unknown): string {
+  if (!(error instanceof Error)) return baseMessage;
+  const detail = error.message.trim();
+  if (!detail || detail === "Failed to fetch") return baseMessage;
+  return `${baseMessage} ${detail}`;
+}
+
 export function EditorialItemModal({
   open,
   item,
@@ -429,7 +436,7 @@ export function EditorialItemModal({
       setSuccess("Impostazioni di pubblicazione salvate.");
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Errore durante il salvataggio della pubblicazione.",
+        formatPublishingError("Errore salvataggio dati di pubblicazione.", e),
       );
     }
   }
@@ -477,7 +484,7 @@ export function EditorialItemModal({
           : "Bozza creata su Shopify.",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Pubblicazione Shopify non riuscita.");
+      setError(formatPublishingError("Errore creazione articolo Shopify.", e));
     }
   }
 

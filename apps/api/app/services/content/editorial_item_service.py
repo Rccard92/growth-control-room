@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemCreate,
+    ContentSeoEditorialItemRead,
     ContentSeoEditorialItemUpdate,
     EditorialItemRescheduleRequest,
 )
@@ -68,6 +69,17 @@ async def get_editorial_item(
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Contenuto editoriale non trovato.")
     return row
+
+
+async def get_editorial_item_read(
+    session: AsyncSession,
+    project_id: UUID,
+    item_id: UUID,
+) -> ContentSeoEditorialItemRead:
+    """Load editorial item and serialize safely after async flush/commit."""
+    row = await get_editorial_item(session, project_id, item_id)
+    await session.refresh(row)
+    return ContentSeoEditorialItemRead.model_validate(row)
 
 
 async def create_editorial_item(

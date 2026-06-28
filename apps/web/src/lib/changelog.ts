@@ -9,6 +9,16 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.16-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed MissingGreenlet error in editorial publishing endpoints",
+      "Publishing responses now reload editorial items after async DB commits",
+      "Improved Shopify publishing error handling",
+    ],
+  },
+  {
     version: "0.5.15-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

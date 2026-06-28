@@ -40,4 +40,5 @@ async def update_editorial_publishing(
         row.scheduled_publish_at = payload.scheduled_publish_at
 
     await session.flush()
+    await session.refresh(row)
     return row

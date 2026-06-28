@@ -3,6 +3,14 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.16-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed MissingGreenlet error in editorial publishing endpoints
+- Publishing responses now reload editorial items after async DB commits
+- Improved Shopify publishing error handling
+
 ## [0.5.15-alpha] - 2026-06-13
 
 Tipo: Alpha patch

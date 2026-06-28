@@ -13,12 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo import ShopifyBlog
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
-    ContentSeoEditorialItemRead,
     EditorialPublishShopifyRequest,
     EditorialPublishShopifyResponse,
     EditorialPublishingPayload,
 )
-from app.services.content.editorial_item_service import get_editorial_item
+from app.services.content.editorial_item_service import get_editorial_item, get_editorial_item_read
 from app.services.content.editorial_publishing_utils import (
     build_article_create_input,
     build_publishing_payload_from_article,
@@ -241,6 +240,6 @@ async def publish_editorial_to_shopify(
 
     await session.flush()
     return EditorialPublishShopifyResponse(
-        item=ContentSeoEditorialItemRead.model_validate(row),
+        item=await get_editorial_item_read(session, project_id, item_id),
         warnings=warnings,
     )

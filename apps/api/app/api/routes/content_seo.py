@@ -58,6 +58,7 @@ from app.services.content.editorial_item_service import (
     create_editorial_item,
     delete_editorial_item,
     get_editorial_item,
+    get_editorial_item_read,
     list_editorial_items,
     reschedule_editorial_item,
     update_editorial_item,
@@ -1088,8 +1089,8 @@ async def update_content_seo_editorial_publishing(
     session: AsyncSession = Depends(get_db),
 ) -> ContentSeoEditorialItemRead:
     await get_project_in_default_workspace(project_id, session)
-    row = await update_editorial_publishing(session, project_id, item_id, payload)
-    return ContentSeoEditorialItemRead.model_validate(row)
+    await update_editorial_publishing(session, project_id, item_id, payload)
+    return await get_editorial_item_read(session, project_id, item_id)
 
 
 @router.post(

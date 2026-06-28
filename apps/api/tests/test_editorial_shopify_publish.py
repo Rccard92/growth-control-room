@@ -5,7 +5,7 @@ import os
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -13,10 +13,13 @@ from fastapi import HTTPException
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
 from app.schemas.content_seo_editorial import EditorialPublishShopifyRequest
+from app.schemas.content_seo_editorial import (
+    ContentSeoEditorialItemRead,
+    EditorialPublishingUpdateRequest,
+)
 from app.services.content.editorial_publishing_utils import build_publishing_payload_from_article
 from app.services.content.editorial_publishing_service import update_editorial_publishing
 from app.services.content.editorial_shopify_publish_service import publish_editorial_to_shopify
-from app.schemas.content_seo_editorial import EditorialPublishingUpdateRequest
 
 
 def _article_payload() -> dict:
@@ -95,6 +98,7 @@ def test_save_publishing_payload() -> None:
                     publishMode="draft",
                 ),
             )
+            mock_session.refresh.assert_awaited_once_with(row)
             assert updated.publishing_payload is not None
             assert updated.publish_mode == "draft"
 
@@ -223,12 +227,26 @@ def test_publish_success_draft_sets_gid() -> None:
                         new_callable=AsyncMock,
                         return_value=mock_client,
                     ):
-                        result = await publish_editorial_to_shopify(
-                            mock_session,
-                            project_id,
-                            item_id,
-                            EditorialPublishShopifyRequest(mode="draft"),
-                        )
+                        async def fake_read(
+                            session: AsyncMock,  # noqa: ARG001
+                            pid: UUID,  # noqa: ARG001
+                            iid: UUID,  # noqa: ARG001
+                        ) -> ContentSeoEditorialItemRead:
+                            return ContentSeoEditorialItemRead.model_validate(row)
+
+                        with patch(
+                            "app.services.content.editorial_shopify_publish_service.get_editorial_item_read",
+                            side_effect=fake_read,
+                        ) as mock_read:
+                            result = await publish_editorial_to_shopify(
+                                mock_session,
+                                project_id,
+                                item_id,
+                                EditorialPublishShopifyRequest(mode="draft"),
+                            )
+                            mock_read.assert_awaited_once_with(
+                                mock_session, project_id, item_id
+                            )
                         assert row.publish_status == "draft_created"
                         assert row.shopify_article_gid == "gid://shopify/Article/55"
                         assert row.shopify_article_id == "55"
@@ -287,13 +305,18 @@ def test_publish_user_errors_keeps_payload() -> None:
                         new_callable=AsyncMock,
                         return_value=mock_client,
                     ):
-                        with pytest.raises(HTTPException) as exc:
-                            await publish_editorial_to_shopify(
-                                mock_session,
-                                project_id,
-                                item_id,
-                                EditorialPublishShopifyRequest(mode="draft"),
-                            )
+                        with patch(
+                            "app.services.content.editorial_shopify_publish_service.get_editorial_item_read",
+                            new_callable=AsyncMock,
+                        ) as mock_read:
+                            with pytest.raises(HTTPException) as exc:
+                                await publish_editorial_to_shopify(
+                                    mock_session,
+                                    project_id,
+                                    item_id,
+                                    EditorialPublishShopifyRequest(mode="draft"),
+                                )
+                            mock_read.assert_not_awaited()
                         assert exc.value.status_code == 422
                         assert row.publish_status == "publish_error"
                         assert row.publishing_payload == original_payload
