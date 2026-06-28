@@ -24,8 +24,8 @@ export const FILENAME_STALE_MESSAGE =
   "Il titolo articolo è cambiato: il nome file SEO potrebbe non essere più allineato.";
 
 export const DEFAULT_IMAGE_PROVIDER_SIZE = "1536x1024";
-export const DEFAULT_IMAGE_FINAL_SIZE = "1600x900";
-export const IMAGE_POST_PROCESSING_LABEL = "crop 16:9 + resize";
+export const DEFAULT_IMAGE_FINAL_SIZE = "1200x800";
+export const IMAGE_POST_PROCESSING_LABEL = "crop 3:2 + resize";
 
 const STATUS_LABELS: Record<EditorialImageStatus, string> = {
   not_generated: "Non generata",
@@ -35,8 +35,14 @@ const STATUS_LABELS: Record<EditorialImageStatus, string> = {
   approved: "Approvata",
 };
 
-export function getImageStatusLabel(status: EditorialImageStatus | undefined): string {
+export function getImageStatusLabel(
+  status: EditorialImageStatus | undefined,
+  image?: EditorialImagePayload,
+): string {
   if (!status) return STATUS_LABELS.not_generated;
+  if (image && isImageModified(image) && status !== "approved") {
+    return `${STATUS_LABELS[status] ?? status} · Modificata`;
+  }
   return STATUS_LABELS[status] ?? status;
 }
 
@@ -116,6 +122,20 @@ export function parseEditorialImagePayload(
     imageFileExtension: (record.imageFileExtension ?? record.image_file_extension ?? null) as string | null,
     imageProviderSize: (record.imageProviderSize ?? record.image_provider_size ?? null) as string | null,
     imageFinalSize: (record.imageFinalSize ?? record.image_final_size ?? null) as string | null,
+    imageProviderRequestedSize: (record.imageProviderRequestedSize ??
+      record.image_provider_requested_size ??
+      null) as string | null,
+    imageProviderReturnedSize: (record.imageProviderReturnedSize ??
+      record.image_provider_returned_size ??
+      null) as string | null,
+    imagePostProcessingApplied: (record.imagePostProcessingApplied ??
+      record.image_post_processing_applied ??
+      null) as string | null,
+    imageRevisedPrompt: (record.imageRevisedPrompt ?? record.image_revised_prompt ?? null) as string | null,
+    generatedFromArticleHash: (record.generatedFromArticleHash ??
+      record.generated_from_article_hash ??
+      null) as string | null,
+    approvedImageHash: (record.approvedImageHash ?? record.approved_image_hash ?? null) as string | null,
     imageGenerationCost: (record.imageGenerationCost ?? record.image_generation_cost ?? null) as number | null,
     imageGenerationLogId: (record.imageGenerationLogId ?? record.image_generation_log_id ?? null) as string | null,
     imageApprovedAt: (record.imageApprovedAt ?? record.image_approved_at ?? null) as string | null,
@@ -210,6 +230,25 @@ export function isImageFilenameStale(image: EditorialImagePayload, articleTitle:
   const fileSlug = image.imageFilename.replace(/\.jpe?g$/i, "").toLowerCase();
   const baseFile = fileSlug.replace(/-v\d+$/, "").replace(/-[a-f0-9]{6}$/, "");
   return baseFile !== titleSlug && fileSlug !== titleSlug;
+}
+
+export function isImageModified(image: EditorialImagePayload): boolean {
+  return Boolean(image.imageRevisionNote?.trim() || image.imageRevisedPrompt?.trim());
+}
+
+export function isImageShopifySynced(image: EditorialImagePayload): boolean {
+  if (!image.shopifyImageSyncedAt) return false;
+  if (image.imageApprovedAt) {
+    return image.shopifyImageSyncedAt >= image.imageApprovedAt;
+  }
+  return true;
+}
+
+export function getImageSyncLabel(image: EditorialImagePayload): string {
+  if (image.imageStatus !== "approved") return "Non approvata";
+  if (!image.shopifyImageReady) return "Non pronta per Shopify";
+  if (isImageShopifySynced(image)) return "Sincronizzata con Shopify";
+  return "In attesa di sync Shopify";
 }
 
 export function hasApprovedImageForPublish(image: EditorialImagePayload): boolean {

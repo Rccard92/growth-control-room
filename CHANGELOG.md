@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.32-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Switched editorial hero images to 1200x800 JPG (3:2)
+- Default image model gpt-image-2 with fallback chain
+- Added adaptive editorial image prompt builder for Solmielato brand
+- Extended image metadata (provider returned size, post-processing, sync hashes)
+- Improved Image tab advanced accordion and Shopify sync indicators
+
 ## [0.5.31-alpha] - 2026-06-13
 
 Tipo: Alpha patch

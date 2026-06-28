@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.32-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Switched editorial hero images to 1200x800 JPG (3:2)",
+      "Default image model gpt-image-2 with fallback chain",
+      "Added adaptive editorial image prompt builder for Solmielato brand",
+      "Extended image metadata and advanced accordion in Image tab",
+    ],
+  },
+  {
     version: "0.5.31-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

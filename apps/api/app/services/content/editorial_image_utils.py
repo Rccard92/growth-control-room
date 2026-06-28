@@ -198,6 +198,29 @@ def storage_warning_if_needed(
     )
 
 
+def is_image_publish_sync_stale(
+    image_payload: EditorialImagePayload,
+    publishing: EditorialPublishingPayload,
+) -> bool:
+    if image_payload.image_status != "approved":
+        return False
+    if not image_payload.image_url:
+        return False
+    if publishing.image_url and publishing.image_url != image_payload.image_url:
+        return True
+    if publishing.image_alt and image_payload.image_alt and publishing.image_alt != image_payload.image_alt:
+        return True
+    return False
+
+
+def is_image_shopify_synced(image_payload: EditorialImagePayload) -> bool:
+    if not image_payload.shopify_image_synced_at:
+        return False
+    if image_payload.image_approved_at:
+        return image_payload.shopify_image_synced_at >= image_payload.image_approved_at
+    return True
+
+
 def empty_editorial_image_payload() -> EditorialImagePayload:
     return EditorialImagePayload()
 

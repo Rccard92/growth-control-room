@@ -186,13 +186,13 @@ GCR_METADATA: dict[str, dict[str, str]] = {
     },
     "editorial_image_generation": {
         "ui_category": "blog_articles",
-        "gcr_recommended_model": "gpt-image-1",
+        "gcr_recommended_model": "gpt-image-2",
         "gcr_recommendation_reason": "Immagine hero editoriale da contesto articolo e brand.",
         "description": "Genera immagine hero per articolo editoriale.",
     },
     "editorial_image_edit": {
         "ui_category": "blog_articles",
-        "gcr_recommended_model": "gpt-image-1",
+        "gcr_recommended_model": "gpt-image-2",
         "gcr_recommendation_reason": "Rigenera immagine hero con istruzioni di modifica.",
         "description": "Modifica immagine hero editoriale.",
     },

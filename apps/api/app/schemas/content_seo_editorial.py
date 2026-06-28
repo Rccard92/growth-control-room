@@ -851,6 +851,20 @@ class EditorialImagePayload(BaseModel):
     image_file_extension: str | None = Field(default=None, serialization_alias="imageFileExtension")
     image_provider_size: str | None = Field(default=None, serialization_alias="imageProviderSize")
     image_final_size: str | None = Field(default=None, serialization_alias="imageFinalSize")
+    image_provider_requested_size: str | None = Field(
+        default=None, serialization_alias="imageProviderRequestedSize"
+    )
+    image_provider_returned_size: str | None = Field(
+        default=None, serialization_alias="imageProviderReturnedSize"
+    )
+    image_post_processing_applied: str | None = Field(
+        default=None, serialization_alias="imagePostProcessingApplied"
+    )
+    image_revised_prompt: str | None = Field(default=None, serialization_alias="imageRevisedPrompt")
+    generated_from_article_hash: str | None = Field(
+        default=None, serialization_alias="generatedFromArticleHash"
+    )
+    approved_image_hash: str | None = Field(default=None, serialization_alias="approvedImageHash")
     image_generation_cost: float | None = Field(
         default=None, serialization_alias="imageGenerationCost"
     )
@@ -912,6 +926,12 @@ def normalize_editorial_image_payload(raw: dict) -> EditorialImagePayload:
         "imageFileExtension": "image_file_extension",
         "imageProviderSize": "image_provider_size",
         "imageFinalSize": "image_final_size",
+        "imageProviderRequestedSize": "image_provider_requested_size",
+        "imageProviderReturnedSize": "image_provider_returned_size",
+        "imagePostProcessingApplied": "image_post_processing_applied",
+        "imageRevisedPrompt": "image_revised_prompt",
+        "generatedFromArticleHash": "generated_from_article_hash",
+        "approvedImageHash": "approved_image_hash",
         "imageGenerationCost": "image_generation_cost",
         "imageGenerationLogId": "image_generation_log_id",
         "imageApprovedAt": "image_approved_at",
@@ -942,8 +962,10 @@ def normalize_editorial_image_payload(raw: dict) -> EditorialImagePayload:
     if status not in ("not_generated", "generated", "uploaded", "upload_error", "approved"):
         status = "not_generated"
     data["image_status"] = status
-    if data.get("image_public_url") and not data.get("image_url"):
-        data["image_url"] = data["image_public_url"]
+    if data.get("generated_from_article_hash") and not data.get("source_article_hash"):
+        data["source_article_hash"] = data["generated_from_article_hash"]
+    if data.get("source_article_hash") and not data.get("generated_from_article_hash"):
+        data["generated_from_article_hash"] = data["source_article_hash"]
     cost = data.get("image_generation_cost")
     if cost is not None:
         try:

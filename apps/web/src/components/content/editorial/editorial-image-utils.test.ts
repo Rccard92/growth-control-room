@@ -8,11 +8,14 @@ import {
   formatImageFinalSize,
   formatImageProviderSize,
   getImageStatusLabel,
+  getImageSyncLabel,
   hasApprovedImageForPublish,
   hasShopifyCdnUrl,
   IMAGE_POST_PROCESSING_LABEL,
   IMAGE_STALE_MESSAGE,
   isImageFilenameStale,
+  isImageModified,
+  isImageShopifySynced,
   parseEditorialImagePayload,
   SHOPIFY_SCOPE_MISSING_WARNING,
 } from "./editorial-image-utils";
@@ -23,6 +26,11 @@ describe("editorial-image-utils", () => {
     expect(getImageStatusLabel("generated")).toBe("Generata");
     expect(getImageStatusLabel("uploaded")).toBe("Caricata su Shopify");
     expect(getImageStatusLabel("upload_error")).toBe("Upload fallito");
+    const modified = parseEditorialImagePayload({
+      imageStatus: "generated",
+      imageRevisionNote: "Più luce",
+    });
+    expect(getImageStatusLabel("generated", modified)).toContain("Modificata");
   });
 
   it("formatta costo immagine", () => {
@@ -36,23 +44,24 @@ describe("editorial-image-utils", () => {
       imagePrompt: "A premium honey jar",
       imageAlt: "Guida al miele",
       imageFilename: "guida-al-miele.jpg",
-      imageWidth: 1600,
-      imageHeight: 900,
+      imageWidth: 1200,
+      imageHeight: 800,
       imageProviderSize: "1536x1024",
-      imageFinalSize: "1600x900",
+      imageProviderReturnedSize: "1536x1024",
+      imagePostProcessingApplied: "cover_crop_3_2 + resize_jpg",
+      imageFinalSize: "1200x800",
+      generatedFromArticleHash: "abc123",
       shopifyImageReady: false,
       accessToken: "abc",
     });
     expect(parsed.imageStatus).toBe("generated");
     expect(parsed.imagePrompt).toContain("honey");
-    expect(parsed.imageAlt).toBe("Guida al miele");
-    expect(parsed.imageFilename).toBe("guida-al-miele.jpg");
-    expect(parsed.imageProviderSize).toBe("1536x1024");
-    expect(parsed.imageFinalSize).toBe("1600x900");
-    expect(parsed.shopifyImageReady).toBe(false);
-    expect(formatImageDimensions(parsed)).toBe("1600×900");
+    expect(parsed.imageFinalSize).toBe("1200x800");
+    expect(parsed.imageProviderReturnedSize).toBe("1536x1024");
+    expect(parsed.generatedFromArticleHash).toBe("abc123");
+    expect(formatImageDimensions(parsed)).toBe("1200×800");
     expect(formatImageProviderSize(parsed)).toBe("1536×1024");
-    expect(formatImageFinalSize(parsed)).toBe("1600×900");
+    expect(formatImageFinalSize(parsed)).toBe("1200×800");
   });
 
   it("usa default provider/final size quando assenti", () => {
@@ -62,7 +71,8 @@ describe("editorial-image-utils", () => {
     expect(formatImageFinalSize({ imageStatus: "not_generated" })).toBe(
       DEFAULT_IMAGE_FINAL_SIZE.replace("x", "×"),
     );
-    expect(IMAGE_POST_PROCESSING_LABEL).toBe("crop 16:9 + resize");
+    expect(DEFAULT_IMAGE_FINAL_SIZE).toBe("1200x800");
+    expect(IMAGE_POST_PROCESSING_LABEL).toBe("crop 3:2 + resize");
   });
 
   it("rileva filename stale rispetto al titolo", () => {
@@ -95,12 +105,26 @@ describe("editorial-image-utils", () => {
       imageUploadError: "Timeout",
     });
     expect(canApproveImage(uploadError)).toBe(false);
+  });
 
-    const generated = parseEditorialImagePayload({
-      imageStatus: "generated",
-      shopifyImageReady: false,
-    });
-    expect(canApproveImage(generated)).toBe(false);
+  it("sync label e modified state", () => {
+    expect(isImageModified({ imageStatus: "generated", imageRevisionNote: "x" })).toBe(true);
+    expect(
+      isImageShopifySynced({
+        imageStatus: "approved",
+        imageApprovedAt: "2026-06-01T10:00:00Z",
+        shopifyImageSyncedAt: "2026-06-01T11:00:00Z",
+        shopifyImageReady: true,
+      }),
+    ).toBe(true);
+    expect(
+      getImageSyncLabel({
+        imageStatus: "approved",
+        shopifyImageReady: true,
+        shopifyImageSyncedAt: "2026-06-01T11:00:00Z",
+        imageApprovedAt: "2026-06-01T10:00:00Z",
+      }),
+    ).toBe("Sincronizzata con Shopify");
   });
 
   it("espone messaggi warning", () => {

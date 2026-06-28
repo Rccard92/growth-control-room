@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { EditorialArticlePayload, EditorialImagePayload } from "@gcr/shared";
 import { buildEditorialImagePreviewUrl } from "../../../lib/content-api";
 import {
@@ -9,6 +8,7 @@ import {
   formatImageProviderSize,
   formatImageUpdatedAt,
   getImageStatusLabel,
+  getImageSyncLabel,
   hasGeneratedImage,
   hasShopifyCdnUrl,
   IMAGE_POST_PROCESSING_LABEL,
@@ -69,7 +69,6 @@ export function EditorialImageTab({
   syncLoading = false,
   retryUploadLoading = false,
 }: EditorialImageTabProps) {
-  const [promptOpen, setPromptOpen] = useState(false);
   const previewUrl = buildEditorialImagePreviewUrl(projectId, itemId, image);
   const busy =
     generateLoading ||
@@ -101,12 +100,12 @@ export function EditorialImageTab({
         <div>
           <h3>Immagine hero</h3>
           <p className="editorial-image-tab__subtitle">
-            Formato fisso 1600×900 JPG. Filename SEO e ALT sincronizzati al titolo articolo.
+            Formato fisso 1200×800 JPG (3:2). Filename SEO e ALT sincronizzati al titolo articolo.
             Storage Shopify Files con URL CDN per la pubblicazione.
           </p>
         </div>
         <span className={`editorial-image-tab__badge editorial-image-tab__badge--${image.imageStatus}`}>
-          {getImageStatusLabel(image.imageStatus)}
+          {getImageStatusLabel(image.imageStatus, image)}
         </span>
       </header>
 
@@ -206,14 +205,25 @@ export function EditorialImageTab({
           <strong>{formatImageUpdatedAt(image.updatedAt)}</strong>
         </div>
         <div>
+          <span className="editorial-image-tab__meta-label">Sync Shopify</span>
+          <strong>{getImageSyncLabel(image)}</strong>
+        </div>
+        <div>
           <span className="editorial-image-tab__meta-label">Hash articolo sorgente</span>
-          <strong className="editorial-image-tab__hash">{image.sourceArticleHash ?? "—"}</strong>
+          <strong className="editorial-image-tab__hash">
+            {image.generatedFromArticleHash ?? image.sourceArticleHash ?? "—"}
+          </strong>
         </div>
       </section>
 
       <section className="editorial-image-tab__preview">
         {previewUrl ? (
-          <img src={previewUrl} alt={altText} className="editorial-image-tab__image" />
+          <img
+            src={previewUrl}
+            alt={altText}
+            className="editorial-image-tab__image"
+            style={{ aspectRatio: "3 / 2", width: "100%", maxWidth: "720px", objectFit: "cover" }}
+          />
         ) : (
           <div className="editorial-image-tab__placeholder">Nessuna anteprima disponibile</div>
         )}
@@ -299,19 +309,81 @@ export function EditorialImageTab({
         </section>
       )}
 
-      {image.imagePrompt && (
-        <section className="editorial-image-tab__section">
-          <button
-            type="button"
-            className="editorial-image-tab__prompt-toggle"
-            onClick={() => setPromptOpen((open) => !open)}
-          >
-            {promptOpen ? "Nascondi prompt usato" : "Mostra prompt usato"}
-          </button>
-          {promptOpen && (
-            <pre className="editorial-image-tab__prompt">{image.imagePrompt}</pre>
+      {hasGeneratedImage(image) && (
+        <details className="editorial-image-tab__section editorial-ai-info__details">
+          <summary>Dettagli avanzati</summary>
+          <div className="editorial-ai-info__section">
+            <h6 className="editorial-ai-info__section-title">Prompt usato</h6>
+            {image.imagePrompt ? (
+              <pre className="editorial-image-tab__prompt">{image.imagePrompt}</pre>
+            ) : (
+              <p className="editorial-ai-info__empty">—</p>
+            )}
+          </div>
+          {image.imageRevisionNote && (
+            <div className="editorial-ai-info__section">
+              <h6 className="editorial-ai-info__section-title">Istruzioni modifica</h6>
+              <p>{image.imageRevisionNote}</p>
+            </div>
           )}
-        </section>
+          {image.imageRevisedPrompt && (
+            <div className="editorial-ai-info__section">
+              <h6 className="editorial-ai-info__section-title">Prompt rivisto</h6>
+              <pre className="editorial-image-tab__prompt">{image.imageRevisedPrompt}</pre>
+            </div>
+          )}
+          <div className="editorial-ai-info__section">
+            <h6 className="editorial-ai-info__section-title">Dettagli tecnici</h6>
+            <ul className="editorial-ai-info__list editorial-ai-info__list--technical">
+              <li>
+                <strong>Provider requested:</strong> {image.imageProviderRequestedSize ?? image.imageProviderSize ?? "—"}
+              </li>
+              <li>
+                <strong>Provider returned:</strong> {image.imageProviderReturnedSize ?? "—"}
+              </li>
+              <li>
+                <strong>Post-processing:</strong> {image.imagePostProcessingApplied ?? IMAGE_POST_PROCESSING_LABEL}
+              </li>
+              <li>
+                <strong>Storage:</strong> {image.imageStorageProvider ?? "shopify_files"}
+              </li>
+              <li>
+                <strong>Shopify file status:</strong> {image.shopifyFileStatus ?? "—"}
+              </li>
+              <li>
+                <strong>Shopify media GID:</strong> {image.shopifyMediaGid ?? "—"}
+              </li>
+              <li>
+                <strong>Uploaded at:</strong> {formatImageUpdatedAt(image.shopifyUploadedAt)}
+              </li>
+              <li>
+                <strong>Synced at:</strong> {formatImageUpdatedAt(image.shopifyImageSyncedAt)}
+              </li>
+              <li>
+                <strong>Approved hash:</strong> {image.approvedImageHash ?? "—"}
+              </li>
+              <li>
+                <strong>Skill pack:</strong> {image.skillPackUsed || "—"} {image.skillPackVersion ? `(${image.skillPackVersion})` : ""}
+              </li>
+            </ul>
+          </div>
+          {image.aiGeneration && (
+            <div className="editorial-ai-info__section">
+              <h6 className="editorial-ai-info__section-title">Generazione AI prompt</h6>
+              <ul className="editorial-ai-info__list">
+                <li>
+                  <strong>Modello:</strong> {image.aiGeneration.model ?? "—"}
+                </li>
+                <li>
+                  <strong>Costo:</strong> {formatImageCost(image.aiGeneration.estimatedTotalCost)}
+                </li>
+                <li>
+                  <strong>Token:</strong> {image.aiGeneration.inputTokens ?? "—"} / {image.aiGeneration.outputTokens ?? "—"}
+                </li>
+              </ul>
+            </div>
+          )}
+        </details>
       )}
     </div>
   );

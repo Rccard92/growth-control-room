@@ -231,12 +231,14 @@ Workflow: **articolo pronto → tab Pubblicazione → modifica form precompilato
 Workflow tra **Articolo** e **Pubblicazione**:
 
 1. Genera immagine hero da contesto articolo, brief e brand (OpenAI Images).
-2. Post-processing server-side obbligatorio: **1600×900 JPG** (crop 16:9, nessuno stretch).
-3. Filename SEO dal titolo articolo (`slug-titolo.jpg`, max 90 caratteri, fallback `articolo-solmielato.jpg`).
-4. **ALT** sempre uguale al titolo articolo (priorità: `articlePayload.title` → `briefPayload.proposedTitle` → `item.title`).
-5. Upload automatico su **Shopify Files** (staged upload → `fileCreate` → poll `READY` → URL CDN).
-6. Approva immagine (solo con URL CDN Shopify) → sincronizza hero in `publishing_payload`.
-7. Pubblica su Shopify → `ArticleImageInput` con `{ url, altText }`.
+2. Post-processing server-side obbligatorio: **1200×800 JPG** (crop 3:2, nessuno stretch).
+3. Modello immagine default: **gpt-image-2** (fallback gpt-image-1, size auto).
+4. Prompt builder adattivo per tipo contenuto (recipe, educational, product guide, storytelling).
+5. Filename SEO dal titolo articolo (`slug-titolo.jpg`, max 90 caratteri, fallback `articolo-solmielato.jpg`).
+6. **ALT** sempre uguale al titolo articolo (priorità: `articlePayload.title` → `briefPayload.proposedTitle` → `item.title`).
+7. Upload automatico su **Shopify Files** (staged upload → `fileCreate` → poll `READY` → URL CDN).
+8. Approva immagine (solo con URL CDN Shopify) → sincronizza hero in `publishing_payload`.
+9. Pubblica su Shopify → `ArticleImageInput` con `{ url, altText }`.
 
 **Struttura `image_payload` (campi principali):**
 
@@ -244,9 +246,11 @@ Workflow tra **Articolo** e **Pubblicazione**:
 {
   "imageStatus": "uploaded",
   "imageFilename": "yogurt-con-frutta-noci-e-miele.jpg",
-  "imageWidth": 1600,
-  "imageHeight": 900,
-  "imageAspectRatio": "16:9",
+  "imageWidth": 1200,
+  "imageHeight": 800,
+  "imageAspectRatio": "3:2",
+  "imageProviderReturnedSize": "1536x1024",
+  "imagePostProcessingApplied": "cover_crop_3_2 + resize_jpg",
   "imageMimeType": "image/jpeg",
   "imageAlt": "Titolo articolo",
   "imageUrl": "https://cdn.shopify.com/s/files/1/.../hero.jpg",
@@ -291,7 +295,7 @@ Base: `/api/projects/{project_id}/content/seo/`
 | PUT | `editorial-items/{item_id}/brief` | Salva/approva `briefPayload`; `status` opzionale (`brief_pending` \| `brief_approved`) |
 | POST | `editorial-items/{item_id}/generate-article` | Genera bozza articolo da brief approvato |
 | PUT | `editorial-items/{item_id}/article` | Salva `articlePayload`; `status` opzionale (`draft_pending` \| `draft_review` \| `ready_to_publish`) |
-| POST | `editorial-items/{item_id}/generate-image` | Genera hero 1600×900 da articolo |
+| POST | `editorial-items/{item_id}/generate-image` | Genera hero 1200×800 da articolo |
 | POST | `editorial-items/{item_id}/edit-image` | Rigenera con istruzioni modifica |
 | POST | `editorial-items/{item_id}/approve-image` | Approva immagine per publish |
 | POST | `editorial-items/{item_id}/retry-image-upload` | Ritenta upload Shopify Files |

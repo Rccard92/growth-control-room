@@ -10,6 +10,8 @@ from app.services.content.editorial_image_utils import (
     IMAGE_STALE_MESSAGE,
     compute_shopify_image_ready,
     is_image_filename_stale,
+    is_image_publish_sync_stale,
+    is_image_shopify_synced,
     is_image_stale,
     resolve_editorial_image_alt,
     sync_approved_image_to_publishing,
@@ -109,3 +111,27 @@ def test_compute_shopify_image_ready_delegates(monkeypatch) -> None:
     )
     assert compute_shopify_image_ready("https://cdn.example.com/x.jpg")
     assert not compute_shopify_image_ready("https://api.example.com/x")
+
+
+def test_is_image_publish_sync_stale() -> None:
+    image = EditorialImagePayload(
+        image_status="approved",
+        image_url="https://cdn.shopify.com/new.jpg",
+        image_alt="Nuovo titolo",
+    )
+    publishing = EditorialPublishingPayload(
+        title="Test",
+        image_url="https://cdn.shopify.com/old.jpg",
+        image_alt="Nuovo titolo",
+    )
+    assert is_image_publish_sync_stale(image, publishing)
+
+
+def test_is_image_shopify_synced() -> None:
+    synced = EditorialImagePayload(
+        image_status="approved",
+        image_approved_at="2026-06-01T10:00:00+00:00",
+        shopify_image_synced_at="2026-06-01T11:00:00+00:00",
+        shopify_image_ready=True,
+    )
+    assert is_image_shopify_synced(synced)

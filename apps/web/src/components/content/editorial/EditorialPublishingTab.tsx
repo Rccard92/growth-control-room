@@ -25,6 +25,7 @@ import {
 } from "./editorial-publishing-utils";
 import {
   hasApprovedImageForPublish,
+  getImageSyncLabel,
   IMAGE_STALE_PUBLISH_WARNING,
   NO_APPROVED_IMAGE_WARNING,
   parseEditorialImagePayload,
@@ -527,9 +528,14 @@ export function EditorialPublishingTab({
                 {imagePayload.imageFilename ?? "—"}. Dimensione:{" "}
                 {imagePayload.imageWidth && imagePayload.imageHeight
                   ? `${imagePayload.imageWidth}×${imagePayload.imageHeight}`
-                  : "1600×900"}
+                  : "1200×800"}
                 . ALT: {(publishing.imageAlt ?? publishing.title) || "—"}.
               </p>
+              {imageApproved && (
+                <p className="editorial-publishing-tab__field-hint">
+                  Sync Shopify: {getImageSyncLabel(imagePayload)}
+                </p>
+              )}
               {imageApproved && publishing.imageUrl && imagePayload.shopifyImageReady && (
                 <p className="editorial-publishing-tab__field-hint">
                   URL Shopify: {publishing.imageUrl}

@@ -19,4 +19,4 @@ Generare immagini hero editoriali coerenti con il brand per articoli blog Shopif
 - Nessun testo nell'immagine
 - Nessuna grafica invadente o overlay
 - Nessun claim sanitario o medico
-- Formato hero landscape (16:9 o 3:2) adatto a blog Shopify
+- Formato hero landscape **3:2**, target finale **1200x800** adatto a blog Shopify

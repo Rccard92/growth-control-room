@@ -19,7 +19,7 @@
 ## Formato
 
 - Hero image per blog Shopify
-- Orientamento landscape **16:9**, target finale **1600x900**
+- Orientamento landscape **3:2**, target finale **1200x800**
 - Soggetto centrale chiaro, spazio respiro per titolo in pagina (non nell'immagine)
 
 ## Contenuto
@@ -32,6 +32,7 @@
 
 - Food photography realistica
 - Ingredienti coerenti con la ricetta
+- Miele visibile come ingrediente
 - Composizione naturale, luce morbida
 - NO mani deformi, NO testo
 

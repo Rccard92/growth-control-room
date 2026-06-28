@@ -145,8 +145,8 @@ def test_persist_generated_image_metadata(tmp_path, monkeypatch) -> None:
             revision_note=None,
             warnings=[],
         )
-        assert payload.image_width == 1600
-        assert payload.image_height == 900
+        assert payload.image_width == 1200
+        assert payload.image_height == 800
         assert payload.image_provider_size == EDITORIAL_IMAGE_PROVIDER_SIZE
         assert payload.image_final_size == EDITORIAL_IMAGE_FINAL_SIZE
         assert payload.image_alt == article.title

@@ -6,6 +6,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from html import unescape
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -31,9 +32,16 @@ from app.services.content.editorial_ai_usage_service import (
     fetch_latest_editorial_ai_log,
 )
 from app.services.content.editorial_image_filename import resolve_unique_editorial_image_filename
+from app.core.config import settings
 from app.services.content.editorial_image_processing import (
     EDITORIAL_IMAGE_PROVIDER_SIZE,
     normalize_editorial_image_bytes,
+    read_image_dimensions,
+)
+from app.services.content.editorial_image_prompt_builder import (
+    EditorialImagePromptContext,
+    build_editorial_image_prompt_system,
+    build_editorial_image_prompt_user,
 )
 from app.services.content.editorial_image_skill_loader import (
     EDITORIAL_IMAGE_SKILL_NAME,
@@ -72,8 +80,10 @@ logger = logging.getLogger(__name__)
 
 IMAGE_SIZE_USER_MESSAGE = (
     "Formato immagine non supportato dal provider. "
-    "Il sistema genera in 1536×1024 e converte a 1600×900."
+    "Il sistema genera in 1536×1024 e converte a 1200×800."
 )
+
+EDITORIAL_IMAGE_MODEL_FALLBACKS = ("gpt-image-2", "gpt-image-1")
 
 
 def _user_friendly_image_error(exc: OpenAIRequestError) -> str:
@@ -88,28 +98,45 @@ async def _generate_editorial_image_bytes(
     *,
     metadata: AiRequestMetadata,
 ) -> object:
-    """Call OpenAI Images with supported landscape size; fallback to auto on Invalid size."""
-    try:
-        return await generate_image(
-            image_prompt,
-            metadata=metadata,
-            size=EDITORIAL_IMAGE_PROVIDER_SIZE,
-        )
-    except OpenAIRequestError as exc:
-        if "invalid size" not in str(exc).lower():
-            raise
-        logger.warning(
-            "Editorial image: provider rejected size %s, retrying with auto",
-            EDITORIAL_IMAGE_PROVIDER_SIZE,
-        )
+    """Call OpenAI Images with gpt-image-2 fallback chain and size auto retry."""
+    preferred = (settings.openai_image_model or "gpt-image-2").strip()
+    models: list[str] = []
+    for candidate in (preferred, *EDITORIAL_IMAGE_MODEL_FALLBACKS):
+        if candidate and candidate not in models:
+            models.append(candidate)
+
+    last_exc: OpenAIRequestError | None = None
+    for model in models:
         try:
             return await generate_image(
                 image_prompt,
                 metadata=metadata,
-                size="auto",
+                model=model,
+                size=EDITORIAL_IMAGE_PROVIDER_SIZE,
             )
-        except OpenAIRequestError:
-            raise OpenAIRequestError(IMAGE_SIZE_USER_MESSAGE) from exc
+        except OpenAIRequestError as exc:
+            last_exc = exc
+            if "invalid size" in str(exc).lower():
+                logger.warning(
+                    "Editorial image: model %s rejected size %s, retrying with auto",
+                    model,
+                    EDITORIAL_IMAGE_PROVIDER_SIZE,
+                )
+                try:
+                    return await generate_image(
+                        image_prompt,
+                        metadata=metadata,
+                        model=model,
+                        size="auto",
+                    )
+                except OpenAIRequestError as auto_exc:
+                    last_exc = auto_exc
+                    logger.warning("Editorial image: model %s auto size failed", model)
+                    continue
+            logger.warning("Editorial image: model %s failed: %s", model, exc)
+            continue
+
+    raise OpenAIRequestError(IMAGE_SIZE_USER_MESSAGE) from last_exc
 
 
 def _strip_html(value: str) -> str:
@@ -146,45 +173,46 @@ def _build_editorial_item_context(row: ContentSeoEditorialItem) -> dict[str, str
     }
 
 
-def _build_prompt_system(skill_context: str, brand_context: str | None) -> str:
-    base = (
-        "Sei un art director per ecommerce Shopify. "
-        "Genera un prompt in inglese per un'immagine hero editoriale. "
-        "Il prompt deve descrivere soggetto, composizione, luce, stile e mood. "
-        "Formato orizzontale 16:9, target 1600x900. "
-        "NON includere testo, logo inventati o grafiche advertising nell'immagine. "
-        "Stile naturale, pulito, luminoso, food/lifestyle realistico, coerente con Solmielato. "
-        "Rispetta Safe Claims e brand visual identity. "
-        "Rispondi SOLO con JSON valido.\n\n"
-        f"{skill_context}"
-    )
-    if brand_context:
-        base += f"\n\n{brand_context}"
-    return base
+def _extract_secondary_keywords(brief: dict[str, Any] | None) -> list[str]:
+    if not brief or not isinstance(brief, dict):
+        return []
+    raw = brief.get("secondaryKeywords") or brief.get("secondary_keywords") or []
+    if not isinstance(raw, list):
+        return []
+    return [str(item).strip() for item in raw if str(item).strip()]
 
 
-def _build_prompt_user(row: ContentSeoEditorialItem, article: EditorialArticlePayload) -> str:
-    content_hints = ""
-    if row.content_type == "recipe":
-        content_hints = (
-            "\nPer ricette: food photography realistica, ingredienti coerenti, "
-            "composizione naturale, luce morbida, no mani deformi, no testo."
-        )
-    elif row.content_type == "educational":
-        content_hints = (
-            "\nPer educational: still life editoriale, miele/prodotto/ingredienti coerenti, "
-            "contesto semplice e naturale, no infografica con testo."
-        )
-    return (
-        f"Genera imagePrompt per hero blog Shopify landscape 16:9.\n"
-        f"Tipo contenuto: {row.content_type}\n"
-        f"Keyword principale: {row.primary_keyword or '—'}\n"
-        f"Search intent: {row.search_intent or '—'}\n"
-        f"Titolo articolo: {article.title}\n"
-        f"Excerpt: {article.excerpt[:300] if article.excerpt else '—'}\n"
-        f"Prodotti collegati: {', '.join(article.linked_products[:5]) or '—'}\n"
-        f"Collezioni collegate: {', '.join(article.linked_collections[:5]) or '—'}"
-        f"{content_hints}"
+def _build_prompt_context(
+    row: ContentSeoEditorialItem,
+    article: EditorialArticlePayload,
+    *,
+    brand_context: str | None,
+    skill_context: str,
+    revision_note: str | None = None,
+    previous_prompt: str | None = None,
+) -> EditorialImagePromptContext:
+    brief = row.brief_payload if isinstance(row.brief_payload, dict) else None
+    brief_angle = ""
+    if brief:
+        brief_angle = str(
+            brief.get("contentAngle") or brief.get("content_angle") or ""
+        ).strip()
+    return EditorialImagePromptContext(
+        content_type=row.content_type or "",
+        article_title=article.title,
+        article_excerpt=article.excerpt or "",
+        article_body_excerpt=_strip_html(article.body_html)[:800],
+        primary_keyword=row.primary_keyword or "",
+        secondary_keywords=_extract_secondary_keywords(brief),
+        search_intent=row.search_intent or "",
+        target_audience=row.target_audience or "",
+        content_angle=brief_angle,
+        linked_products=list(article.linked_products or []),
+        linked_collections=list(article.linked_collections or []),
+        brand_context=brand_context,
+        skill_context=skill_context,
+        revision_note=revision_note,
+        previous_prompt=previous_prompt,
     )
 
 
@@ -220,6 +248,14 @@ async def _build_image_prompt(
     )
     brand_context = ctx.context_text
     skill = load_editorial_image_skill_context()
+    prompt_ctx = _build_prompt_context(
+        row,
+        article,
+        brand_context=brand_context,
+        skill_context=skill.as_prompt_context(),
+        revision_note=revision_note,
+        previous_prompt=base_prompt,
+    )
     metadata = enrich_ai_metadata(
         AiRequestMetadata(
             project_id=project_id,
@@ -231,16 +267,8 @@ async def _build_image_prompt(
         ),
         ctx,
     )
-    system_prompt = _build_prompt_system(skill.as_prompt_context(), brand_context)
-    user_prompt = _build_prompt_user(row, article)
-    if base_prompt and revision_note:
-        user_prompt += (
-            f"\n\nPrompt precedente:\n{base_prompt}\n\n"
-            f"Istruzioni di modifica:\n{revision_note.strip()}"
-        )
-    elif revision_note:
-        user_prompt += f"\n\nIstruzioni di modifica:\n{revision_note.strip()}"
-    user_prompt += '\n\nRispondi con JSON: {"imagePrompt":"..."}'
+    system_prompt = build_editorial_image_prompt_system(prompt_ctx)
+    user_prompt = build_editorial_image_prompt_user(prompt_ctx)
 
     parsed = await generate_structured_json(
         system_prompt=system_prompt,
@@ -381,6 +409,7 @@ async def _persist_generated_image(
     brief = row.brief_payload if isinstance(row.brief_payload, dict) else None
     alt = resolve_editorial_image_alt(article, brief, row.title)
 
+    provider_returned_size = read_image_dimensions(image_bytes)
     processed_bytes, meta = normalize_editorial_image_bytes(image_bytes)
     version_hint = f"{item_id}:{image_prompt}:{datetime.now(timezone.utc).isoformat()}"
     filename = resolve_unique_editorial_image_filename(
@@ -474,6 +503,11 @@ async def _persist_generated_image(
         image_file_extension=meta["extension"],
         image_provider_size=meta["provider_size"],
         image_final_size=meta["final_size"],
+        image_provider_requested_size=meta["provider_size"],
+        image_provider_returned_size=provider_returned_size,
+        image_post_processing_applied=meta.get("post_processing_applied"),
+        image_revised_prompt=image_prompt if revision_note else None,
+        generated_from_article_hash=article.article_hash,
         image_generation_cost=estimated_cost,
         image_generation_log_id=log_id,
         image_approved_at=None,
@@ -694,6 +728,7 @@ async def approve_editorial_image(
         update={
             "image_status": "approved",
             "image_approved_at": now,
+            "approved_image_hash": image_payload.image_hash,
             "updated_at": now,
             "approved_image_backup": None,
         }

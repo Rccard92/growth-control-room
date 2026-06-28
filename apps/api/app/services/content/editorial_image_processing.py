@@ -1,4 +1,4 @@
-"""Post-process editorial hero images to fixed 1600x900 JPEG."""
+"""Post-process editorial hero images to fixed 1200x800 JPEG (3:2)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,12 @@ from typing import Any
 
 from PIL import Image
 
-EDITORIAL_IMAGE_FINAL_WIDTH = 1600
-EDITORIAL_IMAGE_FINAL_HEIGHT = 900
+EDITORIAL_IMAGE_FINAL_WIDTH = 1200
+EDITORIAL_IMAGE_FINAL_HEIGHT = 800
 EDITORIAL_IMAGE_PROVIDER_SIZE = "1536x1024"
-EDITORIAL_IMAGE_FINAL_SIZE = "1600x900"
-EDITORIAL_IMAGE_ASPECT_RATIO = "16:9"
+EDITORIAL_IMAGE_FINAL_SIZE = "1200x800"
+EDITORIAL_IMAGE_ASPECT_RATIO = "3:2"
+EDITORIAL_IMAGE_POST_PROCESSING = "cover_crop_3_2 + resize_jpg"
 JPEG_QUALITY = 90
 
 # Backward-compatible aliases used by existing tests/imports
@@ -21,7 +22,7 @@ TARGET_ASPECT = EDITORIAL_IMAGE_ASPECT_RATIO
 
 
 def normalize_editorial_image_bytes(raw: bytes) -> tuple[bytes, dict[str, Any]]:
-    """Cover-crop and resize any input image to exactly 1600x900 JPEG."""
+    """Cover-crop and resize any input image to exactly 1200x800 JPEG."""
     with Image.open(io.BytesIO(raw)) as img:
         rgb = img.convert("RGB")
         width, height = rgb.size
@@ -51,7 +52,20 @@ def normalize_editorial_image_bytes(raw: bytes) -> tuple[bytes, dict[str, Any]]:
         "aspect_ratio": EDITORIAL_IMAGE_ASPECT_RATIO,
         "provider_size": EDITORIAL_IMAGE_PROVIDER_SIZE,
         "final_size": EDITORIAL_IMAGE_FINAL_SIZE,
+        "post_processing_applied": EDITORIAL_IMAGE_POST_PROCESSING,
         "mime_type": "image/jpeg",
         "extension": "jpg",
     }
     return output, metadata
+
+
+def read_image_dimensions(raw: bytes) -> str | None:
+    """Return provider returned size as WxH string."""
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            width, height = img.size
+            if width > 0 and height > 0:
+                return f"{width}x{height}"
+    except Exception:
+        return None
+    return None

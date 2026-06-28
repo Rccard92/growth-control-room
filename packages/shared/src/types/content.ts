@@ -668,6 +668,12 @@ export interface EditorialImagePayload {
   imageFileExtension?: string | null;
   imageProviderSize?: string | null;
   imageFinalSize?: string | null;
+  imageProviderRequestedSize?: string | null;
+  imageProviderReturnedSize?: string | null;
+  imagePostProcessingApplied?: string | null;
+  imageRevisedPrompt?: string | null;
+  generatedFromArticleHash?: string | null;
+  approvedImageHash?: string | null;
   imageGenerationCost?: number | null;
   imageGenerationLogId?: string | null;
   imageApprovedAt?: string | null;
