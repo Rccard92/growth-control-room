@@ -21,6 +21,12 @@ export function emptyEditorialArticlePayload(): EditorialArticlePayload {
     warnings: [],
     brandContextUsed: [],
     generatedAt: "",
+    readabilityChecklist: [],
+    neuromarketingElements: [],
+    internalLinkSuggestions: [],
+    htmlBlocksUsed: [],
+    skillPackUsed: "",
+    skillPackVersion: "",
   };
 }
 
@@ -69,6 +75,12 @@ export function parseEditorialArticlePayload(
     warnings: coerceStringList(raw.warnings),
     brandContextUsed: coerceStringList(raw.brandContextUsed),
     generatedAt: String(raw.generatedAt ?? ""),
+    readabilityChecklist: coerceStringList(raw.readabilityChecklist),
+    neuromarketingElements: coerceStringList(raw.neuromarketingElements),
+    internalLinkSuggestions: coerceStringList(raw.internalLinkSuggestions),
+    htmlBlocksUsed: coerceStringList(raw.htmlBlocksUsed),
+    skillPackUsed: String(raw.skillPackUsed ?? ""),
+    skillPackVersion: String(raw.skillPackVersion ?? ""),
   };
 }
 

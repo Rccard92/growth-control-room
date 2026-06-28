@@ -55,6 +55,7 @@ from app.services.content.editorial_structure_profiles import (
     resolve_structure_profile,
 )
 from app.services.content.editorial_structure_utils import count_h2_h3, trim_structure
+from app.services.content.editorial_skill_loader import load_editorial_skill_context
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,10 @@ _BRIEF_JSON_SCHEMA = """{
   "maxH2": 5,
   "maxH3": 3,
   "avoidRepetitions": ["string"],
+  "editorialSkillChecklist": ["string"],
+  "suggestedHtmlBlocks": ["string"],
+  "internalLinkingPlan": ["string"],
+  "readabilityNotes": ["string"],
   "warnings": ["string"]
 }"""
 
@@ -273,7 +278,11 @@ def build_brand_context_used(
     return used
 
 
-def _build_system_prompt(brand_context: str | None, content_brief_rules: str) -> str:
+def _build_system_prompt(
+    brand_context: str | None,
+    content_brief_rules: str,
+    editorial_skill_context: str,
+) -> str:
     base = (
         "Sei un content strategist SEO per ecommerce Shopify. "
         "Genera SOLO un brief operativo per un futuro articolo blog — NON scrivere l'articolo, "
@@ -282,8 +291,13 @@ def _build_system_prompt(brand_context: str | None, content_brief_rules: str) ->
         "Usa le Editorial Guidelines dal contesto brand per tono, lunghezza e firma autore. "
         f"{_BRIEF_EDITORIAL_RULES}"
         f"{_BRIEF_STRUCTURE_RULES}"
+        "Compila editorialSkillChecklist (checklist operativa per il redattore), "
+        "suggestedHtmlBlocks (es. gcr-article-note, gcr-product-tip), "
+        "internalLinkingPlan (prodotti/collezioni/articoli con URL o handle reali), "
+        "readabilityNotes (angolo leggibilità e neuromarketing). "
         "Scrivi in italiano. Rispondi SOLO con JSON valido.\n\n"
-        f"{content_brief_rules}"
+        f"{content_brief_rules}\n\n"
+        f"{editorial_skill_context}"
     )
     if brand_context:
         base += f"\n\n{brand_context}"
@@ -310,7 +324,8 @@ def _build_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> 
         "In safeClaimsToUse inserisci solo claim esplicitamente consentiti. "
         "Decidi authorSuggestion in base al tipo contenuto e all'angolo: non forzare sempre una firma. "
         "Compila authorReason, contentLengthProfile, communityCtaSuggestion, editorialToneNotes, "
-        "recommendedWordCountMin/Max, structureComplexity, maxH2, maxH3 e avoidRepetitions. "
+        "recommendedWordCountMin/Max, structureComplexity, maxH2, maxH3, avoidRepetitions, "
+        "editorialSkillChecklist, suggestedHtmlBlocks, internalLinkingPlan e readabilityNotes. "
         "Se mancano informazioni, segnalale in warnings.\n\n"
         f"Rispondi con JSON nel seguente schema:\n{_BRIEF_JSON_SCHEMA}"
     )
@@ -361,7 +376,12 @@ async def generate_editorial_brief_core(
         "Contenuto editoriale generico: brief SEO operativo.",
     )
     skill = load_seo_skill_context()
-    system_prompt = _build_system_prompt(brand_ctx, skill.content_brief_rules)
+    editorial_skill = load_editorial_skill_context()
+    system_prompt = _build_system_prompt(
+        brand_ctx,
+        skill.content_brief_rules,
+        editorial_skill.as_brief_prompt_context(),
+    )
     user_prompt = _build_user_prompt(item, type_instruction)
 
     try:

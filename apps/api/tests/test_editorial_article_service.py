@@ -46,6 +46,46 @@ def test_sanitize_editorial_article_html_strips_script() -> None:
     assert "<p>" in out
 
 
+def test_sanitize_editorial_article_html_preserves_gcr_div() -> None:
+    raw = (
+        '<div class="gcr-article-note"><strong>Da ricordare:</strong> test</div>'
+        '<div class="unknown">strip inner</div>'
+    )
+    out = sanitize_editorial_article_html(raw)
+    assert 'class="gcr-article-note"' in out
+    assert "Da ricordare" in out
+    assert "unknown" not in out
+
+
+def test_normalize_editorial_article_payload_skill_fields() -> None:
+    raw = {
+        **_sample_ai_article(),
+        "readabilityChecklist": ["Paragrafi brevi"],
+        "skillPackUsed": "gcr-editorial-article",
+        "skillPackVersion": "v1",
+        "htmlBlocksUsed": ["gcr-article-note"],
+    }
+    payload = normalize_editorial_article_payload(raw)
+    assert payload.skill_pack_used == "gcr-editorial-article"
+    assert payload.readability_checklist == ["Paragrafi brevi"]
+    assert payload.html_blocks_used == ["gcr-article-note"]
+
+
+def test_build_article_system_prompt_includes_editorial_skill() -> None:
+    from app.services.content.editorial_article_service import _build_article_system_prompt
+    from app.services.content.editorial_skill_loader import load_editorial_skill_context
+
+    editorial_skill = load_editorial_skill_context()
+    prompt = _build_article_system_prompt(
+        None,
+        "brand guardrails",
+        editorial_skill.as_article_prompt_context(),
+    )
+    assert "gcr-editorial-article" in prompt
+    assert "gcr-article-note" in prompt
+    assert "neuromarketing" in prompt.lower() or "Neuromarketing" in prompt
+
+
 def test_normalize_editorial_article_payload_sanitizes_body() -> None:
     payload = normalize_editorial_article_payload(_sample_ai_article())
     assert payload.title == "Guida olio EVO"
@@ -220,6 +260,7 @@ def test_generate_editorial_article_success() -> None:
         brief_payload={"proposedTitle": "Titolo", "h2H3Structure": ["H2: Intro"]},
         linked_shopify_product_id="gid://shopify/Product/1",
         linked_shopify_product_title="Olio",
+        linked_shopify_product_handle="olio-classico",
         content_type="educational_article",
         title="Idea blog",
         planned_date=date(2026, 6, 15),
@@ -275,13 +316,29 @@ def test_generate_editorial_article_success() -> None:
                                 return_value="PK",
                             ):
                                 with patch(
-                                    "app.services.content.editorial_article_service.generate_structured_json",
-                                    new_callable=AsyncMock,
-                                    return_value=_sample_ai_article(),
+                                    "app.services.content.editorial_article_service.load_seo_skill_context",
+                                    return_value=SimpleNamespace(brand_guardrails="GUARDRAILS"),
                                 ):
-                                    result = await generate_editorial_article_core(
-                                        mock_session, project_id, item_id
-                                    )
+                                    with patch(
+                                        "app.services.content.editorial_article_service.load_editorial_skill_context",
+                                        return_value=SimpleNamespace(
+                                            as_article_prompt_context=lambda: "EDITORIAL SKILL",
+                                            version="v1",
+                                        ),
+                                    ):
+                                        with patch(
+                                            "app.services.content.editorial_article_service.fetch_latest_editorial_ai_log",
+                                            new_callable=AsyncMock,
+                                            return_value=None,
+                                        ):
+                                            with patch(
+                                                "app.services.content.editorial_article_service.generate_structured_json",
+                                                new_callable=AsyncMock,
+                                                return_value=_sample_ai_article(),
+                                            ):
+                                                result = await generate_editorial_article_core(
+                                                    mock_session, project_id, item_id
+                                                )
         assert result.status == "draft_review"
         assert result.article_payload is not None
         assert result.article_payload["title"] == "Guida olio EVO"

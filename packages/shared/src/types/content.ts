@@ -657,6 +657,10 @@ export interface EditorialBriefPayload {
   maxH2?: number;
   maxH3?: number;
   avoidRepetitions?: string[];
+  editorialSkillChecklist?: string[];
+  suggestedHtmlBlocks?: string[];
+  internalLinkingPlan?: string[];
+  readabilityNotes?: string[];
   aiGeneration?: EditorialAiGenerationSnapshot;
 }
 
@@ -687,6 +691,12 @@ export interface EditorialArticlePayload {
   warnings: string[];
   brandContextUsed: string[];
   generatedAt: string;
+  readabilityChecklist?: string[];
+  neuromarketingElements?: string[];
+  internalLinkSuggestions?: string[];
+  htmlBlocksUsed?: string[];
+  skillPackUsed?: string;
+  skillPackVersion?: string;
   aiGeneration?: EditorialAiGenerationSnapshot;
 }
 

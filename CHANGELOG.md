@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.18-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added gcr-editorial-article skill pack
+- Article Generator now applies readability and neuromarketing rules
+- Generated Shopify articles include stronger visual hierarchy
+- Added editorial quality checklist for generated articles
+
 ## [0.5.17-alpha] - 2026-06-13
 
 Tipo: Alpha patch

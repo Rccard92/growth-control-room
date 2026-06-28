@@ -53,6 +53,14 @@ from app.services.content.editorial_ai_usage_service import (
     fetch_latest_editorial_ai_log,
 )
 from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
+from app.services.content.editorial_article_quality import (
+    extract_readability_checklist,
+    validate_editorial_article_quality,
+)
+from app.services.content.editorial_skill_loader import (
+    EDITORIAL_SKILL_NAME,
+    load_editorial_skill_context,
+)
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 logger = logging.getLogger(__name__)
@@ -88,6 +96,12 @@ _ARTICLE_JSON_SCHEMA = """{
   "authorRole": "string",
   "communityCta": "string",
   "contentLengthProfile": "breve|medio|approfondito",
+  "readabilityChecklist": ["string"],
+  "neuromarketingElements": ["string"],
+  "internalLinkSuggestions": ["string"],
+  "htmlBlocksUsed": ["string"],
+  "skillPackUsed": "gcr-editorial-article",
+  "skillPackVersion": "v1",
   "warnings": ["string"]
 }"""
 
@@ -232,6 +246,7 @@ def _enrich_article_payload(
 def _build_article_system_prompt(
     brand_context: str | None,
     brand_guardrails: str,
+    editorial_skill_context: str,
     *,
     default_article_length: str | None = None,
 ) -> str:
@@ -250,19 +265,24 @@ def _build_article_system_prompt(
     base = (
         "Sei un redattore per ecommerce Shopify. "
         "Genera un articolo blog in italiano a partire dal brief SEO approvato. "
-        "Scrivi come un essere umano: concreto, utile, non prolisso. "
+        "Scrivi come un essere umano: concreto, utile, non prolisso — NON come documento Word. "
         "Rispetta Safe Claims con priorità assoluta: non inventare claim medici, "
         "non promettere cure o guarigioni, non attaccare competitor, non divulgare process secrets. "
         "Usa il tono del brand dal contesto. "
-        "bodyHtml deve usare SOLO tag sicuri: h2, h3, p, ul, ol, li, strong, em, a, blockquote. "
+        "bodyHtml deve usare tag sicuri: h2, h3, p, ul, ol, li, strong, em, a, blockquote, "
+        "div con classi gcr-article-note, gcr-product-tip, gcr-article-cta. "
+        "Paragrafi brevi (2-4 righe), almeno 1 lista puntata, 5-10 grassetti strategici, "
+        "almeno 1 box Da ricordare o Consiglio Solmielato quando coerente. "
         "Nessuno script, iframe o style inline. "
         "Segui la struttura H2/H3 del brief rispettando maxH2 e maxH3. "
+        "Segui suggestedHtmlBlocks e internalLinkingPlan del brief. "
         "Se il brief ha sezioni eccessive o ripetitive, accorpa mantenendo valore per il lettore. "
         "Includi prodotti da linkare e FAQ solo se presenti e sensati nel brief. "
         f"{_EDITORIAL_HUMAN_RULES}"
         f"{length_note}\n"
         "Rispondi SOLO con JSON valido.\n\n"
-        f"{brand_guardrails}"
+        f"{brand_guardrails}\n\n"
+        f"{editorial_skill_context}"
     )
     if brand_context:
         base += f"\n\n{brand_context}"
@@ -272,13 +292,21 @@ def _build_article_system_prompt(
 
 def _build_article_user_prompt(item: ContentSeoEditorialItem, type_instruction: str) -> str:
     brief_json = json.dumps(item.brief_payload or {}, ensure_ascii=False, indent=2)
+    product_handle = getattr(item, "linked_shopify_product_handle", None) or ""
+    handle_note = (
+        f"HANDLE PRODOTTO COLLEGATO: {product_handle}\n"
+        f"Puoi usare <a href=\"/products/{product_handle}\"> solo se handle reale.\n"
+        if product_handle.strip()
+        else "HANDLE PRODOTTO: non disponibile — NON inventare link /products/ nel bodyHtml.\n"
+    )
     return (
         f"Genera l'articolo completo per questo contenuto editoriale.\n\n"
         f"TIPO CONTENUTO: {item.content_type}\n"
         f"ISTRUZIONI TIPO: {type_instruction}\n"
         f"TITOLO PIANIFICATO: {item.title}\n"
         f"DATA PIANIFICATA: {item.planned_date}\n"
-        f"PRODOTTO COLLEGATO: {item.linked_shopify_product_title or '—'}\n\n"
+        f"PRODOTTO COLLEGATO: {item.linked_shopify_product_title or '—'}\n"
+        f"{handle_note}\n"
         f"BRIEF SEO APPROVATO (fonte principale — segui struttura, keyword, claim, FAQ, CTA):\n"
         f"{brief_json}\n\n"
         "FIRMA E TONO (dal brief):\n"
@@ -286,10 +314,14 @@ def _build_article_user_prompt(item: ContentSeoEditorialItem, type_instruction: 
         "- Se authorSuggestion è valorizzato: compila authorName (es. A cura di ...) e authorRole.\n"
         "- Usa authorReason, editorialToneNotes, contentLengthProfile, communityCtaSuggestion del brief.\n"
         "- Rispetta recommendedWordCountMin/Max, maxH2, maxH3, structureComplexity e avoidRepetitions.\n"
+        "- Segui editorialSkillChecklist, suggestedHtmlBlocks, internalLinkingPlan, readabilityNotes.\n"
+        "- Link interni nel bodyHtml SOLO con URL/handle reali; altrimenti internalLinkSuggestions.\n"
         "- Non inserire la firma nel bodyHtml.\n\n"
-        "bodyHtml deve essere HTML pulito pronto per anteprima e pubblicazione Shopify futura. "
+        "bodyHtml deve essere HTML pulito pronto per anteprima e pubblicazione Shopify. "
         "handle: slug URL-friendly in minuscolo con trattini. "
         "excerpt: 1-2 frasi introduttive. "
+        "Compila readabilityChecklist, neuromarketingElements, htmlBlocksUsed. "
+        "skillPackUsed: gcr-editorial-article. "
         "Se mancano informazioni, segnalale in warnings.\n\n"
         f"Rispondi con JSON nel seguente schema:\n{_ARTICLE_JSON_SCHEMA}"
     )
@@ -353,9 +385,11 @@ async def generate_editorial_article_core(
         else None
     )
     skill = load_seo_skill_context()
+    editorial_skill = load_editorial_skill_context()
     system_prompt = _build_article_system_prompt(
         brand_ctx,
         skill.brand_guardrails,
+        editorial_skill.as_article_prompt_context(),
         default_article_length=default_length,
     )
     user_prompt = _build_article_user_prompt(item, type_instruction)
@@ -405,6 +439,23 @@ async def generate_editorial_article_core(
         payload = _enrich_article_payload(
             payload,
             default_length=enrich_default or None,
+        )
+        quality_warnings, quality_metrics = validate_editorial_article_quality(
+            payload.body_html,
+            payload,
+            brief_norm,
+            item.content_type,
+        )
+        readability_checklist = extract_readability_checklist(quality_metrics)
+        html_blocks = list(quality_metrics.html_blocks_used) or payload.html_blocks_used
+        payload = payload.model_copy(
+            update={
+                "warnings": list(dict.fromkeys([*payload.warnings, *quality_warnings])),
+                "readability_checklist": readability_checklist or payload.readability_checklist,
+                "html_blocks_used": html_blocks,
+                "skill_pack_used": payload.skill_pack_used or EDITORIAL_SKILL_NAME,
+                "skill_pack_version": payload.skill_pack_version or editorial_skill.version,
+            }
         )
     except OpenAINotConfiguredError:
         raise ArticleGenerationError(

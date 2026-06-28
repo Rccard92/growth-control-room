@@ -7,9 +7,12 @@ from html.parser import HTMLParser
 from html import escape, unescape
 
 _ALLOWED_TAGS = frozenset(
-    {"h2", "h3", "p", "ul", "ol", "li", "strong", "em", "a", "blockquote"}
+    {"h2", "h3", "p", "ul", "ol", "li", "strong", "em", "a", "blockquote", "div"}
 )
 _ALLOWED_LINK_ATTRS = frozenset({"href", "title", "rel"})
+_ALLOWED_DIV_CLASSES = frozenset(
+    {"gcr-article-note", "gcr-product-tip", "gcr-article-cta"}
+)
 _STRIP_TAGS = frozenset({"script", "style", "iframe", "object", "embed"})
 
 
@@ -35,6 +38,11 @@ class _SanitizingHTMLParser(HTMLParser):
                 safe_attrs.append((name.lower(), value))
             attr_str = "".join(f' {k}="{escape(v, quote=True)}"' for k, v in safe_attrs)
             self._parts.append(f"<{tag_lower}{attr_str}>")
+        elif tag_lower == "div":
+            class_value = _extract_div_class(attrs)
+            if not class_value:
+                return
+            self._parts.append(f'<div class="{escape(class_value, quote=True)}">')
         else:
             self._parts.append(f"<{tag_lower}>")
         self._tag_stack.append(tag_lower)
@@ -64,6 +72,17 @@ class _SanitizingHTMLParser(HTMLParser):
             tag = self._tag_stack.pop()
             self._parts.append(f"</{tag}>")
         return "".join(self._parts)
+
+
+def _extract_div_class(attrs: list[tuple[str, str | None]]) -> str | None:
+    for name, value in attrs:
+        if name.lower() != "class" or not value:
+            continue
+        for cls in value.split():
+            normalized = cls.strip().lower()
+            if normalized in _ALLOWED_DIV_CLASSES:
+                return normalized
+    return None
 
 
 def _is_safe_href(href: str) -> bool:

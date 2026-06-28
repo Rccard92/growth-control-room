@@ -47,6 +47,37 @@ def _sample_ai_brief() -> dict:
     }
 
 
+def test_normalize_editorial_brief_payload_editorial_skill_fields() -> None:
+    payload = normalize_editorial_brief_payload(
+        {
+            "proposedTitle": "Miele",
+            "editorialSkillChecklist": ["Paragrafi brevi", "1 lista"],
+            "suggestedHtmlBlocks": ["gcr-article-note"],
+            "internalLinkingPlan": ["Link prodotto miele"],
+            "readabilityNotes": ["Angolo rassicurazione cristallizzazione"],
+        }
+    )
+    assert payload.editorial_skill_checklist == ["Paragrafi brevi", "1 lista"]
+    assert payload.suggested_html_blocks == ["gcr-article-note"]
+    assert payload.internal_linking_plan == ["Link prodotto miele"]
+    assert payload.readability_notes == ["Angolo rassicurazione cristallizzazione"]
+
+
+def test_build_brief_system_prompt_includes_editorial_skill() -> None:
+    from app.services.content.editorial_brief_service import _build_system_prompt
+    from app.services.content.editorial_skill_loader import load_editorial_skill_context
+
+    editorial_skill = load_editorial_skill_context()
+    prompt = _build_system_prompt(
+        None,
+        "content brief rules",
+        editorial_skill.as_brief_prompt_context(),
+    )
+    assert "gcr-editorial-article" in prompt
+    assert "editorialSkillChecklist" in prompt
+    assert "Readability rules" in prompt
+
+
 def test_normalize_editorial_brief_payload_coerces_lists() -> None:
     payload = normalize_editorial_brief_payload(
         {
@@ -218,6 +249,17 @@ def test_generate_editorial_brief_success() -> None:
             patch(
                 "app.services.content.editorial_brief_service.load_seo_skill_context",
                 return_value=SimpleNamespace(content_brief_rules="RULES"),
+            ),
+            patch(
+                "app.services.content.editorial_brief_service.load_editorial_skill_context",
+                return_value=SimpleNamespace(
+                    as_brief_prompt_context=lambda: "EDITORIAL SKILL",
+                    version="v1",
+                ),
+            ),
+            patch(
+                "app.services.content.editorial_brief_service.fetch_latest_editorial_ai_log",
+                new=AsyncMock(return_value=None),
             ),
             patch(
                 "app.services.content.editorial_brief_service.generate_structured_json",

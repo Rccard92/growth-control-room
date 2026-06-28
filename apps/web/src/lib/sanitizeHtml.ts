@@ -9,9 +9,15 @@ const ALLOWED_TAGS = new Set([
   "em",
   "a",
   "blockquote",
+  "div",
 ]);
 
 const ALLOWED_LINK_ATTRS = new Set(["href", "title", "rel"]);
+const ALLOWED_DIV_CLASSES = new Set([
+  "gcr-article-note",
+  "gcr-product-tip",
+  "gcr-article-cta",
+]);
 
 function isSafeHref(href: string): boolean {
   const lower = href.trim().toLowerCase();
@@ -19,6 +25,17 @@ function isSafeHref(href: string): boolean {
     return false;
   }
   return true;
+}
+
+function extractDivClass(el: Element): string | null {
+  const className = el.getAttribute("class") ?? "";
+  for (const cls of className.split(/\s+/)) {
+    const normalized = cls.trim().toLowerCase();
+    if (ALLOWED_DIV_CLASSES.has(normalized)) {
+      return normalized;
+    }
+  }
+  return null;
 }
 
 function sanitizeElement(el: Element): string {
@@ -37,6 +54,15 @@ function sanitizeElement(el: Element): string {
     const attrStr = attrs.length ? ` ${attrs.join(" ")}` : "";
     const inner = Array.from(el.childNodes).map((child) => sanitizeNode(child)).join("");
     return `<${tag}${attrStr}>${inner}</${tag}>`;
+  }
+
+  if (tag === "div") {
+    const divClass = extractDivClass(el);
+    if (!divClass) {
+      return Array.from(el.childNodes).map((child) => sanitizeNode(child)).join("");
+    }
+    const inner = Array.from(el.childNodes).map((child) => sanitizeNode(child)).join("");
+    return `<div class="${divClass}">${inner}</div>`;
   }
 
   const inner = Array.from(el.childNodes).map((child) => sanitizeNode(child)).join("");

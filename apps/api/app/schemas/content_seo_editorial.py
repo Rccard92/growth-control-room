@@ -437,6 +437,18 @@ class EditorialBriefPayload(BaseModel):
     avoid_repetitions: list[str] = Field(
         default_factory=list, serialization_alias="avoidRepetitions"
     )
+    editorial_skill_checklist: list[str] = Field(
+        default_factory=list, serialization_alias="editorialSkillChecklist"
+    )
+    suggested_html_blocks: list[str] = Field(
+        default_factory=list, serialization_alias="suggestedHtmlBlocks"
+    )
+    internal_linking_plan: list[str] = Field(
+        default_factory=list, serialization_alias="internalLinkingPlan"
+    )
+    readability_notes: list[str] = Field(
+        default_factory=list, serialization_alias="readabilityNotes"
+    )
     ai_generation: EditorialAiGenerationSnapshot | None = Field(
         default=None, serialization_alias="aiGeneration"
     )
@@ -463,6 +475,10 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
         "warnings": "warnings",
         "editorialToneNotes": "editorial_tone_notes",
         "avoidRepetitions": "avoid_repetitions",
+        "editorialSkillChecklist": "editorial_skill_checklist",
+        "suggestedHtmlBlocks": "suggested_html_blocks",
+        "internalLinkingPlan": "internal_linking_plan",
+        "readabilityNotes": "readability_notes",
     }
     for alias, field in list_fields.items():
         if alias in data:
@@ -586,6 +602,20 @@ class EditorialArticlePayload(BaseModel):
         default_factory=list, serialization_alias="brandContextUsed"
     )
     generated_at: str = Field(default="", serialization_alias="generatedAt")
+    readability_checklist: list[str] = Field(
+        default_factory=list, serialization_alias="readabilityChecklist"
+    )
+    neuromarketing_elements: list[str] = Field(
+        default_factory=list, serialization_alias="neuromarketingElements"
+    )
+    internal_link_suggestions: list[str] = Field(
+        default_factory=list, serialization_alias="internalLinkSuggestions"
+    )
+    html_blocks_used: list[str] = Field(
+        default_factory=list, serialization_alias="htmlBlocksUsed"
+    )
+    skill_pack_used: str = Field(default="", serialization_alias="skillPackUsed")
+    skill_pack_version: str = Field(default="", serialization_alias="skillPackVersion")
     ai_generation: EditorialAiGenerationSnapshot | None = Field(
         default=None, serialization_alias="aiGeneration"
     )
@@ -601,6 +631,10 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
         "linkedProducts": "linked_products",
         "warnings": "warnings",
         "brandContextUsed": "brand_context_used",
+        "readabilityChecklist": "readability_checklist",
+        "neuromarketingElements": "neuromarketing_elements",
+        "internalLinkSuggestions": "internal_link_suggestions",
+        "htmlBlocksUsed": "html_blocks_used",
     }
     for alias, field in list_fields.items():
         if alias in data:
@@ -621,6 +655,8 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
         "communityCta": "community_cta",
         "estimatedReadingTime": "estimated_reading_time",
         "generatedAt": "generated_at",
+        "skillPackUsed": "skill_pack_used",
+        "skillPackVersion": "skill_pack_version",
     }
     for alias, field in str_aliases.items():
         if alias in data and field not in data:

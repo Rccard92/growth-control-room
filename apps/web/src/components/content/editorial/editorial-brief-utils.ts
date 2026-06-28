@@ -31,6 +31,10 @@ export function emptyEditorialBriefPayload(): EditorialBriefPayload {
     maxH2: undefined,
     maxH3: undefined,
     avoidRepetitions: [],
+    editorialSkillChecklist: [],
+    suggestedHtmlBlocks: [],
+    internalLinkingPlan: [],
+    readabilityNotes: [],
   };
 }
 
@@ -201,6 +205,10 @@ export function parseEditorialBriefPayload(
     maxH2: coerceOptionalInt(raw.maxH2),
     maxH3: coerceOptionalInt(raw.maxH3),
     avoidRepetitions: coerceStringList(raw.avoidRepetitions),
+    editorialSkillChecklist: coerceStringList(raw.editorialSkillChecklist),
+    suggestedHtmlBlocks: coerceStringList(raw.suggestedHtmlBlocks),
+    internalLinkingPlan: coerceStringList(raw.internalLinkingPlan),
+    readabilityNotes: coerceStringList(raw.readabilityNotes),
   };
 }
 

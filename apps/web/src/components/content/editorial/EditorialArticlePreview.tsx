@@ -1,5 +1,6 @@
 import type { EditorialArticlePayload } from "@gcr/shared";
 import { sanitizeArticleHtml } from "../../../lib/sanitizeHtml";
+import { EditorialQualityPanel } from "./EditorialQualityPanel";
 
 interface EditorialArticlePreviewProps {
   value: EditorialArticlePayload;
@@ -51,8 +52,10 @@ export function EditorialArticlePreview({ value }: EditorialArticlePreviewProps)
         )}
       </article>
 
-      <aside className="editorial-article-preview__seo gcr-card">
-        <h4 className="gcr-card__title">Metadata SEO</h4>
+      <div className="editorial-article-preview__sidebar">
+        <EditorialQualityPanel article={value} />
+        <aside className="editorial-article-preview__seo gcr-card">
+          <h4 className="gcr-card__title">Metadata SEO</h4>
         <dl className="editorial-article-preview__meta-list">
           <div>
             <dt>Handle</dt>
@@ -100,7 +103,8 @@ export function EditorialArticlePreview({ value }: EditorialArticlePreviewProps)
             </div>
           )}
         </dl>
-      </aside>
+        </aside>
+      </div>
     </div>
   );
 }

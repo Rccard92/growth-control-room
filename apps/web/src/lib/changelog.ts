@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.18-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Added gcr-editorial-article skill pack",
+      "Article Generator now applies readability and neuromarketing rules",
+      "Generated Shopify articles include stronger visual hierarchy",
+      "Added editorial quality checklist for generated articles",
+    ],
+  },
+  {
     version: "0.5.17-alpha",
     date: "2026-06-13",
     type: "Alpha patch",
