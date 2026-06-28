@@ -2062,6 +2062,16 @@
   cursor: pointer;
 }
 
+.editorial-publishing-tab__field-hint {
+  margin: -0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--gcr-text-muted);
+}
+
+.editorial-publishing-tab__field--required .gcr-input {
+  border-color: var(--gcr-danger, #dc2626);
+}
+
 @media (max-width: 768px) {
   .editorial-article-preview {
     grid-template-columns: 1fr;

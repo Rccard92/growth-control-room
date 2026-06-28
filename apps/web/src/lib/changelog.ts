@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.17-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed Shopify articleCreate author validation",
+      "Publication tab now requires author before Shopify publish",
+      "Optional Shopify article fields no longer send invalid null values",
+      "Improved GraphQL publishing error messages",
+    ],
+  },
+  {
     version: "0.5.16-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

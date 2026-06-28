@@ -32,6 +32,8 @@ import {
   validatePublishingPayload,
 } from "./editorial-publishing-utils";
 import { getShopifyScopes } from "../../../lib/shopify-api";
+import { useShopifyStatus } from "../../../hooks/useShopify";
+import { useBrandProfile } from "../../../hooks/useBrandIntelligence";
 import { queryKeys } from "../../../lib/queryKeys";
 import { AppModal } from "../../ui/AppModal";
 import { AppSelect } from "../../ui/AppSelect";
@@ -102,6 +104,8 @@ export function EditorialItemModal({
     enabled: open,
     retry: false,
   });
+  const { data: shopifyStatus } = useShopifyStatus(open ? projectId : undefined);
+  const { data: brandProfile } = useBrandProfile(open ? projectId : undefined);
 
   const [title, setTitle] = useState("");
   const [plannedDate, setPlannedDate] = useState("");
@@ -155,7 +159,10 @@ export function EditorialItemModal({
           source.publishingPayload as unknown as Record<string, unknown>,
         )
       : hasEditorialArticle(source.articlePayload ?? null)
-        ? buildPublishingPayloadFromArticle(parsedArticle)
+        ? buildPublishingPayloadFromArticle(parsedArticle, {
+            shopName: shopifyStatus?.shopName,
+            brandName: brandProfile?.brandName,
+          })
         : null;
     setPublishing(parsedPublishing);
     setSavedPublishingSnapshot(JSON.stringify(parsedPublishing));
@@ -177,7 +184,7 @@ export function EditorialItemModal({
     const isNewItem = item.id !== lastItemIdRef.current;
     hydrateFromItem(item, isNewItem);
     lastItemIdRef.current = item.id;
-  }, [item, open]);
+  }, [item, open, shopifyStatus?.shopName, brandProfile?.brandName]);
 
   const briefDirty = useMemo(() => {
     if (!brief) return false;
@@ -506,7 +513,8 @@ export function EditorialItemModal({
     status !== "ready_to_publish" ||
     !canWriteContent ||
     scopesLoading ||
-    publishShopifyMutation.isPending;
+    publishShopifyMutation.isPending ||
+    !publishing?.author.trim();
 
   const footer =
     activeTab === "detail" ? (

@@ -45,7 +45,8 @@ export function EditorialPublishingTab({
 
   const readyToPublish = status === "ready_to_publish";
   const selectedBlog = blogs.find((b) => b.id === publishing.blogId);
-  const publishBlocked = !canWriteContent || scopesLoading;
+  const authorMissing = !publishing.author.trim();
+  const publishBlocked = !canWriteContent || scopesLoading || authorMissing;
   const publishActionsDisabled = !readyToPublish || publishBlocked;
 
   function patch(partial: Partial<EditorialPublishingPayload>) {
@@ -87,6 +88,12 @@ export function EditorialPublishingTab({
         <div className="gcr-alert gcr-alert--warning">
           Serve il permesso Shopify <strong>write_content</strong>. Riconnetti Shopify con
           gli scope aggiornati per creare articoli nel blog.
+        </div>
+      )}
+
+      {authorMissing && (
+        <div className="gcr-alert gcr-alert--warning">
+          Autore obbligatorio per creare l&apos;articolo su Shopify.
         </div>
       )}
 
@@ -212,14 +219,25 @@ export function EditorialPublishingTab({
 
       <section className="editorial-publishing-tab__section">
         <h4>Organizzazione</h4>
-        <label className="gcr-field">
-          <span className="gcr-field__label">Autore</span>
+        <label
+          className={[
+            "gcr-field",
+            authorMissing ? "editorial-publishing-tab__field--required" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <span className="gcr-field__label">Autore *</span>
           <input
             className="gcr-input"
             value={publishing.author}
             onChange={(e) => patch({ author: e.target.value })}
+            required
           />
         </label>
+        <p className="editorial-publishing-tab__field-hint">
+          Shopify richiede sempre un autore per i post blog.
+        </p>
         <AppSelect
           label="Blog Shopify"
           value={publishing.blogId ?? ""}

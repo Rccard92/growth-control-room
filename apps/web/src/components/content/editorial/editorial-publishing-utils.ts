@@ -4,6 +4,8 @@ import type {
   EditorialPublishMode,
 } from "@gcr/shared";
 
+export const DEFAULT_AUTHOR_FALLBACK = "Redazione Solmielato";
+
 export function emptyEditorialPublishingPayload(): EditorialPublishingPayload {
   return {
     title: "",
@@ -39,6 +41,28 @@ function coerceTags(value: unknown): string[] {
   return [];
 }
 
+export function resolveDefaultAuthor(options?: {
+  articleAuthorName?: string | null;
+  savedAuthor?: string | null;
+  shopName?: string | null;
+  brandName?: string | null;
+}): string {
+  const candidates = [
+    options?.articleAuthorName,
+    options?.savedAuthor,
+    options?.shopName,
+    options?.brandName,
+    options?.brandName ? `Redazione ${options.brandName}` : null,
+    DEFAULT_AUTHOR_FALLBACK,
+  ];
+  for (const candidate of candidates) {
+    if (candidate && String(candidate).trim()) {
+      return String(candidate).trim();
+    }
+  }
+  return DEFAULT_AUTHOR_FALLBACK;
+}
+
 export function parseEditorialPublishingPayload(
   raw: Record<string, unknown> | EditorialPublishingPayload | null | undefined,
 ): EditorialPublishingPayload {
@@ -70,8 +94,20 @@ export function parseEditorialPublishingPayload(
 
 export function buildPublishingPayloadFromArticle(
   article: EditorialArticlePayload,
-  options?: { blogId?: string | null; blogGid?: string | null },
+  options?: {
+    blogId?: string | null;
+    blogGid?: string | null;
+    shopName?: string | null;
+    brandName?: string | null;
+    savedAuthor?: string | null;
+  },
 ): EditorialPublishingPayload {
+  const author = resolveDefaultAuthor({
+    articleAuthorName: article.authorName,
+    savedAuthor: options?.savedAuthor,
+    shopName: options?.shopName,
+    brandName: options?.brandName,
+  });
   return {
     title: article.title.trim(),
     handle: article.handle.trim(),
@@ -79,7 +115,7 @@ export function buildPublishingPayloadFromArticle(
     excerpt: article.excerpt.trim(),
     seoTitle: article.seoTitle.trim() || article.title.trim(),
     metaDescription: article.metaDescription.trim(),
-    author: (article.authorName ?? "").trim(),
+    author,
     blogId: options?.blogId ?? null,
     blogGid: options?.blogGid ?? null,
     tags: [...(article.tags ?? [])],
@@ -101,6 +137,9 @@ export function validatePublishingPayload(
   if (!payload.bodyHtml.trim()) errors.push("Il contenuto HTML è obbligatorio.");
   if (options?.forPublish && !payload.blogId && !payload.blogGid) {
     errors.push("Seleziona un blog Shopify prima di pubblicare.");
+  }
+  if (options?.forPublish && !payload.author.trim()) {
+    errors.push("Autore obbligatorio per creare l'articolo su Shopify.");
   }
   return errors;
 }

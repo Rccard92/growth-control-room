@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { EditorialArticlePayload } from "@gcr/shared";
 import {
   buildPublishingPayloadFromArticle,
+  DEFAULT_AUTHOR_FALLBACK,
   parseEditorialPublishingPayload,
+  resolveDefaultAuthor,
   validatePublishingPayload,
 } from "./editorial-publishing-utils";
 
@@ -43,5 +45,34 @@ describe("editorial-publishing-utils", () => {
     const payload = buildPublishingPayloadFromArticle(sampleArticle);
     const errors = validatePublishingPayload(payload, { forPublish: true });
     expect(errors.some((e) => e.toLowerCase().includes("blog"))).toBe(true);
+  });
+
+  it("resolveDefaultAuthor usa la catena di fallback", () => {
+    expect(
+      resolveDefaultAuthor({
+        articleAuthorName: "Davide",
+        shopName: "Shop",
+        brandName: "Brand",
+      }),
+    ).toBe("Davide");
+    expect(
+      resolveDefaultAuthor({
+        shopName: "Solmielato Shop",
+        brandName: "Solmielato",
+      }),
+    ).toBe("Solmielato Shop");
+    expect(resolveDefaultAuthor({ brandName: "Solmielato" })).toBe("Solmielato");
+    expect(resolveDefaultAuthor({})).toBe(DEFAULT_AUTHOR_FALLBACK);
+  });
+
+  it("richiede autore per publish", () => {
+    const payload = parseEditorialPublishingPayload({
+      title: "Titolo",
+      bodyHtml: "<p>Test</p>",
+      author: "",
+      blogId: "blog-1",
+    });
+    const errors = validatePublishingPayload(payload, { forPublish: true });
+    expect(errors.some((e) => e.toLowerCase().includes("autore"))).toBe(true);
   });
 });

@@ -21,8 +21,11 @@ from app.services.content.editorial_item_service import get_editorial_item, get_
 from app.services.content.editorial_publishing_utils import (
     build_article_create_input,
     build_publishing_payload_from_article,
+    format_shopify_publish_error,
     normalize_publishing_payload,
+    resolve_publishing_author,
     shopify_gid_numeric_id,
+    shopify_publish_http_status,
     validate_publishing_payload,
 )
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
@@ -30,6 +33,48 @@ from app.services.shopify.connect import get_shopify_client_for_store, get_shopi
 from app.services.shopify.scopes import can_publish_with_write_content
 
 logger = logging.getLogger(__name__)
+
+
+async def _project_brand_name(session: AsyncSession, project_id: UUID) -> str | None:
+    try:
+        from app.services.content.editorial_plan_service import _brand_name
+
+        return await _brand_name(session, project_id)
+    except Exception as exc:
+        logger.warning("Editorial publish: brand name unavailable: %s", exc)
+        return None
+
+
+def _article_author_name(article_payload: dict | None) -> str | None:
+    if not article_payload:
+        return None
+    raw = article_payload.get("authorName") or article_payload.get("author_name")
+    return str(raw).strip() if raw else None
+
+
+async def _mark_publish_error(
+    session: AsyncSession,
+    row: ContentSeoEditorialItem,
+    *,
+    message: str,
+    mode: str,
+) -> None:
+    row.publish_status = "publish_error"
+    row.last_publish_error = message
+    row.publish_mode = mode
+    await session.flush()
+
+
+async def _raise_shopify_publish_error(
+    session: AsyncSession,
+    row: ContentSeoEditorialItem,
+    exc: ShopifyAPIError,
+    mode: str,
+) -> None:
+    readable = format_shopify_publish_error(exc.message)
+    http_status = shopify_publish_http_status(exc.message, exc.status_code)
+    await _mark_publish_error(session, row, message=readable, mode=mode)
+    raise HTTPException(http_status, detail=readable) from exc
 
 
 async def _resolve_blog_gid(
@@ -137,16 +182,37 @@ async def publish_editorial_to_shopify(
             detail=scope_check["message"],
         )
 
-    if row.publishing_payload:
+    brand_name = await _project_brand_name(session, project_id)
+    article_author = _article_author_name(row.article_payload)
+    had_saved_payload = row.publishing_payload is not None
+
+    if had_saved_payload:
         publishing = normalize_publishing_payload(row.publishing_payload)
     else:
-        publishing = build_publishing_payload_from_article(row.article_payload)
+        publishing = build_publishing_payload_from_article(
+            row.article_payload,
+            shop_name=store.shop_name,
+            brand_name=brand_name,
+        )
         warnings.append(
             "Payload di pubblicazione generato dall'articolo. "
             "Salva la tab Pubblicazione per conservarlo."
         )
 
-    errors = validate_publishing_payload(publishing, for_publish=True)
+    if not publishing.author.strip() and not had_saved_payload:
+        resolved_author = resolve_publishing_author(
+            publishing,
+            article_author_name=article_author,
+            shop_name=store.shop_name,
+            brand_name=brand_name,
+        )
+        publishing = publishing.model_copy(update={"author": resolved_author})
+
+    errors = validate_publishing_payload(
+        publishing,
+        for_publish=True,
+        scheduled_publish_at=row.scheduled_publish_at,
+    )
     if errors:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -154,37 +220,36 @@ async def publish_editorial_to_shopify(
         )
 
     blog_gid, blog_row = await _resolve_blog_gid(session, store.id, publishing)
-    article_input = build_article_create_input(
-        publishing,
-        blog_gid=blog_gid,
-        mode=request.mode,
-    )
+    try:
+        article_input = build_article_create_input(
+            publishing,
+            blog_gid=blog_gid,
+            mode=request.mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
     try:
         client = await get_shopify_client_for_store(store)
         result = await client.create_article(article_input)
     except ShopifyAPIError as exc:
-        row.publish_status = "publish_error"
-        row.last_publish_error = exc.message
-        row.publish_mode = request.mode
-        await session.flush()
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            detail=f"Errore Shopify: {exc.message}",
-        ) from exc
+        await _raise_shopify_publish_error(session, row, exc, request.mode)
 
     user_errors = result.get("userErrors") or []
     if user_errors:
         messages = "; ".join(
             err.get("message", str(err)) for err in user_errors if isinstance(err, dict)
         )
-        row.publish_status = "publish_error"
-        row.last_publish_error = messages or "Errore durante la creazione dell'articolo."
-        row.publish_mode = request.mode
-        await session.flush()
+        readable = format_shopify_publish_error(
+            messages or "Errore durante la creazione dell'articolo."
+        )
+        await _mark_publish_error(session, row, message=readable, mode=request.mode)
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=row.last_publish_error,
+            detail=readable,
         )
 
     article_node = result.get("article") or {}
