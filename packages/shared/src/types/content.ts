@@ -699,6 +699,8 @@ export interface EditorialArticlePayload {
   warnings: string[];
   brandContextUsed: string[];
   generatedAt: string;
+  updatedAt?: string;
+  articleHash?: string;
   readabilityChecklist?: string[];
   neuromarketingElements?: string[];
   internalLinkSuggestions?: string[];
@@ -742,6 +744,9 @@ export interface EditorialPublishingPayload {
   isPublished: boolean;
   publishDate?: string | null;
   templateSuffix?: string | null;
+  sourceArticleHash?: string | null;
+  sourceArticleUpdatedAt?: string | null;
+  syncedFromArticleAt?: string | null;
 }
 
 export interface EditorialPublishingUpdateRequest {

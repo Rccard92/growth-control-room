@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.20-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added article/publishing payload sync detection
+- Added update flow for existing Shopify article drafts
+- Prevented duplicate Shopify article creation when a draft already exists
+- Reduced Safe Claims false positives for "lavorato con cura"
+
 ## [0.5.19-alpha] - 2026-06-13
 
 Tipo: Alpha patch

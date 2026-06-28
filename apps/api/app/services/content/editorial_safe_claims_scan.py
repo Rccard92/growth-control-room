@@ -11,26 +11,33 @@ from app.models.brand_intelligence import BrandSafeClaims
 Severity = Literal["low", "medium", "high"]
 
 _STRIP_HTML = re.compile(r"<[^>]+>")
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+_ARTISAN_CURA_RE = re.compile(
+    r"\b(?:lavorato|fatto|selezionato|preparato|realizzato)\s+con\s+cura\b|"
+    r"\ba\s+cura\s+di\b|"
+    r"\b(?:con|a)\s+cura\b|"
+    r"\bcura\s+artigianale\b|"
+    r"\battenzione\s+alla\s+qualit[aà]\b",
+    re.IGNORECASE,
+)
 
 _GENERIC_HEALTH_PATTERNS: list[tuple[str, str, str]] = [
     (
-        r"\b(cura|guarisce|guarigione|terapeutico|medicinale)\b",
+        r"\b(cura\s+(?:delle|dei|degli|del|di\s+la|di)\s+\w+|guarisce|guarigione|terapeutico|medicinale|curativo)\b",
         "potenziale linguaggio medico/terapeutico",
         "sostituire con formulazione descrittiva non terapeutica",
     ),
     (
-        r"\b(preven(e|gono|zione)\s+(?:la|il|le|i)\s+\w+)",
+        r"\b(preven(e|gono|zione)\s+(?:la|il|le|i)\s+\w+|aiuta\s+a\s+prevenire)\b",
         "potenziale claim preventivo non verificabile",
         "evitare promesse di prevenzione; descrivere uso e caratteristiche",
     ),
     (
-        r"\b(benessere\s+quotidiano|aiuta\s+il\s+benessere)\b",
+        r"\b(benessere\s+quotidiano|aiuta\s+il\s+benessere|fa\s+bene\s+alla\s+salute|sistema\s+immunitario)\b",
         "potenziale claim salutistico generico",
         "sostituire con 'si inserisce con semplicità nella routine quotidiana'",
     ),
     (
-        r"\b(antibiotico\s+naturale|effetto\s+curativo)\b",
+        r"\b(antibiotico\s+naturale|effetto\s+curativo|antinfiammatorio|antibatterico|depurativo|rimedio\s+naturale)\b",
         "claim salutistico non consentito",
         "rimuovere riferimenti a proprietà curative",
     ),
@@ -60,18 +67,23 @@ def _strip_html(html: str) -> str:
     return _STRIP_HTML.sub(" ", html or "")
 
 
+def _is_artisan_cura_context(sentence: str, matched: str) -> bool:
+    if _ARTISAN_CURA_RE.search(sentence):
+        return True
+    if matched.lower() == "cura" and re.search(r"(?:con|a)\s+cura\b", sentence, re.IGNORECASE):
+        return True
+    return False
+
+
 def _extract_sentence(text: str, match_start: int) -> str:
     text = text.strip()
     if not text:
         return ""
-    # Expand to sentence boundaries
     before = text[:match_start]
     after = text[match_start:]
     start = max(before.rfind("."), before.rfind("!"), before.rfind("?")) + 1
-    end_rel = min(
-        (after.find(c) for c in ".!?" if after.find(c) >= 0),
-        default=len(after),
-    )
+    end_candidates = [after.find(c) for c in ".!?" if after.find(c) >= 0]
+    end_rel = min(end_candidates) if end_candidates else len(after)
     if end_rel == len(after):
         sentence = text[start : match_start + len(after)].strip()
     else:
@@ -101,6 +113,8 @@ def _scan_rule_list(
             continue
         phrase = _extract_sentence(plain, idx)
         if not phrase or phrase.lower() in seen_phrases:
+            continue
+        if _is_artisan_cura_context(phrase, rule_text):
             continue
         seen_phrases.add(phrase.lower())
         flags.append(
@@ -172,8 +186,11 @@ def scan_editorial_safe_claims(
 
     for pattern, reason, suggestion in _GENERIC_HEALTH_PATTERNS:
         for match in re.finditer(pattern, plain, flags=re.IGNORECASE):
+            matched = match.group(0)
             phrase = _extract_sentence(plain, match.start())
             if not phrase or phrase.lower() in seen_phrases:
+                continue
+            if _is_artisan_cura_context(phrase, matched):
                 continue
             seen_phrases.add(phrase.lower())
             flags.append(

@@ -19,8 +19,16 @@ interface EditorialPublishingTabProps {
   item: ContentSeoEditorialItem;
   status: ContentSeoEditorialStatus;
   hasArticle: boolean;
+  publishingStale: boolean;
+  publishingSyncUnknown: boolean;
+  staleDismissed: boolean;
   publishing: EditorialPublishingPayload;
   onChange: (value: EditorialPublishingPayload) => void;
+  onSyncFromArticle: () => void;
+  onDismissStale: () => void;
+  onDisconnectShopify: () => void;
+  syncLoading?: boolean;
+  disconnectLoading?: boolean;
   blogs: ShopifyBlogListItem[];
   blogsLoading: boolean;
   blogsSyncRequired: boolean;
@@ -32,8 +40,16 @@ export function EditorialPublishingTab({
   item,
   status,
   hasArticle,
+  publishingStale,
+  publishingSyncUnknown,
+  staleDismissed,
   publishing,
   onChange,
+  onSyncFromArticle,
+  onDismissStale,
+  onDisconnectShopify,
+  syncLoading = false,
+  disconnectLoading = false,
   blogs,
   blogsLoading,
   blogsSyncRequired,
@@ -48,6 +64,8 @@ export function EditorialPublishingTab({
   const authorMissing = !publishing.author.trim();
   const publishBlocked = !canWriteContent || scopesLoading || authorMissing;
   const publishActionsDisabled = !readyToPublish || publishBlocked;
+  const hasShopifyLink = Boolean(item.shopifyArticleGid);
+  const shopifyActionVerb = hasShopifyLink ? "aggiornato" : "creato";
 
   function patch(partial: Partial<EditorialPublishingPayload>) {
     onChange({ ...publishing, ...partial });
@@ -101,14 +119,52 @@ export function EditorialPublishingTab({
         <div className="gcr-alert gcr-alert--error">{item.lastPublishError}</div>
       )}
 
+      {publishingStale && !staleDismissed && (
+        <div className="gcr-alert gcr-alert--warning editorial-publishing-tab__stale-banner">
+          <p>
+            L&apos;articolo è stato modificato dopo la preparazione dei dati di pubblicazione.
+          </p>
+          <div className="editorial-publishing-tab__stale-actions">
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary gcr-btn--sm"
+              disabled={syncLoading}
+              onClick={onSyncFromArticle}
+            >
+              {syncLoading ? "Aggiornamento…" : "Aggiorna dati pubblicazione dall'articolo"}
+            </button>
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--ghost gcr-btn--sm"
+              onClick={onDismissStale}
+            >
+              Mantieni dati pubblicazione attuali
+            </button>
+          </div>
+        </div>
+      )}
+
+      {publishingSyncUnknown && !publishingStale && !staleDismissed && (
+        <div className="gcr-alert gcr-alert--warning">
+          Sincronizzazione articolo/pubblicazione non verificabile. Verifica i contenuti prima di
+          inviare a Shopify.
+        </div>
+      )}
+
       <div className="editorial-publishing-tab__summary">
         <p>
-          Questo articolo verrà creato nel blog Shopify:{" "}
+          Questo articolo verrà {shopifyActionVerb} nel blog Shopify:{" "}
           <strong>{selectedBlog?.title ?? "— seleziona un blog —"}</strong>
         </p>
         <p>
           Stato: <span className="editorial-publishing-tab__status">{getPublishStatusLabel(item.publishStatus)}</span>
         </p>
+        {hasShopifyLink && item.publishStatus === "draft_created" && (
+          <p className="editorial-publishing-tab__shopify-linked">Bozza Shopify già creata</p>
+        )}
+        {hasShopifyLink && item.publishStatus === "published" && (
+          <p className="editorial-publishing-tab__shopify-linked">Articolo Shopify già collegato</p>
+        )}
         {item.shopifyArticleAdminUrl && (
           <p>
             <a
@@ -315,14 +371,28 @@ export function EditorialPublishingTab({
           {advancedOpen ? "Nascondi avanzate" : "Mostra avanzate"}
         </button>
         {advancedOpen && (
-          <label className="gcr-field">
-            <span className="gcr-field__label">Template suffix</span>
-            <input
-              className="gcr-input"
-              value={publishing.templateSuffix ?? ""}
-              onChange={(e) => patch({ templateSuffix: e.target.value || null })}
-            />
-          </label>
+          <>
+            <label className="gcr-field">
+              <span className="gcr-field__label">Template suffix</span>
+              <input
+                className="gcr-input"
+                value={publishing.templateSuffix ?? ""}
+                onChange={(e) => patch({ templateSuffix: e.target.value || null })}
+              />
+            </label>
+            {hasShopifyLink && (
+              <div className="editorial-publishing-tab__disconnect">
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--danger gcr-btn--sm"
+                  disabled={disconnectLoading}
+                  onClick={onDisconnectShopify}
+                >
+                  {disconnectLoading ? "Scollegamento…" : "Scollega articolo Shopify"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

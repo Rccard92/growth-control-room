@@ -596,6 +596,49 @@ class ShopifyGraphQLClient:
         data = await self.execute(mutation, {"article": article_input})
         return data.get("articleCreate") or {}
 
+    async def update_article(
+        self,
+        article_gid: str,
+        article_input: dict[str, Any],
+    ) -> dict[str, Any]:
+        mutation = """
+        mutation ArticleUpdate($id: ID!, $article: ArticleUpdateInput!) {
+          articleUpdate(id: $id, article: $article) {
+            article {
+              id
+              handle
+              title
+              publishedAt
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+        data = await self.execute(
+            mutation,
+            {"id": article_gid, "article": article_input},
+        )
+        return data.get("articleUpdate") or {}
+
+    async def find_article_by_handle(
+        self,
+        blog_gid: str,
+        handle: str,
+    ) -> dict[str, Any] | None:
+        """Return first article node in blog matching handle, or None."""
+        target = handle.strip().lower()
+        if not target:
+            return None
+        articles = await self._paginate_blog_articles(blog_gid, page_size=50)
+        for article in articles:
+            article_handle = str(article.get("handle") or "").strip().lower()
+            if article_handle == target:
+                return article
+        return None
+
     def _build_orders_query(self, optional_blocks: dict[str, str]) -> str:
         extra = "\n".join(optional_blocks.values())
         node_fields = f"{ORDER_CORE_FIELDS}\n{extra}"

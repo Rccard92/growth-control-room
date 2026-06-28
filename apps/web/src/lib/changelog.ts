@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.20-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Added article/publishing payload sync detection",
+      "Added update flow for existing Shopify article drafts",
+      "Prevented duplicate Shopify article creation when a draft already exists",
+      'Reduced Safe Claims false positives for "lavorato con cura"',
+    ],
+  },
+  {
     version: "0.5.19-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

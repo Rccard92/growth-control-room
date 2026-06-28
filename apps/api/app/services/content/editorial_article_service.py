@@ -48,6 +48,7 @@ from app.services.content.editorial_brief_service import (
     build_brand_context_used,
 )
 from app.services.content.editorial_item_service import get_editorial_item
+from app.services.content.editorial_publishing_utils import enrich_article_with_hash
 from app.services.content.editorial_ai_usage_service import (
     ARTICLE_OPERATION_KEYS,
     build_ai_generation_snapshot_from_log,
@@ -505,9 +506,9 @@ async def generate_editorial_article_core(
         update={
             "brand_context_used": context_used,
             "warnings": merged_warnings,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
+    payload = enrich_article_with_hash(payload, is_new_generation=True)
 
     article_log = await fetch_latest_editorial_ai_log(
         session, project_id, item_id, ARTICLE_OPERATION_KEYS
@@ -559,6 +560,7 @@ async def update_editorial_article(
     try:
         payload = normalize_editorial_article_payload(request.article_payload)
         payload = _enrich_article_payload(payload)
+        payload = enrich_article_with_hash(payload)
     except ValidationError as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,

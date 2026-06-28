@@ -212,6 +212,7 @@ def test_publish_success_draft_sets_gid() -> None:
                     return_value={"allowed": True},
                 ):
                     mock_client = AsyncMock()
+                    mock_client.find_article_by_handle = AsyncMock(return_value=None)
                     mock_client.create_article = AsyncMock(
                         return_value={
                             "article": {
@@ -255,6 +256,92 @@ def test_publish_success_draft_sets_gid() -> None:
     asyncio.run(run())
 
 
+def test_publish_update_when_gid_exists() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+    blog_id = uuid4()
+    publishing = build_publishing_payload_from_article(_article_payload())
+    publishing = publishing.model_copy(update={"blog_id": str(blog_id), "author": "Redazione Test"})
+    row = _sample_row(publishing_payload=publishing.model_dump(by_alias=True))
+    row.shopify_article_gid = "gid://shopify/Article/55"
+    row.shopify_article_id = "55"
+    row.publish_status = "draft_created"
+    store = SimpleNamespace(
+        id=uuid4(),
+        shop_domain="shop.myshopify.com",
+        shop_name="Solmielato",
+        connection_status="connected",
+    )
+    blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
+
+    async def run() -> None:
+        mock_session = AsyncMock()
+
+        async def fake_execute(stmt):  # noqa: ANN001
+            class Result:
+                def scalar_one_or_none(self_inner):  # noqa: ANN001
+                    return blog_row
+
+            return Result()
+
+        mock_session.execute = fake_execute
+
+        with patch(
+            "app.services.content.editorial_shopify_publish_service.get_editorial_item",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            with patch(
+                "app.services.content.editorial_shopify_publish_service.get_shopify_store_for_project",
+                new_callable=AsyncMock,
+                return_value=store,
+            ):
+                with patch(
+                    "app.services.content.editorial_shopify_publish_service.can_publish_with_write_content",
+                    new_callable=AsyncMock,
+                    return_value={"allowed": True},
+                ):
+                    with patch(
+                        "app.services.content.editorial_shopify_publish_service._project_brand_name",
+                        new_callable=AsyncMock,
+                        return_value="Solmielato",
+                    ):
+                        mock_client = AsyncMock()
+                        mock_client.find_article_by_handle = AsyncMock(return_value=None)
+                        mock_client.update_article = AsyncMock(
+                            return_value={
+                                "article": {
+                                    "id": "gid://shopify/Article/55",
+                                    "handle": "guida-olio-evo",
+                                    "title": "Guida olio EVO",
+                                },
+                                "userErrors": [],
+                            }
+                        )
+                        mock_client.create_article = AsyncMock()
+                        with patch(
+                            "app.services.content.editorial_shopify_publish_service.get_shopify_client_for_store",
+                            new_callable=AsyncMock,
+                            return_value=mock_client,
+                        ):
+                            with patch(
+                                "app.services.content.editorial_shopify_publish_service.get_editorial_item_read",
+                                new_callable=AsyncMock,
+                                return_value=ContentSeoEditorialItemRead.model_validate(row),
+                            ):
+                                await publish_editorial_to_shopify(
+                                    mock_session,
+                                    project_id,
+                                    item_id,
+                                    EditorialPublishShopifyRequest(mode="draft"),
+                                )
+                        mock_client.update_article.assert_awaited_once()
+                        mock_client.create_article.assert_not_awaited()
+                        assert row.shopify_article_gid == "gid://shopify/Article/55"
+
+    asyncio.run(run())
+
+
 def test_publish_user_errors_keeps_payload() -> None:
     project_id = uuid4()
     item_id = uuid4()
@@ -294,6 +381,7 @@ def test_publish_user_errors_keeps_payload() -> None:
                     return_value={"allowed": True},
                 ):
                     mock_client = AsyncMock()
+                    mock_client.find_article_by_handle = AsyncMock(return_value=None)
                     mock_client.create_article = AsyncMock(
                         return_value={
                             "article": None,
@@ -340,6 +428,7 @@ def test_publish_empty_author_saved_payload_returns_422_before_shopify() -> None
     async def run() -> None:
         mock_session = AsyncMock()
         mock_client = AsyncMock()
+        mock_client.find_article_by_handle = AsyncMock(return_value=None)
         mock_client.create_article = AsyncMock()
         with patch(
             "app.services.content.editorial_shopify_publish_service.get_editorial_item",
@@ -430,6 +519,7 @@ def test_publish_graphql_author_error_returns_422() -> None:
                         return_value="Solmielato",
                     ):
                         mock_client = AsyncMock()
+                        mock_client.find_article_by_handle = AsyncMock(return_value=None)
                         mock_client.create_article = AsyncMock(
                             side_effect=ShopifyAPIError(
                                 "Errore GraphQL Shopify: invalid value for author "
@@ -505,6 +595,7 @@ def test_publish_network_error_returns_502() -> None:
                         return_value="Solmielato",
                     ):
                         mock_client = AsyncMock()
+                        mock_client.find_article_by_handle = AsyncMock(return_value=None)
                         mock_client.create_article = AsyncMock(
                             side_effect=ShopifyAPIError(
                                 "Impossibile contattare Shopify. Verifica il dominio dello shop."

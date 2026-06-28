@@ -20,6 +20,8 @@ import {
   getEditorialItems,
   getShopifyBlogs,
   publishEditorialShopify,
+  syncEditorialPublishingFromArticle,
+  disconnectEditorialShopifyArticle,
   rescheduleEditorialItem,
   startEditorialBriefBatch,
   updateEditorialBrief,
@@ -236,6 +238,22 @@ export function usePublishEditorialShopify(projectId: string) {
       itemId: string;
       data: EditorialPublishShopifyRequest;
     }) => publishEditorialShopify(projectId, itemId, data),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useSyncEditorialPublishingFromArticle(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => syncEditorialPublishingFromArticle(projectId, itemId),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useDisconnectEditorialShopifyArticle(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => disconnectEditorialShopifyArticle(projectId, itemId),
     onSuccess: () => invalidateEditorial(qc, projectId),
   });
 }

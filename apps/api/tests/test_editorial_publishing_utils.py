@@ -8,8 +8,14 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:
 from app.schemas.content_seo_editorial import EditorialArticlePayload, EditorialPublishingPayload
 from app.services.content.editorial_publishing_utils import (
     DEFAULT_AUTHOR_FALLBACK,
+    HANDLE_CONFLICT_MESSAGE,
+    attach_publishing_sync_metadata,
     build_article_create_input,
+    build_article_update_input,
     build_publishing_payload_from_article,
+    compute_editorial_article_hash,
+    enrich_article_with_hash,
+    format_handle_conflict_error,
     format_shopify_publish_error,
     merge_article_into_publishing,
     normalize_publishing_payload,
@@ -192,3 +198,27 @@ def test_normalize_publishing_payload_camel_case() -> None:
     assert payload.body_html == "<p>Ok</p>"
     assert payload.tags == ["a", "b"]
     assert payload.mode == "publish_now"
+
+
+def test_compute_editorial_article_hash_stable() -> None:
+    article = _sample_article()
+    assert compute_editorial_article_hash(article) == compute_editorial_article_hash(article)
+
+
+def test_enrich_article_with_hash() -> None:
+    enriched = enrich_article_with_hash(_sample_article(), is_new_generation=True)
+    assert enriched.article_hash
+    assert enriched.generated_at
+    assert enriched.updated_at
+
+
+def test_build_article_update_input_publish_now() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    update_input = build_article_update_input(payload, mode="publish_now")
+    assert "blogId" not in update_input
+    assert update_input["isPublished"] is True
+    assert "publishDate" in update_input
+
+
+def test_format_handle_conflict_error() -> None:
+    assert format_handle_conflict_error("Handle already taken") == HANDLE_CONFLICT_MESSAGE

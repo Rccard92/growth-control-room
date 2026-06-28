@@ -1,78 +1,68 @@
 import { describe, expect, it } from "vitest";
-import type { EditorialArticlePayload } from "@gcr/shared";
+import type { EditorialArticlePayload, EditorialPublishingPayload } from "@gcr/shared";
 import {
-  buildPublishingPayloadFromArticle,
-  DEFAULT_AUTHOR_FALLBACK,
-  parseEditorialPublishingPayload,
-  resolveDefaultAuthor,
-  validatePublishingPayload,
+  buildArticleHashCanonical,
+  isPublishingStale,
+  isPublishingSyncUnknown,
 } from "./editorial-publishing-utils";
 
 const sampleArticle: EditorialArticlePayload = {
-  title: "Guida olio EVO",
-  handle: "guida-olio-evo",
-  excerpt: "Tutto sull'olio.",
-  bodyHtml: "<h2>Intro</h2><p>Testo.</p>",
+  title: "Guida miele",
+  handle: "guida-miele",
+  excerpt: "Intro",
+  bodyHtml: "<p>Test</p>",
   bodyMarkdown: "",
-  seoTitle: "Olio EVO guida",
-  metaDescription: "Meta desc",
-  tags: ["olio"],
+  seoTitle: "",
+  metaDescription: "",
+  tags: [],
   linkedProducts: [],
-  cta: "",
-  authorName: "Davide",
+  cta: "Scopri",
   status: "draft",
   warnings: [],
   brandContextUsed: [],
   generatedAt: "",
+  articleHash: "abc123",
+  skillPackUsed: "gcr-editorial-article",
+  skillPackVersion: "v1.1",
 };
 
-describe("editorial-publishing-utils", () => {
-  it("precompila da articlePayload", () => {
-    const payload = buildPublishingPayloadFromArticle(sampleArticle);
-    expect(payload.title).toBe("Guida olio EVO");
-    expect(payload.bodyHtml).toContain("<h2>");
-    expect(payload.author).toBe("Davide");
-    expect(payload.mode).toBe("draft");
+const samplePublishing: EditorialPublishingPayload = {
+  title: "Guida miele",
+  handle: "guida-miele",
+  bodyHtml: "<p>Old</p>",
+  excerpt: "",
+  seoTitle: "",
+  metaDescription: "",
+  author: "Redazione",
+  tags: [],
+  mode: "draft",
+  isPublished: false,
+  sourceArticleHash: "old-hash",
+};
+
+describe("editorial-publishing-utils sync", () => {
+  it("rileva publishing stale quando hash differisce", () => {
+    expect(isPublishingStale(sampleArticle, samplePublishing)).toBe(true);
   });
 
-  it("valida campi obbligatori", () => {
-    const payload = parseEditorialPublishingPayload({ title: "", bodyHtml: "" });
-    const errors = validatePublishingPayload(payload);
-    expect(errors.length).toBeGreaterThanOrEqual(2);
+  it("non segnala stale se hash allineati", () => {
+    const publishing = { ...samplePublishing, sourceArticleHash: "abc123" };
+    expect(isPublishingStale(sampleArticle, publishing)).toBe(false);
   });
 
-  it("richiede blog per publish", () => {
-    const payload = buildPublishingPayloadFromArticle(sampleArticle);
-    const errors = validatePublishingPayload(payload, { forPublish: true });
-    expect(errors.some((e) => e.toLowerCase().includes("blog"))).toBe(true);
-  });
-
-  it("resolveDefaultAuthor usa la catena di fallback", () => {
-    expect(
-      resolveDefaultAuthor({
-        articleAuthorName: "Davide",
-        shopName: "Shop",
-        brandName: "Brand",
-      }),
-    ).toBe("Davide");
-    expect(
-      resolveDefaultAuthor({
-        shopName: "Solmielato Shop",
-        brandName: "Solmielato",
-      }),
-    ).toBe("Solmielato Shop");
-    expect(resolveDefaultAuthor({ brandName: "Solmielato" })).toBe("Solmielato");
-    expect(resolveDefaultAuthor({})).toBe(DEFAULT_AUTHOR_FALLBACK);
-  });
-
-  it("richiede autore per publish", () => {
-    const payload = parseEditorialPublishingPayload({
-      title: "Titolo",
-      bodyHtml: "<p>Test</p>",
-      author: "",
-      blogId: "blog-1",
+  it("buildArticleHashCanonical ordina i tag", () => {
+    const canonical = buildArticleHashCanonical({
+      ...sampleArticle,
+      title: " Titolo ",
+      tags: ["b", "a"],
     });
-    const errors = validatePublishingPayload(payload, { forPublish: true });
-    expect(errors.some((e) => e.toLowerCase().includes("autore"))).toBe(true);
+    expect(canonical).toContain('"title":"Titolo"');
+    expect(canonical).toContain('"tags":"a,b"');
+  });
+
+  it("isPublishingSyncUnknown se manca sourceArticleHash", () => {
+    expect(
+      isPublishingSyncUnknown(sampleArticle, { ...samplePublishing, sourceArticleHash: null }, true),
+    ).toBe(true);
   });
 });

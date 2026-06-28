@@ -456,3 +456,23 @@ export function publishEditorialShopify(
     { method: "POST", ...jsonBody(data) },
   );
 }
+
+export function syncEditorialPublishingFromArticle(
+  projectId: string,
+  itemId: string,
+): Promise<ContentSeoEditorialItem> {
+  return apiFetch<ContentSeoEditorialItem>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/publishing/sync-from-article`,
+    { method: "POST" },
+  );
+}
+
+export function disconnectEditorialShopifyArticle(
+  projectId: string,
+  itemId: string,
+): Promise<ContentSeoEditorialItem> {
+  return apiFetch<ContentSeoEditorialItem>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/shopify/disconnect`,
+    { method: "POST" },
+  );
+}

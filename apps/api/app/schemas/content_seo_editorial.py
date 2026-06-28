@@ -616,6 +616,8 @@ class EditorialArticlePayload(BaseModel):
         default_factory=list, serialization_alias="brandContextUsed"
     )
     generated_at: str = Field(default="", serialization_alias="generatedAt")
+    updated_at: str = Field(default="", serialization_alias="updatedAt")
+    article_hash: str = Field(default="", serialization_alias="articleHash")
     readability_checklist: list[str] = Field(
         default_factory=list, serialization_alias="readabilityChecklist"
     )
@@ -673,6 +675,8 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
         "communityCta": "community_cta",
         "estimatedReadingTime": "estimated_reading_time",
         "generatedAt": "generated_at",
+        "updatedAt": "updated_at",
+        "articleHash": "article_hash",
         "skillPackUsed": "skill_pack_used",
         "skillPackVersion": "skill_pack_version",
     }
@@ -752,6 +756,15 @@ class EditorialPublishingPayload(BaseModel):
     is_published: bool = Field(default=False, serialization_alias="isPublished")
     publish_date: str | None = Field(default=None, serialization_alias="publishDate")
     template_suffix: str | None = Field(default=None, serialization_alias="templateSuffix")
+    source_article_hash: str | None = Field(
+        default=None, serialization_alias="sourceArticleHash"
+    )
+    source_article_updated_at: str | None = Field(
+        default=None, serialization_alias="sourceArticleUpdatedAt"
+    )
+    synced_from_article_at: str | None = Field(
+        default=None, serialization_alias="syncedFromArticleAt"
+    )
 
 
 class EditorialPublishingUpdateRequest(BaseModel):

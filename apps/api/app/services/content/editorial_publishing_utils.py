@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -14,6 +16,78 @@ from app.schemas.content_seo_editorial import (
 
 _GID_NUMERIC_RE = re.compile(r"/(\d+)$")
 DEFAULT_AUTHOR_FALLBACK = "Redazione Solmielato"
+HANDLE_CONFLICT_MESSAGE = (
+    "Esiste già un articolo Shopify con questo handle. "
+    "Cambia handle o collega l'articolo esistente."
+)
+
+
+def _article_hash_fields(article: EditorialArticlePayload | dict[str, Any]) -> dict[str, str]:
+    if isinstance(article, EditorialArticlePayload):
+        tags = sorted(str(t).strip() for t in (article.tags or []) if str(t).strip())
+        return {
+            "title": article.title.strip(),
+            "handle": article.handle.strip(),
+            "bodyHtml": article.body_html.strip(),
+            "excerpt": article.excerpt.strip(),
+            "seoTitle": article.seo_title.strip(),
+            "metaDescription": article.meta_description.strip(),
+            "tags": ",".join(tags),
+            "authorName": (article.author_name or "").strip(),
+        }
+    tags = sorted(str(t).strip() for t in (article.get("tags") or []) if str(t).strip())
+    return {
+        "title": str(article.get("title") or "").strip(),
+        "handle": str(article.get("handle") or "").strip(),
+        "bodyHtml": str(article.get("bodyHtml") or article.get("body_html") or "").strip(),
+        "excerpt": str(article.get("excerpt") or "").strip(),
+        "seoTitle": str(article.get("seoTitle") or article.get("seo_title") or "").strip(),
+        "metaDescription": str(
+            article.get("metaDescription") or article.get("meta_description") or ""
+        ).strip(),
+        "tags": ",".join(tags),
+        "authorName": str(article.get("authorName") or article.get("author_name") or "").strip(),
+    }
+
+
+def compute_editorial_article_hash(article: EditorialArticlePayload | dict[str, Any]) -> str:
+    """SHA-256 hex of canonical article content fields."""
+    canonical = json.dumps(_article_hash_fields(article), sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def enrich_article_with_hash(
+    payload: EditorialArticlePayload,
+    *,
+    now: datetime | None = None,
+    is_new_generation: bool = False,
+) -> EditorialArticlePayload:
+    """Attach articleHash and updatedAt; set generatedAt on first generation."""
+    ts = (now or datetime.now(UTC)).isoformat()
+    article_hash = compute_editorial_article_hash(payload)
+    updates: dict[str, Any] = {
+        "article_hash": article_hash,
+        "updated_at": ts,
+    }
+    if is_new_generation or not (payload.generated_at or "").strip():
+        updates["generated_at"] = ts
+    return payload.model_copy(update=updates)
+
+
+def attach_publishing_sync_metadata(
+    publishing: EditorialPublishingPayload,
+    article: EditorialArticlePayload,
+    *,
+    synced_at: datetime | None = None,
+) -> EditorialPublishingPayload:
+    ts = (synced_at or datetime.now(UTC)).isoformat()
+    return publishing.model_copy(
+        update={
+            "source_article_hash": article.article_hash or compute_editorial_article_hash(article),
+            "source_article_updated_at": article.updated_at or article.generated_at or ts,
+            "synced_from_article_at": ts,
+        }
+    )
 
 
 def shopify_gid_numeric_id(gid: str | None) -> str | None:
@@ -87,6 +161,15 @@ def normalize_publishing_payload(raw: dict[str, Any]) -> EditorialPublishingPayl
             data[field] = str(data[field])
         else:
             data.setdefault(field, "")
+    for alias, field in (
+        ("sourceArticleHash", "source_article_hash"),
+        ("sourceArticleUpdatedAt", "source_article_updated_at"),
+        ("syncedFromArticleAt", "synced_from_article_at"),
+    ):
+        if alias in data and field not in data:
+            data[field] = data.pop(alias)
+        elif field in data and data[field] is not None:
+            data[field] = str(data[field])
     mode = data.get("mode", "draft")
     if mode not in ("draft", "publish_now", "schedule"):
         data["mode"] = "draft"
@@ -266,13 +349,67 @@ def build_article_create_input(
     return article_input
 
 
+def build_article_update_input(
+    payload: EditorialPublishingPayload,
+    *,
+    mode: EditorialPublishMode,
+) -> dict[str, Any]:
+    from datetime import datetime, timezone
+
+    author = payload.author.strip()
+    if not author:
+        raise ValueError("Autore obbligatorio per Shopify articleUpdate.")
+
+    article_input: dict[str, Any] = {
+        "title": payload.title.strip(),
+        "body": payload.body_html.strip(),
+        "author": {"name": author},
+    }
+    if payload.handle.strip():
+        article_input["handle"] = payload.handle.strip()
+    if payload.excerpt.strip():
+        article_input["summary"] = payload.excerpt.strip()
+    if payload.tags:
+        article_input["tags"] = payload.tags
+    if payload.template_suffix and payload.template_suffix.strip():
+        article_input["templateSuffix"] = payload.template_suffix.strip()
+    if payload.image_url and payload.image_url.strip():
+        image: dict[str, str] = {"url": payload.image_url.strip()}
+        if payload.image_alt and payload.image_alt.strip():
+            image["altText"] = payload.image_alt.strip()
+        article_input["image"] = image
+
+    if mode == "publish_now":
+        article_input["isPublished"] = True
+        article_input["publishDate"] = datetime.now(timezone.utc).isoformat()
+    else:
+        article_input["isPublished"] = False
+
+    return article_input
+
+
+def format_handle_conflict_error(message: str) -> str | None:
+    lowered = message.lower()
+    if "handle" in lowered and ("already" in lowered or "taken" in lowered or "exists" in lowered):
+        return HANDLE_CONFLICT_MESSAGE
+    if "handle" in lowered and ("unique" in lowered or "duplicat" in lowered):
+        return HANDLE_CONFLICT_MESSAGE
+    return None
+
+
 def format_shopify_publish_error(message: str) -> str:
     lowered = message.lower()
     if "author" in lowered and ("null" in lowered or "obbligator" in lowered):
         return "Shopify ha rifiutato l'articolo: author obbligatorio."
     if message.startswith("Errore GraphQL Shopify:"):
         detail = message.removeprefix("Errore GraphQL Shopify:").strip()
+        handle_msg = format_handle_conflict_error(detail)
+        if handle_msg:
+            return handle_msg
         return f"Shopify ha rifiutato l'articolo: {detail}"
+    handle_msg = format_handle_conflict_error(message)
+    if handle_msg:
+        return handle_msg
     return message
 
 

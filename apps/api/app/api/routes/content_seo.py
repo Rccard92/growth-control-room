@@ -78,7 +78,11 @@ from app.services.content.editorial_article_service import (
 )
 from app.services.content.editorial_ai_usage_service import get_editorial_item_ai_usage
 from app.services.content.editorial_plan_service import generate_editorial_calendar
-from app.services.content.editorial_publishing_service import update_editorial_publishing
+from app.services.content.editorial_publishing_service import (
+    disconnect_editorial_shopify_article,
+    sync_publishing_from_article,
+    update_editorial_publishing,
+)
 from app.services.content.editorial_shopify_blogs_service import list_shopify_blogs_for_project
 from app.services.content.editorial_shopify_publish_service import publish_editorial_to_shopify
 from app.services.content.analyze import run_content_seo_analyze
@@ -1090,6 +1094,39 @@ async def update_content_seo_editorial_publishing(
 ) -> ContentSeoEditorialItemRead:
     await get_project_in_default_workspace(project_id, session)
     await update_editorial_publishing(session, project_id, item_id, payload)
+    await session.commit()
+    return await get_editorial_item_read(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/publishing/sync-from-article",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def sync_content_seo_editorial_publishing_from_article(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    await sync_publishing_from_article(session, project_id, item_id)
+    await session.commit()
+    return await get_editorial_item_read(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/shopify/disconnect",
+    response_model=ContentSeoEditorialItemRead,
+    response_model_by_alias=True,
+)
+async def disconnect_content_seo_editorial_shopify(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> ContentSeoEditorialItemRead:
+    await get_project_in_default_workspace(project_id, session)
+    await disconnect_editorial_shopify_article(session, project_id, item_id)
+    await session.commit()
     return await get_editorial_item_read(session, project_id, item_id)
 
 

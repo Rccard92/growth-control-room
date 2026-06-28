@@ -2116,6 +2116,25 @@
   font-weight: 600;
 }
 
+.editorial-publishing-tab__stale-banner p {
+  margin: 0 0 0.65rem;
+}
+
+.editorial-publishing-tab__stale-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.editorial-publishing-tab__shopify-linked {
+  font-weight: 600;
+  color: var(--gcr-accent-emerald, #10b981);
+}
+
+.editorial-publishing-tab__disconnect {
+  margin-top: 0.75rem;
+}
+
 .editorial-publishing-tab__success {
   color: var(--gcr-success, #15803d);
 }

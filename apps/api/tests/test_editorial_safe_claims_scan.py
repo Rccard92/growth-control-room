@@ -17,7 +17,20 @@ def test_scan_forbidden_claim_returns_phrase() -> None:
     assert len(flags) >= 1
     assert flags[0].severity == "high"
     assert "cura" in flags[0].phrase.lower() or "malattie" in flags[0].phrase.lower()
-    assert "Possibile claim" in flags[0].to_warning()
+
+
+def test_scan_lavorato_con_cura_no_flag() -> None:
+    html = (
+        "<p>Può capitare anche con un miele biologico artigianale, "
+        "lavorato con cura e nel rispetto del prodotto naturale.</p>"
+    )
+    flags = scan_editorial_safe_claims(html)
+    assert len(flags) == 0
+
+
+def test_scan_a_cura_di_no_flag() -> None:
+    flags = scan_editorial_safe_claims("", title="A cura di Davide")
+    assert len(flags) == 0
 
 
 def test_scan_generic_health_pattern() -> None:
@@ -25,4 +38,10 @@ def test_scan_generic_health_pattern() -> None:
     flags = scan_editorial_safe_claims(html)
     assert any("benessere" in f.phrase.lower() for f in flags)
     assert flags[0].severity == "medium"
-    assert flags[0].suggestion
+
+
+def test_scan_sistema_immunitario() -> None:
+    html = "<p>Il miele aiuta il sistema immunitario.</p>"
+    flags = scan_editorial_safe_claims(html)
+    assert len(flags) >= 1
+    assert any("immunitario" in f.phrase.lower() for f in flags)

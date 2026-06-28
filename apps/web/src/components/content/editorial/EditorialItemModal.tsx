@@ -28,6 +28,8 @@ import {
 } from "./editorial-article-utils";
 import {
   buildPublishingPayloadFromArticle,
+  isPublishingStale,
+  isPublishingSyncUnknown,
   parseEditorialPublishingPayload,
   validatePublishingPayload,
 } from "./editorial-publishing-utils";
@@ -46,6 +48,8 @@ import {
   useGenerateEditorialArticle,
   useGenerateEditorialBrief,
   usePublishEditorialShopify,
+  useSyncEditorialPublishingFromArticle,
+  useDisconnectEditorialShopifyArticle,
   useRescheduleEditorialItem,
   useShopifyBlogs,
   useUpdateEditorialArticle,
@@ -97,6 +101,8 @@ export function EditorialItemModal({
   const updateArticleMutation = useUpdateEditorialArticle(projectId);
   const updatePublishingMutation = useUpdateEditorialPublishing(projectId);
   const publishShopifyMutation = usePublishEditorialShopify(projectId);
+  const syncPublishingMutation = useSyncEditorialPublishingFromArticle(projectId);
+  const disconnectShopifyMutation = useDisconnectEditorialShopifyArticle(projectId);
   const { data: blogsData, isLoading: blogsLoading } = useShopifyBlogs(projectId, open);
   const { data: scopesData, isLoading: scopesLoading } = useQuery({
     queryKey: queryKeys.shopify.scopes(projectId),
@@ -127,6 +133,7 @@ export function EditorialItemModal({
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [staleDismissed, setStaleDismissed] = useState(false);
   const [activeTab, setActiveTab] = useState<"detail" | "brief" | "article" | "publishing">(
     "detail",
   );
@@ -172,6 +179,7 @@ export function EditorialItemModal({
       setError(null);
       setWarning(null);
       setSuccess(null);
+      setStaleDismissed(false);
     }
   }
 
@@ -448,6 +456,42 @@ export function EditorialItemModal({
     }
   }
 
+  async function handleSyncPublishingFromArticle() {
+    if (!item) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      const updated = await syncPublishingMutation.mutateAsync(item.id);
+      syncItem(updated);
+      setStaleDismissed(false);
+      setSuccess("Dati di pubblicazione aggiornati dall'articolo.");
+    } catch (e) {
+      setError(
+        formatPublishingError("Errore aggiornamento dati di pubblicazione.", e),
+      );
+    }
+  }
+
+  async function handleDisconnectShopify() {
+    if (!item) return;
+    if (
+      !window.confirm(
+        "Scollegare l'articolo Shopify da questo contenuto editoriale? Non verrà eliminato su Shopify.",
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    try {
+      const updated = await disconnectShopifyMutation.mutateAsync(item.id);
+      syncItem(updated);
+      setSuccess("Articolo Shopify scollegato.");
+    } catch (e) {
+      setError(formatPublishingError("Errore scollegamento articolo Shopify.", e));
+    }
+  }
+
   async function handlePublishShopify(mode: "draft" | "publish_now") {
     if (!item || !publishing) return;
     const errors = validatePublishingPayload(publishing, { forPublish: true });
@@ -455,17 +499,30 @@ export function EditorialItemModal({
       setError(errors.join(" "));
       return;
     }
+    const hasShopifyLink = Boolean(item.shopifyArticleGid);
+    const isPublishedOnShopify = item.publishStatus === "published";
+
     if (mode === "publish_now") {
-      if (
-        !window.confirm(
-          "Pubblicare subito questo articolo su Shopify? Sarà visibile nel blog selezionato.",
-        )
-      ) {
+      const confirmMessage = isPublishedOnShopify
+        ? "Aggiornare l'articolo già pubblicato su Shopify con i dati attuali?"
+        : hasShopifyLink
+          ? "Pubblicare la bozza Shopify collegata? Sarà visibile nel blog selezionato."
+          : "Pubblicare subito questo articolo su Shopify? Sarà visibile nel blog selezionato.";
+      if (!window.confirm(confirmMessage)) {
         return;
       }
     }
+
+    if (publishingStale && !staleDismissed) {
+      setWarning(
+        "I dati di pubblicazione potrebbero non riflettere l'ultima versione dell'articolo.",
+      );
+    }
+
     setError(null);
-    setWarning(null);
+    if (!publishingStale || staleDismissed) {
+      setWarning(null);
+    }
     setSuccess(null);
     try {
       if (publishingDirty) {
@@ -485,13 +542,18 @@ export function EditorialItemModal({
       if (result.warnings.length > 0) {
         setWarning(result.warnings.join(" "));
       }
-      setSuccess(
-        mode === "publish_now"
+      const successMessage = hasShopifyLink
+        ? mode === "publish_now"
+          ? isPublishedOnShopify
+            ? "Articolo pubblicato su Shopify aggiornato."
+            : "Bozza Shopify pubblicata."
+          : "Bozza Shopify aggiornata."
+        : mode === "publish_now"
           ? "Articolo pubblicato su Shopify."
-          : "Bozza creata su Shopify.",
-      );
+          : "Bozza creata su Shopify.";
+      setSuccess(successMessage);
     } catch (e) {
-      setError(formatPublishingError("Errore creazione articolo Shopify.", e));
+      setError(formatPublishingError("Errore invio articolo Shopify.", e));
     }
   }
 
@@ -508,6 +570,15 @@ export function EditorialItemModal({
   const itemHasBrief = hasEditorialBrief(item.briefPayload ?? null);
   const itemHasArticle = hasEditorialArticle(item.articlePayload ?? null);
   const hasArticle = Boolean(article);
+  const hasSavedPublishing = Boolean(item.publishingPayload);
+  const publishingStale = isPublishingStale(article, publishing);
+  const publishingSyncUnknown = isPublishingSyncUnknown(
+    article,
+    publishing,
+    hasSavedPublishing,
+  );
+  const hasShopifyLink = Boolean(item.shopifyArticleGid);
+  const isPublishedOnShopify = item.publishStatus === "published";
   const canWriteContent = scopesData?.canWriteContent ?? false;
   const publishActionsDisabled =
     status !== "ready_to_publish" ||
@@ -640,21 +711,33 @@ export function EditorialItemModal({
         >
           {updatePublishingMutation.isPending ? "Salvataggio…" : "Salva publishing"}
         </button>
-        <button
-          type="button"
-          className="gcr-btn gcr-btn--secondary"
-          disabled={publishActionsDisabled || !publishing}
-          onClick={() => void handlePublishShopify("draft")}
-        >
-          {publishShopifyMutation.isPending ? "Invio…" : "Crea bozza Shopify"}
-        </button>
+        {!isPublishedOnShopify && (
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary"
+            disabled={publishActionsDisabled || !publishing}
+            onClick={() => void handlePublishShopify("draft")}
+          >
+            {publishShopifyMutation.isPending
+              ? "Invio…"
+              : hasShopifyLink
+                ? "Aggiorna bozza Shopify"
+                : "Crea bozza Shopify"}
+          </button>
+        )}
         <button
           type="button"
           className="gcr-btn gcr-btn--primary"
           disabled={publishActionsDisabled || !publishing}
           onClick={() => void handlePublishShopify("publish_now")}
         >
-          Pubblica subito
+          {publishShopifyMutation.isPending
+            ? "Invio…"
+            : isPublishedOnShopify
+              ? "Aggiorna articolo pubblicato"
+              : hasShopifyLink
+                ? "Pubblica bozza Shopify"
+                : "Pubblica subito"}
         </button>
       </>
     );
@@ -919,8 +1002,16 @@ export function EditorialItemModal({
               item={item}
               status={status}
               hasArticle={hasArticle}
+              publishingStale={publishingStale}
+              publishingSyncUnknown={publishingSyncUnknown}
+              staleDismissed={staleDismissed}
               publishing={publishing}
               onChange={setPublishing}
+              onSyncFromArticle={() => void handleSyncPublishingFromArticle()}
+              onDismissStale={() => setStaleDismissed(true)}
+              onDisconnectShopify={() => void handleDisconnectShopify()}
+              syncLoading={syncPublishingMutation.isPending}
+              disconnectLoading={disconnectShopifyMutation.isPending}
               blogs={blogsData?.blogs ?? []}
               blogsLoading={blogsLoading}
               blogsSyncRequired={blogsData?.syncRequired ?? false}

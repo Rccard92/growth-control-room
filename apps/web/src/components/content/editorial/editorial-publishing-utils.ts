@@ -24,6 +24,9 @@ export function emptyEditorialPublishingPayload(): EditorialPublishingPayload {
     isPublished: false,
     publishDate: null,
     templateSuffix: null,
+    sourceArticleHash: null,
+    sourceArticleUpdatedAt: null,
+    syncedFromArticleAt: null,
   };
 }
 
@@ -89,7 +92,51 @@ export function parseEditorialPublishingPayload(
     isPublished: Boolean(raw.isPublished),
     publishDate: raw.publishDate ? String(raw.publishDate) : null,
     templateSuffix: raw.templateSuffix ? String(raw.templateSuffix) : null,
+    sourceArticleHash: raw.sourceArticleHash ? String(raw.sourceArticleHash) : null,
+    sourceArticleUpdatedAt: raw.sourceArticleUpdatedAt
+      ? String(raw.sourceArticleUpdatedAt)
+      : null,
+    syncedFromArticleAt: raw.syncedFromArticleAt ? String(raw.syncedFromArticleAt) : null,
   };
+}
+
+export function buildArticleHashCanonical(article: EditorialArticlePayload): string {
+  const tags = [...(article.tags ?? [])]
+    .map((t) => String(t).trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
+  const payload = {
+    title: article.title.trim(),
+    handle: article.handle.trim(),
+    bodyHtml: article.bodyHtml.trim(),
+    excerpt: article.excerpt.trim(),
+    seoTitle: article.seoTitle.trim(),
+    metaDescription: article.metaDescription.trim(),
+    tags,
+    authorName: (article.authorName ?? "").trim(),
+  };
+  return JSON.stringify(payload);
+}
+
+export function isPublishingStale(
+  article: EditorialArticlePayload | null | undefined,
+  publishing: EditorialPublishingPayload | null | undefined,
+): boolean {
+  if (!article || !publishing) return false;
+  const sourceHash = publishing.sourceArticleHash?.trim();
+  const articleHash = article.articleHash?.trim();
+  if (!sourceHash || !articleHash) return false;
+  return sourceHash !== articleHash;
+}
+
+export function isPublishingSyncUnknown(
+  article: EditorialArticlePayload | null | undefined,
+  publishing: EditorialPublishingPayload | null | undefined,
+  hasSavedPublishing: boolean,
+): boolean {
+  if (!article || !publishing || !hasSavedPublishing) return false;
+  return !publishing.sourceArticleHash?.trim() || !article.articleHash?.trim();
 }
 
 export function buildPublishingPayloadFromArticle(

@@ -1,4 +1,4 @@
-"""Publish editorial articles to Shopify via articleCreate."""
+"""Publish or update editorial articles on Shopify via articleCreate / articleUpdate."""
 
 from __future__ import annotations
 
@@ -16,10 +16,14 @@ from app.schemas.content_seo_editorial import (
     EditorialPublishShopifyRequest,
     EditorialPublishShopifyResponse,
     EditorialPublishingPayload,
+    normalize_editorial_article_payload,
 )
 from app.services.content.editorial_item_service import get_editorial_item, get_editorial_item_read
 from app.services.content.editorial_publishing_utils import (
+    HANDLE_CONFLICT_MESSAGE,
+    attach_publishing_sync_metadata,
     build_article_create_input,
+    build_article_update_input,
     build_publishing_payload_from_article,
     format_shopify_publish_error,
     normalize_publishing_payload,
@@ -28,7 +32,7 @@ from app.services.content.editorial_publishing_utils import (
     shopify_publish_http_status,
     validate_publishing_payload,
 )
-from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
+from app.services.shopify.client import ShopifyAPIError
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
 from app.services.shopify.scopes import can_publish_with_write_content
 
@@ -141,6 +145,63 @@ def _build_public_url(
     return f"https://{shop_domain}/blogs/{blog_handle}/{article_handle}"
 
 
+def _apply_publish_result_to_row(
+    row: ContentSeoEditorialItem,
+    *,
+    store_domain: str,
+    blog_gid: str,
+    blog_row: ShopifyBlog | None,
+    article_node: dict,
+    publishing: EditorialPublishingPayload,
+    mode: str,
+    article_payload: dict,
+) -> EditorialPublishingPayload:
+    article_gid = article_node.get("id") or row.shopify_article_gid
+    article_numeric = shopify_gid_numeric_id(article_gid)
+    blog_numeric = shopify_gid_numeric_id(blog_gid)
+    blog_handle = blog_row.handle if blog_row else None
+    article_handle = article_node.get("handle") or publishing.handle
+
+    row.shopify_article_gid = article_gid
+    row.shopify_article_id = article_numeric
+    row.shopify_blog_id = blog_numeric or row.shopify_blog_id
+    row.shopify_article_admin_url = _build_admin_url(
+        store_domain,
+        blog_numeric,
+        article_numeric,
+    )
+    row.shopify_article_public_url = _build_public_url(
+        store_domain,
+        blog_handle,
+        article_handle,
+    )
+    row.publish_mode = mode
+    row.last_publish_error = None
+
+    if mode == "publish_now":
+        row.publish_status = "published"
+        row.shopify_status = "published"
+        row.status = "published"
+        row.published_at = datetime.now(UTC)
+        publishing = publishing.model_copy(update={"is_published": True, "mode": "publish_now"})
+    else:
+        if row.publish_status != "published":
+            row.publish_status = "draft_created"
+            row.shopify_status = "draft"
+        publishing = publishing.model_copy(update={"is_published": False, "mode": "draft"})
+
+    publishing = publishing.model_copy(
+        update={
+            "blog_id": str(blog_row.id) if blog_row else publishing.blog_id,
+            "blog_gid": blog_gid,
+        }
+    )
+    article_norm = normalize_editorial_article_payload(article_payload)
+    publishing = attach_publishing_sync_metadata(publishing, article_norm)
+    row.publishing_payload = publishing.model_dump(by_alias=True, mode="json")
+    return publishing
+
+
 async def publish_editorial_to_shopify(
     session: AsyncSession,
     project_id: UUID,
@@ -220,23 +281,66 @@ async def publish_editorial_to_shopify(
         )
 
     blog_gid, blog_row = await _resolve_blog_gid(session, store.id, publishing)
-    try:
-        article_input = build_article_create_input(
-            publishing,
-            blog_gid=blog_gid,
-            mode=request.mode,
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        ) from exc
+    existing_gid = (row.shopify_article_gid or "").strip()
 
     try:
         client = await get_shopify_client_for_store(store)
-        result = await client.create_article(article_input)
-    except ShopifyAPIError as exc:
-        await _raise_shopify_publish_error(session, row, exc, request.mode)
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail="Impossibile contattare Shopify.",
+        ) from exc
+
+    if existing_gid:
+        try:
+            update_input = build_article_update_input(publishing, mode=request.mode)
+        except ValueError as exc:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+        try:
+            result = await client.update_article(existing_gid, update_input)
+        except ShopifyAPIError as exc:
+            await _raise_shopify_publish_error(session, row, exc, request.mode)
+        operation_label = "aggiornamento"
+    else:
+        handle = publishing.handle.strip()
+        if handle:
+            try:
+                existing = await client.find_article_by_handle(blog_gid, handle)
+            except ShopifyAPIError as exc:
+                await _raise_shopify_publish_error(session, row, exc, request.mode)
+            if existing:
+                existing_id = existing.get("id")
+                if existing_id and existing_id != existing_gid:
+                    await _mark_publish_error(
+                        session,
+                        row,
+                        message=HANDLE_CONFLICT_MESSAGE,
+                        mode=request.mode,
+                    )
+                    raise HTTPException(
+                        status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=HANDLE_CONFLICT_MESSAGE,
+                    )
+
+        try:
+            create_input = build_article_create_input(
+                publishing,
+                blog_gid=blog_gid,
+                mode=request.mode,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+        try:
+            result = await client.create_article(create_input)
+        except ShopifyAPIError as exc:
+            await _raise_shopify_publish_error(session, row, exc, request.mode)
+        operation_label = "creazione"
 
     user_errors = result.get("userErrors") or []
     if user_errors:
@@ -244,7 +348,7 @@ async def publish_editorial_to_shopify(
             err.get("message", str(err)) for err in user_errors if isinstance(err, dict)
         )
         readable = format_shopify_publish_error(
-            messages or "Errore durante la creazione dell'articolo."
+            messages or f"Errore durante la {operation_label} dell'articolo."
         )
         await _mark_publish_error(session, row, message=readable, mode=request.mode)
         raise HTTPException(
@@ -256,52 +360,23 @@ async def publish_editorial_to_shopify(
     article_gid = article_node.get("id")
     if not article_gid:
         row.publish_status = "publish_error"
-        row.last_publish_error = "Shopify non ha restituito l'articolo creato."
+        row.last_publish_error = f"Shopify non ha restituito l'articolo dopo la {operation_label}."
         await session.flush()
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,
             detail=row.last_publish_error,
         )
 
-    article_numeric = shopify_gid_numeric_id(article_gid)
-    blog_numeric = shopify_gid_numeric_id(blog_gid)
-    blog_handle = blog_row.handle if blog_row else None
-    article_handle = article_node.get("handle") or publishing.handle
-
-    row.shopify_article_gid = article_gid
-    row.shopify_article_id = article_numeric
-    row.shopify_blog_id = blog_numeric or row.shopify_blog_id
-    row.shopify_article_admin_url = _build_admin_url(
-        store.shop_domain,
-        blog_numeric,
-        article_numeric,
+    _apply_publish_result_to_row(
+        row,
+        store_domain=store.shop_domain,
+        blog_gid=blog_gid,
+        blog_row=blog_row,
+        article_node=article_node,
+        publishing=publishing,
+        mode=request.mode,
+        article_payload=row.article_payload,
     )
-    row.shopify_article_public_url = _build_public_url(
-        store.shop_domain,
-        blog_handle,
-        article_handle,
-    )
-    row.publish_mode = request.mode
-    row.last_publish_error = None
-
-    if request.mode == "publish_now":
-        row.publish_status = "published"
-        row.shopify_status = "published"
-        row.status = "published"
-        row.published_at = datetime.now(UTC)
-        publishing = publishing.model_copy(update={"is_published": True, "mode": "publish_now"})
-    else:
-        row.publish_status = "draft_created"
-        row.shopify_status = "draft"
-        publishing = publishing.model_copy(update={"is_published": False, "mode": "draft"})
-
-    publishing = publishing.model_copy(
-        update={
-            "blog_id": str(blog_row.id) if blog_row else publishing.blog_id,
-            "blog_gid": blog_gid,
-        }
-    )
-    row.publishing_payload = publishing.model_dump(by_alias=True, mode="json")
 
     await session.flush()
     return EditorialPublishShopifyResponse(
