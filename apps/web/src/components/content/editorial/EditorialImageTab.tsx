@@ -4,10 +4,12 @@ import { buildEditorialImagePreviewUrl } from "../../../lib/content-api";
 import {
   FILENAME_STALE_MESSAGE,
   formatImageCost,
-  formatImageDimensions,
+  formatImageFinalSize,
+  formatImageProviderSize,
   formatImageUpdatedAt,
   getImageStatusLabel,
   hasGeneratedImage,
+  IMAGE_POST_PROCESSING_LABEL,
   IMAGE_STALE_MESSAGE,
   isImageFilenameStale,
   PUBLIC_STORAGE_WARNING,
@@ -122,12 +124,20 @@ export function EditorialImageTab({
 
       <section className="editorial-image-tab__meta">
         <div>
-          <span className="editorial-image-tab__meta-label">Filename SEO</span>
-          <strong>{image.imageFilename ?? "—"}</strong>
+          <span className="editorial-image-tab__meta-label">Formato finale</span>
+          <strong>{formatImageFinalSize(image)}</strong>
         </div>
         <div>
-          <span className="editorial-image-tab__meta-label">Dimensione</span>
-          <strong>{formatImageDimensions(image)}</strong>
+          <span className="editorial-image-tab__meta-label">Formato generazione</span>
+          <strong>{formatImageProviderSize(image)}</strong>
+        </div>
+        <div>
+          <span className="editorial-image-tab__meta-label">Post-processing</span>
+          <strong>{IMAGE_POST_PROCESSING_LABEL}</strong>
+        </div>
+        <div>
+          <span className="editorial-image-tab__meta-label">Filename SEO</span>
+          <strong>{image.imageFilename ?? "—"}</strong>
         </div>
         <div>
           <span className="editorial-image-tab__meta-label">ALT immagine</span>

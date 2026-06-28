@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.29-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed editorial image provider size mismatch",
+      "Image generation now uses supported landscape size 1536x1024",
+      "Final editorial hero images are post-processed to 1600x900 JPG",
+      "Preserved SEO filename and ALT from article title",
+    ],
+  },
+  {
     version: "0.5.28-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

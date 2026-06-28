@@ -849,6 +849,8 @@ class EditorialImagePayload(BaseModel):
     image_aspect_ratio: str | None = Field(default=None, serialization_alias="imageAspectRatio")
     image_mime_type: str | None = Field(default=None, serialization_alias="imageMimeType")
     image_file_extension: str | None = Field(default=None, serialization_alias="imageFileExtension")
+    image_provider_size: str | None = Field(default=None, serialization_alias="imageProviderSize")
+    image_final_size: str | None = Field(default=None, serialization_alias="imageFinalSize")
     image_generation_cost: float | None = Field(
         default=None, serialization_alias="imageGenerationCost"
     )
@@ -899,6 +901,8 @@ def normalize_editorial_image_payload(raw: dict) -> EditorialImagePayload:
         "imageAspectRatio": "image_aspect_ratio",
         "imageMimeType": "image_mime_type",
         "imageFileExtension": "image_file_extension",
+        "imageProviderSize": "image_provider_size",
+        "imageFinalSize": "image_final_size",
         "imageGenerationCost": "image_generation_cost",
         "imageGenerationLogId": "image_generation_log_id",
         "imageApprovedAt": "image_approved_at",

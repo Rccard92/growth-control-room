@@ -14,6 +14,10 @@ export const PUBLIC_STORAGE_WARNING =
 export const FILENAME_STALE_MESSAGE =
   "Il titolo articolo è cambiato: il nome file SEO potrebbe non essere più allineato.";
 
+export const DEFAULT_IMAGE_PROVIDER_SIZE = "1536x1024";
+export const DEFAULT_IMAGE_FINAL_SIZE = "1600x900";
+export const IMAGE_POST_PROCESSING_LABEL = "crop 16:9 + resize";
+
 const STATUS_LABELS: Record<EditorialImageStatus, string> = {
   not_generated: "Non generata",
   generated: "Generata",
@@ -38,10 +42,22 @@ export function formatImageUpdatedAt(value: string | null | undefined): string {
 }
 
 export function formatImageDimensions(image: EditorialImagePayload): string {
+  if (image.imageFinalSize) {
+    return image.imageFinalSize.replace("x", "×");
+  }
   if (image.imageWidth && image.imageHeight) {
     return `${image.imageWidth}×${image.imageHeight}`;
   }
-  return "1600×900";
+  return DEFAULT_IMAGE_FINAL_SIZE.replace("x", "×");
+}
+
+export function formatImageProviderSize(image: EditorialImagePayload): string {
+  const size = image.imageProviderSize ?? DEFAULT_IMAGE_PROVIDER_SIZE;
+  return size.replace("x", "×");
+}
+
+export function formatImageFinalSize(image: EditorialImagePayload): string {
+  return formatImageDimensions(image);
 }
 
 export function emptyEditorialImagePayload(): EditorialImagePayload {
@@ -71,6 +87,8 @@ export function parseEditorialImagePayload(
     imageAspectRatio: (record.imageAspectRatio ?? record.image_aspect_ratio ?? null) as string | null,
     imageMimeType: (record.imageMimeType ?? record.image_mime_type ?? null) as string | null,
     imageFileExtension: (record.imageFileExtension ?? record.image_file_extension ?? null) as string | null,
+    imageProviderSize: (record.imageProviderSize ?? record.image_provider_size ?? null) as string | null,
+    imageFinalSize: (record.imageFinalSize ?? record.image_final_size ?? null) as string | null,
     imageGenerationCost: (record.imageGenerationCost ?? record.image_generation_cost ?? null) as number | null,
     imageGenerationLogId: (record.imageGenerationLogId ?? record.image_generation_log_id ?? null) as string | null,
     imageApprovedAt: (record.imageApprovedAt ?? record.image_approved_at ?? null) as string | null,

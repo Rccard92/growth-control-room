@@ -7,10 +7,17 @@ from typing import Any
 
 from PIL import Image
 
-TARGET_WIDTH = 1600
-TARGET_HEIGHT = 900
-TARGET_ASPECT = "16:9"
+EDITORIAL_IMAGE_FINAL_WIDTH = 1600
+EDITORIAL_IMAGE_FINAL_HEIGHT = 900
+EDITORIAL_IMAGE_PROVIDER_SIZE = "1536x1024"
+EDITORIAL_IMAGE_FINAL_SIZE = "1600x900"
+EDITORIAL_IMAGE_ASPECT_RATIO = "16:9"
 JPEG_QUALITY = 90
+
+# Backward-compatible aliases used by existing tests/imports
+TARGET_WIDTH = EDITORIAL_IMAGE_FINAL_WIDTH
+TARGET_HEIGHT = EDITORIAL_IMAGE_FINAL_HEIGHT
+TARGET_ASPECT = EDITORIAL_IMAGE_ASPECT_RATIO
 
 
 def normalize_editorial_image_bytes(raw: bytes) -> tuple[bytes, dict[str, Any]]:
@@ -18,7 +25,7 @@ def normalize_editorial_image_bytes(raw: bytes) -> tuple[bytes, dict[str, Any]]:
     with Image.open(io.BytesIO(raw)) as img:
         rgb = img.convert("RGB")
         width, height = rgb.size
-        target_ratio = TARGET_WIDTH / TARGET_HEIGHT
+        target_ratio = EDITORIAL_IMAGE_FINAL_WIDTH / EDITORIAL_IMAGE_FINAL_HEIGHT
         source_ratio = width / height
 
         if source_ratio > target_ratio:
@@ -30,15 +37,20 @@ def normalize_editorial_image_bytes(raw: bytes) -> tuple[bytes, dict[str, Any]]:
             top = (height - new_height) // 2
             cropped = rgb.crop((0, top, width, top + new_height))
 
-        resized = cropped.resize((TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS)
+        resized = cropped.resize(
+            (EDITORIAL_IMAGE_FINAL_WIDTH, EDITORIAL_IMAGE_FINAL_HEIGHT),
+            Image.Resampling.LANCZOS,
+        )
         buffer = io.BytesIO()
         resized.save(buffer, format="JPEG", quality=JPEG_QUALITY, optimize=True)
         output = buffer.getvalue()
 
     metadata = {
-        "width": TARGET_WIDTH,
-        "height": TARGET_HEIGHT,
-        "aspect_ratio": TARGET_ASPECT,
+        "width": EDITORIAL_IMAGE_FINAL_WIDTH,
+        "height": EDITORIAL_IMAGE_FINAL_HEIGHT,
+        "aspect_ratio": EDITORIAL_IMAGE_ASPECT_RATIO,
+        "provider_size": EDITORIAL_IMAGE_PROVIDER_SIZE,
+        "final_size": EDITORIAL_IMAGE_FINAL_SIZE,
         "mime_type": "image/jpeg",
         "extension": "jpg",
     }

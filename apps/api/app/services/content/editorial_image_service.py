@@ -31,7 +31,10 @@ from app.services.content.editorial_ai_usage_service import (
     fetch_latest_editorial_ai_log,
 )
 from app.services.content.editorial_image_filename import resolve_unique_editorial_image_filename
-from app.services.content.editorial_image_processing import normalize_editorial_image_bytes
+from app.services.content.editorial_image_processing import (
+    EDITORIAL_IMAGE_PROVIDER_SIZE,
+    normalize_editorial_image_bytes,
+)
 from app.services.content.editorial_image_skill_loader import (
     EDITORIAL_IMAGE_SKILL_NAME,
     load_editorial_image_skill_context,
@@ -58,6 +61,47 @@ from app.services.content.editorial_item_service import get_editorial_item, get_
 from app.services.content.editorial_publishing_utils import normalize_publishing_payload
 
 logger = logging.getLogger(__name__)
+
+IMAGE_SIZE_USER_MESSAGE = (
+    "Formato immagine non supportato dal provider. "
+    "Il sistema genera in 1536×1024 e converte a 1600×900."
+)
+
+
+def _user_friendly_image_error(exc: OpenAIRequestError) -> str:
+    message = str(exc).strip()
+    if "invalid size" in message.lower():
+        return IMAGE_SIZE_USER_MESSAGE
+    return message
+
+
+async def _generate_editorial_image_bytes(
+    image_prompt: str,
+    *,
+    metadata: AiRequestMetadata,
+) -> object:
+    """Call OpenAI Images with supported landscape size; fallback to auto on Invalid size."""
+    try:
+        return await generate_image(
+            image_prompt,
+            metadata=metadata,
+            size=EDITORIAL_IMAGE_PROVIDER_SIZE,
+        )
+    except OpenAIRequestError as exc:
+        if "invalid size" not in str(exc).lower():
+            raise
+        logger.warning(
+            "Editorial image: provider rejected size %s, retrying with auto",
+            EDITORIAL_IMAGE_PROVIDER_SIZE,
+        )
+        try:
+            return await generate_image(
+                image_prompt,
+                metadata=metadata,
+                size="auto",
+            )
+        except OpenAIRequestError:
+            raise OpenAIRequestError(IMAGE_SIZE_USER_MESSAGE) from exc
 
 
 def _strip_html(value: str) -> str:
@@ -309,6 +353,8 @@ async def _persist_generated_image(
         image_aspect_ratio=meta["aspect_ratio"],
         image_mime_type=meta["mime_type"],
         image_file_extension=meta["extension"],
+        image_provider_size=meta["provider_size"],
+        image_final_size=meta["final_size"],
         image_generation_cost=estimated_cost,
         image_generation_log_id=log_id,
         image_approved_at=None,
@@ -361,7 +407,7 @@ async def generate_editorial_image(
             operation_key="editorial_image_generation",
             operation="generate_image_prompt",
         )
-        image_result = await generate_image(
+        image_result = await _generate_editorial_image_bytes(
             image_prompt,
             metadata=AiRequestMetadata(
                 project_id=project_id,
@@ -371,12 +417,14 @@ async def generate_editorial_image(
                 entity_type="editorial_item",
                 entity_id=str(item_id),
             ),
-            size="1792x1024",
         )
     except OpenAINotConfiguredError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except OpenAIRequestError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_user_friendly_image_error(exc),
+        ) from exc
 
     await _persist_generated_image(
         session,
@@ -433,7 +481,7 @@ async def edit_editorial_image(
             revision_note=note,
             base_prompt=existing.image_prompt or None,
         )
-        image_result = await generate_image(
+        image_result = await _generate_editorial_image_bytes(
             image_prompt,
             metadata=AiRequestMetadata(
                 project_id=project_id,
@@ -443,12 +491,14 @@ async def edit_editorial_image(
                 entity_type="editorial_item",
                 entity_id=str(item_id),
             ),
-            size="1792x1024",
         )
     except OpenAINotConfiguredError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except OpenAIRequestError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_user_friendly_image_error(exc),
+        ) from exc
 
     await _persist_generated_image(
         session,

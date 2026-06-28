@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.29-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed editorial image provider size mismatch
+- Image generation now uses supported landscape size 1536x1024
+- Final editorial hero images are post-processed to 1600x900 JPG
+- Preserved SEO filename and ALT from article title
+
 ## [0.5.28-alpha] - 2026-06-13
 
 Tipo: Alpha patch

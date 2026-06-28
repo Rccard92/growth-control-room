@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_IMAGE_FINAL_SIZE,
+  DEFAULT_IMAGE_PROVIDER_SIZE,
   formatImageCost,
   formatImageDimensions,
+  formatImageFinalSize,
+  formatImageProviderSize,
   getImageStatusLabel,
   hasApprovedImageForPublish,
+  IMAGE_POST_PROCESSING_LABEL,
   IMAGE_STALE_MESSAGE,
   isImageFilenameStale,
   parseEditorialImagePayload,
@@ -29,6 +34,8 @@ describe("editorial-image-utils", () => {
       imageFilename: "guida-al-miele.jpg",
       imageWidth: 1600,
       imageHeight: 900,
+      imageProviderSize: "1536x1024",
+      imageFinalSize: "1600x900",
       shopifyImageReady: false,
       accessToken: "abc",
     });
@@ -36,8 +43,22 @@ describe("editorial-image-utils", () => {
     expect(parsed.imagePrompt).toContain("honey");
     expect(parsed.imageAlt).toBe("Guida al miele");
     expect(parsed.imageFilename).toBe("guida-al-miele.jpg");
+    expect(parsed.imageProviderSize).toBe("1536x1024");
+    expect(parsed.imageFinalSize).toBe("1600x900");
     expect(parsed.shopifyImageReady).toBe(false);
     expect(formatImageDimensions(parsed)).toBe("1600×900");
+    expect(formatImageProviderSize(parsed)).toBe("1536×1024");
+    expect(formatImageFinalSize(parsed)).toBe("1600×900");
+  });
+
+  it("usa default provider/final size quando assenti", () => {
+    expect(formatImageProviderSize({ imageStatus: "not_generated" })).toBe(
+      DEFAULT_IMAGE_PROVIDER_SIZE.replace("x", "×"),
+    );
+    expect(formatImageFinalSize({ imageStatus: "not_generated" })).toBe(
+      DEFAULT_IMAGE_FINAL_SIZE.replace("x", "×"),
+    );
+    expect(IMAGE_POST_PROCESSING_LABEL).toBe("crop 16:9 + resize");
   });
 
   it("rileva filename stale rispetto al titolo", () => {

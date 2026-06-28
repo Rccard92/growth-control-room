@@ -661,6 +661,8 @@ export interface EditorialImagePayload {
   imageAspectRatio?: string | null;
   imageMimeType?: string | null;
   imageFileExtension?: string | null;
+  imageProviderSize?: string | null;
+  imageFinalSize?: string | null;
   imageGenerationCost?: number | null;
   imageGenerationLogId?: string | null;
   imageApprovedAt?: string | null;
