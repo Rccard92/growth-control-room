@@ -1,4 +1,4 @@
-"""Local and S3-compatible storage for editorial hero images."""
+"""Local, S3-compatible, and Shopify Files storage for editorial hero images."""
 
 from __future__ import annotations
 
@@ -7,10 +7,23 @@ import secrets
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import settings
+from app.services.shopify.connect import get_shopify_store_for_project
 
 PUBLIC_STORAGE_WARNING = (
     "Storage pubblico immagini non configurato: l'immagine non può essere inviata a Shopify."
+)
+SHOPIFY_NOT_CONNECTED_WARNING = (
+    "Shopify non connesso: connetti lo shop per caricare l'immagine su Shopify Files."
+)
+SHOPIFY_SCOPE_MISSING_WARNING = (
+    "Per caricare immagini su Shopify serve il permesso write_files o write_images. "
+    "Aggiorna gli scope della Custom App Shopify."
+)
+SHOPIFY_UPLOAD_FAILED_WARNING = (
+    "Upload Shopify Files fallito. Usa «Riprova upload su Shopify»."
 )
 
 
@@ -23,8 +36,30 @@ def _images_root() -> Path:
     return root
 
 
-def _storage_provider() -> str:
-    return (settings.editorial_image_storage_provider or "local").strip().lower()
+def configured_storage_provider() -> str:
+    return (settings.editorial_image_storage_provider or "shopify_files").strip().lower()
+
+
+def _disk_storage_provider() -> str:
+    provider = configured_storage_provider()
+    if provider == "s3":
+        return "s3"
+    return "local"
+
+
+async def resolve_effective_storage_provider(
+    project_id: UUID,
+    session: AsyncSession,
+) -> str:
+    provider = configured_storage_provider()
+    if provider == "s3":
+        return "s3"
+    if provider == "local":
+        return "local"
+    store = await get_shopify_store_for_project(project_id, session)
+    if store is not None and store.connection_status == "connected":
+        return "shopify_files"
+    return "local"
 
 
 def generate_access_token() -> str:
@@ -78,7 +113,7 @@ def save_editorial_image(
     """Save image bytes and return (storage_path, public_url, sha256 hash)."""
     storage_key = _build_storage_key(project_id, filename)
     image_hash = hashlib.sha256(image_bytes).hexdigest()
-    provider = _storage_provider()
+    provider = _disk_storage_provider()
 
     if provider == "s3":
         if not settings.editorial_image_s3_bucket:
@@ -96,7 +131,7 @@ def save_editorial_image(
 def delete_editorial_image(storage_path: str | None) -> None:
     if not storage_path:
         return
-    provider = _storage_provider()
+    provider = _disk_storage_provider()
     if provider == "s3":
         if not settings.editorial_image_s3_bucket:
             return
@@ -124,7 +159,7 @@ def delete_editorial_image(storage_path: str | None) -> None:
 
 
 def read_editorial_image_bytes(storage_path: str) -> bytes:
-    provider = _storage_provider()
+    provider = _disk_storage_provider()
     if provider == "s3":
         if not settings.editorial_image_s3_bucket:
             raise FileNotFoundError(f"Bucket S3 non configurato: {storage_path}")
@@ -174,7 +209,7 @@ def resolve_authenticated_image_url(project_id: UUID, item_id: UUID) -> str:
 
 
 def is_public_storage_configured() -> bool:
-    provider = _storage_provider()
+    provider = configured_storage_provider()
     if provider != "s3":
         return False
     return bool(
@@ -183,6 +218,11 @@ def is_public_storage_configured() -> bool:
         and settings.editorial_image_s3_access_key
         and settings.editorial_image_s3_secret_key
     )
+
+
+def is_shopify_cdn_url(url: str) -> bool:
+    lowered = url.strip().lower()
+    return "cdn.shopify.com" in lowered or "shopifycdn.com" in lowered
 
 
 def is_shopify_image_publishable(image_url: str | None) -> bool:
@@ -195,14 +235,57 @@ def is_shopify_image_publishable(image_url: str | None) -> bool:
         return False
     if "/image-media" in url or "token=" in url:
         return False
+    if is_shopify_cdn_url(url):
+        return True
     public_base = (settings.editorial_image_public_base_url or "").strip().rstrip("/").lower()
     if not public_base:
         return False
-    return url.startswith(public_base.lower() + "/") or url.startswith(public_base.lower())
+    return url.startswith(public_base + "/") or url.startswith(public_base)
+
+
+def editorial_storage_warning(
+    *,
+    shopify_ready: bool,
+    effective_provider: str | None = None,
+    shopify_connected: bool | None = None,
+    can_upload_files: bool | None = None,
+    upload_error: str | None = None,
+) -> str | None:
+    if shopify_ready:
+        return None
+    if upload_error:
+        return f"{SHOPIFY_UPLOAD_FAILED_WARNING} {upload_error}".strip()
+    provider = effective_provider or configured_storage_provider()
+    if provider == "shopify_files":
+        if shopify_connected is False:
+            return SHOPIFY_NOT_CONNECTED_WARNING
+        if can_upload_files is False:
+            return SHOPIFY_SCOPE_MISSING_WARNING
+        return "L'immagine non è ancora pronta per Shopify. Attendi l'upload o riprova."
+    if provider == "s3" and not is_public_storage_configured():
+        return PUBLIC_STORAGE_WARNING
+    return PUBLIC_STORAGE_WARNING
+
+
+def storage_warning_if_needed(
+    shopify_ready: bool,
+    *,
+    effective_provider: str | None = None,
+    shopify_connected: bool | None = None,
+    can_upload_files: bool | None = None,
+    upload_error: str | None = None,
+) -> str | None:
+    return editorial_storage_warning(
+        shopify_ready=shopify_ready,
+        effective_provider=effective_provider,
+        shopify_connected=shopify_connected,
+        can_upload_files=can_upload_files,
+        upload_error=upload_error,
+    )
 
 
 def list_existing_filenames(project_id: UUID) -> set[str]:
-    provider = _storage_provider()
+    provider = _disk_storage_provider()
     prefix = f"{project_id}/editorial/"
     names: set[str] = set()
     if provider == "s3":

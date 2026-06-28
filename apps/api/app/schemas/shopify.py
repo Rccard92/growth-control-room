@@ -43,6 +43,10 @@ class ShopifyScopesResponse(BaseModel):
     missing_scopes: list[str] = Field(serialization_alias="missingScopes")
     can_write_products: bool = Field(serialization_alias="canWriteProducts")
     can_write_content: bool = Field(default=False, serialization_alias="canWriteContent")
+    can_write_files: bool = Field(default=False, serialization_alias="canWriteFiles")
+    missing_image_upload_scopes: list[str] = Field(
+        default_factory=list, serialization_alias="missingImageUploadScopes"
+    )
     requires_reconnect: bool = Field(serialization_alias="requiresReconnect")
     message: str
 

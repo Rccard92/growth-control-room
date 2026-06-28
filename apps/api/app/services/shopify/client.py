@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import re
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -946,6 +948,184 @@ class ShopifyGraphQLClient:
         }
         """
         return await self.execute(mutation, {"metafields": inputs})
+
+    async def create_staged_upload_for_image(
+        self,
+        *,
+        filename: str,
+        mime_type: str,
+        file_size: int,
+    ) -> dict[str, Any]:
+        mutation = """
+        mutation StagedUploadsCreate($input: [StagedUploadInput!]!) {
+          stagedUploadsCreate(input: $input) {
+            stagedTargets {
+              url
+              resourceUrl
+              parameters { name value }
+            }
+            userErrors { field message }
+          }
+        }
+        """
+
+        async def _create(resource: str) -> dict[str, Any]:
+            staged_input = [
+                {
+                    "filename": filename,
+                    "mimeType": mime_type,
+                    "httpMethod": "POST",
+                    "resource": resource,
+                    "fileSize": str(file_size),
+                }
+            ]
+            data = await self.execute(mutation, {"input": staged_input})
+            return data.get("stagedUploadsCreate") or {}
+
+        result = await _create("FILE")
+        user_errors = result.get("userErrors") or []
+        if user_errors:
+            result = await _create("IMAGE")
+            user_errors = result.get("userErrors") or []
+        if user_errors:
+            messages = [
+                err.get("message", str(err))
+                for err in user_errors
+                if isinstance(err, dict)
+            ]
+            raise ShopifyAPIError(
+                "Upload Shopify Files non riuscito: " + "; ".join(messages[:3])
+            )
+        targets = result.get("stagedTargets") or []
+        if not targets:
+            raise ShopifyAPIError("Shopify non ha restituito un target di upload.")
+        target = targets[0]
+        if not isinstance(target, dict) or not target.get("url"):
+            raise ShopifyAPIError("Target di upload Shopify non valido.")
+        return target
+
+    async def upload_to_staged_target(
+        self,
+        target: dict[str, Any],
+        file_bytes: bytes,
+        *,
+        mime_type: str = "image/jpeg",
+    ) -> None:
+        url = target.get("url")
+        if not url:
+            raise ShopifyAPIError("URL di upload Shopify mancante.")
+        parameters = target.get("parameters") or []
+        form_data: dict[str, str] = {}
+        for param in parameters:
+            if not isinstance(param, dict):
+                continue
+            name = param.get("name")
+            if name is None:
+                continue
+            value = param.get("value")
+            form_data[str(name)] = "" if value is None else str(value)
+
+        files = {"file": (target.get("filename") or "upload.jpg", file_bytes, mime_type)}
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(url, data=form_data, files=files)
+        except httpx.RequestError as exc:
+            raise ShopifyAPIError(
+                "Impossibile caricare il file su Shopify. Riprova più tardi."
+            ) from exc
+
+        if response.status_code not in (200, 201, 204):
+            raise ShopifyAPIError(
+                f"Upload file su Shopify fallito (HTTP {response.status_code})."
+            )
+
+    async def file_create_from_staged_upload(
+        self,
+        resource_url: str,
+        alt_text: str,
+    ) -> dict[str, Any]:
+        mutation = """
+        mutation FileCreate($files: [FileCreateInput!]!) {
+          fileCreate(files: $files) {
+            files {
+              id
+              fileStatus
+              alt
+              ... on MediaImage {
+                image { url width height }
+                preview { image { url } }
+              }
+            }
+            userErrors { field message }
+          }
+        }
+        """
+        data = await self.execute(
+            mutation,
+            {
+                "files": [
+                    {
+                        "originalSource": resource_url,
+                        "contentType": "IMAGE",
+                        "alt": alt_text,
+                    }
+                ]
+            },
+        )
+        result = data.get("fileCreate") or {}
+        user_errors = result.get("userErrors") or []
+        if user_errors:
+            messages = [
+                err.get("message", str(err))
+                for err in user_errors
+                if isinstance(err, dict)
+            ]
+            raise ShopifyAPIError(
+                "Creazione file Shopify non riuscita: " + "; ".join(messages[:3])
+            )
+        files = result.get("files") or []
+        if not files or not isinstance(files[0], dict):
+            raise ShopifyAPIError("Shopify non ha creato il file immagine.")
+        return files[0]
+
+    async def get_file_media_image(self, file_gid: str) -> dict[str, Any]:
+        query = """
+        query MediaImageStatus($id: ID!) {
+          node(id: $id) {
+            ... on MediaImage {
+              id
+              fileStatus
+              alt
+              image { url width height }
+              preview { image { url } }
+            }
+          }
+        }
+        """
+        data = await self.execute(query, {"id": file_gid})
+        node = data.get("node")
+        if not isinstance(node, dict):
+            raise ShopifyAPIError("File Shopify non trovato.")
+        return node
+
+    async def wait_until_file_ready(
+        self,
+        file_gid: str,
+        timeout_seconds: float = 20.0,
+    ) -> dict[str, Any]:
+        deadline = time.monotonic() + timeout_seconds
+        last: dict[str, Any] = {}
+        while time.monotonic() < deadline:
+            last = await self.get_file_media_image(file_gid)
+            status = str(last.get("fileStatus") or "").upper()
+            if status == "READY":
+                return last
+            if status == "FAILED":
+                raise ShopifyAPIError("Elaborazione file Shopify fallita.")
+            await asyncio.sleep(1.0)
+        raise ShopifyAPIError(
+            "Timeout in attesa del file Shopify. Riprova l'upload."
+        )
 
 
 def parse_product_metafields(node: dict[str, Any]) -> list[dict[str, Any]]:

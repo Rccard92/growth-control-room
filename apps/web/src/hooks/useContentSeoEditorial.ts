@@ -33,6 +33,7 @@ import {
   approveEditorialImage,
   removeEditorialImage,
   syncEditorialImageFromTitle,
+  retryEditorialImageUpload,
 } from "../lib/content-api";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -311,6 +312,14 @@ export function useSyncEditorialImageFromTitle(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) => syncEditorialImageFromTitle(projectId, itemId),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useRetryEditorialImageUpload(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => retryEditorialImageUpload(projectId, itemId),
     onSuccess: () => invalidateEditorial(qc, projectId),
   });
 }

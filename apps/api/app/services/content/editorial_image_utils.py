@@ -16,8 +16,8 @@ from app.services.content.editorial_image_filename import (
     filename_slug_from_image_filename,
 )
 from app.services.content.editorial_image_storage import (
-    PUBLIC_STORAGE_WARNING,
     is_shopify_image_publishable,
+    storage_warning_if_needed as resolve_editorial_storage_warning,
 )
 from app.utils.slug import slugify
 
@@ -119,7 +119,7 @@ def is_image_filename_stale(
 
 
 def _effective_publishing_image(image_payload: EditorialImagePayload) -> EditorialImagePayload:
-    if image_payload.image_status == "generated" and image_payload.approved_image_backup:
+    if image_payload.image_status in ("generated", "uploaded") and image_payload.approved_image_backup:
         backup = image_payload.approved_image_backup
         return image_payload.model_copy(
             update={
@@ -181,10 +181,21 @@ def build_approved_image_backup(image_payload: EditorialImagePayload) -> Editori
     )
 
 
-def storage_warning_if_needed(shopify_ready: bool) -> str | None:
-    if shopify_ready:
-        return None
-    return PUBLIC_STORAGE_WARNING
+def storage_warning_if_needed(
+    shopify_ready: bool,
+    *,
+    effective_provider: str | None = None,
+    shopify_connected: bool | None = None,
+    can_upload_files: bool | None = None,
+    upload_error: str | None = None,
+) -> str | None:
+    return resolve_editorial_storage_warning(
+        shopify_ready,
+        effective_provider=effective_provider,
+        shopify_connected=shopify_connected,
+        can_upload_files=can_upload_files,
+        upload_error=upload_error,
+    )
 
 
 def empty_editorial_image_payload() -> EditorialImagePayload:

@@ -80,17 +80,37 @@ def test_required_for_apply_constant() -> None:
     assert "write_products" in REQUIRED_FOR_APPLY
 
 
+def test_build_scope_result_image_upload_write_files() -> None:
+    result = build_scope_result(
+        shop_domain="shop.myshopify.com",
+        configured=["write_files"],
+        granted=["write_files"],
+    )
+    assert result["can_write_files"] is True
+    assert result["missing_image_upload_scopes"] == []
+
+
+def test_build_scope_result_image_upload_write_images_fallback() -> None:
+    result = build_scope_result(
+        shop_domain="shop.myshopify.com",
+        configured=["write_images"],
+        granted=["write_images"],
+    )
+    assert result["can_write_files"] is True
+
+
 def test_shopify_scopes_response_schema() -> None:
     from app.schemas.shopify import ShopifyScopesResponse
 
     payload = build_scope_result(
         shop_domain="shop.myshopify.com",
-        configured=["write_products"],
-        granted=["write_products"],
+        configured=["write_products", "write_files"],
+        granted=["write_products", "write_files"],
     )
     response = ShopifyScopesResponse.model_validate(payload)
     dumped = response.model_dump(by_alias=True)
     assert dumped["canWriteProducts"] is True
+    assert dumped["canWriteFiles"] is True
     assert dumped["shopDomain"] == "shop.myshopify.com"
 
 

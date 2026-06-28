@@ -472,6 +472,16 @@ export function removeEditorialImage(
   );
 }
 
+export function retryEditorialImageUpload(
+  projectId: string,
+  itemId: string,
+): Promise<EditorialImageActionResponse> {
+  return apiFetch<EditorialImageActionResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/retry-image-upload`,
+    { method: "POST" },
+  );
+}
+
 export function syncEditorialImageFromTitle(
   projectId: string,
   itemId: string,

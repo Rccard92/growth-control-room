@@ -28,7 +28,8 @@ import {
   IMAGE_STALE_PUBLISH_WARNING,
   NO_APPROVED_IMAGE_WARNING,
   parseEditorialImagePayload,
-  PUBLIC_STORAGE_WARNING,
+  resolveImageStorageWarning,
+  SHOPIFY_SCOPE_MISSING_WARNING,
 } from "./editorial-image-utils";
 import { buildEditorialImagePreviewUrl } from "../../../lib/content-api";
 
@@ -55,6 +56,8 @@ interface EditorialPublishingTabProps {
   blogsLoading: boolean;
   blogsSyncRequired: boolean;
   canWriteContent: boolean;
+  canWriteFiles?: boolean;
+  shopifyConnected?: boolean;
   scopesLoading: boolean;
 }
 
@@ -81,6 +84,8 @@ export function EditorialPublishingTab({
   blogsLoading,
   blogsSyncRequired,
   canWriteContent,
+  canWriteFiles,
+  shopifyConnected,
   scopesLoading,
 }: EditorialPublishingTabProps) {
   const [showPreview, setShowPreview] = useState(false);
@@ -186,6 +191,12 @@ export function EditorialPublishingTab({
         <div className="gcr-alert gcr-alert--warning">
           Serve il permesso Shopify <strong>write_content</strong>. Riconnetti Shopify con
           gli scope aggiornati per creare articoli nel blog.
+        </div>
+      )}
+
+      {canWriteFiles === false && !scopesLoading && (
+        <div className="gcr-alert gcr-alert--warning">
+          {SHOPIFY_SCOPE_MISSING_WARNING}
         </div>
       )}
 
@@ -493,7 +504,10 @@ export function EditorialPublishingTab({
               )}
               {imageApproved && !imagePayload.shopifyImageReady && (
                 <p className="editorial-publishing-tab__warning" role="alert">
-                  {PUBLIC_STORAGE_WARNING}
+                  {resolveImageStorageWarning(imagePayload, {
+                    canWriteFiles,
+                    shopifyConnected,
+                  }) ?? "L'immagine approvata non ha un URL CDN Shopify."}
                 </p>
               )}
               {imageApproved && imageIsStale && (

@@ -11,6 +11,15 @@ export const NO_APPROVED_IMAGE_WARNING = "Nessuna immagine approvata associata a
 export const PUBLIC_STORAGE_WARNING =
   "Storage pubblico immagini non configurato: l'immagine non può essere inviata a Shopify.";
 
+export const SHOPIFY_NOT_CONNECTED_WARNING =
+  "Shopify non connesso: connetti lo shop per caricare l'immagine su Shopify Files.";
+
+export const SHOPIFY_SCOPE_MISSING_WARNING =
+  "Per caricare immagini su Shopify serve il permesso write_files o write_images. Aggiorna gli scope della Custom App Shopify.";
+
+export const SHOPIFY_UPLOAD_FAILED_WARNING =
+  "Upload Shopify Files fallito. Usa «Riprova upload su Shopify».";
+
 export const FILENAME_STALE_MESSAGE =
   "Il titolo articolo è cambiato: il nome file SEO potrebbe non essere più allineato.";
 
@@ -21,6 +30,8 @@ export const IMAGE_POST_PROCESSING_LABEL = "crop 16:9 + resize";
 const STATUS_LABELS: Record<EditorialImageStatus, string> = {
   not_generated: "Non generata",
   generated: "Generata",
+  uploaded: "Caricata su Shopify",
+  upload_error: "Upload fallito",
   approved: "Approvata",
 };
 
@@ -64,19 +75,35 @@ export function emptyEditorialImagePayload(): EditorialImagePayload {
   return { imageStatus: "not_generated", imagePrompt: "" };
 }
 
+function normalizeImageStatus(value: unknown): EditorialImageStatus {
+  const status = String(value ?? "not_generated");
+  if (
+    status === "generated" ||
+    status === "uploaded" ||
+    status === "upload_error" ||
+    status === "approved"
+  ) {
+    return status;
+  }
+  return "not_generated";
+}
+
 export function parseEditorialImagePayload(
   raw: EditorialImagePayload | Record<string, unknown> | null | undefined,
 ): EditorialImagePayload {
   if (!raw || typeof raw !== "object") return emptyEditorialImagePayload();
   const record = raw as Record<string, unknown>;
-  const status = (record.imageStatus ?? record.image_status ?? "not_generated") as EditorialImageStatus;
+  const status = normalizeImageStatus(record.imageStatus ?? record.image_status);
+  const imageUrl = (record.imageUrl ?? record.image_url ?? record.imagePublicUrl ?? record.image_public_url ?? null) as
+    | string
+    | null;
   return {
-    imageStatus: status === "generated" || status === "approved" ? status : "not_generated",
+    imageStatus: status,
     imagePrompt: String(record.imagePrompt ?? record.image_prompt ?? ""),
     imageRevisionNote: (record.imageRevisionNote ?? record.image_revision_note ?? null) as string | null,
     imageModel: (record.imageModel ?? record.image_model ?? null) as string | null,
     imageAlt: (record.imageAlt ?? record.image_alt ?? null) as string | null,
-    imageUrl: (record.imageUrl ?? record.image_url ?? null) as string | null,
+    imageUrl,
     imageStoragePath: (record.imageStoragePath ?? record.image_storage_path ?? null) as string | null,
     imageFilename: (record.imageFilename ?? record.image_filename ?? null) as string | null,
     imageOriginalProviderFilename: (record.imageOriginalProviderFilename ??
@@ -99,6 +126,13 @@ export function parseEditorialImagePayload(
     skillPackUsed: String(record.skillPackUsed ?? record.skill_pack_used ?? ""),
     skillPackVersion: String(record.skillPackVersion ?? record.skill_pack_version ?? ""),
     shopifyImageReady: Boolean(record.shopifyImageReady ?? record.shopify_image_ready ?? false),
+    imageStorageProvider: (record.imageStorageProvider ?? record.image_storage_provider ?? null) as string | null,
+    shopifyFileId: (record.shopifyFileId ?? record.shopify_file_id ?? null) as string | null,
+    shopifyMediaGid: (record.shopifyMediaGid ?? record.shopify_media_gid ?? null) as string | null,
+    shopifyFileStatus: (record.shopifyFileStatus ?? record.shopify_file_status ?? null) as string | null,
+    shopifyUploadedAt: (record.shopifyUploadedAt ?? record.shopify_uploaded_at ?? null) as string | null,
+    imageUploadError: (record.imageUploadError ?? record.image_upload_error ?? null) as string | null,
+    imagePublicUrl: (record.imagePublicUrl ?? record.image_public_url ?? null) as string | null,
     shopifyImageSyncedAt: (record.shopifyImageSyncedAt ?? record.shopify_image_synced_at ?? null) as string | null,
     shopifyImageAltSynced: (record.shopifyImageAltSynced ?? record.shopify_image_alt_synced ?? null) as string | null,
     shopifyImageFilenameSynced: (record.shopifyImageFilenameSynced ??
@@ -109,8 +143,58 @@ export function parseEditorialImagePayload(
   };
 }
 
+export function hasShopifyCdnUrl(image: EditorialImagePayload): boolean {
+  const url = (image.imageUrl ?? image.imagePublicUrl ?? "").trim().toLowerCase();
+  if (!url) return false;
+  return url.includes("cdn.shopify.com") || url.includes("shopifycdn.com");
+}
+
 export function hasGeneratedImage(image: EditorialImagePayload): boolean {
-  return image.imageStatus === "generated" || image.imageStatus === "approved";
+  return (
+    image.imageStatus === "generated" ||
+    image.imageStatus === "uploaded" ||
+    image.imageStatus === "upload_error" ||
+    image.imageStatus === "approved"
+  );
+}
+
+export function canApproveImage(image: EditorialImagePayload): boolean {
+  if (image.imageStatus === "upload_error" || image.imageStatus === "approved") {
+    return false;
+  }
+  if (image.imageStatus !== "generated" && image.imageStatus !== "uploaded") {
+    return false;
+  }
+  return Boolean(image.imageUrl && image.shopifyImageReady);
+}
+
+export function resolveImageStorageWarning(
+  image: EditorialImagePayload,
+  options?: { canWriteFiles?: boolean; shopifyConnected?: boolean },
+): string | null {
+  if (image.shopifyImageReady && hasShopifyCdnUrl(image)) {
+    return null;
+  }
+  if (image.imageStatus === "upload_error") {
+    return image.imageUploadError
+      ? `${SHOPIFY_UPLOAD_FAILED_WARNING} ${image.imageUploadError}`
+      : SHOPIFY_UPLOAD_FAILED_WARNING;
+  }
+  if (image.imageStorageProvider === "shopify_files" || image.imageStorageProvider === null) {
+    if (options?.shopifyConnected === false) {
+      return SHOPIFY_NOT_CONNECTED_WARNING;
+    }
+    if (options?.canWriteFiles === false) {
+      return SHOPIFY_SCOPE_MISSING_WARNING;
+    }
+    if (image.imageStatus === "generated" && !image.shopifyImageReady) {
+      return "Elaborazione Shopify in corso o upload non ancora completato.";
+    }
+  }
+  if (!image.shopifyImageReady) {
+    return PUBLIC_STORAGE_WARNING;
+  }
+  return null;
 }
 
 export function isImageFilenameStale(image: EditorialImagePayload, articleTitle: string): boolean {

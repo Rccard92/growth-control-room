@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { EditorialArticlePayload, EditorialImagePayload } from "@gcr/shared";
 import { buildEditorialImagePreviewUrl } from "../../../lib/content-api";
 import {
+  canApproveImage,
   FILENAME_STALE_MESSAGE,
   formatImageCost,
   formatImageFinalSize,
@@ -9,10 +10,12 @@ import {
   formatImageUpdatedAt,
   getImageStatusLabel,
   hasGeneratedImage,
+  hasShopifyCdnUrl,
   IMAGE_POST_PROCESSING_LABEL,
   IMAGE_STALE_MESSAGE,
   isImageFilenameStale,
-  PUBLIC_STORAGE_WARNING,
+  resolveImageStorageWarning,
+  SHOPIFY_SCOPE_MISSING_WARNING,
 } from "./editorial-image-utils";
 
 interface EditorialImageTabProps {
@@ -30,11 +33,15 @@ interface EditorialImageTabProps {
   onApprove: () => void;
   onRemove: () => void;
   onSyncFromTitle?: () => void;
+  onRetryUpload?: () => void;
+  canWriteFiles?: boolean;
+  shopifyConnected?: boolean;
   generateLoading?: boolean;
   editLoading?: boolean;
   approveLoading?: boolean;
   removeLoading?: boolean;
   syncLoading?: boolean;
+  retryUploadLoading?: boolean;
 }
 
 export function EditorialImageTab({
@@ -52,17 +59,33 @@ export function EditorialImageTab({
   onApprove,
   onRemove,
   onSyncFromTitle,
+  onRetryUpload,
+  canWriteFiles,
+  shopifyConnected,
   generateLoading = false,
   editLoading = false,
   approveLoading = false,
   removeLoading = false,
   syncLoading = false,
+  retryUploadLoading = false,
 }: EditorialImageTabProps) {
   const [promptOpen, setPromptOpen] = useState(false);
   const previewUrl = buildEditorialImagePreviewUrl(projectId, itemId, image);
-  const busy = generateLoading || editLoading || approveLoading || removeLoading || syncLoading;
+  const busy =
+    generateLoading ||
+    editLoading ||
+    approveLoading ||
+    removeLoading ||
+    syncLoading ||
+    retryUploadLoading;
   const altText = image.imageAlt ?? article?.title ?? "—";
   const filenameStale = article ? isImageFilenameStale(image, article.title) : false;
+  const storageWarning = resolveImageStorageWarning(image, { canWriteFiles, shopifyConnected });
+  const approveAllowed = canApproveImage(image);
+  const showRetryUpload =
+    Boolean(onRetryUpload) &&
+    (image.imageStatus === "upload_error" ||
+      (image.imageStatus === "generated" && !image.shopifyImageReady));
 
   if (!hasArticle || !article) {
     return (
@@ -79,6 +102,7 @@ export function EditorialImageTab({
           <h3>Immagine hero</h3>
           <p className="editorial-image-tab__subtitle">
             Formato fisso 1600×900 JPG. Filename SEO e ALT sincronizzati al titolo articolo.
+            Storage Shopify Files con URL CDN per la pubblicazione.
           </p>
         </div>
         <span className={`editorial-image-tab__badge editorial-image-tab__badge--${image.imageStatus}`}>
@@ -86,9 +110,31 @@ export function EditorialImageTab({
         </span>
       </header>
 
-      {hasGeneratedImage(image) && !image.shopifyImageReady && (
+      {canWriteFiles === false && hasGeneratedImage(image) && (
         <div className="editorial-image-tab__warning" role="alert">
-          <p>{PUBLIC_STORAGE_WARNING}</p>
+          <p>{SHOPIFY_SCOPE_MISSING_WARNING}</p>
+        </div>
+      )}
+
+      {storageWarning && hasGeneratedImage(image) && (
+        <div className="editorial-image-tab__warning" role="alert">
+          <p>{storageWarning}</p>
+          {showRetryUpload && (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              onClick={onRetryUpload}
+              disabled={busy || canWriteFiles === false}
+            >
+              {retryUploadLoading ? "Upload in corso…" : "Riprova upload su Shopify"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {image.imageStatus === "uploaded" && hasShopifyCdnUrl(image) && (
+        <div className="editorial-image-tab__success" role="status">
+          <p>Immagine caricata su Shopify Files. Pronta per l&apos;approvazione.</p>
         </div>
       )}
 
@@ -144,6 +190,10 @@ export function EditorialImageTab({
           <strong>{altText}</strong>
         </div>
         <div>
+          <span className="editorial-image-tab__meta-label">Storage</span>
+          <strong>{image.imageStorageProvider ?? "shopify_files"}</strong>
+        </div>
+        <div>
           <span className="editorial-image-tab__meta-label">Modello</span>
           <strong>{image.imageModel ?? "—"}</strong>
         </div>
@@ -189,14 +239,29 @@ export function EditorialImageTab({
             >
               {generateLoading ? "Rigenerazione…" : "Rigenera"}
             </button>
-            {image.imageStatus === "generated" && (
+            {(image.imageStatus === "generated" || image.imageStatus === "uploaded") && (
               <button
                 type="button"
                 className="gcr-btn gcr-btn--primary"
                 onClick={onApprove}
-                disabled={busy}
+                disabled={busy || !approveAllowed}
+                title={
+                  approveAllowed
+                    ? undefined
+                    : "Serve un URL CDN Shopify prima di approvare l'immagine."
+                }
               >
                 {approveLoading ? "Approvazione…" : "Approva immagine"}
+              </button>
+            )}
+            {showRetryUpload && (
+              <button
+                type="button"
+                className="gcr-btn gcr-btn--secondary"
+                onClick={onRetryUpload}
+                disabled={busy || canWriteFiles === false}
+              >
+                {retryUploadLoading ? "Upload in corso…" : "Riprova upload su Shopify"}
               </button>
             )}
             <button

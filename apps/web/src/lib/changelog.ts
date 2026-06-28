@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.31-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Switched editorial image storage default to Shopify Files",
+      "Added staged upload + fileCreate flow for editorial images",
+      "Shopify article featured images now use Shopify-hosted CDN URLs",
+      "Added scope checks for Shopify image uploads",
+    ],
+  },
+  {
     version: "0.5.29-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

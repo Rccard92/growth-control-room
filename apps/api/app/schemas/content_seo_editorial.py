@@ -810,7 +810,7 @@ class EditorialPublishingUpdateRequest(BaseModel):
         return value
 
 
-EditorialImageStatus = Literal["not_generated", "generated", "approved"]
+EditorialImageStatus = Literal["not_generated", "generated", "uploaded", "upload_error", "approved"]
 
 
 class EditorialApprovedImageBackup(BaseModel):
@@ -867,6 +867,15 @@ class EditorialImagePayload(BaseModel):
     skill_pack_used: str = Field(default="", serialization_alias="skillPackUsed")
     skill_pack_version: str = Field(default="", serialization_alias="skillPackVersion")
     shopify_image_ready: bool = Field(default=False, serialization_alias="shopifyImageReady")
+    image_storage_provider: str | None = Field(
+        default=None, serialization_alias="imageStorageProvider"
+    )
+    shopify_file_id: str | None = Field(default=None, serialization_alias="shopifyFileId")
+    shopify_media_gid: str | None = Field(default=None, serialization_alias="shopifyMediaGid")
+    shopify_file_status: str | None = Field(default=None, serialization_alias="shopifyFileStatus")
+    shopify_uploaded_at: str | None = Field(default=None, serialization_alias="shopifyUploadedAt")
+    image_upload_error: str | None = Field(default=None, serialization_alias="imageUploadError")
+    image_public_url: str | None = Field(default=None, serialization_alias="imagePublicUrl")
     shopify_image_synced_at: str | None = Field(
         default=None, serialization_alias="shopifyImageSyncedAt"
     )
@@ -913,6 +922,13 @@ def normalize_editorial_image_payload(raw: dict) -> EditorialImagePayload:
         "skillPackUsed": "skill_pack_used",
         "skillPackVersion": "skill_pack_version",
         "shopifyImageReady": "shopify_image_ready",
+        "imageStorageProvider": "image_storage_provider",
+        "shopifyFileId": "shopify_file_id",
+        "shopifyMediaGid": "shopify_media_gid",
+        "shopifyFileStatus": "shopify_file_status",
+        "shopifyUploadedAt": "shopify_uploaded_at",
+        "imageUploadError": "image_upload_error",
+        "imagePublicUrl": "image_public_url",
         "shopifyImageSyncedAt": "shopify_image_synced_at",
         "shopifyImageAltSynced": "shopify_image_alt_synced",
         "shopifyImageFilenameSynced": "shopify_image_filename_synced",
@@ -923,9 +939,11 @@ def normalize_editorial_image_payload(raw: dict) -> EditorialImagePayload:
         if alias in data and field not in data:
             data[field] = data.pop(alias)
     status = str(data.get("image_status") or "not_generated").strip()
-    if status not in ("not_generated", "generated", "approved"):
+    if status not in ("not_generated", "generated", "uploaded", "upload_error", "approved"):
         status = "not_generated"
     data["image_status"] = status
+    if data.get("image_public_url") and not data.get("image_url"):
+        data["image_url"] = data["image_public_url"]
     cost = data.get("image_generation_cost")
     if cost is not None:
         try:

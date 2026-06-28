@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.31-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Switched editorial image storage default to Shopify Files
+- Added staged upload + fileCreate flow for editorial images
+- Shopify article featured images now use Shopify-hosted CDN URLs
+- Added scope checks for Shopify image uploads
+
 ## [0.5.29-alpha] - 2026-06-13
 
 Tipo: Alpha patch

@@ -40,12 +40,17 @@ from app.services.content.editorial_image_skill_loader import (
     load_editorial_image_skill_context,
 )
 from app.services.content.editorial_image_storage import (
-    PUBLIC_STORAGE_WARNING,
     delete_editorial_image,
     generate_access_token,
     list_existing_filenames,
+    read_editorial_image_bytes,
+    resolve_effective_storage_provider,
     resolve_preview_image_url,
     save_editorial_image,
+)
+from app.services.content.editorial_shopify_files_storage import (
+    ShopifyFileUploadResult,
+    upload_editorial_image_to_shopify_files,
 )
 from app.services.content.editorial_image_utils import (
     build_approved_image_backup,
@@ -59,6 +64,9 @@ from app.services.content.editorial_image_utils import (
 )
 from app.services.content.editorial_item_service import get_editorial_item, get_editorial_item_read
 from app.services.content.editorial_publishing_utils import normalize_publishing_payload
+from app.services.shopify.client import ShopifyAPIError
+from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
+from app.services.shopify.scopes import can_upload_shopify_files
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +290,77 @@ def _collect_existing_filenames(
     return names
 
 
+async def _resolve_shopify_upload_context(
+    session: AsyncSession,
+    project_id: UUID,
+) -> tuple[str, bool, bool | None, str | None]:
+    effective_provider = await resolve_effective_storage_provider(project_id, session)
+    if effective_provider != "shopify_files":
+        return effective_provider, False, None, None
+    store = await get_shopify_store_for_project(project_id, session)
+    shopify_connected = store is not None and store.connection_status == "connected"
+    if not shopify_connected:
+        return effective_provider, False, False, None
+    scope = await can_upload_shopify_files(store, session)
+    if scope["allowed"]:
+        return effective_provider, True, True, None
+    return effective_provider, True, False, scope.get("message")
+
+
+async def _try_upload_to_shopify_files(
+    session: AsyncSession,
+    project_id: UUID,
+    *,
+    filename: str,
+    alt_text: str,
+    image_bytes: bytes,
+    mime_type: str,
+) -> tuple[ShopifyFileUploadResult | None, str | None]:
+    effective_provider, shopify_connected, can_upload_files, scope_message = (
+        await _resolve_shopify_upload_context(session, project_id)
+    )
+    if effective_provider != "shopify_files":
+        return None, None
+    if not shopify_connected:
+        return None, None
+    if can_upload_files is False:
+        return None, scope_message
+    store = await get_shopify_store_for_project(project_id, session)
+    if store is None:
+        return None, "Shopify non connesso."
+    try:
+        client = await get_shopify_client_for_store(store)
+        result = await upload_editorial_image_to_shopify_files(
+            client,
+            filename=filename,
+            alt_text=alt_text,
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+        )
+        return result, None
+    except ShopifyAPIError as exc:
+        return None, str(exc)
+    except Exception as exc:
+        logger.exception("Shopify Files upload failed for editorial image")
+        return None, str(exc) or "Errore sconosciuto durante l'upload Shopify."
+
+
+def _shopify_upload_fields(
+    upload_result: ShopifyFileUploadResult,
+    *,
+    effective_provider: str,
+) -> dict[str, object]:
+    return {
+        "image_storage_provider": effective_provider,
+        "shopify_file_id": upload_result.media_gid,
+        "shopify_media_gid": upload_result.media_gid,
+        "shopify_file_status": upload_result.file_status,
+        "shopify_uploaded_at": upload_result.shopify_uploaded_at,
+        "image_public_url": upload_result.cdn_url,
+        "image_upload_error": None,
+    }
+
+
 async def _persist_generated_image(
     session: AsyncSession,
     row: ContentSeoEditorialItem,
@@ -315,11 +394,8 @@ async def _persist_generated_image(
         approved_backup = build_approved_image_backup(existing)
     elif existing.image_status == "approved" and approved_backup:
         pass
-    elif existing.image_status == "generated" and existing.image_storage_path:
+    elif existing.image_status in ("generated", "uploaded", "upload_error") and existing.image_storage_path:
         delete_editorial_image(existing.image_storage_path)
-    elif existing.image_status == "generated" and not approved_backup:
-        if existing.image_storage_path:
-            delete_editorial_image(existing.image_storage_path)
 
     storage_path, public_url, image_hash = save_editorial_image(
         project_id,
@@ -328,18 +404,61 @@ async def _persist_generated_image(
         content_type=meta["mime_type"],
     )
     access_token = existing.access_token or generate_access_token()
-    shopify_ready = compute_shopify_image_ready(public_url)
-    preview_url = resolve_preview_image_url(project_id, item_id, access_token)
-    effective_url = public_url if shopify_ready else None
 
-    storage_warning = storage_warning_if_needed(shopify_ready)
+    effective_provider, shopify_connected, can_upload_files, _scope_message = (
+        await _resolve_shopify_upload_context(session, project_id)
+    )
+    upload_result, upload_error = await _try_upload_to_shopify_files(
+        session,
+        project_id,
+        filename=filename,
+        alt_text=alt,
+        image_bytes=processed_bytes,
+        mime_type=meta["mime_type"],
+    )
+
+    shopify_fields: dict[str, object] = {
+        "image_storage_provider": effective_provider,
+        "shopify_file_id": None,
+        "shopify_media_gid": None,
+        "shopify_file_status": None,
+        "shopify_uploaded_at": None,
+        "image_public_url": None,
+        "image_upload_error": upload_error,
+    }
+    if upload_result:
+        image_status = "uploaded"
+        effective_url = upload_result.cdn_url
+        shopify_ready = compute_shopify_image_ready(effective_url)
+        shopify_fields = _shopify_upload_fields(
+            upload_result,
+            effective_provider=effective_provider,
+        )
+    elif upload_error:
+        image_status = "upload_error"
+        effective_url = None
+        shopify_ready = False
+    else:
+        image_status = "generated"
+        shopify_ready = compute_shopify_image_ready(public_url)
+        effective_url = public_url if shopify_ready else None
+
+    preview_url = resolve_preview_image_url(project_id, item_id, access_token)
+
+    storage_warning = storage_warning_if_needed(
+        shopify_ready,
+        effective_provider=effective_provider,
+        shopify_connected=shopify_connected,
+        can_upload_files=can_upload_files,
+        upload_error=upload_error,
+    )
     if storage_warning:
         warnings.append(storage_warning)
 
     skill = load_editorial_image_skill_context()
     now = datetime.now(timezone.utc).isoformat()
     payload = EditorialImagePayload(
-        image_status="generated",
+        image_status=image_status,
         image_prompt=image_prompt,
         image_revision_note=revision_note,
         image_model=image_model,
@@ -367,8 +486,9 @@ async def _persist_generated_image(
         shopify_image_ready=shopify_ready,
         approved_image_backup=approved_backup,
         ai_generation=prompt_snapshot,
+        **shopify_fields,
     )
-    if not shopify_ready and preview_url:
+    if not shopify_ready and preview_url and not effective_url:
         payload = payload.model_copy(update={"image_url": None})
 
     row.image_payload = payload.model_dump(mode="json", by_alias=True)
@@ -527,7 +647,12 @@ async def approve_editorial_image(
     row = await get_editorial_item(session, project_id, item_id)
     article = _require_article(row)
     image_payload = normalize_image_payload(row.image_payload)
-    if image_payload.image_status != "generated":
+    if image_payload.image_status == "upload_error":
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Carica l'immagine su Shopify prima di approvare.",
+        )
+    if image_payload.image_status not in ("generated", "uploaded"):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Approva solo un'immagine già generata.",
@@ -536,6 +661,11 @@ async def approve_editorial_image(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="File immagine mancante.",
+        )
+    if not image_payload.image_url or not image_payload.shopify_image_ready:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Serve un URL CDN Shopify prima di approvare.",
         )
 
     warnings: list[str] = []
@@ -552,7 +682,10 @@ async def approve_editorial_image(
         if backup.image_storage_path and backup.image_storage_path != image_payload.image_storage_path:
             delete_editorial_image(backup.image_storage_path)
 
-    storage_warning = storage_warning_if_needed(image_payload.shopify_image_ready)
+    storage_warning = storage_warning_if_needed(
+        image_payload.shopify_image_ready,
+        effective_provider=image_payload.image_storage_provider,
+    )
     if storage_warning:
         warnings.append(storage_warning)
 
@@ -572,6 +705,108 @@ async def approve_editorial_image(
         publishing = sync_approved_image_to_publishing(publishing, image_payload)
         row.publishing_payload = publishing.model_dump(mode="json", by_alias=True)
 
+    await session.commit()
+    item = await get_editorial_item_read(session, project_id, item_id)
+    return EditorialImageActionResponse(item=item, warnings=warnings)
+
+
+async def retry_editorial_image_upload(
+    session: AsyncSession,
+    project_id: UUID,
+    item_id: UUID,
+) -> EditorialImageActionResponse:
+    row = await get_editorial_item(session, project_id, item_id)
+    image_payload = normalize_image_payload(row.image_payload)
+    if image_payload.image_status not in ("generated", "uploaded", "upload_error"):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Nessun upload Shopify da ritentare per questa immagine.",
+        )
+    if not image_payload.image_storage_path:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="File immagine mancante.",
+        )
+
+    article = _require_article(row)
+    brief = row.brief_payload if isinstance(row.brief_payload, dict) else None
+    alt = resolve_editorial_image_alt(article, brief, row.title)
+    filename = image_payload.image_filename or "articolo-solmielato.jpg"
+    mime_type = image_payload.image_mime_type or "image/jpeg"
+
+    effective_provider, shopify_connected, can_upload_files, scope_message = (
+        await _resolve_shopify_upload_context(session, project_id)
+    )
+    if effective_provider != "shopify_files":
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Storage Shopify Files non disponibile per questo progetto.",
+        )
+    if not shopify_connected:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Shopify non connesso: connetti lo shop per caricare l'immagine.",
+        )
+    if can_upload_files is False:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=scope_message or "Permessi Shopify insufficienti per l'upload immagini.",
+        )
+
+    try:
+        image_bytes = read_editorial_image_bytes(image_payload.image_storage_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail="File immagine non trovato.",
+        ) from exc
+
+    warnings: list[str] = []
+    upload_result, upload_error = await _try_upload_to_shopify_files(
+        session,
+        project_id,
+        filename=filename,
+        alt_text=alt,
+        image_bytes=image_bytes,
+        mime_type=mime_type,
+    )
+
+    now = datetime.now(timezone.utc).isoformat()
+    if upload_result:
+        shopify_ready = compute_shopify_image_ready(upload_result.cdn_url)
+        image_payload = image_payload.model_copy(
+            update={
+                "image_status": "uploaded",
+                "image_alt": alt,
+                "image_url": upload_result.cdn_url,
+                "shopify_image_ready": shopify_ready,
+                "updated_at": now,
+                **_shopify_upload_fields(upload_result, effective_provider=effective_provider),
+            }
+        )
+    else:
+        image_payload = image_payload.model_copy(
+            update={
+                "image_status": "upload_error",
+                "image_alt": alt,
+                "image_url": None,
+                "shopify_image_ready": False,
+                "image_upload_error": upload_error,
+                "updated_at": now,
+            }
+        )
+
+    storage_warning = storage_warning_if_needed(
+        image_payload.shopify_image_ready,
+        effective_provider=effective_provider,
+        shopify_connected=shopify_connected,
+        can_upload_files=can_upload_files,
+        upload_error=upload_error,
+    )
+    if storage_warning:
+        warnings.append(storage_warning)
+
+    row.image_payload = image_payload.model_dump(mode="json", by_alias=True)
     await session.commit()
     item = await get_editorial_item_read(session, project_id, item_id)
     return EditorialImageActionResponse(item=item, warnings=warnings)
@@ -659,8 +894,6 @@ async def get_editorial_image_media(
     *,
     token: str,
 ) -> tuple[bytes, str]:
-    from app.services.content.editorial_image_storage import read_editorial_image_bytes
-
     row = await get_editorial_item(session, project_id, item_id)
     image_payload = normalize_image_payload(row.image_payload)
     if not image_payload.image_storage_path:

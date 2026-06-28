@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canApproveImage,
   DEFAULT_IMAGE_FINAL_SIZE,
   DEFAULT_IMAGE_PROVIDER_SIZE,
   formatImageCost,
@@ -8,17 +9,20 @@ import {
   formatImageProviderSize,
   getImageStatusLabel,
   hasApprovedImageForPublish,
+  hasShopifyCdnUrl,
   IMAGE_POST_PROCESSING_LABEL,
   IMAGE_STALE_MESSAGE,
   isImageFilenameStale,
   parseEditorialImagePayload,
-  PUBLIC_STORAGE_WARNING,
+  SHOPIFY_SCOPE_MISSING_WARNING,
 } from "./editorial-image-utils";
 
 describe("editorial-image-utils", () => {
   it("formatta label stato immagine", () => {
     expect(getImageStatusLabel("approved")).toBe("Approvata");
     expect(getImageStatusLabel("generated")).toBe("Generata");
+    expect(getImageStatusLabel("uploaded")).toBe("Caricata su Shopify");
+    expect(getImageStatusLabel("upload_error")).toBe("Upload fallito");
   });
 
   it("formatta costo immagine", () => {
@@ -77,8 +81,30 @@ describe("editorial-image-utils", () => {
     expect(hasApprovedImageForPublish(image)).toBe(true);
   });
 
+  it("canApproveImage richiede URL CDN Shopify", () => {
+    const uploaded = parseEditorialImagePayload({
+      imageStatus: "uploaded",
+      imageUrl: "https://cdn.shopify.com/s/files/1/hero.jpg",
+      shopifyImageReady: true,
+    });
+    expect(canApproveImage(uploaded)).toBe(true);
+    expect(hasShopifyCdnUrl(uploaded)).toBe(true);
+
+    const uploadError = parseEditorialImagePayload({
+      imageStatus: "upload_error",
+      imageUploadError: "Timeout",
+    });
+    expect(canApproveImage(uploadError)).toBe(false);
+
+    const generated = parseEditorialImagePayload({
+      imageStatus: "generated",
+      shopifyImageReady: false,
+    });
+    expect(canApproveImage(generated)).toBe(false);
+  });
+
   it("espone messaggi warning", () => {
     expect(IMAGE_STALE_MESSAGE).toContain("non essere aggiornata");
-    expect(PUBLIC_STORAGE_WARNING).toContain("Shopify");
+    expect(SHOPIFY_SCOPE_MISSING_WARNING).toContain("write_files");
   });
 });

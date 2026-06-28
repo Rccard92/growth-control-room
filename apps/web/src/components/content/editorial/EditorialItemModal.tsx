@@ -65,6 +65,7 @@ import {
   useApproveEditorialImage,
   useRemoveEditorialImage,
   useSyncEditorialImageFromTitle,
+  useRetryEditorialImageUpload,
   usePublishEditorialShopify,
   useSyncEditorialPublishingFromArticle,
   useDisconnectEditorialShopifyArticle,
@@ -115,6 +116,7 @@ export function EditorialItemModal({
   const approveImageMutation = useApproveEditorialImage(projectId);
   const removeImageMutation = useRemoveEditorialImage(projectId);
   const syncImageFromTitleMutation = useSyncEditorialImageFromTitle(projectId);
+  const retryImageUploadMutation = useRetryEditorialImageUpload(projectId);
   const updateArticleMutation = useUpdateEditorialArticle(projectId);
   const updatePublishingMutation = useUpdateEditorialPublishing(projectId);
   const publishShopifyMutation = usePublishEditorialShopify(projectId);
@@ -358,6 +360,21 @@ export function EditorialItemModal({
       setSuccess("ALT e filename aggiornati dal titolo articolo.");
     } catch (err) {
       setError(formatPublishingError("Errore sincronizzazione immagine.", err));
+    }
+  }
+
+  async function handleRetryImageUpload() {
+    if (!item) return;
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      const result = await retryImageUploadMutation.mutateAsync(item.id);
+      syncItem(result.item);
+      if (result.warnings?.length) setWarning(result.warnings.join(" "));
+      setSuccess("Upload Shopify completato.");
+    } catch (err) {
+      setError(formatPublishingError("Errore upload Shopify Files.", err));
     }
   }
 
@@ -801,6 +818,8 @@ export function EditorialItemModal({
   const hasShopifyLink = Boolean(item.shopifyArticleGid);
   const isPublishedOnShopify = item.publishStatus === "published";
   const canWriteContent = scopesData?.canWriteContent ?? false;
+  const canWriteFiles = scopesData?.canWriteFiles ?? false;
+  const shopifyConnected = shopifyStatus?.connected ?? false;
   const publishActionsDisabled =
     status !== "ready_to_publish" ||
     !canWriteContent ||
@@ -1271,11 +1290,15 @@ export function EditorialItemModal({
               onApprove={() => void handleApproveImage()}
               onRemove={() => void handleRemoveImage()}
               onSyncFromTitle={() => void handleSyncImageFromTitle()}
+              onRetryUpload={() => void handleRetryImageUpload()}
+              canWriteFiles={canWriteFiles}
+              shopifyConnected={shopifyConnected}
               generateLoading={generateImageMutation.isPending}
               editLoading={editImageMutation.isPending}
               approveLoading={approveImageMutation.isPending}
               removeLoading={removeImageMutation.isPending}
               syncLoading={syncImageFromTitleMutation.isPending}
+              retryUploadLoading={retryImageUploadMutation.isPending}
             />
           </section>
         )}
@@ -1305,6 +1328,8 @@ export function EditorialItemModal({
               blogsLoading={blogsLoading}
               blogsSyncRequired={blogsData?.syncRequired ?? false}
               canWriteContent={canWriteContent}
+              canWriteFiles={canWriteFiles}
+              shopifyConnected={shopifyConnected}
               scopesLoading={scopesLoading}
             />
           </section>

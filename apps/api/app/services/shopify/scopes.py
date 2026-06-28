@@ -14,6 +14,8 @@ from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 
 REQUIRED_FOR_APPLY = ["write_products"]
 REQUIRED_FOR_PUBLISH = ["write_content"]
+REQUIRED_FOR_IMAGE_UPLOAD = ["write_files"]
+IMAGE_UPLOAD_FALLBACK_SCOPES = ["write_images"]
 SCOPES_CACHE_TTL = timedelta(hours=1)
 
 
@@ -56,6 +58,12 @@ def _scope_message(
     )
 
 
+def _has_image_upload_scope(granted: list[str]) -> bool:
+    if "write_files" in granted:
+        return True
+    return any(scope in granted for scope in IMAGE_UPLOAD_FALLBACK_SCOPES)
+
+
 def build_scope_result(
     *,
     shop_domain: str,
@@ -65,13 +73,21 @@ def build_scope_result(
 ) -> dict[str, Any]:
     missing_apply = [s for s in REQUIRED_FOR_APPLY if s not in granted]
     missing_publish = [s for s in REQUIRED_FOR_PUBLISH if s not in granted]
+    missing_image_upload = [
+        s for s in REQUIRED_FOR_IMAGE_UPLOAD if s not in granted and not _has_image_upload_scope(granted)
+    ]
     can_write_products = "write_products" in granted and not verify_failed
     can_write_content = "write_content" in granted and not verify_failed
+    can_write_files = _has_image_upload_scope(granted) and not verify_failed
     requires_reconnect = (
         not verify_failed
         and (
             ("write_products" in configured and "write_products" not in granted)
             or ("write_content" in configured and "write_content" not in granted)
+            or (
+                any(scope in configured for scope in REQUIRED_FOR_IMAGE_UPLOAD + IMAGE_UPLOAD_FALLBACK_SCOPES)
+                and not _has_image_upload_scope(granted)
+            )
         )
     )
     message = _scope_message(
@@ -86,10 +102,13 @@ def build_scope_result(
         "granted_scopes": granted,
         "required_for_apply": list(REQUIRED_FOR_APPLY),
         "required_for_publish": list(REQUIRED_FOR_PUBLISH),
+        "required_for_image_upload": list(REQUIRED_FOR_IMAGE_UPLOAD),
         "missing_scopes": missing_apply,
         "missing_publish_scopes": missing_publish,
+        "missing_image_upload_scopes": missing_image_upload,
         "can_write_products": can_write_products,
         "can_write_content": can_write_content,
+        "can_write_files": can_write_files,
         "requires_reconnect": requires_reconnect,
         "message": message,
     }
@@ -195,6 +214,26 @@ async def can_publish_with_write_content(
         "message": (
             "Serve il permesso Shopify write_content. "
             "Riconnetti Shopify con gli scope aggiornati."
+        ),
+        **result,
+    }
+
+
+async def can_upload_shopify_files(
+    store: ShopifyStore,
+    session: AsyncSession,
+) -> dict[str, Any]:
+    result = await resolve_shopify_scopes(store, session, force_refresh=True)
+    if result["can_write_files"]:
+        return {"allowed": True, **result}
+    return {
+        "allowed": False,
+        "requires_scope": "write_files",
+        "missing_scopes": result.get("missing_image_upload_scopes") or [],
+        "requires_reconnect": result["requires_reconnect"],
+        "message": (
+            "Per caricare immagini su Shopify serve il permesso write_files o write_images. "
+            "Aggiorna gli scope della Custom App Shopify."
         ),
         **result,
     }

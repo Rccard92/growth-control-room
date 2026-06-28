@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     app_env: str = "production"
     shopify_client_id: str | None = None
     shopify_client_secret: str | None = None
-    shopify_scopes: str = "read_products,read_orders,read_content,write_content,read_reports"
+    shopify_scopes: str = (
+        "read_products,read_orders,read_content,write_content,read_reports,read_files,write_files"
+    )
     shopify_redirect_uri: str | None = None
     frontend_url: str | None = None
     openai_api_key: str | None = None
@@ -38,7 +40,7 @@ class Settings(BaseSettings):
     editorial_images_dir: str = "data/editorial-images"
     public_api_base_url: str | None = None
     openai_image_model: str = "gpt-image-1"
-    editorial_image_storage_provider: str = "local"
+    editorial_image_storage_provider: str = "shopify_files"
     editorial_image_public_base_url: str | None = None
     editorial_image_s3_bucket: str | None = None
     editorial_image_s3_region: str = "auto"

@@ -234,35 +234,44 @@ Workflow tra **Articolo** e **Pubblicazione**:
 2. Post-processing server-side obbligatorio: **1600×900 JPG** (crop 16:9, nessuno stretch).
 3. Filename SEO dal titolo articolo (`slug-titolo.jpg`, max 90 caratteri, fallback `articolo-solmielato.jpg`).
 4. **ALT** sempre uguale al titolo articolo (priorità: `articlePayload.title` → `briefPayload.proposedTitle` → `item.title`).
-5. Approva immagine → sincronizza hero in `publishing_payload` se storage pubblico configurato.
-6. Pubblica su Shopify → `ArticleImageInput` con `{ url, altText }`.
+5. Upload automatico su **Shopify Files** (staged upload → `fileCreate` → poll `READY` → URL CDN).
+6. Approva immagine (solo con URL CDN Shopify) → sincronizza hero in `publishing_payload`.
+7. Pubblica su Shopify → `ArticleImageInput` con `{ url, altText }`.
 
 **Struttura `image_payload` (campi principali):**
 
 ```json
 {
-  "imageStatus": "not_generated",
+  "imageStatus": "uploaded",
   "imageFilename": "yogurt-con-frutta-noci-e-miele.jpg",
   "imageWidth": 1600,
   "imageHeight": 900,
   "imageAspectRatio": "16:9",
   "imageMimeType": "image/jpeg",
   "imageAlt": "Titolo articolo",
-  "imageUrl": "https://cdn.example.com/editorial/{project_id}/editorial/{filename}",
+  "imageUrl": "https://cdn.shopify.com/s/files/1/.../hero.jpg",
+  "imageStorageProvider": "shopify_files",
+  "shopifyMediaGid": "gid://shopify/MediaImage/...",
+  "shopifyFileStatus": "READY",
   "shopifyImageReady": true,
   "sourceArticleHash": "..."
 }
 ```
 
-**Storage pubblico (richiesto per Shopify):**
+Stati immagine: `generated` (AI OK, upload pending), `uploaded` (CDN pronta), `upload_error` (retry UI), `approved`.
+
+**Storage immagini editoriali (default: Shopify Files):**
 
 | Env | Descrizione |
 |-----|-------------|
-| `EDITORIAL_IMAGE_STORAGE_PROVIDER` | `local` (solo preview tool) o `s3` (R2/Supabase/S3) |
-| `EDITORIAL_IMAGE_PUBLIC_BASE_URL` | Base URL CDN pubblico per Shopify |
-| `EDITORIAL_IMAGE_S3_*` | Credenziali bucket S3-compatible |
+| `EDITORIAL_IMAGE_STORAGE_PROVIDER` | Default `shopify_files`; opzionale `local` (solo preview) o `s3` (CDN esterno) |
+| `SHOPIFY_SCOPES` | Include `read_files,write_files` (fallback accettato: `write_images`) |
+| `EDITORIAL_IMAGE_PUBLIC_BASE_URL` | Solo se provider `s3` |
+| `EDITORIAL_IMAGE_S3_*` | Solo se provider `s3` esplicito |
 
-Con `local` o senza CDN: generazione e preview nel tool OK; **l'immagine non viene inviata a Shopify** (warning in UI).
+Flusso Shopify Files: `stagedUploadsCreate` → POST multipart al target → `fileCreate` (`contentType: IMAGE`, `alt`) → poll `fileStatus=READY` → URL da `MediaImage.image.url`.
+
+Preview locale via token (`image-media?token=`) resta disponibile finché l'upload CDN non è pronto. S3/R2 non è più obbligatorio.
 
 **Stale image:** se `articleHash` cambia dopo generazione/approvazione → `imageIsStale=true` e warning in tab Immagine e Pubblicazione (non blocca publish MVP).
 
@@ -285,6 +294,7 @@ Base: `/api/projects/{project_id}/content/seo/`
 | POST | `editorial-items/{item_id}/generate-image` | Genera hero 1600×900 da articolo |
 | POST | `editorial-items/{item_id}/edit-image` | Rigenera con istruzioni modifica |
 | POST | `editorial-items/{item_id}/approve-image` | Approva immagine per publish |
+| POST | `editorial-items/{item_id}/retry-image-upload` | Ritenta upload Shopify Files |
 | POST | `editorial-items/{item_id}/remove-image` | Rimuove immagine |
 | POST | `editorial-items/{item_id}/sync-image-from-title` | Aggiorna ALT e filename SEO dal titolo |
 | GET | `editorial-items/{item_id}/image-media?token=` | Preview locale (non per Shopify) |

@@ -86,6 +86,7 @@ from app.services.content.editorial_image_service import (
     generate_editorial_image,
     get_editorial_image_media,
     remove_editorial_image,
+    retry_editorial_image_upload,
     sync_editorial_image_from_title,
 )
 from app.services.content.editorial_plan_service import generate_editorial_calendar
@@ -1110,6 +1111,20 @@ async def approve_content_seo_editorial_image(
 ) -> EditorialImageActionResponse:
     await get_project_in_default_workspace(project_id, session)
     return await approve_editorial_image(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/retry-image-upload",
+    response_model=EditorialImageActionResponse,
+    response_model_by_alias=True,
+)
+async def retry_content_seo_editorial_image_upload(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialImageActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await retry_editorial_image_upload(session, project_id, item_id)
 
 
 @router.post(

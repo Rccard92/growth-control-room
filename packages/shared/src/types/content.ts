@@ -631,7 +631,12 @@ export interface EditorialItemAiUsageResponse {
   logs?: EditorialAiGenerationInfo[];
 }
 
-export type EditorialImageStatus = "not_generated" | "generated" | "approved";
+export type EditorialImageStatus =
+  | "not_generated"
+  | "generated"
+  | "uploaded"
+  | "upload_error"
+  | "approved";
 
 export interface EditorialApprovedImageBackup {
   imageUrl?: string | null;
@@ -673,6 +678,13 @@ export interface EditorialImagePayload {
   skillPackUsed?: string;
   skillPackVersion?: string;
   shopifyImageReady?: boolean;
+  imageStorageProvider?: string | null;
+  shopifyFileId?: string | null;
+  shopifyMediaGid?: string | null;
+  shopifyFileStatus?: string | null;
+  shopifyUploadedAt?: string | null;
+  imageUploadError?: string | null;
+  imagePublicUrl?: string | null;
   shopifyImageSyncedAt?: string | null;
   shopifyImageAltSynced?: string | null;
   shopifyImageFilenameSynced?: string | null;

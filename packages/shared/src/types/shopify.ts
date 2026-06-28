@@ -29,6 +29,8 @@ export interface ShopifyScopesResponse {
   missingScopes: string[];
   canWriteProducts: boolean;
   canWriteContent?: boolean;
+  canWriteFiles?: boolean;
+  missingImageUploadScopes?: string[];
   requiresReconnect: boolean;
   message: string;
 }
