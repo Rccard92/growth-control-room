@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { EditorialArticlePayload, EditorialPublishingPayload } from "@gcr/shared";
 import {
   buildArticleHashCanonical,
+  formatPublishingError,
   getPublishingSeoWarnings,
   isPublishingStale,
+  parseStructuredPublishErrorDetail,
   validatePublishingPayload,
 } from "./editorial-publishing-utils";
 
@@ -93,5 +95,23 @@ describe("editorial-publishing-utils sync", () => {
       metaDescription: "ok",
     });
     expect(warnings.length).toBeGreaterThan(0);
+  });
+
+  it("estrae message da errore strutturato publish", () => {
+    const parsed = parseStructuredPublishErrorDetail({
+      message: "SEO mancante",
+      code: "seo_missing",
+      details: {},
+    });
+    expect(parsed?.message).toBe("SEO mancante");
+    expect(parsed?.code).toBe("seo_missing");
+  });
+
+  it("aggiunge hint per errore Field seo GraphQL", () => {
+    const message = formatPublishingError(
+      "Errore invio articolo Shopify.",
+      new Error("Field `seo` doesn't exist on type `Article`"),
+    );
+    expect(message).toContain("campo GraphQL non supportato");
   });
 });

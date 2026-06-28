@@ -22,11 +22,14 @@ from app.schemas.content_seo_editorial import (
 from app.services.content.editorial_item_service import get_editorial_item, get_editorial_item_read
 from app.services.content.editorial_publishing_utils import (
     HANDLE_CONFLICT_MESSAGE,
+    SEO_REQUIRED_MESSAGE,
     attach_publishing_sync_metadata,
     build_article_create_input,
     build_article_seo_metafields,
     build_article_update_input,
+    build_publish_shopify_error_detail,
     build_publishing_payload_from_article,
+    classify_shopify_publish_error_code,
     format_shopify_publish_error,
     get_publishing_seo_warnings,
     is_publishing_stale,
@@ -104,12 +107,15 @@ async def _ensure_shopify_seo_synced(
             parsed = await client.get_article_global_metafields(article_gid)
         else:
             error = str(sync_result.get("error") or "Errore sincronizzazione SEO Shopify.")
-            warnings.append(f"Articolo creato, ma SEO non sincronizzata: {error}")
+            error_message = (
+                f"Articolo creato/aggiornato, ma SEO Shopify non sincronizzata: {error}"
+            )
+            warnings.append(error_message)
             return publishing.model_copy(
                 update={
                     "shopify_seo_synced": False,
                     "shopify_seo_synced_at": None,
-                    "shopify_seo_error": error,
+                    "shopify_seo_error": error_message,
                 }
             )
 
@@ -127,12 +133,13 @@ async def _ensure_shopify_seo_synced(
         )
 
     error = "I metafields SEO non corrispondono ai valori attesi dopo la sincronizzazione."
-    warnings.append(f"Articolo creato, ma SEO non sincronizzata: {error}")
+    error_message = f"Articolo creato/aggiornato, ma SEO Shopify non sincronizzata: {error}"
+    warnings.append(error_message)
     return publishing.model_copy(
         update={
             "shopify_seo_synced": False,
             "shopify_seo_synced_at": None,
-            "shopify_seo_error": error,
+            "shopify_seo_error": error_message,
         }
     )
 
@@ -155,11 +162,40 @@ async def _raise_shopify_publish_error(
     row: ContentSeoEditorialItem,
     exc: ShopifyAPIError,
     mode: str,
+    *,
+    last_attempt_at: str | None = None,
 ) -> None:
     readable = format_shopify_publish_error(exc.message)
     http_status = shopify_publish_http_status(exc.message, exc.status_code)
     await _mark_publish_error(session, row, message=readable, mode=mode)
-    raise HTTPException(http_status, detail=readable) from exc
+    code = classify_shopify_publish_error_code(exc.message)
+    raise HTTPException(
+        http_status,
+        detail=build_publish_shopify_error_detail(
+            code,
+            readable,
+            shopifyErrors=[exc.message],
+            lastAttemptAt=last_attempt_at,
+        ),
+    ) from exc
+
+
+def _raise_publish_validation_error(
+    errors: list[str],
+    *,
+    last_attempt_at: str | None = None,
+) -> None:
+    message = "; ".join(errors)
+    code = "seo_missing" if any(SEO_REQUIRED_MESSAGE in err for err in errors) else "validation_error"
+    raise HTTPException(
+        status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=build_publish_shopify_error_detail(
+            code,
+            message,
+            validationErrors=errors,
+            lastAttemptAt=last_attempt_at,
+        ),
+    )
 
 
 async def _resolve_blog_gid(
@@ -301,7 +337,10 @@ async def publish_editorial_to_shopify(
     if is_publishing_stale(row.article_payload, row.publishing_payload):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            detail=PUBLISHING_STALE_MESSAGE,
+            detail=build_publish_shopify_error_detail(
+                "publishing_stale",
+                PUBLISHING_STALE_MESSAGE,
+            ),
         )
 
     if row.status != "ready_to_publish":
@@ -362,15 +401,16 @@ async def publish_editorial_to_shopify(
         scheduled_publish_at=row.scheduled_publish_at,
     )
     if errors:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="; ".join(errors),
-        )
+        _raise_publish_validation_error(errors)
 
     warnings.extend(get_publishing_seo_warnings(publishing))
 
     blog_gid, blog_row = await _resolve_blog_gid(session, store.id, publishing)
     existing_gid = (row.shopify_article_gid or "").strip()
+
+    attempt_at = datetime.now(UTC).isoformat()
+    row.last_publish_error = None
+    await session.flush()
 
     try:
         client = await get_shopify_client_for_store(store)
@@ -391,7 +431,9 @@ async def publish_editorial_to_shopify(
         try:
             result = await client.update_article(existing_gid, update_input)
         except ShopifyAPIError as exc:
-            await _raise_shopify_publish_error(session, row, exc, request.mode)
+            await _raise_shopify_publish_error(
+                session, row, exc, request.mode, last_attempt_at=attempt_at
+            )
         operation_label = "aggiornamento"
         article_input_for_retry = update_input
     else:
@@ -400,7 +442,9 @@ async def publish_editorial_to_shopify(
             try:
                 existing = await client.find_article_by_handle(blog_gid, handle)
             except ShopifyAPIError as exc:
-                await _raise_shopify_publish_error(session, row, exc, request.mode)
+                await _raise_shopify_publish_error(
+                    session, row, exc, request.mode, last_attempt_at=attempt_at
+                )
             if existing:
                 existing_id = existing.get("id")
                 if existing_id and existing_id != existing_gid:
@@ -412,7 +456,11 @@ async def publish_editorial_to_shopify(
                     )
                     raise HTTPException(
                         status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail=HANDLE_CONFLICT_MESSAGE,
+                        detail=build_publish_shopify_error_detail(
+                            "shopify_handle_conflict",
+                            HANDLE_CONFLICT_MESSAGE,
+                            lastAttemptAt=attempt_at,
+                        ),
                     )
 
         try:
@@ -429,7 +477,9 @@ async def publish_editorial_to_shopify(
         try:
             result = await client.create_article(create_input)
         except ShopifyAPIError as exc:
-            await _raise_shopify_publish_error(session, row, exc, request.mode)
+            await _raise_shopify_publish_error(
+                session, row, exc, request.mode, last_attempt_at=attempt_at
+            )
         operation_label = "creazione"
         article_input_for_retry = create_input
 
@@ -457,7 +507,12 @@ async def publish_editorial_to_shopify(
         await _mark_publish_error(session, row, message=readable, mode=request.mode)
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=readable,
+            detail=build_publish_shopify_error_detail(
+                classify_shopify_publish_error_code(messages),
+                readable,
+                userErrors=user_errors,
+                lastAttemptAt=attempt_at,
+            ),
         )
 
     if user_errors and article_gid:
@@ -494,6 +549,19 @@ async def publish_editorial_to_shopify(
         mode=request.mode,
         article_payload=row.article_payload,
     )
+
+    if publishing.shopify_seo_synced is False and publishing.shopify_seo_error:
+        row.publish_status = "publish_error"
+        row.last_publish_error = publishing.shopify_seo_error
+        await session.flush()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=build_publish_shopify_error_detail(
+                "shopify_metafields_error",
+                publishing.shopify_seo_error,
+                lastAttemptAt=attempt_at,
+            ),
+        )
 
     await session.flush()
     return EditorialPublishShopifyResponse(

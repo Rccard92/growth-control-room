@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ContentSeoEditorialItem,
   ContentSeoEditorialObjective,
@@ -28,6 +28,7 @@ import {
 } from "./editorial-article-utils";
 import {
   buildPublishingPayloadFromArticle,
+  formatPublishingError,
   isPublishingStale,
   isPublishingSeoComplete,
   parseEditorialPublishingPayload,
@@ -78,13 +79,6 @@ function formatPlannedDate(value: string): string {
   });
 }
 
-function formatPublishingError(baseMessage: string, error: unknown): string {
-  if (!(error instanceof Error)) return baseMessage;
-  const detail = error.message.trim();
-  if (!detail || detail === "Failed to fetch") return baseMessage;
-  return `${baseMessage} ${detail}`;
-}
-
 export function EditorialItemModal({
   open,
   item,
@@ -93,6 +87,7 @@ export function EditorialItemModal({
   onClose,
   onItemUpdated,
 }: EditorialItemModalProps) {
+  const queryClient = useQueryClient();
   const updateMutation = useUpdateEditorialItem(projectId);
   const rescheduleMutation = useRescheduleEditorialItem(projectId);
   const deleteMutation = useDeleteEditorialItem(projectId);
@@ -554,6 +549,9 @@ export function EditorialItemModal({
           : "Bozza creata su Shopify.";
       setSuccess(successMessage);
     } catch (e) {
+      void queryClient.invalidateQueries({
+        queryKey: ["contentSeo", projectId, "editorialItems"],
+      });
       setError(formatPublishingError("Errore invio articolo Shopify.", e));
     }
   }
@@ -1005,6 +1003,7 @@ export function EditorialItemModal({
               staleDismissed={staleDismissed}
               publishBlockedByStale={publishingStale}
               publishBlockedBySeo={publishSeoIncomplete}
+              publishError={error}
               publishing={publishing}
               onChange={setPublishing}
               onSyncFromArticle={() => void handleSyncPublishingFromArticle()}

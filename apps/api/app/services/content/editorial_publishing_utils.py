@@ -27,7 +27,7 @@ PUBLISHING_STALE_MESSAGE = (
 SEO_TITLE_RECOMMENDED_MAX = 60
 META_DESCRIPTION_RECOMMENDED_MAX = 160
 SEO_REQUIRED_MESSAGE = (
-    "SEO title e meta description sono obbligatori per pubblicare un articolo completo."
+    "SEO title e meta description sono obbligatori per creare un articolo Shopify completo."
 )
 ARTICLE_SEO_METAFIELD_NAMESPACE = "global"
 ARTICLE_SEO_TITLE_KEY = "title_tag"
@@ -600,3 +600,26 @@ def shopify_publish_http_status(message: str, status_code: int | None = None) ->
     if status_code in (400, 401, 403, 404, 422):
         return 422
     return 502
+
+
+def classify_shopify_publish_error_code(message: str) -> str:
+    lowered = message.lower()
+    if "field `seo`" in lowered or "field 'seo'" in lowered:
+        return "shopify_article_seo_field_invalid"
+    if "metafield" in lowered:
+        return "shopify_metafields_error"
+    if format_handle_conflict_error(message):
+        return "shopify_handle_conflict"
+    return "shopify_publish_error"
+
+
+def build_publish_shopify_error_detail(
+    code: str,
+    message: str,
+    **details: Any,
+) -> dict[str, Any]:
+    return {
+        "message": message,
+        "code": code,
+        "details": details,
+    }

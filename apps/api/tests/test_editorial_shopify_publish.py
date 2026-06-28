@@ -221,7 +221,10 @@ def test_publish_stale_payload_returns_409() -> None:
                     EditorialPublishShopifyRequest(mode="draft"),
                 )
             assert exc.value.status_code == 409
-            assert exc.value.detail == PUBLISHING_STALE_MESSAGE
+            detail = exc.value.detail
+            assert isinstance(detail, dict)
+            assert detail["code"] == "publishing_stale"
+            assert detail["message"] == PUBLISHING_STALE_MESSAGE
 
     asyncio.run(run())
 
@@ -259,7 +262,10 @@ def test_publish_missing_seo_returns_422() -> None:
                             EditorialPublishShopifyRequest(mode="draft"),
                         )
                     assert exc.value.status_code == 422
-                    assert "SEO title e meta description" in str(exc.value.detail)
+                    detail = exc.value.detail
+                    assert isinstance(detail, dict)
+                    assert detail["code"] == "seo_missing"
+                    assert "SEO title e meta description" in detail["message"]
 
     asyncio.run(run())
 
@@ -557,7 +563,9 @@ def test_publish_empty_author_saved_payload_returns_422_before_shopify() -> None
                                     EditorialPublishShopifyRequest(mode="draft"),
                                 )
                             assert exc.value.status_code == 422
-                            assert "autore" in str(exc.value.detail).lower()
+                            detail = exc.value.detail
+                            assert isinstance(detail, dict)
+                            assert "autore" in detail["message"].lower()
                             mock_client.create_article.assert_not_awaited()
 
     asyncio.run(run())
@@ -633,7 +641,9 @@ def test_publish_graphql_author_error_returns_422() -> None:
                                     EditorialPublishShopifyRequest(mode="draft"),
                                 )
                             assert exc.value.status_code == 422
-                            assert "shopify" in str(exc.value.detail).lower()
+                            detail = exc.value.detail
+                            assert isinstance(detail, dict)
+                            assert "shopify" in detail["message"].lower()
                             assert row.publish_status == "publish_error"
 
     asyncio.run(run())
@@ -708,5 +718,219 @@ def test_publish_network_error_returns_502() -> None:
                                     EditorialPublishShopifyRequest(mode="draft"),
                                 )
                             assert exc.value.status_code == 502
+
+    asyncio.run(run())
+
+
+def test_publish_success_clears_last_publish_error() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+    blog_id = uuid4()
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    row = _sample_row(publishing_payload=publishing_payload)
+    row.last_publish_error = "Errore precedente stale"
+    row.publish_status = "publish_error"
+    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
+
+    async def run() -> None:
+        mock_session = AsyncMock()
+
+        async def fake_execute(stmt):  # noqa: ANN001
+            class Result:
+                def scalar_one_or_none(self_inner):  # noqa: ANN001
+                    return blog_row
+
+            return Result()
+
+        mock_session.execute = fake_execute
+
+        with patch(
+            "app.services.content.editorial_shopify_publish_service.get_editorial_item",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            with patch(
+                "app.services.content.editorial_shopify_publish_service.get_shopify_store_for_project",
+                new_callable=AsyncMock,
+                return_value=store,
+            ):
+                with patch(
+                    "app.services.content.editorial_shopify_publish_service.can_publish_with_write_content",
+                    new_callable=AsyncMock,
+                    return_value={"allowed": True},
+                ):
+                    mock_client = AsyncMock()
+                    mock_client.find_article_by_handle = AsyncMock(return_value=None)
+                    mock_client.create_article = AsyncMock(
+                        return_value={
+                            "article": _article_node_with_seo_metafields(),
+                            "userErrors": [],
+                        }
+                    )
+                    _configure_mock_client_seo(mock_client)
+                    with patch(
+                        "app.services.content.editorial_shopify_publish_service.get_shopify_client_for_store",
+                        new_callable=AsyncMock,
+                        return_value=mock_client,
+                    ):
+                        with patch(
+                            "app.services.content.editorial_shopify_publish_service.get_editorial_item_read",
+                            new_callable=AsyncMock,
+                            return_value=ContentSeoEditorialItemRead.model_validate(row),
+                        ):
+                            await publish_editorial_to_shopify(
+                                mock_session,
+                                project_id,
+                                item_id,
+                                EditorialPublishShopifyRequest(mode="draft"),
+                            )
+                        assert row.last_publish_error is None
+                        assert row.publish_status == "draft_created"
+
+    asyncio.run(run())
+
+
+def test_publish_metafields_sync_fail_marks_publish_error() -> None:
+    from app.services.shopify.client import ShopifyAPIError
+
+    project_id = uuid4()
+    item_id = uuid4()
+    blog_id = uuid4()
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    row = _sample_row(publishing_payload=publishing_payload)
+    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
+
+    async def run() -> None:
+        mock_session = AsyncMock()
+
+        async def fake_execute(stmt):  # noqa: ANN001
+            class Result:
+                def scalar_one_or_none(self_inner):  # noqa: ANN001
+                    return blog_row
+
+            return Result()
+
+        mock_session.execute = fake_execute
+
+        with patch(
+            "app.services.content.editorial_shopify_publish_service.get_editorial_item",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            with patch(
+                "app.services.content.editorial_shopify_publish_service.get_shopify_store_for_project",
+                new_callable=AsyncMock,
+                return_value=store,
+            ):
+                with patch(
+                    "app.services.content.editorial_shopify_publish_service.can_publish_with_write_content",
+                    new_callable=AsyncMock,
+                    return_value={"allowed": True},
+                ):
+                    mock_client = AsyncMock()
+                    mock_client.find_article_by_handle = AsyncMock(return_value=None)
+                    mock_client.create_article = AsyncMock(
+                        return_value={
+                            "article": {"id": "gid://shopify/Article/55", "handle": "guida-olio-evo"},
+                            "userErrors": [],
+                        }
+                    )
+                    mock_client.sync_article_seo_metafields = AsyncMock(
+                        return_value={"synced": False, "error": "metafieldsSet rejected", "userErrors": []}
+                    )
+                    mock_client.get_article_global_metafields = AsyncMock(
+                        return_value={"title_tag": "", "description_tag": ""}
+                    )
+                    with patch(
+                        "app.services.content.editorial_shopify_publish_service.get_shopify_client_for_store",
+                        new_callable=AsyncMock,
+                        return_value=mock_client,
+                    ):
+                        with patch(
+                            "app.services.content.editorial_shopify_publish_service.get_editorial_item_read",
+                            new_callable=AsyncMock,
+                        ) as mock_read:
+                            with pytest.raises(HTTPException) as exc:
+                                await publish_editorial_to_shopify(
+                                    mock_session,
+                                    project_id,
+                                    item_id,
+                                    EditorialPublishShopifyRequest(mode="draft"),
+                                )
+                            mock_read.assert_not_awaited()
+                        detail = exc.value.detail
+                        assert isinstance(detail, dict)
+                        assert detail["code"] == "shopify_metafields_error"
+                        assert row.publish_status == "publish_error"
+                        assert row.shopify_article_gid == "gid://shopify/Article/55"
+                        assert "SEO Shopify non sincronizzata" in (row.last_publish_error or "")
+
+    asyncio.run(run())
+
+
+def test_publish_find_by_handle_seo_graphql_error_returns_structured_422() -> None:
+    from app.services.shopify.client import ShopifyAPIError
+
+    project_id = uuid4()
+    item_id = uuid4()
+    blog_id = uuid4()
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    row = _sample_row(publishing_payload=publishing_payload)
+    row.last_publish_error = "Errore precedente"
+    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
+
+    async def run() -> None:
+        mock_session = AsyncMock()
+
+        async def fake_execute(stmt):  # noqa: ANN001
+            class Result:
+                def scalar_one_or_none(self_inner):  # noqa: ANN001
+                    return blog_row
+
+            return Result()
+
+        mock_session.execute = fake_execute
+
+        with patch(
+            "app.services.content.editorial_shopify_publish_service.get_editorial_item",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            with patch(
+                "app.services.content.editorial_shopify_publish_service.get_shopify_store_for_project",
+                new_callable=AsyncMock,
+                return_value=store,
+            ):
+                with patch(
+                    "app.services.content.editorial_shopify_publish_service.can_publish_with_write_content",
+                    new_callable=AsyncMock,
+                    return_value={"allowed": True},
+                ):
+                    mock_client = AsyncMock()
+                    mock_client.find_article_by_handle = AsyncMock(
+                        side_effect=ShopifyAPIError(
+                            "Errore GraphQL Shopify: Field `seo` doesn't exist on type `Article`"
+                        )
+                    )
+                    with patch(
+                        "app.services.content.editorial_shopify_publish_service.get_shopify_client_for_store",
+                        new_callable=AsyncMock,
+                        return_value=mock_client,
+                    ):
+                        with pytest.raises(HTTPException) as exc:
+                            await publish_editorial_to_shopify(
+                                mock_session,
+                                project_id,
+                                item_id,
+                                EditorialPublishShopifyRequest(mode="draft"),
+                            )
+                        detail = exc.value.detail
+                        assert isinstance(detail, dict)
+                        assert detail["code"] == "shopify_article_seo_field_invalid"
+                        assert row.last_publish_error != "Errore precedente"
+                        mock_client.create_article.assert_not_awaited()
 
     asyncio.run(run())

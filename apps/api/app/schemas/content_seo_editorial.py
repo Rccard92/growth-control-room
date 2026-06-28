@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -794,6 +794,14 @@ class EditorialPublishShopifyRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     mode: EditorialPublishMode = "draft"
+
+
+class EditorialPublishShopifyErrorDetail(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str
+    code: str
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class EditorialPublishShopifyResponse(BaseModel):

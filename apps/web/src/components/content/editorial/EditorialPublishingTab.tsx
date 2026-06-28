@@ -26,6 +26,7 @@ interface EditorialPublishingTabProps {
   staleDismissed: boolean;
   publishBlockedByStale?: boolean;
   publishBlockedBySeo?: boolean;
+  publishError?: string | null;
   publishing: EditorialPublishingPayload;
   onChange: (value: EditorialPublishingPayload) => void;
   onSyncFromArticle: () => void;
@@ -48,6 +49,7 @@ export function EditorialPublishingTab({
   staleDismissed,
   publishBlockedByStale = false,
   publishBlockedBySeo = false,
+  publishError = null,
   publishing,
   onChange,
   onSyncFromArticle,
@@ -123,8 +125,12 @@ export function EditorialPublishingTab({
         </div>
       )}
 
-      {item.lastPublishError && (
-        <div className="gcr-alert gcr-alert--error">{item.lastPublishError}</div>
+      {publishError ? (
+        <div className="gcr-alert gcr-alert--error">{publishError}</div>
+      ) : (
+        item.lastPublishError && (
+          <div className="gcr-alert gcr-alert--error">{item.lastPublishError}</div>
+        )
       )}
 
       {publishing.shopifySeoSynced === true && (

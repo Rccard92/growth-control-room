@@ -15,7 +15,11 @@ from app.models.content_seo import (
     ShopifyPage,
 )
 from app.models.shopify import ShopifyStore
-from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
+from app.services.shopify.client import (
+    ShopifyAPIError,
+    ShopifyGraphQLClient,
+    parse_article_global_seo_metafields,
+)
 from app.services.shopify.html_utils import html_to_text
 
 logger = logging.getLogger(__name__)
@@ -193,7 +197,7 @@ async def _upsert_article(
         row = ShopifyArticle(shopify_store_id=store_id, shopify_gid=gid)
         session.add(row)
 
-    seo = node.get("seo") or {}
+    seo = parse_article_global_seo_metafields(node)
     author = node.get("author") or {}
     body_html = node.get("body")
     blog_meta = node.get("_blog") or {}
@@ -212,8 +216,8 @@ async def _upsert_article(
     row.body_html = body_html
     row.body_text = html_to_text(body_html)
     row.summary_html = node.get("summary")
-    row.seo_title = seo.get("title")
-    row.seo_description = seo.get("description")
+    row.seo_title = seo.get("title_tag")
+    row.seo_description = seo.get("description_tag")
     row.author = author.get("name")
     row.published_at_shopify = _parse_datetime(node.get("publishedAt"))
     row.raw_payload = node

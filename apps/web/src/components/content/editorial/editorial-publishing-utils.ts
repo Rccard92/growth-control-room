@@ -8,7 +8,7 @@ export const DEFAULT_AUTHOR_FALLBACK = "Redazione Solmielato";
 export const SEO_TITLE_MAX = 60;
 export const META_DESCRIPTION_MAX = 160;
 export const SEO_REQUIRED_MESSAGE =
-  "SEO title e meta description sono obbligatori per pubblicare un articolo completo.";
+  "SEO title e meta description sono obbligatori per creare un articolo Shopify completo.";
 
 export function emptyEditorialPublishingPayload(): EditorialPublishingPayload {
   return {
@@ -269,4 +269,36 @@ export function getPublishStatusLabel(status?: string | null): string {
     default:
       return "Non pubblicato";
   }
+}
+
+export function extractApiErrorMessage(error: unknown): string | null {
+  if (!(error instanceof Error)) return null;
+  const detail = error.message.trim();
+  if (!detail || detail === "Failed to fetch") return null;
+  return detail;
+}
+
+export function formatPublishingError(baseMessage: string, error: unknown): string {
+  const detail = extractApiErrorMessage(error);
+  if (!detail) return baseMessage;
+  let message = `${baseMessage} ${detail}`;
+  if (message.includes("Field 'seo'") || message.includes("Field `seo`")) {
+    message +=
+      " Il publisher sta ancora usando un campo GraphQL non supportato. Controllare query Shopify.";
+  }
+  return message;
+}
+
+export function parseStructuredPublishErrorDetail(
+  detail: unknown,
+): { message: string; code?: string } | null {
+  if (!detail || typeof detail !== "object" || Array.isArray(detail)) return null;
+  const record = detail as Record<string, unknown>;
+  if (typeof record.message === "string") {
+    return {
+      message: record.message,
+      code: typeof record.code === "string" ? record.code : undefined,
+    };
+  }
+  return null;
 }

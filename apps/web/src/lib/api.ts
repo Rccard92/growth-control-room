@@ -44,8 +44,19 @@ function buildFetchError(path: string, status: number, text: string): Error {
   if (text) {
     try {
       const json = JSON.parse(text) as {
-        detail?: string | Array<{ loc?: unknown[]; msg?: string; input?: unknown }>;
+        detail?:
+          | string
+          | Record<string, unknown>
+          | Array<{ loc?: unknown[]; msg?: string; input?: unknown }>;
       };
+      if (
+        json.detail
+        && typeof json.detail === "object"
+        && !Array.isArray(json.detail)
+        && typeof json.detail.message === "string"
+      ) {
+        return new Error(json.detail.message);
+      }
       if (typeof json.detail === "string") {
         return new Error(json.detail);
       }

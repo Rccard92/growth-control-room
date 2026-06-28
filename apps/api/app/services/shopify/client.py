@@ -160,16 +160,33 @@ BLOG_FIELDS = """
                 title
                 handle"""
 
+ARTICLE_LIST_FIELDS = """
+                id
+                title
+                handle"""
+
 ARTICLE_FIELDS = """
                 id
                 title
                 handle
                 body
                 summary
-                seo { title description }
                 tags
+                isPublished
                 publishedAt
-                author { name }"""
+                templateSuffix
+                author { name }
+                metafields(first: 10, namespace: "global") {
+                  edges {
+                    node {
+                      id
+                      namespace
+                      key
+                      type
+                      value
+                    }
+                  }
+                }"""
 
 
 class ShopifyAPIError(Exception):
