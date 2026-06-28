@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.brand_intelligence import BrandContextBundleResponse
 from app.schemas.content_seo_editorial import (
+    EditorialAiGenerationSnapshot,
     EditorialBriefPayload,
     EditorialBriefUpdateRequest,
     normalize_editorial_brief_payload,
@@ -44,6 +45,11 @@ from app.services.brand_intelligence.product_knowledge_context import (
 from app.services.brand_intelligence.safe_claims_service import safe_claims_has_minimum
 from app.services.brand_intelligence.score import profile_has_minimum
 from app.services.content.editorial_item_service import get_editorial_item
+from app.services.content.editorial_ai_usage_service import (
+    BRIEF_OPERATION_KEYS,
+    build_ai_generation_snapshot_from_log,
+    fetch_latest_editorial_ai_log,
+)
 from app.services.content.editorial_structure_profiles import (
     default_avoid_repetitions,
     resolve_structure_profile,
@@ -392,6 +398,18 @@ async def generate_editorial_brief_core(
     merged_warnings = list(dict.fromkeys([*bi_warnings, *payload.warnings]))
     payload.brand_context_used = context_used
     payload.warnings = merged_warnings
+
+    brief_log = await fetch_latest_editorial_ai_log(
+        session, project_id, item_id, BRIEF_OPERATION_KEYS
+    )
+    if brief_log is not None:
+        payload = payload.model_copy(
+            update={
+                "ai_generation": EditorialAiGenerationSnapshot.model_validate(
+                    build_ai_generation_snapshot_from_log(brief_log)
+                )
+            }
+        )
 
     item.brief_payload = payload.model_dump(mode="json", by_alias=True)
     item.status = "brief_pending"

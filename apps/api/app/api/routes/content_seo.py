@@ -21,6 +21,7 @@ from app.schemas.content_seo_editorial import (
     EditorialBriefBatchJobResponse,
     EditorialBriefBatchStartRequest,
     EditorialArticleUpdateRequest,
+    EditorialItemAiUsageResponse,
     EditorialItemRescheduleRequest,
     EditorialItemRescheduleResponse,
     EditorialPlanGenerateRequest,
@@ -70,6 +71,7 @@ from app.services.content.editorial_article_service import (
     generate_editorial_article,
     update_editorial_article,
 )
+from app.services.content.editorial_ai_usage_service import get_editorial_item_ai_usage
 from app.services.content.editorial_plan_service import generate_editorial_calendar
 from app.services.content.analyze import run_content_seo_analyze
 from app.services.content.collection_seo_analyzer import analyze_collections_for_store
@@ -1037,6 +1039,21 @@ async def update_content_seo_editorial_article(
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return ContentSeoEditorialItemRead.model_validate(row)
+
+
+@router.get(
+    "/{project_id}/content/seo/editorial-items/{item_id}/ai-usage",
+    response_model=EditorialItemAiUsageResponse,
+    response_model_by_alias=True,
+)
+async def get_content_seo_editorial_item_ai_usage(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialItemAiUsageResponse:
+    await get_project_in_default_workspace(project_id, session)
+    await get_editorial_item(session, project_id, item_id)
+    return await get_editorial_item_ai_usage(session, project_id, item_id)
 
 
 @router.post(

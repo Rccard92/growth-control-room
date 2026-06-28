@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ContentSeoEditorialItem,
   ContentSeoEditorialObjective,
@@ -11,6 +11,7 @@ import {
   CONTENT_SEO_EDITORIAL_OBJECTIVE_LABELS,
   CONTENT_SEO_EDITORIAL_STATUS_LABELS,
 } from "@gcr/shared";
+import { EditorialAiGenerationAccordion } from "./EditorialAiGenerationAccordion";
 import { EditorialBriefEditor } from "./EditorialBriefEditor";
 import { EditorialArticleEditor } from "./EditorialArticleEditor";
 import { EditorialArticlePreview } from "./EditorialArticlePreview";
@@ -92,34 +93,49 @@ export function EditorialItemModal({
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"detail" | "brief" | "article">("detail");
+  const lastItemIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!item) return;
-    const date = item.plannedDate.slice(0, 10);
-    setActiveTab("detail");
-    setTitle(item.title);
+  function hydrateFromItem(source: ContentSeoEditorialItem, resetTab: boolean) {
+    const date = source.plannedDate.slice(0, 10);
+    if (resetTab) {
+      setActiveTab("detail");
+    }
+    setTitle(source.title);
     setPlannedDate(date);
     setOriginalPlannedDate(date);
     setCascadeReschedule(false);
-    setStatus(item.status);
-    setObjective(item.objective ?? "");
-    setPrimaryKeyword(item.primaryKeyword ?? "");
-    setSecondaryKeywords((item.secondaryKeywords ?? []).join(", "));
-    setNotes(item.notes ?? "");
-    const parsed = parseEditorialBriefPayload(item.briefPayload ?? null);
-    setBrief(hasEditorialBrief(item.briefPayload ?? null) ? parsed : null);
+    setStatus(source.status);
+    setObjective(source.objective ?? "");
+    setPrimaryKeyword(source.primaryKeyword ?? "");
+    setSecondaryKeywords((source.secondaryKeywords ?? []).join(", "));
+    setNotes(source.notes ?? "");
+    const parsed = parseEditorialBriefPayload(source.briefPayload ?? null);
+    setBrief(hasEditorialBrief(source.briefPayload ?? null) ? parsed : null);
     setSavedBriefSnapshot(JSON.stringify(parsed));
     const parsedArticle = parseEditorialArticlePayload(
-      (item.articlePayload ?? null) as Record<string, unknown> | null,
+      (source.articlePayload ?? null) as Record<string, unknown> | null,
     );
-    setArticle(hasEditorialArticle(item.articlePayload ?? null) ? parsedArticle : null);
+    setArticle(hasEditorialArticle(source.articlePayload ?? null) ? parsedArticle : null);
     setSavedArticleSnapshot(JSON.stringify(parsedArticle));
-    setArticleView("editor");
-    setArticleBodyMode("html");
-    setError(null);
-    setWarning(null);
-    setSuccess(null);
-  }, [item]);
+    if (resetTab) {
+      setArticleView("editor");
+      setArticleBodyMode("html");
+      setError(null);
+      setWarning(null);
+      setSuccess(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!open) {
+      lastItemIdRef.current = null;
+      return;
+    }
+    if (!item) return;
+    const isNewItem = item.id !== lastItemIdRef.current;
+    hydrateFromItem(item, isNewItem);
+    lastItemIdRef.current = item.id;
+  }, [item, open]);
 
   const briefDirty = useMemo(() => {
     if (!brief) return false;
@@ -607,7 +623,14 @@ export function EditorialItemModal({
             </div>
 
             {hasBrief ? (
-              <EditorialBriefEditor value={brief!} onChange={setBrief} />
+              <>
+                <EditorialBriefEditor value={brief!} onChange={setBrief} />
+                <EditorialAiGenerationAccordion
+                  projectId={projectId}
+                  item={item}
+                  variant="brief"
+                />
+              </>
             ) : (
               <div className="editorial-item-modal__brief-empty gcr-card">
                 <p className="gcr-card__description">
@@ -685,6 +708,11 @@ export function EditorialItemModal({
                 ) : (
                   <EditorialArticlePreview value={article!} />
                 )}
+                <EditorialAiGenerationAccordion
+                  projectId={projectId}
+                  item={item}
+                  variant="article"
+                />
               </>
             )}
           </section>

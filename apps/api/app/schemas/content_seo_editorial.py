@@ -313,6 +313,56 @@ def _coerce_str_list(value: object) -> list[str]:
     return []
 
 
+class EditorialAiGenerationSnapshot(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    model: str = ""
+    model_tier: str = Field(default="", serialization_alias="modelTier")
+    operation_key: str = Field(default="", serialization_alias="operationKey")
+    context_profile: str = Field(default="", serialization_alias="contextProfile")
+    estimated_total_cost: float | None = Field(
+        default=None, serialization_alias="estimatedTotalCost"
+    )
+    input_tokens: int = Field(default=0, serialization_alias="inputTokens")
+    output_tokens: int = Field(default=0, serialization_alias="outputTokens")
+    generated_at: str = Field(default="", serialization_alias="generatedAt")
+    generator_version: str = Field(default="", serialization_alias="generatorVersion")
+    log_id: str = Field(default="", serialization_alias="logId")
+    status: str = ""
+    context_hash: str = Field(default="", serialization_alias="contextHash")
+    prompt_hash: str = Field(default="", serialization_alias="promptHash")
+
+
+class EditorialAiGenerationInfo(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    generated: bool = False
+    model: str | None = None
+    model_tier: str | None = Field(default=None, serialization_alias="modelTier")
+    operation_key: str | None = Field(default=None, serialization_alias="operationKey")
+    context_profile: str | None = Field(default=None, serialization_alias="contextProfile")
+    estimated_total_cost: float | None = Field(
+        default=None, serialization_alias="estimatedTotalCost"
+    )
+    input_tokens: int | None = Field(default=None, serialization_alias="inputTokens")
+    output_tokens: int | None = Field(default=None, serialization_alias="outputTokens")
+    created_at: str | None = Field(default=None, serialization_alias="createdAt")
+    status: str | None = None
+    error_message: str | None = Field(default=None, serialization_alias="errorMessage")
+    generator_version: str | None = Field(default=None, serialization_alias="generatorVersion")
+    log_id: str | None = Field(default=None, serialization_alias="logId")
+    context_hash: str | None = Field(default=None, serialization_alias="contextHash")
+    prompt_hash: str | None = Field(default=None, serialization_alias="promptHash")
+
+
+class EditorialItemAiUsageResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    brief: EditorialAiGenerationInfo | None = None
+    article: EditorialAiGenerationInfo | None = None
+    logs: list[EditorialAiGenerationInfo] = Field(default_factory=list)
+
+
 class BriefH2Section(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -371,6 +421,9 @@ class EditorialBriefPayload(BaseModel):
     max_h3: int | None = Field(default=None, serialization_alias="maxH3")
     avoid_repetitions: list[str] = Field(
         default_factory=list, serialization_alias="avoidRepetitions"
+    )
+    ai_generation: EditorialAiGenerationSnapshot | None = Field(
+        default=None, serialization_alias="aiGeneration"
     )
 
 
@@ -457,6 +510,11 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
                 data[int_field] = int(val)
             except (TypeError, ValueError):
                 data[int_field] = None
+    if "aiGeneration" in data and "ai_generation" not in data:
+        raw_ai = data.pop("aiGeneration")
+        data["ai_generation"] = raw_ai if isinstance(raw_ai, dict) else None
+    elif data.get("ai_generation") is not None and not isinstance(data.get("ai_generation"), dict):
+        data["ai_generation"] = None
     return EditorialBriefPayload.model_validate(data)
 
 
@@ -513,6 +571,9 @@ class EditorialArticlePayload(BaseModel):
         default_factory=list, serialization_alias="brandContextUsed"
     )
     generated_at: str = Field(default="", serialization_alias="generatedAt")
+    ai_generation: EditorialAiGenerationSnapshot | None = Field(
+        default=None, serialization_alias="aiGeneration"
+    )
 
 
 def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
@@ -555,6 +616,11 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
             data.setdefault(field, "")
     if "contentLengthProfile" in data and "content_length_profile" not in data:
         data["content_length_profile"] = data.pop("contentLengthProfile")
+    if "aiGeneration" in data and "ai_generation" not in data:
+        raw_ai = data.pop("aiGeneration")
+        data["ai_generation"] = raw_ai if isinstance(raw_ai, dict) else None
+    elif data.get("ai_generation") is not None and not isinstance(data.get("ai_generation"), dict):
+        data["ai_generation"] = None
     profile = data.get("content_length_profile")
     if profile not in (None, "breve", "medio", "approfondito"):
         data["content_length_profile"] = None

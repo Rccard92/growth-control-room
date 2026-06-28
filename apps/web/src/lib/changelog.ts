@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.14-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Preserved active editorial modal tab after brief/article actions",
+      "Added AI generation info accordion for editorial brief and article",
+      "Calendar cards now show the real generated brief/article title",
+      "Improved editorial item refresh after generation and approval",
+    ],
+  },
+  {
     version: "0.5.13-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

@@ -578,6 +578,46 @@ export interface BriefH2Section {
   h3: string[];
 }
 
+export interface EditorialAiGenerationSnapshot {
+  model?: string;
+  modelTier?: string;
+  operationKey?: string;
+  contextProfile?: string;
+  estimatedTotalCost?: number | null;
+  inputTokens?: number;
+  outputTokens?: number;
+  generatedAt?: string;
+  generatorVersion?: string;
+  logId?: string;
+  status?: string;
+  contextHash?: string;
+  promptHash?: string;
+}
+
+export interface EditorialAiGenerationInfo {
+  generated?: boolean;
+  model?: string | null;
+  modelTier?: string | null;
+  operationKey?: string | null;
+  contextProfile?: string | null;
+  estimatedTotalCost?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  createdAt?: string | null;
+  status?: string | null;
+  errorMessage?: string | null;
+  generatorVersion?: string | null;
+  logId?: string | null;
+  contextHash?: string | null;
+  promptHash?: string | null;
+}
+
+export interface EditorialItemAiUsageResponse {
+  brief?: EditorialAiGenerationInfo | null;
+  article?: EditorialAiGenerationInfo | null;
+  logs?: EditorialAiGenerationInfo[];
+}
+
 export interface EditorialBriefPayload {
   proposedTitle: string;
   searchIntent: string;
@@ -608,6 +648,7 @@ export interface EditorialBriefPayload {
   maxH2?: number;
   maxH3?: number;
   avoidRepetitions?: string[];
+  aiGeneration?: EditorialAiGenerationSnapshot;
 }
 
 export type EditorialBriefUpdateStatus = "brief_pending" | "brief_approved";
@@ -637,6 +678,7 @@ export interface EditorialArticlePayload {
   warnings: string[];
   brandContextUsed: string[];
   generatedAt: string;
+  aiGeneration?: EditorialAiGenerationSnapshot;
 }
 
 export type ArticleUpdateStatus = "draft_pending" | "draft_review" | "ready_to_publish";

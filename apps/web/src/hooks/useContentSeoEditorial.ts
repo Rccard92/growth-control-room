@@ -14,6 +14,7 @@ import {
   generateEditorialCalendar,
   generateEditorialArticle,
   getEditorialBriefBatchJob,
+  getEditorialItemAiUsage,
   getEditorialItems,
   rescheduleEditorialItem,
   startEditorialBriefBatch,
@@ -106,11 +107,32 @@ function invalidateEditorial(qc: ReturnType<typeof useQueryClient>, projectId: s
   void qc.invalidateQueries({ queryKey: ["contentSeo", projectId, "editorialItems"] });
 }
 
+function invalidateEditorialAiUsage(
+  qc: ReturnType<typeof useQueryClient>,
+  projectId: string,
+  itemId: string,
+) {
+  void qc.invalidateQueries({
+    queryKey: ["contentSeo", projectId, "editorialItemAiUsage", itemId],
+  });
+}
+
+export function useEditorialItemAiUsage(projectId: string, itemId: string | undefined) {
+  return useQuery({
+    queryKey: ["contentSeo", projectId, "editorialItemAiUsage", itemId ?? ""],
+    queryFn: () => getEditorialItemAiUsage(projectId, itemId!),
+    enabled: Boolean(projectId && itemId),
+  });
+}
+
 export function useGenerateEditorialBrief(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) => generateEditorialBrief(projectId, itemId),
-    onSuccess: () => invalidateEditorial(qc, projectId),
+    onSuccess: (_data, itemId) => {
+      invalidateEditorial(qc, projectId);
+      invalidateEditorialAiUsage(qc, projectId, itemId);
+    },
   });
 }
 
@@ -156,7 +178,10 @@ export function useGenerateEditorialArticle(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) => generateEditorialArticle(projectId, itemId),
-    onSuccess: () => invalidateEditorial(qc, projectId),
+    onSuccess: (_data, itemId) => {
+      invalidateEditorial(qc, projectId);
+      invalidateEditorialAiUsage(qc, projectId, itemId);
+    },
   });
 }
 

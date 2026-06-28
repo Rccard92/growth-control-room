@@ -1459,8 +1459,57 @@
 }
 
 .editorial-item-card__meta,
-.editorial-item-card__product {
+.editorial-item-card__product,
+.editorial-item-card__status-label {
   color: var(--gcr-text-muted);
+}
+
+.editorial-item-card__status-label {
+  font-size: 0.65rem;
+}
+
+.editorial-ai-info {
+  margin-top: 1rem;
+}
+
+.editorial-ai-info__summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+}
+
+.editorial-ai-info__body {
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.editorial-ai-info__section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+}
+
+.editorial-ai-info__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+}
+
+.editorial-ai-info__list--technical {
+  font-size: 0.75rem;
+}
+
+.editorial-ai-info__empty,
+.editorial-ai-info__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--gcr-text-muted);
+}
+
+.editorial-ai-info__details {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
 }
 
 .editorial-calendar-skeleton {

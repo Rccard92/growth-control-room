@@ -28,6 +28,7 @@ import type {
   EditorialBriefBatchStartRequest,
   EditorialBriefBatchJobResponse,
   EditorialArticleUpdateRequest,
+  EditorialItemAiUsageResponse,
 } from "@gcr/shared";
 import { apiFetch, jsonBody } from "./api";
 
@@ -412,5 +413,14 @@ export function updateEditorialArticle(
   return apiFetch<ContentSeoEditorialItem>(
     `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/article`,
     { method: "PUT", ...jsonBody(data) },
+  );
+}
+
+export function getEditorialItemAiUsage(
+  projectId: string,
+  itemId: string,
+): Promise<EditorialItemAiUsageResponse> {
+  return apiFetch<EditorialItemAiUsageResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/ai-usage`,
   );
 }

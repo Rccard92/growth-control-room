@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
+    EditorialAiGenerationSnapshot,
     EditorialArticlePayload,
     EditorialArticleUpdateRequest,
     normalize_editorial_article_payload,
@@ -46,6 +47,11 @@ from app.services.content.editorial_brief_service import (
     build_brand_context_used,
 )
 from app.services.content.editorial_item_service import get_editorial_item
+from app.services.content.editorial_ai_usage_service import (
+    ARTICLE_OPERATION_KEYS,
+    build_ai_generation_snapshot_from_log,
+    fetch_latest_editorial_ai_log,
+)
 from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
@@ -418,6 +424,18 @@ async def generate_editorial_article_core(
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
+
+    article_log = await fetch_latest_editorial_ai_log(
+        session, project_id, item_id, ARTICLE_OPERATION_KEYS
+    )
+    if article_log is not None:
+        payload = payload.model_copy(
+            update={
+                "ai_generation": EditorialAiGenerationSnapshot.model_validate(
+                    build_ai_generation_snapshot_from_log(article_log)
+                )
+            }
+        )
 
     item.article_payload = payload.model_dump(mode="json", by_alias=True)
     item.status = "draft_review"

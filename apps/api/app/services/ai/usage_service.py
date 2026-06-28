@@ -196,6 +196,8 @@ def _apply_log_filters(
     model_tier: str | None,
     operation_key: str | None,
     status: str | None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
 ):
     if project_id is not None:
         stmt = stmt.where(AiUsageLog.project_id == project_id)
@@ -215,6 +217,10 @@ def _apply_log_filters(
         stmt = stmt.where(AiUsageLog.operation_key == operation_key)
     if status:
         stmt = stmt.where(AiUsageLog.status == status)
+    if entity_type:
+        stmt = stmt.where(AiUsageLog.entity_type == entity_type)
+    if entity_id:
+        stmt = stmt.where(AiUsageLog.entity_id == entity_id)
     return stmt
 
 
@@ -378,6 +384,8 @@ async def list_usage_logs(
     model_tier: str | None = None,
     operation_key: str | None = None,
     status: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[AiUsageLog], int]:
@@ -393,6 +401,8 @@ async def list_usage_logs(
         model_tier=model_tier,
         operation_key=operation_key,
         status=status,
+        entity_type=entity_type,
+        entity_id=entity_id,
     )
 
     count_stmt = select(func.count(AiUsageLog.id))
@@ -407,6 +417,8 @@ async def list_usage_logs(
         model_tier=model_tier,
         operation_key=operation_key,
         status=status,
+        entity_type=entity_type,
+        entity_id=entity_id,
     )
     total = int((await session.execute(count_stmt)).scalar_one())
 

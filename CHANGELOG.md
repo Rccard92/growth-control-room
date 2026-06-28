@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.14-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Preserved active editorial modal tab after brief/article actions
+- Added AI generation info accordion for editorial brief and article
+- Calendar cards now show the real generated brief/article title
+- Improved editorial item refresh after generation and approval
+
 ## [0.5.13-alpha] - 2026-06-13
 
 Tipo: Alpha patch
