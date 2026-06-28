@@ -112,6 +112,25 @@ export function jsonBody(data: unknown): Pick<RequestInit, "body" | "headers"> {
   };
 }
 
+export async function parseApiResponseBody(response: Response): Promise<unknown | null> {
+  if (response.status === 204 || response.status === 205) {
+    return null;
+  }
+  const text = await response.text();
+  if (!text.trim()) {
+    return null;
+  }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (
+    contentType.includes("application/json")
+    || text.trim().startsWith("{")
+    || text.trim().startsWith("[")
+  ) {
+    return JSON.parse(text);
+  }
+  return text;
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -127,7 +146,8 @@ export async function apiFetch<T>(
     const text = await response.text().catch(() => "");
     throw buildFetchError(path, response.status, text);
   }
-  return response.json() as Promise<T>;
+  const data = await parseApiResponseBody(response);
+  return data as T;
 }
 
 export async function apiUploadForm<T>(path: string, formData: FormData): Promise<T> {
@@ -145,5 +165,6 @@ export async function apiUploadForm<T>(path: string, formData: FormData): Promis
     const text = await response.text().catch(() => "");
     throw buildFetchError(path, response.status, text);
   }
-  return response.json() as Promise<T>;
+  const data = await parseApiResponseBody(response);
+  return data as T;
 }

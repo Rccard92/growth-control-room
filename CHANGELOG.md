@@ -3,6 +3,14 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.11-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed frontend handling of 204 No Content API responses
+- Editorial item deletion no longer shows JSON parse errors
+- Calendar refreshes correctly after deleting editorial content
+
 ## [0.5.10-alpha] - 2026-06-13
 
 Tipo: Alpha patch

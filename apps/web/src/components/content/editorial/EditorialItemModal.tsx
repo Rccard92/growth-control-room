@@ -240,8 +240,8 @@ export function EditorialItemModal({
     try {
       await deleteMutation.mutateAsync(item.id);
       onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Errore durante l'eliminazione.");
+    } catch {
+      setError("Impossibile eliminare il contenuto editoriale.");
     }
   }
 

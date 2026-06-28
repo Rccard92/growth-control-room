@@ -9,6 +9,16 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.11-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed frontend handling of 204 No Content API responses",
+      "Editorial item deletion no longer shows JSON parse errors",
+      "Calendar refreshes correctly after deleting editorial content",
+    ],
+  },
+  {
     version: "0.5.10-alpha",
     date: "2026-06-13",
     type: "Alpha patch",
