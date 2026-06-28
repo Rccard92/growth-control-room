@@ -3,6 +3,7 @@ from uuid import UUID
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,8 @@ from app.schemas.content_seo_editorial import (
     EditorialBriefBatchJobResponse,
     EditorialBriefBatchStartRequest,
     EditorialArticleUpdateRequest,
+    EditorialImageActionResponse,
+    EditorialImageEditRequest,
     EditorialItemAiUsageResponse,
     EditorialItemRescheduleRequest,
     EditorialItemRescheduleResponse,
@@ -77,6 +80,14 @@ from app.services.content.editorial_article_service import (
     update_editorial_article,
 )
 from app.services.content.editorial_ai_usage_service import get_editorial_item_ai_usage
+from app.services.content.editorial_image_service import (
+    approve_editorial_image,
+    edit_editorial_image,
+    generate_editorial_image,
+    get_editorial_image_media,
+    remove_editorial_image,
+    sync_editorial_image_from_title,
+)
 from app.services.content.editorial_plan_service import generate_editorial_calendar
 from app.services.content.editorial_publishing_service import (
     disconnect_editorial_shopify_article,
@@ -1051,6 +1062,102 @@ async def update_content_seo_editorial_article(
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return await get_editorial_item_read(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/generate-image",
+    response_model=EditorialImageActionResponse,
+    response_model_by_alias=True,
+)
+async def generate_content_seo_editorial_image(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialImageActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await generate_editorial_image(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/edit-image",
+    response_model=EditorialImageActionResponse,
+    response_model_by_alias=True,
+)
+async def edit_content_seo_editorial_image(
+    project_id: UUID,
+    item_id: UUID,
+    payload: EditorialImageEditRequest,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialImageActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await edit_editorial_image(
+        session,
+        project_id,
+        item_id,
+        revision_note=payload.revision_note,
+    )
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/approve-image",
+    response_model=EditorialImageActionResponse,
+    response_model_by_alias=True,
+)
+async def approve_content_seo_editorial_image(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialImageActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await approve_editorial_image(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/remove-image",
+    response_model=EditorialImageActionResponse,
+    response_model_by_alias=True,
+)
+async def remove_content_seo_editorial_image(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialImageActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await remove_editorial_image(session, project_id, item_id)
+
+
+@router.post(
+    "/{project_id}/content/seo/editorial-items/{item_id}/sync-image-from-title",
+    response_model=EditorialImageActionResponse,
+    response_model_by_alias=True,
+)
+async def sync_content_seo_editorial_image_from_title(
+    project_id: UUID,
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> EditorialImageActionResponse:
+    await get_project_in_default_workspace(project_id, session)
+    return await sync_editorial_image_from_title(session, project_id, item_id)
+
+
+@router.get("/{project_id}/content/seo/editorial-items/{item_id}/image-media")
+async def get_content_seo_editorial_image_media(
+    project_id: UUID,
+    item_id: UUID,
+    token: str = Query(..., min_length=8),
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    content, media_type = await get_editorial_image_media(
+        session,
+        project_id,
+        item_id,
+        token=token,
+    )
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @router.get(

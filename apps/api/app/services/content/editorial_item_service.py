@@ -17,6 +17,7 @@ from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemUpdate,
     EditorialItemRescheduleRequest,
 )
+from app.services.content.editorial_image_utils import is_image_stale
 from app.services.content.editorial_publishing_utils import (
     is_publishing_stale,
     normalize_publishing_payload,
@@ -53,14 +54,18 @@ def _apply_planned_date_schedule_sync(
 
 
 def serialize_editorial_item_read(row: ContentSeoEditorialItem) -> ContentSeoEditorialItemRead:
-    """Serialize DB row with computed publishingIsStale."""
+    """Serialize DB row with computed publishingIsStale and imageIsStale."""
     base = ContentSeoEditorialItemRead.model_validate(row)
     return base.model_copy(
         update={
             "publishing_is_stale": is_publishing_stale(
                 row.article_payload,
                 row.publishing_payload,
-            )
+            ),
+            "image_is_stale": is_image_stale(
+                row.article_payload,
+                row.image_payload,
+            ),
         }
     )
 

@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     ai_single_request_warn_usd: float | None = None
     ai_single_request_block_usd: float | None = None
     ai_log_prompt_preview: bool = False
+    editorial_images_dir: str = "data/editorial-images"
+    public_api_base_url: str | None = None
+    openai_image_model: str = "gpt-image-1"
+    editorial_image_storage_provider: str = "local"
+    editorial_image_public_base_url: str | None = None
+    editorial_image_s3_bucket: str | None = None
+    editorial_image_s3_region: str = "auto"
+    editorial_image_s3_access_key: str | None = None
+    editorial_image_s3_secret_key: str | None = None
+    editorial_image_s3_endpoint_url: str | None = None
 
     @model_validator(mode="after")
     def require_database_url(self) -> "Settings":

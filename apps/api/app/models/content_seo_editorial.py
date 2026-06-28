@@ -48,6 +48,7 @@ class ContentSeoEditorialItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     brief_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     article_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     publishing_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    image_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     shopify_blog_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     shopify_article_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     shopify_article_gid: Mapped[str | None] = mapped_column(String(255), nullable=True)

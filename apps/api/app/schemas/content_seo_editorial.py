@@ -104,6 +104,7 @@ class ContentSeoEditorialItemRead(BaseModel):
     brief_payload: dict | None = Field(default=None, serialization_alias="briefPayload")
     article_payload: dict | None = Field(default=None, serialization_alias="articlePayload")
     publishing_payload: dict | None = Field(default=None, serialization_alias="publishingPayload")
+    image_payload: dict | None = Field(default=None, serialization_alias="imagePayload")
     shopify_blog_id: str | None = Field(default=None, serialization_alias="shopifyBlogId")
     shopify_article_id: str | None = Field(default=None, serialization_alias="shopifyArticleId")
     shopify_article_gid: str | None = Field(default=None, serialization_alias="shopifyArticleGid")
@@ -124,6 +125,7 @@ class ContentSeoEditorialItemRead(BaseModel):
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
     publishing_is_stale: bool = Field(default=False, serialization_alias="publishingIsStale")
+    image_is_stale: bool = Field(default=False, serialization_alias="imageIsStale")
 
 
 class ContentSeoEditorialItemCreate(BaseModel):
@@ -376,6 +378,7 @@ class EditorialItemAiUsageResponse(BaseModel):
 
     brief: EditorialAiGenerationInfo | None = None
     article: EditorialAiGenerationInfo | None = None
+    image: EditorialAiGenerationInfo | None = None
     logs: list[EditorialAiGenerationInfo] = Field(default_factory=list)
 
 
@@ -805,6 +808,168 @@ class EditorialPublishingUpdateRequest(BaseModel):
         if not isinstance(value, dict):
             raise ValueError("publishingPayload deve essere un oggetto JSON.")
         return value
+
+
+EditorialImageStatus = Literal["not_generated", "generated", "approved"]
+
+
+class EditorialApprovedImageBackup(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    image_url: str | None = Field(default=None, serialization_alias="imageUrl")
+    image_storage_path: str | None = Field(default=None, serialization_alias="imageStoragePath")
+    image_filename: str | None = Field(default=None, serialization_alias="imageFilename")
+    image_alt: str | None = Field(default=None, serialization_alias="imageAlt")
+    image_hash: str | None = Field(default=None, serialization_alias="imageHash")
+    image_approved_at: str | None = Field(default=None, serialization_alias="imageApprovedAt")
+    shopify_image_ready: bool = Field(default=False, serialization_alias="shopifyImageReady")
+    image_width: int | None = Field(default=None, serialization_alias="imageWidth")
+    image_height: int | None = Field(default=None, serialization_alias="imageHeight")
+    image_mime_type: str | None = Field(default=None, serialization_alias="imageMimeType")
+
+
+class EditorialImagePayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    image_status: EditorialImageStatus = Field(
+        default="not_generated", serialization_alias="imageStatus"
+    )
+    image_prompt: str = Field(default="", serialization_alias="imagePrompt")
+    image_revision_note: str | None = Field(default=None, serialization_alias="imageRevisionNote")
+    image_model: str | None = Field(default=None, serialization_alias="imageModel")
+    image_alt: str | None = Field(default=None, serialization_alias="imageAlt")
+    image_url: str | None = Field(default=None, serialization_alias="imageUrl")
+    image_storage_path: str | None = Field(default=None, serialization_alias="imageStoragePath")
+    image_filename: str | None = Field(default=None, serialization_alias="imageFilename")
+    image_original_provider_filename: str | None = Field(
+        default=None, serialization_alias="imageOriginalProviderFilename"
+    )
+    image_width: int | None = Field(default=None, serialization_alias="imageWidth")
+    image_height: int | None = Field(default=None, serialization_alias="imageHeight")
+    image_aspect_ratio: str | None = Field(default=None, serialization_alias="imageAspectRatio")
+    image_mime_type: str | None = Field(default=None, serialization_alias="imageMimeType")
+    image_file_extension: str | None = Field(default=None, serialization_alias="imageFileExtension")
+    image_generation_cost: float | None = Field(
+        default=None, serialization_alias="imageGenerationCost"
+    )
+    image_generation_log_id: str | None = Field(
+        default=None, serialization_alias="imageGenerationLogId"
+    )
+    image_approved_at: str | None = Field(default=None, serialization_alias="imageApprovedAt")
+    image_hash: str | None = Field(default=None, serialization_alias="imageHash")
+    source_article_hash: str | None = Field(
+        default=None, serialization_alias="sourceArticleHash"
+    )
+    access_token: str | None = Field(default=None, serialization_alias="accessToken")
+    updated_at: str | None = Field(default=None, serialization_alias="updatedAt")
+    skill_pack_used: str = Field(default="", serialization_alias="skillPackUsed")
+    skill_pack_version: str = Field(default="", serialization_alias="skillPackVersion")
+    shopify_image_ready: bool = Field(default=False, serialization_alias="shopifyImageReady")
+    shopify_image_synced_at: str | None = Field(
+        default=None, serialization_alias="shopifyImageSyncedAt"
+    )
+    shopify_image_alt_synced: str | None = Field(
+        default=None, serialization_alias="shopifyImageAltSynced"
+    )
+    shopify_image_filename_synced: str | None = Field(
+        default=None, serialization_alias="shopifyImageFilenameSynced"
+    )
+    approved_image_backup: EditorialApprovedImageBackup | None = Field(
+        default=None, serialization_alias="approvedImageBackup"
+    )
+    ai_generation: EditorialAiGenerationSnapshot | None = Field(
+        default=None, serialization_alias="aiGeneration"
+    )
+
+
+def normalize_editorial_image_payload(raw: dict) -> EditorialImagePayload:
+    data = dict(raw)
+    str_aliases = {
+        "imageStatus": "image_status",
+        "imagePrompt": "image_prompt",
+        "imageRevisionNote": "image_revision_note",
+        "imageModel": "image_model",
+        "imageAlt": "image_alt",
+        "imageUrl": "image_url",
+        "imageStoragePath": "image_storage_path",
+        "imageFilename": "image_filename",
+        "imageOriginalProviderFilename": "image_original_provider_filename",
+        "imageWidth": "image_width",
+        "imageHeight": "image_height",
+        "imageAspectRatio": "image_aspect_ratio",
+        "imageMimeType": "image_mime_type",
+        "imageFileExtension": "image_file_extension",
+        "imageGenerationCost": "image_generation_cost",
+        "imageGenerationLogId": "image_generation_log_id",
+        "imageApprovedAt": "image_approved_at",
+        "imageHash": "image_hash",
+        "sourceArticleHash": "source_article_hash",
+        "accessToken": "access_token",
+        "updatedAt": "updated_at",
+        "skillPackUsed": "skill_pack_used",
+        "skillPackVersion": "skill_pack_version",
+        "shopifyImageReady": "shopify_image_ready",
+        "shopifyImageSyncedAt": "shopify_image_synced_at",
+        "shopifyImageAltSynced": "shopify_image_alt_synced",
+        "shopifyImageFilenameSynced": "shopify_image_filename_synced",
+        "approvedImageBackup": "approved_image_backup",
+        "aiGeneration": "ai_generation",
+    }
+    for alias, field in str_aliases.items():
+        if alias in data and field not in data:
+            data[field] = data.pop(alias)
+    status = str(data.get("image_status") or "not_generated").strip()
+    if status not in ("not_generated", "generated", "approved"):
+        status = "not_generated"
+    data["image_status"] = status
+    cost = data.get("image_generation_cost")
+    if cost is not None:
+        try:
+            data["image_generation_cost"] = float(cost)
+        except (TypeError, ValueError):
+            data["image_generation_cost"] = None
+    for int_field in ("image_width", "image_height"):
+        value = data.get(int_field)
+        if value is not None:
+            try:
+                data[int_field] = int(value)
+            except (TypeError, ValueError):
+                data[int_field] = None
+    ready = data.get("shopify_image_ready")
+    if ready is not None:
+        data["shopify_image_ready"] = bool(ready)
+    backup = data.get("approved_image_backup")
+    if backup and isinstance(backup, dict):
+        backup_aliases = {
+            "imageUrl": "image_url",
+            "imageStoragePath": "image_storage_path",
+            "imageFilename": "image_filename",
+            "imageAlt": "image_alt",
+            "imageHash": "image_hash",
+            "imageApprovedAt": "image_approved_at",
+            "shopifyImageReady": "shopify_image_ready",
+            "imageWidth": "image_width",
+            "imageHeight": "image_height",
+            "imageMimeType": "image_mime_type",
+        }
+        for alias, field in backup_aliases.items():
+            if alias in backup and field not in backup:
+                backup[field] = backup.pop(alias)
+        data["approved_image_backup"] = backup
+    return EditorialImagePayload.model_validate(data)
+
+
+class EditorialImageEditRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    revision_note: str = Field(min_length=1, validation_alias="revisionNote")
+
+
+class EditorialImageActionResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    item: ContentSeoEditorialItemRead
+    warnings: list[str] = Field(default_factory=list)
 
 
 class EditorialPublishShopifyRequest(BaseModel):

@@ -23,7 +23,7 @@ from app.services.ai.exceptions import (
 )
 from app.services.ai.model_policy import AiResolvedModel, resolve_ai_model, resolve_standard_fallback
 from app.services.ai.model_request_params import build_openai_request_params
-from app.services.ai.pricing import estimate_usage_cost
+from app.services.ai.pricing import estimate_image_cost, estimate_usage_cost
 from app.services.ai.usage_service import (
     UsageLogInput,
     check_budget_before_request,
@@ -40,6 +40,7 @@ __all__ = [
     "AiSingleRequestBlockedError",
     "OpenAINotConfiguredError",
     "OpenAIRequestError",
+    "generate_image",
     "generate_structured_json",
     "is_openai_configured",
 ]
@@ -611,3 +612,146 @@ async def probe_resolved_model(
             )
         )
         raise OpenAIRequestError(user_message, code=error_code) from exc
+
+
+class GenerateImageResult(BaseModel):
+    image_bytes: bytes
+    model: str
+    log_id: str | None = None
+    estimated_total_cost: float | None = None
+
+
+async def generate_image(
+    prompt: str,
+    *,
+    metadata: AiRequestMetadata,
+    model: str | None = None,
+    size: str = "1536x1024",
+    timeout: float = 120.0,
+) -> GenerateImageResult:
+    """Generate an image via OpenAI Images API and log usage."""
+    import base64
+
+    if not is_openai_configured():
+        raise OpenAINotConfiguredError("OPENAI_API_KEY non configurata")
+
+    image_model = (model or settings.openai_image_model or "gpt-image-1").strip()
+    prompt_text = prompt.strip()
+    if not prompt_text:
+        raise OpenAIRequestError("Prompt immagine vuoto.")
+
+    resolved = AiResolvedModel(
+        model=image_model,
+        tier="standard",
+        policy_source="image_direct",
+        operation_key=metadata.operation_key,
+        max_output_tokens=0,
+        temperature=0.0,
+        reasoning_effort=None,
+    )
+
+    session_factory = get_session_factory()
+    async with session_factory() as budget_session:
+        await check_budget_before_request(budget_session, metadata.project_id)
+        await budget_session.commit()
+
+    prompt_hash = _hash_prompt("", prompt_text)
+    started = time.perf_counter()
+    status = "error"
+    error_type: str | None = None
+    error_message: str | None = None
+    image_bytes = b""
+    response_id: str | None = None
+
+    try:
+        client = _client()
+        response = await client.images.generate(
+            model=image_model,
+            prompt=prompt_text,
+            size=size,
+            n=1,
+            timeout=timeout,
+        )
+        if not response.data:
+            raise OpenAIRequestError("OpenAI non ha restituito immagini.")
+        item = response.data[0]
+        b64_data = getattr(item, "b64_json", None)
+        if b64_data:
+            image_bytes = base64.b64decode(b64_data)
+        elif getattr(item, "url", None):
+            import httpx
+
+            async with httpx.AsyncClient(timeout=timeout) as http_client:
+                fetch = await http_client.get(item.url)
+                fetch.raise_for_status()
+                image_bytes = fetch.content
+        else:
+            raise OpenAIRequestError("Formato risposta immagine OpenAI non supportato.")
+        status = "success"
+        response_id = getattr(response, "created", None)
+        if response_id is not None:
+            response_id = str(response_id)
+    except OpenAINotConfiguredError:
+        raise
+    except OpenAIError as exc:
+        error_type = type(exc).__name__
+        error_message = _openai_error_snippet(exc)
+        _error_code, user_message = _classify_openai_error(exc)
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        await _persist_log(
+            _base_log_input(
+                metadata=metadata,
+                resolved=resolved,
+                requested_model=model,
+                prompt_hash=prompt_hash,
+                prompt_chars=len(prompt_text),
+                prompt_preview=truncate_preview(prompt_text) if settings.ai_log_prompt_preview else None,
+                prompt_cache_key=None,
+                status=status,
+                duration_ms=duration_ms,
+                error_type=error_type,
+                error_message=error_message,
+            )
+        )
+        raise OpenAIRequestError(user_message) from exc
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    estimated_total = estimate_image_cost(image_model, size=size)
+    if estimated_total is not None:
+        check_single_request_cost(estimated_total)
+
+    log_id: str | None = None
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        try:
+            log_row = await record_usage_log(
+                session,
+                _base_log_input(
+                    metadata=metadata,
+                    resolved=resolved,
+                    requested_model=model,
+                    prompt_hash=prompt_hash,
+                    prompt_chars=len(prompt_text),
+                    prompt_preview=truncate_preview(prompt_text)
+                    if settings.ai_log_prompt_preview
+                    else None,
+                    prompt_cache_key=None,
+                    status=status,
+                    duration_ms=duration_ms,
+                    estimated_total_cost=estimated_total,
+                    output_chars=len(image_bytes),
+                    response_id=response_id,
+                ),
+            )
+            await session.commit()
+            log_id = str(log_row.id) if log_row else None
+        except Exception:
+            await session.rollback()
+            logger.exception("Failed to persist AI image usage log")
+
+    return GenerateImageResult(
+        image_bytes=image_bytes,
+        model=image_model,
+        log_id=log_id,
+        estimated_total_cost=float(estimated_total) if estimated_total is not None else None,
+    )

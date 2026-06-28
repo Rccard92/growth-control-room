@@ -101,3 +101,22 @@ def estimate_usage_cost(
         cached_cost=cached_cost,
         total_cost=total,
     )
+
+
+IMAGE_MODEL_PRICING_USD: dict[str, Decimal] = {
+    "gpt-image-1": Decimal("0.040"),
+    "dall-e-3": Decimal("0.080"),
+    "dall-e-2": Decimal("0.020"),
+}
+
+
+def estimate_image_cost(model: str, *, size: str = "1536x1024") -> Decimal | None:
+    del size
+    price = IMAGE_MODEL_PRICING_USD.get(model)
+    if price is None:
+        for key, value in IMAGE_MODEL_PRICING_USD.items():
+            if key in model:
+                return value
+        logger.warning("image pricing not configured for %s", model)
+        return None
+    return price

@@ -15,6 +15,7 @@ from app.schemas.content_seo_editorial import (
 
 BRIEF_OPERATION_KEYS = ("blog_brief_generation", "blog_brief_batch_item")
 ARTICLE_OPERATION_KEYS = ("article_draft_generation",)
+IMAGE_OPERATION_KEYS = ("editorial_image_generation", "editorial_image_edit")
 EDITORIAL_GENERATOR_VERSION = "0.5.14-alpha"
 
 
@@ -110,8 +111,9 @@ async def get_editorial_item_ai_usage(
     entity_id = str(item_id)
     brief_log = await _fetch_latest_log(session, project_id, entity_id, BRIEF_OPERATION_KEYS)
     article_log = await _fetch_latest_log(session, project_id, entity_id, ARTICLE_OPERATION_KEYS)
+    image_log = await _fetch_latest_log(session, project_id, entity_id, IMAGE_OPERATION_KEYS)
 
-    all_keys = (*BRIEF_OPERATION_KEYS, *ARTICLE_OPERATION_KEYS)
+    all_keys = (*BRIEF_OPERATION_KEYS, *ARTICLE_OPERATION_KEYS, *IMAGE_OPERATION_KEYS)
     logs_stmt = (
         select(AiUsageLog)
         .where(
@@ -128,6 +130,7 @@ async def get_editorial_item_ai_usage(
     return EditorialItemAiUsageResponse(
         brief=_log_to_info(brief_log),
         article=_log_to_info(article_log),
+        image=_log_to_info(image_log),
         logs=[
             EditorialAiGenerationInfo(
                 generated=row.status == "success",

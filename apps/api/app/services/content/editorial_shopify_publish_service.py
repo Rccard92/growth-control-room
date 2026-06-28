@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo import ShopifyBlog
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
+    EditorialImagePayload,
     EditorialPublishShopifyRequest,
     EditorialPublishShopifyResponse,
     EditorialPublishingPayload,
@@ -150,6 +151,24 @@ async def _ensure_shopify_seo_synced(
             "shopify_seo_error": error_message,
         }
     )
+
+
+def _mark_shopify_image_synced(
+    row: ContentSeoEditorialItem,
+    publishing: EditorialPublishingPayload,
+    image_payload: EditorialImagePayload,
+) -> None:
+    if not publishing.image_url or not image_payload.shopify_image_ready:
+        return
+    now = datetime.now(UTC).isoformat()
+    updated = image_payload.model_copy(
+        update={
+            "shopify_image_synced_at": now,
+            "shopify_image_alt_synced": publishing.image_alt or image_payload.image_alt,
+            "shopify_image_filename_synced": image_payload.image_filename,
+        }
+    )
+    row.image_payload = updated.model_dump(mode="json", by_alias=True)
 
 
 async def _mark_publish_error(
@@ -422,6 +441,30 @@ async def publish_editorial_to_shopify(
 
     publishing = publishing.model_copy(update={"mode": request.mode})
 
+    from app.services.content.editorial_image_utils import (
+        IMAGE_STALE_PUBLISH_WARNING,
+        NO_APPROVED_IMAGE_WARNING,
+        is_image_stale,
+        normalize_image_payload,
+        storage_warning_if_needed,
+        sync_approved_image_to_publishing,
+    )
+
+    image_payload = normalize_image_payload(getattr(row, "image_payload", None))
+    has_approved_image = image_payload.image_status == "approved" or (
+        image_payload.image_status == "generated" and image_payload.approved_image_backup is not None
+    )
+    if has_approved_image:
+        if is_image_stale(row.article_payload, image_payload):
+            warnings.append(IMAGE_STALE_PUBLISH_WARNING)
+        if image_payload.image_status == "approved" and not image_payload.shopify_image_ready:
+            storage_warning = storage_warning_if_needed(False)
+            if storage_warning:
+                warnings.append(storage_warning)
+        publishing = sync_approved_image_to_publishing(publishing, image_payload)
+    else:
+        warnings.append(NO_APPROVED_IMAGE_WARNING)
+
     if request.mode == "schedule":
         planned_class = classify_planned_date(
             row.planned_date,
@@ -599,6 +642,8 @@ async def publish_editorial_to_shopify(
         mode=request.mode,
         article_payload=row.article_payload,
     )
+
+    _mark_shopify_image_synced(row, publishing, image_payload)
 
     if publishing.shopify_seo_synced is False and publishing.shopify_seo_error:
         row.publish_status = "publish_error"

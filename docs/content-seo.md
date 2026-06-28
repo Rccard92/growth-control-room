@@ -226,6 +226,46 @@ Workflow: **articolo pronto → tab Pubblicazione → modifica form precompilato
 
 `bodyHtml` è il contenuto principale per anteprima e futura pubblicazione Shopify.
 
+#### Tab Immagine (hero editoriale)
+
+Workflow tra **Articolo** e **Pubblicazione**:
+
+1. Genera immagine hero da contesto articolo, brief e brand (OpenAI Images).
+2. Post-processing server-side obbligatorio: **1600×900 JPG** (crop 16:9, nessuno stretch).
+3. Filename SEO dal titolo articolo (`slug-titolo.jpg`, max 90 caratteri, fallback `articolo-solmielato.jpg`).
+4. **ALT** sempre uguale al titolo articolo (priorità: `articlePayload.title` → `briefPayload.proposedTitle` → `item.title`).
+5. Approva immagine → sincronizza hero in `publishing_payload` se storage pubblico configurato.
+6. Pubblica su Shopify → `ArticleImageInput` con `{ url, altText }`.
+
+**Struttura `image_payload` (campi principali):**
+
+```json
+{
+  "imageStatus": "not_generated",
+  "imageFilename": "yogurt-con-frutta-noci-e-miele.jpg",
+  "imageWidth": 1600,
+  "imageHeight": 900,
+  "imageAspectRatio": "16:9",
+  "imageMimeType": "image/jpeg",
+  "imageAlt": "Titolo articolo",
+  "imageUrl": "https://cdn.example.com/editorial/{project_id}/editorial/{filename}",
+  "shopifyImageReady": true,
+  "sourceArticleHash": "..."
+}
+```
+
+**Storage pubblico (richiesto per Shopify):**
+
+| Env | Descrizione |
+|-----|-------------|
+| `EDITORIAL_IMAGE_STORAGE_PROVIDER` | `local` (solo preview tool) o `s3` (R2/Supabase/S3) |
+| `EDITORIAL_IMAGE_PUBLIC_BASE_URL` | Base URL CDN pubblico per Shopify |
+| `EDITORIAL_IMAGE_S3_*` | Credenziali bucket S3-compatible |
+
+Con `local` o senza CDN: generazione e preview nel tool OK; **l'immagine non viene inviata a Shopify** (warning in UI).
+
+**Stale image:** se `articleHash` cambia dopo generazione/approvazione → `imageIsStale=true` e warning in tab Immagine e Pubblicazione (non blocca publish MVP).
+
 ## API
 
 Base: `/api/projects/{project_id}/content/seo/`
@@ -242,6 +282,12 @@ Base: `/api/projects/{project_id}/content/seo/`
 | PUT | `editorial-items/{item_id}/brief` | Salva/approva `briefPayload`; `status` opzionale (`brief_pending` \| `brief_approved`) |
 | POST | `editorial-items/{item_id}/generate-article` | Genera bozza articolo da brief approvato |
 | PUT | `editorial-items/{item_id}/article` | Salva `articlePayload`; `status` opzionale (`draft_pending` \| `draft_review` \| `ready_to_publish`) |
+| POST | `editorial-items/{item_id}/generate-image` | Genera hero 1600×900 da articolo |
+| POST | `editorial-items/{item_id}/edit-image` | Rigenera con istruzioni modifica |
+| POST | `editorial-items/{item_id}/approve-image` | Approva immagine per publish |
+| POST | `editorial-items/{item_id}/remove-image` | Rimuove immagine |
+| POST | `editorial-items/{item_id}/sync-image-from-title` | Aggiorna ALT e filename SEO dal titolo |
+| GET | `editorial-items/{item_id}/image-media?token=` | Preview locale (non per Shopify) |
 | GET | `shopify/blogs` | Listing blog Shopify del progetto; sync lazy se vuoto |
 | PUT | `editorial-items/{item_id}/publishing` | Salva `publishingPayload` (no chiamata Shopify) |
 | POST | `editorial-items/{item_id}/publish-shopify` | Crea/pubblica articolo su Shopify (`mode`: `draft` \| `publish_now`) |
@@ -252,7 +298,7 @@ Gli endpoint editorial di generazione/salvataggio brief e articolo **non** richi
 
 Tabella: `content_seo_editorial_items` (migration `027`, publishing `034`).
 
-Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`, `publish_status`. Campi JSONB `brief_payload`, `article_payload`, `publishing_payload`.
+Modello: `ContentSeoEditorialItem` — FK `project_id`, indici su `planned_date`, `status`, `content_type`, `publish_status`. Campi JSONB `brief_payload`, `article_payload`, `publishing_payload`, `image_payload`.
 
 ## Roadmap (step successivi)
 

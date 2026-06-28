@@ -28,6 +28,11 @@ import {
   updateEditorialArticle,
   updateEditorialPublishing,
   updateEditorialItem,
+  generateEditorialImage,
+  editEditorialImage,
+  approveEditorialImage,
+  removeEditorialImage,
+  syncEditorialImageFromTitle,
 } from "../lib/content-api";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -254,6 +259,58 @@ export function useDisconnectEditorialShopifyArticle(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) => disconnectEditorialShopifyArticle(projectId, itemId),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useGenerateEditorialImage(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => generateEditorialImage(projectId, itemId),
+    onSuccess: (_data, itemId) => {
+      invalidateEditorial(qc, projectId);
+      invalidateEditorialAiUsage(qc, projectId, itemId);
+    },
+  });
+}
+
+export function useEditEditorialImage(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itemId,
+      revisionNote,
+    }: {
+      itemId: string;
+      revisionNote: string;
+    }) => editEditorialImage(projectId, itemId, { revisionNote }),
+    onSuccess: (_data, variables) => {
+      invalidateEditorial(qc, projectId);
+      invalidateEditorialAiUsage(qc, projectId, variables.itemId);
+    },
+  });
+}
+
+export function useApproveEditorialImage(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => approveEditorialImage(projectId, itemId),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useRemoveEditorialImage(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => removeEditorialImage(projectId, itemId),
+    onSuccess: () => invalidateEditorial(qc, projectId),
+  });
+}
+
+export function useSyncEditorialImageFromTitle(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => syncEditorialImageFromTitle(projectId, itemId),
     onSuccess: () => invalidateEditorial(qc, projectId),
   });
 }

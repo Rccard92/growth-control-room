@@ -321,6 +321,35 @@ def test_build_article_update_input_has_metafields_not_seo() -> None:
     assert "metafields" in update_input
 
 
+def test_build_article_create_input_includes_image_when_url_present() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    payload = payload.model_copy(
+        update={
+            "image_url": "https://cdn.example.com/editorial/hero.jpg",
+            "image_alt": "Guida olio EVO",
+        }
+    )
+    article_input = build_article_create_input(
+        payload,
+        blog_gid="gid://shopify/Blog/99",
+        mode="draft",
+    )
+    assert article_input["image"] == {
+        "url": "https://cdn.example.com/editorial/hero.jpg",
+        "altText": "Guida olio EVO",
+    }
+
+
+def test_build_article_create_input_omits_image_without_url() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    article_input = build_article_create_input(
+        payload,
+        blog_gid="gid://shopify/Blog/99",
+        mode="draft",
+    )
+    assert "image" not in article_input
+
+
 def test_validate_publishing_seo_requires_fields_for_publish() -> None:
     payload = build_publishing_payload_from_article(_sample_article())
     payload = payload.model_copy(update={"seo_title": "", "meta_description": ""})

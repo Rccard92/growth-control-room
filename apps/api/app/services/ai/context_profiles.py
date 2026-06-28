@@ -39,6 +39,7 @@ class AiContextProfile(str, Enum):
     COLLECTION_SEO_FULL = "collection_seo_full"
     BLOG_BRIEF = "blog_brief"
     ARTICLE_DRAFT = "article_draft"
+    EDITORIAL_IMAGE = "editorial_image"
     BRAND_IMPORT = "brand_import"
     COMPLIANCE_REVIEW = "compliance_review"
     SOCIAL_RESPONSE = "social_response"
@@ -53,6 +54,7 @@ CLAIM_RISK_PROFILES = frozenset(
         AiContextProfile.COLLECTION_SEO_FULL,
         AiContextProfile.BLOG_BRIEF,
         AiContextProfile.ARTICLE_DRAFT,
+        AiContextProfile.EDITORIAL_IMAGE,
         AiContextProfile.COMPLIANCE_REVIEW,
     }
 )
@@ -717,6 +719,67 @@ async def _assemble_profile_blocks(
             if pk:
                 blocks.append(pk)
                 used.append("product_knowledge_specific")
+
+    elif profile == AiContextProfile.EDITORIAL_IMAGE:
+        brief_payload = opts.get("brief_payload")
+        if isinstance(brief_payload, dict) and brief_payload:
+            blocks.append(_format_brief_payload_block(brief_payload))
+            used.append("approved_brief")
+        article_summary = opts.get("article_summary")
+        if article_summary:
+            blocks.append(f"ARTICOLO\n{str(article_summary)[:2000]}")
+            used.append("article_summary")
+        editorial = _editorial_guidelines_block(bundle)
+        _track_block(
+            blocks,
+            used,
+            "editorial_guidelines",
+            editorial,
+            missing_warning="Editorial Guidelines missing",
+            warnings=warnings,
+        )
+        _track_block(
+            blocks,
+            used,
+            "safe_claims",
+            _full_safe_claims(bundle),
+            missing_warning="Safe Claims missing",
+            warnings=warnings,
+        )
+        if bundle.visual_identity:
+            from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
+
+            visual_text = BrandIntelligenceContextBuilder.format_visual_for_prompt(
+                bundle.visual_identity
+            )
+            if visual_text and len(visual_text.splitlines()) > 1:
+                blocks.append(visual_text)
+                used.append("visual_identity")
+        editorial_item = opts.get("editorial_item")
+        if isinstance(editorial_item, dict):
+            item_block = _editorial_item_block(editorial_item)
+            if item_block:
+                blocks.append(item_block)
+                used.append("editorial_item")
+        if shopify_product_id:
+            pk = await get_product_knowledge_prompt_for_entity(
+                session, project_id, shopify_product_id=shopify_product_id
+            )
+            if pk:
+                blocks.append(pk)
+                used.append("product_knowledge_specific")
+        linked_products = opts.get("linked_products")
+        if isinstance(linked_products, list) and linked_products:
+            titles = [str(p).strip() for p in linked_products if str(p).strip()]
+            if titles:
+                blocks.append(f"PRODOTTI COLLEGATI\n- {', '.join(titles[:8])}")
+                used.append("linked_products")
+        linked_collections = opts.get("linked_collections")
+        if isinstance(linked_collections, list) and linked_collections:
+            titles = [str(c).strip() for c in linked_collections if str(c).strip()]
+            if titles:
+                blocks.append(f"COLLEZIONI COLLEGATE\n- {', '.join(titles[:8])}")
+                used.append("linked_collections")
 
     elif profile == AiContextProfile.BRAND_IMPORT:
         import_block = _brand_import_block(opts)

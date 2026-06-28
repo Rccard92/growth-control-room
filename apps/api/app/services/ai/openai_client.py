@@ -6,6 +6,7 @@ from app.services.ai.ai_client import (
     AiSingleRequestBlockedError,
     OpenAINotConfiguredError,
     OpenAIRequestError,
+    generate_image,
     generate_structured_json,
     is_openai_configured,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "OpenAIRequestError",
     "build_openai_request_params",
     "generate_structured_json",
+    "generate_image",
     "infer_model_family",
     "is_known_supported_model",
     "is_openai_configured",

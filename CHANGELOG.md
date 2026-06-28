@@ -3,6 +3,18 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.28-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added editorial Image tab for hero image generation
+- Added fixed 1600x900 editorial article images
+- Added SEO filename generation from article title
+- Synced article image ALT with article title
+- Added Shopify featured image publishing for editorial articles
+- S3-compatible public storage for Shopify hero images
+- Stale image warning when article changes after generation
+
 ## [0.5.27-alpha] - 2026-06-13
 
 Tipo: Alpha patch

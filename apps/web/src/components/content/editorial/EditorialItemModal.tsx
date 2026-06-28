@@ -6,6 +6,7 @@ import type {
   ContentSeoEditorialStatus,
   EditorialArticlePayload,
   EditorialBriefPayload,
+  EditorialImagePayload,
   EditorialPublishingPayload,
   EditorialPublishMode,
 } from "@gcr/shared";
@@ -19,6 +20,7 @@ import { EditorialBriefEditor } from "./EditorialBriefEditor";
 import { EditorialArticleEditor } from "./EditorialArticleEditor";
 import { EditorialArticlePreview } from "./EditorialArticlePreview";
 import { EditorialPublishingTab } from "./EditorialPublishingTab";
+import { EditorialImageTab } from "./EditorialImageTab";
 import {
   hasEditorialBrief,
   parseEditorialBriefPayload,
@@ -40,6 +42,10 @@ import {
   validatePublishingPayload,
   validatePublishingPayloadWithWarnings,
 } from "./editorial-publishing-utils";
+import {
+  emptyEditorialImagePayload,
+  parseEditorialImagePayload,
+} from "./editorial-image-utils";
 import { getShopifyScopes } from "../../../lib/shopify-api";
 import { useShopifyStatus } from "../../../hooks/useShopify";
 import { useBrandProfile } from "../../../hooks/useBrandIntelligence";
@@ -54,6 +60,11 @@ import {
   useDeleteEditorialItem,
   useGenerateEditorialArticle,
   useGenerateEditorialBrief,
+  useGenerateEditorialImage,
+  useEditEditorialImage,
+  useApproveEditorialImage,
+  useRemoveEditorialImage,
+  useSyncEditorialImageFromTitle,
   usePublishEditorialShopify,
   useSyncEditorialPublishingFromArticle,
   useDisconnectEditorialShopifyArticle,
@@ -99,6 +110,11 @@ export function EditorialItemModal({
   const generateBriefMutation = useGenerateEditorialBrief(projectId);
   const updateBriefMutation = useUpdateEditorialBrief(projectId);
   const generateArticleMutation = useGenerateEditorialArticle(projectId);
+  const generateImageMutation = useGenerateEditorialImage(projectId);
+  const editImageMutation = useEditEditorialImage(projectId);
+  const approveImageMutation = useApproveEditorialImage(projectId);
+  const removeImageMutation = useRemoveEditorialImage(projectId);
+  const syncImageFromTitleMutation = useSyncEditorialImageFromTitle(projectId);
   const updateArticleMutation = useUpdateEditorialArticle(projectId);
   const updatePublishingMutation = useUpdateEditorialPublishing(projectId);
   const publishShopifyMutation = usePublishEditorialShopify(projectId);
@@ -130,13 +146,15 @@ export function EditorialItemModal({
   const [articleView, setArticleView] = useState<"editor" | "preview">("editor");
   const [articleBodyMode, setArticleBodyMode] = useState<"html" | "markdown">("html");
   const [publishing, setPublishing] = useState<EditorialPublishingPayload | null>(null);
+  const [image, setImage] = useState<EditorialImagePayload>(emptyEditorialImagePayload());
+  const [imageRevisionNote, setImageRevisionNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [staleDismissed, setStaleDismissed] = useState(false);
-  const [activeTab, setActiveTab] = useState<"detail" | "brief" | "article" | "publishing">(
-    "detail",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "detail" | "brief" | "article" | "image" | "publishing"
+  >("detail");
   const lastItemIdRef = useRef<string | null>(null);
 
   function hydrateFromItem(source: ContentSeoEditorialItem, resetTab: boolean) {
@@ -182,6 +200,8 @@ export function EditorialItemModal({
           })
         : parsedPublishing;
     setPublishing(hydratedPublishing);
+    setImage(parseEditorialImagePayload(source.imagePayload ?? null));
+    setImageRevisionNote("");
     if (resetTab) {
       setArticleView("editor");
       setArticleBodyMode("html");
@@ -257,6 +277,87 @@ export function EditorialItemModal({
         updated.publishingPayload as unknown as Record<string, unknown>,
       );
       setPublishing(parsedPublishing);
+    }
+    setImage(parseEditorialImagePayload(updated.imagePayload ?? null));
+  }
+
+  async function handleGenerateImage() {
+    if (!item) return;
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      const result = await generateImageMutation.mutateAsync(item.id);
+      syncItem(result.item);
+      if (result.warnings?.length) setWarning(result.warnings.join(" "));
+      setSuccess("Immagine generata.");
+      setActiveTab("image");
+    } catch (err) {
+      setError(formatPublishingError("Errore generazione immagine.", err));
+    }
+  }
+
+  async function handleEditImage() {
+    if (!item || !imageRevisionNote.trim()) return;
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      const result = await editImageMutation.mutateAsync({
+        itemId: item.id,
+        revisionNote: imageRevisionNote.trim(),
+      });
+      syncItem(result.item);
+      if (result.warnings?.length) setWarning(result.warnings.join(" "));
+      setSuccess("Immagine aggiornata.");
+      setImageRevisionNote("");
+    } catch (err) {
+      setError(formatPublishingError("Errore modifica immagine.", err));
+    }
+  }
+
+  async function handleApproveImage() {
+    if (!item) return;
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      const result = await approveImageMutation.mutateAsync(item.id);
+      syncItem(result.item);
+      if (result.warnings?.length) setWarning(result.warnings.join(" "));
+      setSuccess("Immagine approvata e sincronizzata con la pubblicazione.");
+    } catch (err) {
+      setError(formatPublishingError("Errore approvazione immagine.", err));
+    }
+  }
+
+  async function handleRemoveImage() {
+    if (!item) return;
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      const result = await removeImageMutation.mutateAsync(item.id);
+      syncItem(result.item);
+      setImageRevisionNote("");
+      setSuccess("Immagine rimossa.");
+    } catch (err) {
+      setError(formatPublishingError("Errore rimozione immagine.", err));
+    }
+  }
+
+  async function handleSyncImageFromTitle() {
+    if (!item) return;
+    setError(null);
+    setWarning(null);
+    setSuccess(null);
+    try {
+      const result = await syncImageFromTitleMutation.mutateAsync(item.id);
+      syncItem(result.item);
+      if (result.warnings?.length) setWarning(result.warnings.join(" "));
+      setSuccess("ALT e filename aggiornati dal titolo articolo.");
+    } catch (err) {
+      setError(formatPublishingError("Errore sincronizzazione immagine.", err));
     }
   }
 
@@ -692,6 +793,8 @@ export function EditorialItemModal({
   const itemHasBrief = hasEditorialBrief(item.briefPayload ?? null);
   const itemHasArticle = hasEditorialArticle(item.articlePayload ?? null);
   const hasArticle = Boolean(article);
+  const itemHasImage = image.imageStatus !== "not_generated";
+  const imageIsStale = item.imageIsStale ?? false;
   const publishingStale =
     item.publishingIsStale ?? isPublishingStale(article, publishing);
   const publishSeoIncomplete = !isPublishingSeoComplete(publishing);
@@ -840,6 +943,12 @@ export function EditorialItemModal({
           </>
         )}
       </>
+    ) : activeTab === "image" ? (
+      <>
+        <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
+          Chiudi
+        </button>
+      </>
     ) : (
       <>
         <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
@@ -934,6 +1043,21 @@ export function EditorialItemModal({
             onClick={() => setActiveTab("article")}
           >
             Articolo & Anteprima
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "image"}
+            className={[
+              "editorial-item-modal__tab",
+              activeTab === "image" ? "editorial-item-modal__tab--active" : "",
+              itemHasImage ? "editorial-item-modal__tab--has-content" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setActiveTab("image")}
+          >
+            Immagine
           </button>
           <button
             type="button"
@@ -1127,6 +1251,32 @@ export function EditorialItemModal({
                 />
               </>
             )}
+          </section>
+        )}
+
+        {activeTab === "image" && item && (
+          <section className="editorial-item-modal__section editorial-image-tab-wrap">
+            <EditorialImageTab
+              projectId={projectId}
+              itemId={item.id}
+              hasArticle={hasArticle}
+              article={article}
+              image={image}
+              imageIsStale={imageIsStale}
+              revisionNote={imageRevisionNote}
+              onRevisionNoteChange={setImageRevisionNote}
+              onGenerate={() => void handleGenerateImage()}
+              onRegenerate={() => void handleGenerateImage()}
+              onApplyEdit={() => void handleEditImage()}
+              onApprove={() => void handleApproveImage()}
+              onRemove={() => void handleRemoveImage()}
+              onSyncFromTitle={() => void handleSyncImageFromTitle()}
+              generateLoading={generateImageMutation.isPending}
+              editLoading={editImageMutation.isPending}
+              approveLoading={approveImageMutation.isPending}
+              removeLoading={removeImageMutation.isPending}
+              syncLoading={syncImageFromTitleMutation.isPending}
+            />
           </section>
         )}
 

@@ -23,6 +23,15 @@ import {
   SEO_TITLE_MAX,
   tagsToInput,
 } from "./editorial-publishing-utils";
+import {
+  hasApprovedImageForPublish,
+  IMAGE_STALE_PUBLISH_WARNING,
+  NO_APPROVED_IMAGE_WARNING,
+  parseEditorialImagePayload,
+  PUBLIC_STORAGE_WARNING,
+} from "./editorial-image-utils";
+import { buildEditorialImagePreviewUrl } from "../../../lib/content-api";
+
 interface EditorialPublishingTabProps {
   item: ContentSeoEditorialItem;
   status: ContentSeoEditorialStatus;
@@ -468,23 +477,53 @@ export function EditorialPublishingTab({
       </section>
 
       <section className="editorial-publishing-tab__section">
-        <h4>Immagine (opzionale)</h4>
-        <label className="gcr-field">
-          <span className="gcr-field__label">URL immagine</span>
-          <input
-            className="gcr-input"
-            value={publishing.imageUrl ?? ""}
-            onChange={(e) => patch({ imageUrl: e.target.value || null })}
-          />
-        </label>
-        <label className="gcr-field">
-          <span className="gcr-field__label">Alt text</span>
-          <input
-            className="gcr-input"
-            value={publishing.imageAlt ?? ""}
-            onChange={(e) => patch({ imageAlt: e.target.value || null })}
-          />
-        </label>
+        <h4>Immagine hero</h4>
+        {(() => {
+          const imagePayload = parseEditorialImagePayload(item.imagePayload ?? null);
+          const previewUrl = buildEditorialImagePreviewUrl(item.projectId, item.id, imagePayload);
+          const imageApproved = hasApprovedImageForPublish(imagePayload);
+          const imageIsStale = item.imageIsStale ?? false;
+          return (
+            <>
+              {!imageApproved && (
+                <p className="editorial-publishing-tab__warning" role="alert">
+                  {NO_APPROVED_IMAGE_WARNING} Puoi pubblicare comunque, ma l&apos;articolo Shopify
+                  non avrà immagine in evidenza.
+                </p>
+              )}
+              {imageApproved && !imagePayload.shopifyImageReady && (
+                <p className="editorial-publishing-tab__warning" role="alert">
+                  {PUBLIC_STORAGE_WARNING}
+                </p>
+              )}
+              {imageApproved && imageIsStale && (
+                <p className="editorial-publishing-tab__warning" role="alert">
+                  {IMAGE_STALE_PUBLISH_WARNING}
+                </p>
+              )}
+              {imageApproved && previewUrl && (
+                <img
+                  src={previewUrl}
+                  alt={publishing.imageAlt ?? publishing.title}
+                  className="editorial-publishing-tab__hero-preview"
+                />
+              )}
+              <p className="editorial-publishing-tab__field-hint">
+                Stato tab Immagine: {imagePayload.imageStatus}. Filename:{" "}
+                {imagePayload.imageFilename ?? "—"}. Dimensione:{" "}
+                {imagePayload.imageWidth && imagePayload.imageHeight
+                  ? `${imagePayload.imageWidth}×${imagePayload.imageHeight}`
+                  : "1600×900"}
+                . ALT: {(publishing.imageAlt ?? publishing.title) || "—"}.
+              </p>
+              {imageApproved && publishing.imageUrl && imagePayload.shopifyImageReady && (
+                <p className="editorial-publishing-tab__field-hint">
+                  URL Shopify: {publishing.imageUrl}
+                </p>
+              )}
+            </>
+          );
+        })()}
       </section>
 
       <section className="editorial-publishing-tab__section">

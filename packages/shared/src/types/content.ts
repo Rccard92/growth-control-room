@@ -478,6 +478,7 @@ export interface ContentSeoEditorialItem {
   briefPayload?: Record<string, unknown> | null;
   articlePayload?: EditorialArticlePayload | null;
   publishingPayload?: EditorialPublishingPayload | null;
+  imagePayload?: EditorialImagePayload | null;
   shopifyBlogId?: string | null;
   shopifyArticleId?: string | null;
   shopifyArticleGid?: string | null;
@@ -492,6 +493,7 @@ export interface ContentSeoEditorialItem {
   createdAt: string;
   updatedAt: string;
   publishingIsStale?: boolean;
+  imageIsStale?: boolean;
 }
 
 export interface ContentSeoEditorialItemCreate {
@@ -625,7 +627,64 @@ export interface EditorialAiGenerationInfo {
 export interface EditorialItemAiUsageResponse {
   brief?: EditorialAiGenerationInfo | null;
   article?: EditorialAiGenerationInfo | null;
+  image?: EditorialAiGenerationInfo | null;
   logs?: EditorialAiGenerationInfo[];
+}
+
+export type EditorialImageStatus = "not_generated" | "generated" | "approved";
+
+export interface EditorialApprovedImageBackup {
+  imageUrl?: string | null;
+  imageStoragePath?: string | null;
+  imageFilename?: string | null;
+  imageAlt?: string | null;
+  imageHash?: string | null;
+  imageApprovedAt?: string | null;
+  shopifyImageReady?: boolean;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  imageMimeType?: string | null;
+}
+
+export interface EditorialImagePayload {
+  imageStatus: EditorialImageStatus;
+  imagePrompt?: string;
+  imageRevisionNote?: string | null;
+  imageModel?: string | null;
+  imageAlt?: string | null;
+  imageUrl?: string | null;
+  imageStoragePath?: string | null;
+  imageFilename?: string | null;
+  imageOriginalProviderFilename?: string | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  imageAspectRatio?: string | null;
+  imageMimeType?: string | null;
+  imageFileExtension?: string | null;
+  imageGenerationCost?: number | null;
+  imageGenerationLogId?: string | null;
+  imageApprovedAt?: string | null;
+  imageHash?: string | null;
+  sourceArticleHash?: string | null;
+  accessToken?: string | null;
+  updatedAt?: string | null;
+  skillPackUsed?: string;
+  skillPackVersion?: string;
+  shopifyImageReady?: boolean;
+  shopifyImageSyncedAt?: string | null;
+  shopifyImageAltSynced?: string | null;
+  shopifyImageFilenameSynced?: string | null;
+  approvedImageBackup?: EditorialApprovedImageBackup | null;
+  aiGeneration?: EditorialAiGenerationSnapshot;
+}
+
+export interface EditorialImageEditRequest {
+  revisionNote: string;
+}
+
+export interface EditorialImageActionResponse {
+  item: ContentSeoEditorialItem;
+  warnings?: string[];
 }
 
 export interface EditorialBriefPayload {

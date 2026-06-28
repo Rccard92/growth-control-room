@@ -29,6 +29,8 @@ import type {
   EditorialBriefBatchJobResponse,
   EditorialArticleUpdateRequest,
   EditorialItemAiUsageResponse,
+  EditorialImageActionResponse,
+  EditorialImageEditRequest,
   EditorialPublishingUpdateRequest,
   EditorialPublishShopifyRequest,
   EditorialPublishShopifyResponse,
@@ -427,6 +429,67 @@ export function getEditorialItemAiUsage(
   return apiFetch<EditorialItemAiUsageResponse>(
     `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/ai-usage`,
   );
+}
+
+export function generateEditorialImage(
+  projectId: string,
+  itemId: string,
+): Promise<EditorialImageActionResponse> {
+  return apiFetch<EditorialImageActionResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/generate-image`,
+    { method: "POST" },
+  );
+}
+
+export function editEditorialImage(
+  projectId: string,
+  itemId: string,
+  data: EditorialImageEditRequest,
+): Promise<EditorialImageActionResponse> {
+  return apiFetch<EditorialImageActionResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/edit-image`,
+    { method: "POST", ...jsonBody(data) },
+  );
+}
+
+export function approveEditorialImage(
+  projectId: string,
+  itemId: string,
+): Promise<EditorialImageActionResponse> {
+  return apiFetch<EditorialImageActionResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/approve-image`,
+    { method: "POST" },
+  );
+}
+
+export function removeEditorialImage(
+  projectId: string,
+  itemId: string,
+): Promise<EditorialImageActionResponse> {
+  return apiFetch<EditorialImageActionResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/remove-image`,
+    { method: "POST" },
+  );
+}
+
+export function syncEditorialImageFromTitle(
+  projectId: string,
+  itemId: string,
+): Promise<EditorialImageActionResponse> {
+  return apiFetch<EditorialImageActionResponse>(
+    `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/sync-image-from-title`,
+    { method: "POST" },
+  );
+}
+
+export function buildEditorialImagePreviewUrl(
+  projectId: string,
+  itemId: string,
+  image: { imageUrl?: string | null; accessToken?: string | null },
+): string | null {
+  if (image.imageUrl) return image.imageUrl;
+  if (!image.accessToken) return null;
+  return `/api/projects/${projectId}/content/seo/editorial-items/${itemId}/image-media?token=${encodeURIComponent(image.accessToken)}`;
 }
 
 export function getShopifyBlogs(projectId: string): Promise<ShopifyBlogsListResponse> {

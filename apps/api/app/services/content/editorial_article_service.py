@@ -48,7 +48,7 @@ from app.services.content.editorial_brief_service import (
     build_brand_context_used,
 )
 from app.services.content.editorial_item_service import get_editorial_item
-from app.services.content.editorial_publishing_utils import enrich_article_with_hash
+from app.services.content.editorial_publishing_utils import enrich_article_with_hash, normalize_publishing_payload
 from app.services.content.editorial_ai_usage_service import (
     ARTICLE_OPERATION_KEYS,
     build_ai_generation_snapshot_from_log,
@@ -599,6 +599,29 @@ async def update_editorial_article(
         ) from exc
 
     item.article_payload = payload.model_dump(mode="json", by_alias=True)
+
+    from app.services.content.editorial_image_utils import (
+        normalize_image_payload,
+        sync_approved_image_to_publishing,
+        sync_image_alt_from_article,
+    )
+
+    if item.image_payload:
+        image_payload = normalize_image_payload(item.image_payload)
+        if image_payload.image_status != "not_generated":
+            brief = item.brief_payload if isinstance(item.brief_payload, dict) else None
+            image_payload = sync_image_alt_from_article(
+                image_payload,
+                payload,
+                brief=brief,
+                item_title=item.title,
+            )
+            item.image_payload = image_payload.model_dump(mode="json", by_alias=True)
+            if image_payload.image_status == "approved" and item.publishing_payload:
+                publishing = normalize_publishing_payload(item.publishing_payload)
+                publishing = sync_approved_image_to_publishing(publishing, image_payload)
+                item.publishing_payload = publishing.model_dump(mode="json", by_alias=True)
+
     if request.status is not None:
         if request.status in _DISALLOWED_ARTICLE_STATUSES:
             raise HTTPException(
