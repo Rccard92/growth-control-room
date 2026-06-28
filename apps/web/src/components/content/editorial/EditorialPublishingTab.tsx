@@ -10,14 +10,19 @@ import { AppSelect } from "../../ui/AppSelect";
 import { AutoResizeTextarea } from "../../ui/AutoResizeTextarea";
 import { EditorialArticlePreview } from "./EditorialArticlePreview";
 import {
+  buildScheduledPublishAt,
+  classifyPlannedDate,
+  formatPedScheduleMessage,
+  formatScheduledPublishLabel,
   getPublishStatusLabel,
   getPublishingSeoWarnings,
+  getScheduleDateFromPublishing,
   inputToTags,
   META_DESCRIPTION_MAX,
+  resolveEditorialTimezone,
   SEO_TITLE_MAX,
   tagsToInput,
 } from "./editorial-publishing-utils";
-
 interface EditorialPublishingTabProps {
   item: ContentSeoEditorialItem;
   status: ContentSeoEditorialStatus;
@@ -27,11 +32,14 @@ interface EditorialPublishingTabProps {
   publishBlockedByStale?: boolean;
   publishBlockedBySeo?: boolean;
   publishError?: string | null;
+  plannedDate: string;
+  timezone?: string | null;
   publishing: EditorialPublishingPayload;
   onChange: (value: EditorialPublishingPayload) => void;
   onSyncFromArticle: () => void;
   onDismissStale: () => void;
   onDisconnectShopify: () => void;
+  onRestorePedDate: () => void;
   syncLoading?: boolean;
   disconnectLoading?: boolean;
   blogs: ShopifyBlogListItem[];
@@ -50,11 +58,14 @@ export function EditorialPublishingTab({
   publishBlockedByStale = false,
   publishBlockedBySeo = false,
   publishError = null,
+  plannedDate,
+  timezone = null,
   publishing,
   onChange,
   onSyncFromArticle,
   onDismissStale,
   onDisconnectShopify,
+  onRestorePedDate,
   syncLoading = false,
   disconnectLoading = false,
   blogs,
@@ -76,9 +87,41 @@ export function EditorialPublishingTab({
   const seoTitleMissing = !publishing.seoTitle.trim();
   const metaDescriptionMissing = !publishing.metaDescription.trim();
   const seoWarnings = getPublishingSeoWarnings(publishing);
+  const editorialTimezone = resolveEditorialTimezone(timezone);
+  const plannedClassification = classifyPlannedDate(plannedDate, editorialTimezone);
+  const scheduleDate = getScheduleDateFromPublishing(publishing, plannedDate);
+  const scheduleTime = publishing.scheduledPublishTime ?? "09:00";
+  const pedScheduleMessage = formatPedScheduleMessage(plannedDate, scheduleTime, editorialTimezone);
 
   function patch(partial: Partial<EditorialPublishingPayload>) {
     onChange({ ...publishing, ...partial });
+  }
+
+  function patchSchedule(partial: Partial<EditorialPublishingPayload>) {
+    onChange({ ...publishing, ...partial, scheduledPublishSource: "manual" });
+  }
+
+  function handleScheduleDateChange(value: string) {
+    if (!value) return;
+    const scheduledAt = buildScheduledPublishAt(value, scheduleTime, editorialTimezone);
+    patchSchedule({
+      scheduledPublishAt: scheduledAt,
+      publishDate: scheduledAt,
+      sourcePlannedDate: value,
+      mode: "schedule",
+      isPublished: true,
+    });
+  }
+
+  function handleScheduleTimeChange(value: string) {
+    const scheduledAt = buildScheduledPublishAt(scheduleDate, value, editorialTimezone);
+    patchSchedule({
+      scheduledPublishTime: value,
+      scheduledPublishAt: scheduledAt,
+      publishDate: scheduledAt,
+      mode: "schedule",
+      isPublished: true,
+    });
   }
 
   function handleBlogChange(blogId: string) {
@@ -90,8 +133,26 @@ export function EditorialPublishingTab({
   }
 
   function handleModeChange(mode: EditorialPublishMode) {
-    if (mode === "schedule") return;
-    patch({ mode });
+    if (mode === "schedule" && plannedClassification === "past") {
+      return;
+    }
+    const updates: Partial<EditorialPublishingPayload> = {
+      mode,
+      scheduledPublishSource: "manual",
+    };
+    if (mode === "schedule") {
+      const scheduledAt = buildScheduledPublishAt(scheduleDate, scheduleTime, editorialTimezone);
+      updates.scheduledPublishAt = scheduledAt;
+      updates.publishDate = scheduledAt;
+      updates.isPublished = true;
+      updates.scheduledPublishTimezone = editorialTimezone;
+    } else if (mode === "draft") {
+      updates.isPublished = false;
+      updates.publishDate = null;
+    } else {
+      updates.isPublished = true;
+    }
+    onChange({ ...publishing, ...updates });
   }
 
   if (!hasArticle) {
@@ -132,6 +193,24 @@ export function EditorialPublishingTab({
           <div className="gcr-alert gcr-alert--error">{item.lastPublishError}</div>
         )
       )}
+
+      <div
+        className={[
+          "gcr-alert",
+          plannedClassification === "past" ? "gcr-alert--warning" : "gcr-alert--success",
+        ].join(" ")}
+      >
+        <p>{pedScheduleMessage}</p>
+        {publishing.scheduledPublishSource === "manual" && (
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--ghost gcr-btn--sm"
+            onClick={onRestorePedDate}
+          >
+            Ripristina data PED
+          </button>
+        )}
+      </div>
 
       {publishing.shopifySeoSynced === true && (
         <div className="gcr-alert gcr-alert--success">SEO Shopify sincronizzata</div>
@@ -182,6 +261,11 @@ export function EditorialPublishingTab({
         )}
         {hasShopifyLink && item.publishStatus === "published" && (
           <p className="editorial-publishing-tab__shopify-linked">Articolo Shopify già collegato</p>
+        )}
+        {item.publishStatus === "scheduled" && (
+          <p className="editorial-publishing-tab__shopify-linked">
+            {formatScheduledPublishLabel(item.scheduledPublishAt, editorialTimezone)}
+          </p>
         )}
         {item.shopifyArticleAdminUrl && (
           <p>
@@ -404,6 +488,31 @@ export function EditorialPublishingTab({
       </section>
 
       <section className="editorial-publishing-tab__section">
+        <h4>Programmazione Shopify</h4>
+        <label className="gcr-field">
+          <span className="gcr-field__label">Data pubblicazione</span>
+          <input
+            className="gcr-input"
+            type="date"
+            value={scheduleDate}
+            onChange={(e) => handleScheduleDateChange(e.target.value)}
+          />
+        </label>
+        <label className="gcr-field">
+          <span className="gcr-field__label">Ora pubblicazione</span>
+          <input
+            className="gcr-input"
+            type="time"
+            value={scheduleTime}
+            onChange={(e) => handleScheduleTimeChange(e.target.value)}
+          />
+        </label>
+        <p className="editorial-publishing-tab__field-hint">
+          Fuso orario: {editorialTimezone}
+        </p>
+      </section>
+
+      <section className="editorial-publishing-tab__section">
         <h4>Visibilità</h4>
         <div className="editorial-publishing-tab__modes">
           <label className="editorial-publishing-tab__mode">
@@ -413,7 +522,17 @@ export function EditorialPublishingTab({
               checked={publishing.mode === "draft"}
               onChange={() => handleModeChange("draft")}
             />
-            Crea bozza Shopify (default)
+            Crea bozza Shopify
+          </label>
+          <label className="editorial-publishing-tab__mode">
+            <input
+              type="radio"
+              name={`publish-mode-${item.id}`}
+              checked={publishing.mode === "schedule"}
+              onChange={() => handleModeChange("schedule")}
+              disabled={plannedClassification === "past" || publishActionsDisabled || publishBlockedByStale || publishBlockedBySeo}
+            />
+            Programma su Shopify
           </label>
           <label className="editorial-publishing-tab__mode">
             <input
@@ -424,10 +543,6 @@ export function EditorialPublishingTab({
               disabled={publishActionsDisabled || publishBlockedByStale || publishBlockedBySeo}
             />
             Pubblica subito
-          </label>
-          <label className="editorial-publishing-tab__mode editorial-publishing-tab__mode--disabled">
-            <input type="radio" name={`publish-mode-${item.id}`} disabled />
-            Programma pubblicazione — Disponibile nel prossimo step
           </label>
         </div>
       </section>

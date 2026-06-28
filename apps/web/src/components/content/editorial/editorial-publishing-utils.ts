@@ -5,6 +5,10 @@ import type {
 } from "@gcr/shared";
 
 export const DEFAULT_AUTHOR_FALLBACK = "Redazione Solmielato";
+export const DEFAULT_EDITORIAL_PUBLISH_TIME = "09:00";
+export const DEFAULT_EDITORIAL_TIMEZONE = "Europe/Rome";
+export const PED_PAST_DATE_WARNING =
+  "La data PED è passata. Crea bozza o scegli una nuova data.";
 export const SEO_TITLE_MAX = 60;
 export const META_DESCRIPTION_MAX = 160;
 export const SEO_REQUIRED_MESSAGE =
@@ -34,6 +38,11 @@ export function emptyEditorialPublishingPayload(): EditorialPublishingPayload {
     shopifySeoSynced: null,
     shopifySeoSyncedAt: null,
     shopifySeoError: null,
+    scheduledPublishAt: null,
+    scheduledPublishTimezone: null,
+    scheduledPublishSource: null,
+    sourcePlannedDate: null,
+    scheduledPublishTime: DEFAULT_EDITORIAL_PUBLISH_TIME,
   };
 }
 
@@ -110,7 +119,219 @@ export function parseEditorialPublishingPayload(
         : Boolean(raw.shopifySeoSynced),
     shopifySeoSyncedAt: raw.shopifySeoSyncedAt ? String(raw.shopifySeoSyncedAt) : null,
     shopifySeoError: raw.shopifySeoError ? String(raw.shopifySeoError) : null,
+    scheduledPublishAt: raw.scheduledPublishAt ? String(raw.scheduledPublishAt) : null,
+    scheduledPublishTimezone: raw.scheduledPublishTimezone
+      ? String(raw.scheduledPublishTimezone)
+      : null,
+    scheduledPublishSource:
+      raw.scheduledPublishSource === "manual" || raw.scheduledPublishSource === "ped_planned_date"
+        ? raw.scheduledPublishSource
+        : null,
+    sourcePlannedDate: raw.sourcePlannedDate ? String(raw.sourcePlannedDate) : null,
+    scheduledPublishTime: raw.scheduledPublishTime
+      ? String(raw.scheduledPublishTime)
+      : DEFAULT_EDITORIAL_PUBLISH_TIME,
   };
+}
+
+export type PlannedDateClass = "future" | "today" | "past";
+
+export function resolveEditorialTimezone(timezone?: string | null): string {
+  const tz = timezone?.trim();
+  return tz || DEFAULT_EDITORIAL_TIMEZONE;
+}
+
+function dateKeyInTimezone(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+export function classifyPlannedDate(
+  plannedDate: string,
+  timezone: string,
+): PlannedDateClass {
+  const todayKey = dateKeyInTimezone(new Date(), timezone);
+  const plannedKey = plannedDate.slice(0, 10);
+  if (plannedKey > todayKey) return "future";
+  if (plannedKey === todayKey) return "today";
+  return "past";
+}
+
+function getTimezoneOffsetMinutes(timezone: string, at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    timeZoneName: "shortOffset",
+  }).formatToParts(at);
+  const tzName = parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT";
+  const match = tzName.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+  if (!match) return 0;
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3] ?? "0");
+  return sign * (hours * 60 + minutes);
+}
+
+export function buildScheduledPublishAt(
+  plannedDate: string,
+  publishTime: string,
+  timezone: string,
+): string {
+  const dateKey = plannedDate.slice(0, 10);
+  const time = publishTime.trim() || DEFAULT_EDITORIAL_PUBLISH_TIME;
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const probe = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const offsetMinutes = getTimezoneOffsetMinutes(timezone, probe);
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMinutes);
+  const offsetStr = `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00${offsetStr}`;
+}
+
+export function applyPedScheduleDefaults(
+  publishing: EditorialPublishingPayload,
+  options: {
+    plannedDate: string;
+    timezone?: string | null;
+    publishTime?: string | null;
+    force?: boolean;
+  },
+): EditorialPublishingPayload {
+  const timezone = resolveEditorialTimezone(options.timezone ?? publishing.scheduledPublishTimezone);
+  const publishTime = options.publishTime?.trim() || publishing.scheduledPublishTime || DEFAULT_EDITORIAL_PUBLISH_TIME;
+  if (!options.force && publishing.scheduledPublishSource === "manual") {
+    return publishing;
+  }
+  const classification = classifyPlannedDate(options.plannedDate, timezone);
+  if (classification === "future") {
+    const scheduledAt = buildScheduledPublishAt(options.plannedDate, publishTime, timezone);
+    return {
+      ...publishing,
+      mode: "schedule",
+      scheduledPublishAt: scheduledAt,
+      scheduledPublishTimezone: timezone,
+      scheduledPublishSource: "ped_planned_date",
+      sourcePlannedDate: options.plannedDate.slice(0, 10),
+      scheduledPublishTime: publishTime,
+      publishDate: scheduledAt,
+      isPublished: true,
+    };
+  }
+  return {
+    ...publishing,
+    mode: "draft",
+    scheduledPublishAt: null,
+    scheduledPublishTimezone: timezone,
+    scheduledPublishSource: "ped_planned_date",
+    sourcePlannedDate: options.plannedDate.slice(0, 10),
+    scheduledPublishTime: publishTime,
+    publishDate: null,
+    isPublished: false,
+  };
+}
+
+export function getScheduleDateFromPublishing(
+  publishing: EditorialPublishingPayload,
+  plannedDate: string,
+): string {
+  if (publishing.scheduledPublishAt) {
+    return publishing.scheduledPublishAt.slice(0, 10);
+  }
+  return publishing.sourcePlannedDate?.slice(0, 10) || plannedDate.slice(0, 10);
+}
+
+export function formatPlannedDateItalian(plannedDate: string): string {
+  const [year, month, day] = plannedDate.slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+export function formatPedScheduleMessage(
+  plannedDate: string,
+  publishTime: string,
+  timezone: string,
+): string {
+  const classification = classifyPlannedDate(plannedDate, timezone);
+  const plannedLabel = formatPlannedDateItalian(plannedDate);
+  if (classification === "future") {
+    return `Questo articolo è previsto nel PED per il ${plannedLabel}. Verrà programmato su Shopify per il ${plannedLabel} alle ${publishTime}.`;
+  }
+  if (classification === "today") {
+    return `Questo articolo è previsto nel PED per oggi (${plannedLabel}). Di default verrà creata una bozza Shopify.`;
+  }
+  return PED_PAST_DATE_WARNING;
+}
+
+export interface PrimaryPublishAction {
+  mode: EditorialPublishMode;
+  label: string;
+  confirmMessage?: string;
+}
+
+export function getPrimaryPublishAction(options: {
+  plannedDate: string;
+  timezone: string;
+  publishingStale: boolean;
+  hasShopifyLink: boolean;
+  isPublishedOnShopify: boolean;
+}): PrimaryPublishAction {
+  const classification = classifyPlannedDate(options.plannedDate, options.timezone);
+  if (options.publishingStale && classification === "future") {
+    return { mode: "schedule", label: "Aggiorna dati e programma su Shopify" };
+  }
+  if (classification === "future") {
+    return {
+      mode: "schedule",
+      label: options.hasShopifyLink
+        ? "Aggiorna programmazione Shopify"
+        : "Programma su Shopify",
+    };
+  }
+  if (classification === "today") {
+    return {
+      mode: "publish_now",
+      label: options.isPublishedOnShopify
+        ? "Aggiorna articolo pubblicato"
+        : options.hasShopifyLink
+          ? "Pubblica bozza Shopify"
+          : "Pubblica subito",
+      confirmMessage: options.isPublishedOnShopify
+        ? "Aggiornare l'articolo già pubblicato su Shopify con i dati attuali?"
+        : options.hasShopifyLink
+          ? "Pubblicare la bozza Shopify collegata? Sarà visibile nel blog selezionato."
+          : "Pubblicare subito questo articolo su Shopify? Sarà visibile nel blog selezionato.",
+    };
+  }
+  return {
+    mode: "draft",
+    label: options.hasShopifyLink ? "Aggiorna bozza Shopify" : "Crea bozza Shopify",
+  };
+}
+
+export function formatScheduledPublishLabel(
+  scheduledAt: string | null | undefined,
+  timezone?: string | null,
+): string {
+  if (!scheduledAt) return "Programmato Shopify";
+  const date = new Date(scheduledAt);
+  if (Number.isNaN(date.getTime())) return "Programmato Shopify";
+  const formatted = new Intl.DateTimeFormat("it-IT", {
+    timeZone: resolveEditorialTimezone(timezone),
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+  return `Programmato ${formatted}`;
 }
 
 export function buildArticleHashCanonical(article: EditorialArticlePayload): string {
@@ -161,6 +382,8 @@ export function buildPublishingPayloadFromArticle(
     shopName?: string | null;
     brandName?: string | null;
     savedAuthor?: string | null;
+    plannedDate?: string;
+    timezone?: string | null;
   },
 ): EditorialPublishingPayload {
   const author = resolveDefaultAuthor({
@@ -169,7 +392,7 @@ export function buildPublishingPayloadFromArticle(
     shopName: options?.shopName,
     brandName: options?.brandName,
   });
-  return {
+  const base: EditorialPublishingPayload = {
     title: article.title.trim(),
     handle: article.handle.trim(),
     bodyHtml: article.bodyHtml.trim(),
@@ -187,6 +410,13 @@ export function buildPublishingPayloadFromArticle(
     publishDate: null,
     templateSuffix: null,
   };
+  if (options?.plannedDate) {
+    return applyPedScheduleDefaults(base, {
+      plannedDate: options.plannedDate,
+      timezone: options.timezone,
+    });
+  }
+  return base;
 }
 
 export function getPublishingSeoWarnings(payload: EditorialPublishingPayload): string[] {
@@ -231,6 +461,9 @@ export function validatePublishingPayload(
     if (!payload.handle.trim()) {
       errors.push("Handle obbligatorio per pubblicare su Shopify.");
     }
+    if (payload.mode === "schedule" && !payload.scheduledPublishAt) {
+      errors.push("Data di pubblicazione programmata obbligatoria.");
+    }
   }
   return errors;
 }
@@ -265,7 +498,7 @@ export function getPublishStatusLabel(status?: string | null): string {
     case "publish_error":
       return "Errore";
     case "scheduled":
-      return "Programmato";
+      return "Programmato Shopify";
     default:
       return "Non pubblicato";
   }

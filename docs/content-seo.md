@@ -142,7 +142,21 @@ Workflow: **articolo pronto → tab Pubblicazione → modifica form precompilato
 4. **Crea bozza Shopify** — `POST editorial-items/{id}/publish-shopify` con `{ "mode": "draft" }` → GraphQL `articleCreate` con `isPublished: false`
 5. **Pubblica subito** — stesso endpoint con `{ "mode": "publish_now" }` + conferma UI; `isPublished: true`
 
-**Modalità v1:**
+**Modalità pubblicazione (0.5.26-alpha):**
+
+| Mode | UI | Backend GraphQL |
+|------|-----|-----------------|
+| `draft` | Default per PED oggi/passato | `isPublished: false`, nessun `publishDate` |
+| `schedule` | Default per PED futuro | `isPublished: true`, `publishDate` ISO 8601 futuro |
+| `publish_now` | Solo con conferma (PED oggi) | `isPublished: true`, `publishDate` = now |
+
+**Programmazione automatica da data PED:** se `plannedDate` è futura, il `publishing_payload` viene precompilato con `mode: schedule` e `scheduledPublishAt = plannedDate + 09:00` nel fuso dello store Shopify (`shopify_stores.timezone`, fallback `Europe/Rome`). L'utente può modificare data/ora (source `manual`) o ripristinare la data PED.
+
+**Guardrail:** non è possibile programmare nel passato; PED passata → bozza di default con warning.
+
+**Stati `publish_status`:** `draft_created`, `scheduled`, `published`, `publish_error`.
+
+**Modalità v1 (storico pre-0.5.26):**
 
 | Mode | UI | Backend |
 |------|-----|---------|
@@ -175,7 +189,12 @@ Workflow: **articolo pronto → tab Pubblicazione → modifica form precompilato
   "mode": "draft",
   "isPublished": false,
   "publishDate": null,
-  "templateSuffix": null
+  "templateSuffix": null,
+  "scheduledPublishAt": null,
+  "scheduledPublishTimezone": "Europe/Rome",
+  "scheduledPublishSource": "ped_planned_date",
+  "sourcePlannedDate": "2026-07-05",
+  "scheduledPublishTime": "09:00"
 }
 ```
 

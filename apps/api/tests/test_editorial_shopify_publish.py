@@ -934,3 +934,92 @@ def test_publish_find_by_handle_seo_graphql_error_returns_structured_422() -> No
                         mock_client.create_article.assert_not_awaited()
 
     asyncio.run(run())
+
+
+def test_publish_schedule_success_sets_scheduled_status() -> None:
+    project_id = uuid4()
+    item_id = uuid4()
+    blog_id = uuid4()
+    _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    publishing_payload = {
+        **publishing_payload,
+        "mode": "schedule",
+        "scheduledPublishSource": "ped_planned_date",
+        "scheduledPublishTimezone": "Europe/Rome",
+        "scheduledPublishTime": "09:00",
+        "sourcePlannedDate": "2026-07-05",
+        "scheduledPublishAt": "2026-07-05T09:00:00+02:00",
+        "isPublished": True,
+        "publishDate": "2026-07-05T09:00:00+02:00",
+    }
+    row = _sample_row(publishing_payload=publishing_payload)
+    row.planned_date = date(2026, 7, 5)
+    store = SimpleNamespace(
+        id=uuid4(),
+        shop_domain="shop.myshopify.com",
+        shop_name="Solmielato",
+        timezone="Europe/Rome",
+        connection_status="connected",
+    )
+    blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
+
+    async def run() -> None:
+        mock_session = AsyncMock()
+
+        async def fake_execute(stmt):  # noqa: ANN001
+            class Result:
+                def scalar_one_or_none(self_inner):  # noqa: ANN001
+                    return blog_row
+
+            return Result()
+
+        mock_session.execute = fake_execute
+
+        with patch(
+            "app.services.content.editorial_shopify_publish_service.get_editorial_item",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            with patch(
+                "app.services.content.editorial_shopify_publish_service.get_shopify_store_for_project",
+                new_callable=AsyncMock,
+                return_value=store,
+            ):
+                with patch(
+                    "app.services.content.editorial_shopify_publish_service.can_publish_with_write_content",
+                    new_callable=AsyncMock,
+                    return_value={"allowed": True},
+                ):
+                    mock_client = AsyncMock()
+                    mock_client.find_article_by_handle = AsyncMock(return_value=None)
+                    mock_client.create_article = AsyncMock(
+                        return_value={
+                            "article": _article_node_with_seo_metafields(),
+                            "userErrors": [],
+                        }
+                    )
+                    _configure_mock_client_seo(mock_client)
+                    with patch(
+                        "app.services.content.editorial_shopify_publish_service.get_shopify_client_for_store",
+                        new_callable=AsyncMock,
+                        return_value=mock_client,
+                    ):
+                        with patch(
+                            "app.services.content.editorial_shopify_publish_service.get_editorial_item_read",
+                            new_callable=AsyncMock,
+                            return_value=ContentSeoEditorialItemRead.model_validate(row),
+                        ):
+                            await publish_editorial_to_shopify(
+                                mock_session,
+                                project_id,
+                                item_id,
+                                EditorialPublishShopifyRequest(mode="schedule"),
+                            )
+                        create_input = mock_client.create_article.await_args.args[0]
+                        assert create_input["isPublished"] is True
+                        assert create_input["publishDate"] == "2026-07-05T09:00:00+02:00"
+                        assert "metafields" in create_input
+                        assert row.publish_status == "scheduled"
+                        assert row.last_publish_error is None
+
+    asyncio.run(run())

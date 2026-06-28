@@ -737,6 +737,8 @@ EditorialPublishStatus = Literal[
     "scheduled",
 ]
 
+EditorialScheduledPublishSource = Literal["ped_planned_date", "manual"]
+
 
 class EditorialPublishingPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -771,6 +773,21 @@ class EditorialPublishingPayload(BaseModel):
         default=None, serialization_alias="shopifySeoSyncedAt"
     )
     shopify_seo_error: str | None = Field(default=None, serialization_alias="shopifySeoError")
+    scheduled_publish_at: str | None = Field(
+        default=None, serialization_alias="scheduledPublishAt"
+    )
+    scheduled_publish_timezone: str | None = Field(
+        default=None, serialization_alias="scheduledPublishTimezone"
+    )
+    scheduled_publish_source: EditorialScheduledPublishSource | None = Field(
+        default=None, serialization_alias="scheduledPublishSource"
+    )
+    source_planned_date: str | None = Field(
+        default=None, serialization_alias="sourcePlannedDate"
+    )
+    scheduled_publish_time: str | None = Field(
+        default=None, serialization_alias="scheduledPublishTime"
+    )
 
 
 class EditorialPublishingUpdateRequest(BaseModel):

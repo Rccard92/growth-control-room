@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { EditorialArticlePayload, EditorialPublishingPayload } from "@gcr/shared";
 import {
   buildArticleHashCanonical,
+  formatPedScheduleMessage,
   formatPublishingError,
+  formatScheduledPublishLabel,
+  getPrimaryPublishAction,
   getPublishingSeoWarnings,
   isPublishingStale,
   parseStructuredPublishErrorDetail,
@@ -113,5 +116,27 @@ describe("editorial-publishing-utils sync", () => {
       new Error("Field `seo` doesn't exist on type `Article`"),
     );
     expect(message).toContain("campo GraphQL non supportato");
+  });
+
+  it("data futura mostra azione Programma su Shopify", () => {
+    const action = getPrimaryPublishAction({
+      plannedDate: "2099-07-05",
+      timezone: "Europe/Rome",
+      publishingStale: false,
+      hasShopifyLink: false,
+      isPublishedOnShopify: false,
+    });
+    expect(action.mode).toBe("schedule");
+    expect(action.label).toContain("Programma su Shopify");
+  });
+
+  it("data passata mostra warning nel messaggio PED", () => {
+    const message = formatPedScheduleMessage("2020-01-01", "09:00", "Europe/Rome");
+    expect(message).toContain("passata");
+  });
+
+  it("formatta badge programmato", () => {
+    const label = formatScheduledPublishLabel("2026-07-05T09:00:00+02:00", "Europe/Rome");
+    expect(label).toContain("Programmato");
   });
 });

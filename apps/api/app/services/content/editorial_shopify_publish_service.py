@@ -40,6 +40,14 @@ from app.services.content.editorial_publishing_utils import (
     shopify_publish_http_status,
     validate_publishing_payload,
 )
+from app.services.content.editorial_schedule_utils import (
+    PED_PAST_DATE_WARNING,
+    apply_ped_schedule_defaults,
+    classify_planned_date,
+    resolve_editorial_timezone,
+    resolve_scheduled_publish_at_from_payload,
+    resolve_zoneinfo,
+)
 from app.services.shopify.client import (
     ShopifyAPIError,
     article_seo_metafields_match,
@@ -186,7 +194,14 @@ def _raise_publish_validation_error(
     last_attempt_at: str | None = None,
 ) -> None:
     message = "; ".join(errors)
-    code = "seo_missing" if any(SEO_REQUIRED_MESSAGE in err for err in errors) else "validation_error"
+    if any(SEO_REQUIRED_MESSAGE in err for err in errors):
+        code = "seo_missing"
+    elif any("programmata obbligatoria" in err.lower() for err in errors):
+        code = "schedule_missing"
+    elif any("deve essere futura" in err.lower() for err in errors):
+        code = "schedule_in_past"
+    else:
+        code = "validation_error"
     raise HTTPException(
         status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail=build_publish_shopify_error_detail(
@@ -301,6 +316,21 @@ def _apply_publish_result_to_row(
         row.status = "published"
         row.published_at = datetime.now(UTC)
         publishing = publishing.model_copy(update={"is_published": True, "mode": "publish_now"})
+    elif mode == "schedule":
+        scheduled_at = resolve_scheduled_publish_at_from_payload(publishing)
+        row.publish_status = "scheduled"
+        row.shopify_status = "scheduled"
+        if scheduled_at is not None:
+            row.scheduled_publish_at = scheduled_at.astimezone(UTC)
+        publish_date = scheduled_at.isoformat() if scheduled_at else publishing.publish_date
+        publishing = publishing.model_copy(
+            update={
+                "is_published": True,
+                "mode": "schedule",
+                "publish_date": publish_date,
+                "scheduled_publish_at": publish_date,
+            }
+        )
     else:
         if row.publish_status != "published":
             row.publish_status = "draft_created"
@@ -349,12 +379,6 @@ async def publish_editorial_to_shopify(
             "Verrà comunque inviato a Shopify."
         )
 
-    if request.mode == "schedule":
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="La pubblicazione programmata non è ancora disponibile.",
-        )
-
     store = await get_shopify_store_for_project(project_id, session)
     if store is None or store.connection_status != "connected":
         raise HTTPException(
@@ -372,6 +396,7 @@ async def publish_editorial_to_shopify(
     brand_name = await _project_brand_name(session, project_id)
     article_author = _article_author_name(row.article_payload)
     had_saved_payload = row.publishing_payload is not None
+    timezone_name = resolve_editorial_timezone(store)
 
     if had_saved_payload:
         publishing = normalize_publishing_payload(row.publishing_payload)
@@ -380,11 +405,30 @@ async def publish_editorial_to_shopify(
             row.article_payload,
             shop_name=store.shop_name,
             brand_name=brand_name,
+            planned_date=row.planned_date,
+            timezone_name=timezone_name,
         )
         warnings.append(
             "Payload di pubblicazione generato dall'articolo. "
             "Salva la tab Pubblicazione per conservarlo."
         )
+
+    if publishing.scheduled_publish_source != "manual":
+        publishing = apply_ped_schedule_defaults(
+            publishing,
+            planned_date=row.planned_date,
+            timezone_name=timezone_name,
+        )
+
+    publishing = publishing.model_copy(update={"mode": request.mode})
+
+    if request.mode == "schedule":
+        planned_class = classify_planned_date(
+            row.planned_date,
+            resolve_zoneinfo(timezone_name),
+        )
+        if planned_class == "past":
+            warnings.append(PED_PAST_DATE_WARNING)
 
     if not publishing.author.strip() and not had_saved_payload:
         resolved_author = resolve_publishing_author(
@@ -395,10 +439,16 @@ async def publish_editorial_to_shopify(
         )
         publishing = publishing.model_copy(update={"author": resolved_author})
 
+    resolved_schedule = None
+    if request.mode == "schedule":
+        resolved_schedule = (
+            resolve_scheduled_publish_at_from_payload(publishing) or row.scheduled_publish_at
+        )
+
     errors = validate_publishing_payload(
         publishing,
         for_publish=True,
-        scheduled_publish_at=row.scheduled_publish_at,
+        scheduled_publish_at=resolved_schedule,
     )
     if errors:
         _raise_publish_validation_error(errors)

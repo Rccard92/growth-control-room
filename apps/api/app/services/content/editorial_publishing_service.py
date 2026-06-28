@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -22,7 +23,23 @@ from app.services.content.editorial_publishing_utils import (
     resolve_publishing_author,
     validate_publishing_payload,
 )
+from app.services.content.editorial_schedule_utils import (
+    resolve_editorial_timezone,
+    resolve_scheduled_publish_at_from_payload,
+)
 from app.services.shopify.connect import get_shopify_store_for_project
+
+
+def _sync_row_schedule_fields(
+    row: ContentSeoEditorialItem,
+    publishing,
+) -> None:
+    row.publish_mode = publishing.mode
+    scheduled_at = resolve_scheduled_publish_at_from_payload(publishing)
+    if scheduled_at is not None:
+        row.scheduled_publish_at = scheduled_at.astimezone(UTC)
+    elif publishing.mode != "schedule":
+        row.scheduled_publish_at = None
 
 
 async def update_editorial_publishing(
@@ -40,13 +57,23 @@ async def update_editorial_publishing(
             detail="; ".join(errors),
         )
 
-    row.publishing_payload = normalized.model_dump(by_alias=True, mode="json")
     if payload.publish_mode is not None:
-        row.publish_mode = payload.publish_mode
-        normalized_mode = payload.publish_mode
-        row.publishing_payload["mode"] = normalized_mode
+        normalized = normalized.model_copy(update={"mode": payload.publish_mode})
+
     if payload.scheduled_publish_at is not None:
-        row.scheduled_publish_at = payload.scheduled_publish_at
+        scheduled_at = payload.scheduled_publish_at
+        if scheduled_at.tzinfo is None:
+            scheduled_at = scheduled_at.replace(tzinfo=UTC)
+        normalized = normalized.model_copy(
+            update={
+                "scheduled_publish_at": scheduled_at.isoformat(),
+                "publish_date": scheduled_at.isoformat(),
+                "scheduled_publish_source": "manual",
+            }
+        )
+
+    row.publishing_payload = normalized.model_dump(by_alias=True, mode="json")
+    _sync_row_schedule_fields(row, normalized)
 
     await session.flush()
     await session.refresh(row)
@@ -70,6 +97,7 @@ async def sync_publishing_from_article(
     store = await get_shopify_store_for_project(project_id, session)
     brand_name = await _brand_name(session, project_id)
     shop_name = store.shop_name if store else None
+    timezone_name = resolve_editorial_timezone(store)
 
     if row.publishing_payload:
         base = normalize_publishing_payload(row.publishing_payload)
@@ -78,6 +106,8 @@ async def sync_publishing_from_article(
             article,
             shop_name=shop_name,
             brand_name=brand_name,
+            planned_date=row.planned_date,
+            timezone_name=timezone_name,
         )
 
     merged = merge_article_into_publishing(
@@ -97,6 +127,7 @@ async def sync_publishing_from_article(
     merged = attach_publishing_sync_metadata(merged, article)
 
     row.publishing_payload = merged.model_dump(by_alias=True, mode="json")
+    _sync_row_schedule_fields(row, merged)
     await session.flush()
     await session.refresh(row)
     return row

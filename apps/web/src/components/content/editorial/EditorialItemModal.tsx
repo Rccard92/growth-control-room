@@ -7,6 +7,7 @@ import type {
   EditorialArticlePayload,
   EditorialBriefPayload,
   EditorialPublishingPayload,
+  EditorialPublishMode,
 } from "@gcr/shared";
 import {
   CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS,
@@ -27,11 +28,15 @@ import {
   parseEditorialArticlePayload,
 } from "./editorial-article-utils";
 import {
+  applyPedScheduleDefaults,
   buildPublishingPayloadFromArticle,
+  classifyPlannedDate,
   formatPublishingError,
+  getPrimaryPublishAction,
   isPublishingStale,
   isPublishingSeoComplete,
   parseEditorialPublishingPayload,
+  resolveEditorialTimezone,
   validatePublishingPayload,
   validatePublishingPayloadWithWarnings,
 } from "./editorial-publishing-utils";
@@ -125,7 +130,6 @@ export function EditorialItemModal({
   const [articleView, setArticleView] = useState<"editor" | "preview">("editor");
   const [articleBodyMode, setArticleBodyMode] = useState<"html" | "markdown">("html");
   const [publishing, setPublishing] = useState<EditorialPublishingPayload | null>(null);
-  const [savedPublishingSnapshot, setSavedPublishingSnapshot] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -165,10 +169,19 @@ export function EditorialItemModal({
         ? buildPublishingPayloadFromArticle(parsedArticle, {
             shopName: shopifyStatus?.shopName,
             brandName: brandProfile?.brandName,
+            plannedDate: source.plannedDate,
+            timezone: shopifyStatus?.timezone,
           })
         : null;
-    setPublishing(parsedPublishing);
-    setSavedPublishingSnapshot(JSON.stringify(parsedPublishing));
+    const timezone = resolveEditorialTimezone(shopifyStatus?.timezone);
+    const hydratedPublishing =
+      parsedPublishing && source.plannedDate
+        ? applyPedScheduleDefaults(parsedPublishing, {
+            plannedDate: source.plannedDate,
+            timezone,
+          })
+        : parsedPublishing;
+    setPublishing(hydratedPublishing);
     if (resetTab) {
       setArticleView("editor");
       setArticleBodyMode("html");
@@ -199,11 +212,6 @@ export function EditorialItemModal({
     if (!article) return false;
     return JSON.stringify(article) !== savedArticleSnapshot;
   }, [article, savedArticleSnapshot]);
-
-  const publishingDirty = useMemo(() => {
-    if (!publishing) return false;
-    return JSON.stringify(publishing) !== savedPublishingSnapshot;
-  }, [publishing, savedPublishingSnapshot]);
 
   const briefApproved = status === "brief_approved" || item?.status === "brief_approved";
 
@@ -249,7 +257,6 @@ export function EditorialItemModal({
         updated.publishingPayload as unknown as Record<string, unknown>,
       );
       setPublishing(parsedPublishing);
-      setSavedPublishingSnapshot(JSON.stringify(parsedPublishing));
     }
   }
 
@@ -442,6 +449,7 @@ export function EditorialItemModal({
         data: {
           publishingPayload: publishing,
           publishMode: publishing.mode,
+          scheduledPublishAt: publishing.scheduledPublishAt ?? undefined,
         },
       });
       syncItem(updated);
@@ -489,10 +497,20 @@ export function EditorialItemModal({
     }
   }
 
-  async function handlePublishShopify(mode: "draft" | "publish_now") {
+  function handleRestorePedDate() {
+    if (!item || !publishing) return;
+    const restored = applyPedScheduleDefaults(publishing, {
+      plannedDate: item.plannedDate,
+      timezone: resolveEditorialTimezone(shopifyStatus?.timezone),
+      force: true,
+    });
+    setPublishing(restored);
+  }
+
+  async function handlePublishShopify(mode: EditorialPublishMode) {
     if (!item || !publishing) return;
     const { errors, warnings: seoWarnings } = validatePublishingPayloadWithWarnings(
-      publishing,
+      { ...publishing, mode },
       { forPublish: true },
     );
     if (errors.length > 0) {
@@ -508,9 +526,9 @@ export function EditorialItemModal({
         : hasShopifyLink
           ? "Pubblicare la bozza Shopify collegata? Sarà visibile nel blog selezionato."
           : "Pubblicare subito questo articolo su Shopify? Sarà visibile nel blog selezionato.";
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
     }
 
     setError(null);
@@ -521,15 +539,15 @@ export function EditorialItemModal({
     }
     setSuccess(null);
     try {
-      if (publishingDirty) {
-        await updatePublishingMutation.mutateAsync({
-          itemId: item.id,
-          data: {
-            publishingPayload: publishing,
-            publishMode: mode,
-          },
-        });
-      }
+      const payloadToSave = { ...publishing, mode };
+      await updatePublishingMutation.mutateAsync({
+        itemId: item.id,
+        data: {
+          publishingPayload: payloadToSave,
+          publishMode: mode,
+          scheduledPublishAt: payloadToSave.scheduledPublishAt ?? undefined,
+        },
+      });
       const result = await publishShopifyMutation.mutateAsync({
         itemId: item.id,
         data: { mode },
@@ -538,16 +556,121 @@ export function EditorialItemModal({
       if (result.warnings.length > 0) {
         setWarning(result.warnings.join(" "));
       }
-      const successMessage = hasShopifyLink
-        ? mode === "publish_now"
-          ? isPublishedOnShopify
-            ? "Articolo pubblicato su Shopify aggiornato."
-            : "Bozza Shopify pubblicata."
-          : "Bozza Shopify aggiornata."
-        : mode === "publish_now"
-          ? "Articolo pubblicato su Shopify."
-          : "Bozza creata su Shopify.";
+      const successMessage =
+        mode === "schedule"
+          ? hasShopifyLink
+            ? "Programmazione Shopify aggiornata."
+            : "Articolo programmato su Shopify."
+          : hasShopifyLink
+            ? mode === "publish_now"
+              ? isPublishedOnShopify
+                ? "Articolo pubblicato su Shopify aggiornato."
+                : "Bozza Shopify pubblicata."
+              : "Bozza Shopify aggiornata."
+            : mode === "publish_now"
+              ? "Articolo pubblicato su Shopify."
+              : "Bozza creata su Shopify.";
       setSuccess(successMessage);
+    } catch (e) {
+      void queryClient.invalidateQueries({
+        queryKey: ["contentSeo", projectId, "editorialItems"],
+      });
+      setError(formatPublishingError("Errore invio articolo Shopify.", e));
+    }
+  }
+
+  async function handlePrimaryShopifyAction() {
+    if (!item) return;
+    const timezone = resolveEditorialTimezone(shopifyStatus?.timezone);
+    const primaryAction = getPrimaryPublishAction({
+      plannedDate: item.plannedDate,
+      timezone,
+      publishingStale,
+      hasShopifyLink: Boolean(item.shopifyArticleGid),
+      isPublishedOnShopify: item.publishStatus === "published",
+    });
+
+    if (primaryAction.confirmMessage && !window.confirm(primaryAction.confirmMessage)) {
+      return;
+    }
+
+    let currentPublishing = publishing;
+    if (!currentPublishing && article) {
+      currentPublishing = buildPublishingPayloadFromArticle(article, {
+        shopName: shopifyStatus?.shopName,
+        brandName: brandProfile?.brandName,
+        plannedDate: item.plannedDate,
+        timezone,
+      });
+    }
+    if (!currentPublishing) return;
+
+    setError(null);
+    setSuccess(null);
+    try {
+      if (publishingStale) {
+        const synced = await syncPublishingMutation.mutateAsync(item.id);
+        syncItem(synced);
+        currentPublishing = synced.publishingPayload
+          ? parseEditorialPublishingPayload(
+              synced.publishingPayload as unknown as Record<string, unknown>,
+            )
+          : currentPublishing;
+        setStaleDismissed(false);
+      }
+
+      if (currentPublishing.scheduledPublishSource !== "manual") {
+        currentPublishing = applyPedScheduleDefaults(currentPublishing, {
+          plannedDate: item.plannedDate,
+          timezone,
+        });
+      }
+      currentPublishing = { ...currentPublishing, mode: primaryAction.mode };
+
+      const { errors, warnings: seoWarnings } = validatePublishingPayloadWithWarnings(
+        currentPublishing,
+        { forPublish: true },
+      );
+      if (errors.length > 0) {
+        setError(errors.join(" "));
+        return;
+      }
+      if (seoWarnings.length > 0) {
+        setWarning(seoWarnings.join(" "));
+      }
+
+      const updated = await updatePublishingMutation.mutateAsync({
+        itemId: item.id,
+        data: {
+          publishingPayload: currentPublishing,
+          publishMode: primaryAction.mode,
+          scheduledPublishAt: currentPublishing.scheduledPublishAt ?? undefined,
+        },
+      });
+      syncItem(updated);
+      setPublishing(
+        updated.publishingPayload
+          ? parseEditorialPublishingPayload(
+              updated.publishingPayload as unknown as Record<string, unknown>,
+            )
+          : currentPublishing,
+      );
+
+      const result = await publishShopifyMutation.mutateAsync({
+        itemId: item.id,
+        data: { mode: primaryAction.mode },
+      });
+      syncItem(result.item);
+      if (result.warnings.length > 0) {
+        setWarning(result.warnings.join(" "));
+      }
+      setSuccess(
+        primaryAction.mode === "schedule"
+          ? "Articolo programmato su Shopify."
+          : primaryAction.mode === "publish_now"
+            ? "Articolo pubblicato su Shopify."
+            : "Bozza creata su Shopify.",
+      );
     } catch (e) {
       void queryClient.invalidateQueries({
         queryKey: ["contentSeo", projectId, "editorialItems"],
@@ -580,9 +703,31 @@ export function EditorialItemModal({
     !canWriteContent ||
     scopesLoading ||
     publishShopifyMutation.isPending ||
+    syncPublishingMutation.isPending ||
+    updatePublishingMutation.isPending ||
     !publishing?.author.trim() ||
     publishingStale ||
     publishSeoIncomplete;
+
+  const primaryPublishDisabled =
+    status !== "ready_to_publish" ||
+    !canWriteContent ||
+    scopesLoading ||
+    publishShopifyMutation.isPending ||
+    syncPublishingMutation.isPending ||
+    updatePublishingMutation.isPending ||
+    !publishing?.author.trim() ||
+    publishSeoIncomplete;
+
+  const editorialTimezone = resolveEditorialTimezone(shopifyStatus?.timezone);
+  const primaryPublishAction = getPrimaryPublishAction({
+    plannedDate: item.plannedDate,
+    timezone: editorialTimezone,
+    publishingStale,
+    hasShopifyLink,
+    isPublishedOnShopify,
+  });
+  const plannedClassification = classifyPlannedDate(item.plannedDate, editorialTimezone);
 
   const footer =
     activeTab === "detail" ? (
@@ -708,33 +853,25 @@ export function EditorialItemModal({
         >
           {updatePublishingMutation.isPending ? "Salvataggio…" : "Salva publishing"}
         </button>
-        {!isPublishedOnShopify && (
+        {plannedClassification === "today" && !isPublishedOnShopify && (
           <button
             type="button"
             className="gcr-btn gcr-btn--secondary"
             disabled={publishActionsDisabled || !publishing}
             onClick={() => void handlePublishShopify("draft")}
           >
-            {publishShopifyMutation.isPending
-              ? "Invio…"
-              : hasShopifyLink
-                ? "Aggiorna bozza Shopify"
-                : "Crea bozza Shopify"}
+            {publishShopifyMutation.isPending ? "Invio…" : "Crea bozza Shopify"}
           </button>
         )}
         <button
           type="button"
           className="gcr-btn gcr-btn--primary"
-          disabled={publishActionsDisabled || !publishing}
-          onClick={() => void handlePublishShopify("publish_now")}
+          disabled={primaryPublishDisabled || !publishing}
+          onClick={() => void handlePrimaryShopifyAction()}
         >
-          {publishShopifyMutation.isPending
+          {publishShopifyMutation.isPending || syncPublishingMutation.isPending
             ? "Invio…"
-            : isPublishedOnShopify
-              ? "Aggiorna articolo pubblicato"
-              : hasShopifyLink
-                ? "Pubblica bozza Shopify"
-                : "Pubblica subito"}
+            : primaryPublishAction.label}
         </button>
       </>
     );
@@ -1004,11 +1141,14 @@ export function EditorialItemModal({
               publishBlockedByStale={publishingStale}
               publishBlockedBySeo={publishSeoIncomplete}
               publishError={error}
+              plannedDate={item.plannedDate}
+              timezone={shopifyStatus?.timezone}
               publishing={publishing}
               onChange={setPublishing}
               onSyncFromArticle={() => void handleSyncPublishingFromArticle()}
               onDismissStale={() => setStaleDismissed(true)}
               onDisconnectShopify={() => void handleDisconnectShopify()}
+              onRestorePedDate={handleRestorePedDate}
               syncLoading={syncPublishingMutation.isPending}
               disconnectLoading={disconnectShopifyMutation.isPending}
               blogs={blogsData?.blogs ?? []}

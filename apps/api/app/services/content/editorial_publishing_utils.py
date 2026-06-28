@@ -5,13 +5,19 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from app.schemas.content_seo_editorial import (
     EditorialArticlePayload,
     EditorialPublishingPayload,
     EditorialPublishMode,
+)
+from app.services.content.editorial_schedule_utils import (
+    apply_ped_schedule_defaults,
+    is_scheduled_publish_in_future,
+    parse_scheduled_publish_at,
+    resolve_scheduled_publish_at_from_payload,
 )
 
 _GID_NUMERIC_RE = re.compile(r"/(\d+)$")
@@ -240,6 +246,11 @@ def normalize_publishing_payload(raw: dict[str, Any]) -> EditorialPublishingPayl
         ("syncedFromArticleAt", "synced_from_article_at"),
         ("shopifySeoSyncedAt", "shopify_seo_synced_at"),
         ("shopifySeoError", "shopify_seo_error"),
+        ("scheduledPublishAt", "scheduled_publish_at"),
+        ("scheduledPublishTimezone", "scheduled_publish_timezone"),
+        ("scheduledPublishSource", "scheduled_publish_source"),
+        ("sourcePlannedDate", "source_planned_date"),
+        ("scheduledPublishTime", "scheduled_publish_time"),
     ):
         if alias in data and field not in data:
             data[field] = data.pop(alias)
@@ -263,6 +274,8 @@ def build_publishing_payload_from_article(
     default_blog_gid: str | None = None,
     shop_name: str | None = None,
     brand_name: str | None = None,
+    planned_date: date | None = None,
+    timezone_name: str | None = None,
 ) -> EditorialPublishingPayload:
     if isinstance(article, dict):
         article = EditorialArticlePayload.model_validate(
@@ -300,7 +313,14 @@ def build_publishing_payload_from_article(
         shop_name=shop_name,
         brand_name=brand_name,
     )
-    return draft.model_copy(update={"author": author})
+    payload = draft.model_copy(update={"author": author})
+    if planned_date is not None:
+        payload = apply_ped_schedule_defaults(
+            payload,
+            planned_date=planned_date,
+            timezone_name=timezone_name,
+        )
+    return payload
 
 
 def merge_article_into_publishing(
@@ -434,15 +454,16 @@ def validate_publishing_payload(
     if for_publish and not normalized.author.strip():
         errors.append("Autore obbligatorio per creare l'articolo su Shopify.")
     if for_publish and normalized.mode == "schedule":
-        errors.append("La pubblicazione programmata non è ancora disponibile.")
-        if scheduled_publish_at is None:
+        resolved_schedule = scheduled_publish_at or resolve_scheduled_publish_at_from_payload(
+            normalized
+        )
+        if resolved_schedule is None:
             errors.append("Data di pubblicazione programmata obbligatoria.")
-        else:
-            checked = scheduled_publish_at
-            if checked.tzinfo is None:
-                checked = checked.replace(tzinfo=UTC)
-            if checked <= datetime.now(UTC):
-                errors.append("La data di pubblicazione programmata deve essere futura.")
+        elif not is_scheduled_publish_in_future(
+            resolved_schedule,
+            timezone_name=normalized.scheduled_publish_timezone,
+        ):
+            errors.append("La data di pubblicazione programmata deve essere futura.")
     seo_errors, _seo_warnings = validate_publishing_seo(normalized, for_publish=for_publish)
     errors.extend(seo_errors)
     return errors
@@ -482,14 +503,36 @@ def _attach_seo_metafields_to_input(
         article_input["metafields"] = metafields
 
 
+def _apply_publish_mode_to_article_input(
+    article_input: dict[str, Any],
+    payload: EditorialPublishingPayload,
+    *,
+    mode: EditorialPublishMode,
+) -> None:
+    from datetime import timezone
+
+    if mode == "publish_now":
+        article_input["isPublished"] = True
+        article_input["publishDate"] = datetime.now(timezone.utc).isoformat()
+        return
+
+    if mode == "schedule":
+        scheduled_at = resolve_scheduled_publish_at_from_payload(payload)
+        if scheduled_at is None:
+            raise ValueError("Data di pubblicazione programmata obbligatoria.")
+        article_input["isPublished"] = True
+        article_input["publishDate"] = scheduled_at.isoformat()
+        return
+
+    article_input["isPublished"] = False
+
+
 def build_article_create_input(
     payload: EditorialPublishingPayload,
     *,
     blog_gid: str,
     mode: EditorialPublishMode,
 ) -> dict[str, Any]:
-    from datetime import datetime, timezone
-
     author = payload.author.strip()
     if not author:
         raise ValueError("Autore obbligatorio per Shopify articleCreate.")
@@ -514,11 +557,7 @@ def build_article_create_input(
             image["altText"] = payload.image_alt.strip()
         article_input["image"] = image
 
-    if mode == "publish_now":
-        article_input["isPublished"] = True
-        article_input["publishDate"] = datetime.now(timezone.utc).isoformat()
-    else:
-        article_input["isPublished"] = False
+    _apply_publish_mode_to_article_input(article_input, payload, mode=mode)
 
     _attach_seo_metafields_to_input(article_input, payload)
     return article_input
@@ -529,8 +568,6 @@ def build_article_update_input(
     *,
     mode: EditorialPublishMode,
 ) -> dict[str, Any]:
-    from datetime import datetime, timezone
-
     author = payload.author.strip()
     if not author:
         raise ValueError("Autore obbligatorio per Shopify articleUpdate.")
@@ -554,11 +591,7 @@ def build_article_update_input(
             image["altText"] = payload.image_alt.strip()
         article_input["image"] = image
 
-    if mode == "publish_now":
-        article_input["isPublished"] = True
-        article_input["publishDate"] = datetime.now(timezone.utc).isoformat()
-    else:
-        article_input["isPublished"] = False
+    _apply_publish_mode_to_article_input(article_input, payload, mode=mode)
 
     _attach_seo_metafields_to_input(article_input, payload)
     return article_input

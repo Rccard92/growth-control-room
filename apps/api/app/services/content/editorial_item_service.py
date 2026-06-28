@@ -17,7 +17,39 @@ from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemUpdate,
     EditorialItemRescheduleRequest,
 )
-from app.services.content.editorial_publishing_utils import is_publishing_stale
+from app.services.content.editorial_publishing_utils import (
+    is_publishing_stale,
+    normalize_publishing_payload,
+)
+from app.services.content.editorial_schedule_utils import (
+    resolve_editorial_timezone,
+    resolve_scheduled_publish_at_from_payload,
+    sync_ped_schedule_on_planned_date_change,
+)
+from app.services.shopify.connect import get_shopify_store_for_project
+
+
+def _apply_planned_date_schedule_sync(
+    row: ContentSeoEditorialItem,
+    *,
+    timezone_name: str | None,
+) -> None:
+    updated_payload = sync_ped_schedule_on_planned_date_change(
+        row.publishing_payload,
+        planned_date=row.planned_date,
+        timezone_name=timezone_name,
+    )
+    if updated_payload is None:
+        return
+    row.publishing_payload = updated_payload
+    publishing = normalize_publishing_payload(updated_payload)
+    scheduled_at = resolve_scheduled_publish_at_from_payload(publishing)
+    if scheduled_at is not None:
+        from datetime import UTC
+
+        row.scheduled_publish_at = scheduled_at.astimezone(UTC)
+    elif publishing.mode != "schedule":
+        row.scheduled_publish_at = None
 
 
 def serialize_editorial_item_read(row: ContentSeoEditorialItem) -> ContentSeoEditorialItemRead:
@@ -135,12 +167,19 @@ async def update_editorial_item(
 ) -> ContentSeoEditorialItem:
     row = await get_editorial_item(session, project_id, item_id)
     data = payload.model_dump(exclude_unset=True)
+    planned_date_changed = "planned_date" in data
     for key, value in data.items():
         if key == "title" and isinstance(value, str):
             value = value.strip()
         if key == "primary_keyword" and isinstance(value, str):
             value = value.strip() or None
         setattr(row, key, value)
+    if planned_date_changed:
+        store = await get_shopify_store_for_project(project_id, session)
+        _apply_planned_date_schedule_sync(
+            row,
+            timezone_name=resolve_editorial_timezone(store),
+        )
     await session.commit()
     await session.refresh(row)
     return row
@@ -185,6 +224,8 @@ async def reschedule_editorial_item(
 
     row.planned_date = new_date
     updated: list[ContentSeoEditorialItem] = [row]
+    store = await get_shopify_store_for_project(project_id, session)
+    timezone_name = resolve_editorial_timezone(store)
 
     if payload.cascade and delta != 0:
         following = (
@@ -203,7 +244,10 @@ async def reschedule_editorial_item(
         ).scalars().all()
         for item in following:
             item.planned_date = item.planned_date + timedelta(days=delta)
+            _apply_planned_date_schedule_sync(item, timezone_name=timezone_name)
             updated.append(item)
+
+    _apply_planned_date_schedule_sync(row, timezone_name=timezone_name)
 
     await session.commit()
     for item in updated:

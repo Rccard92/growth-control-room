@@ -31,6 +31,7 @@ class ShopifyStatusResponse(BaseModel):
     shop_domain: str | None = Field(default=None, serialization_alias="shopDomain")
     shop_name: str | None = Field(default=None, serialization_alias="shopName")
     last_sync_at: datetime | None = Field(default=None, serialization_alias="lastSyncAt")
+    timezone: str | None = None
 
 
 class ShopifyScopesResponse(BaseModel):

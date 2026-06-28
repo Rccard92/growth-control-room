@@ -5,6 +5,7 @@ import {
 } from "@gcr/shared";
 import { EditorialStatusBadge } from "./EditorialStatusLegend";
 import { getEditorialDisplayTitle } from "./editorial-display-utils";
+import { formatScheduledPublishLabel } from "./editorial-publishing-utils";
 
 interface EditorialItemCardProps {
   item: ContentSeoEditorialItem;
@@ -23,6 +24,11 @@ export function EditorialItemCard({ item, onClick }: EditorialItemCardProps) {
         {CONTENT_SEO_EDITORIAL_CONTENT_TYPE_LABELS[item.contentType]}
       </span>
       <EditorialStatusBadge status={item.status} />
+      {item.publishStatus === "scheduled" && (
+        <span className="editorial-item-card__scheduled">
+          {formatScheduledPublishLabel(item.scheduledPublishAt)}
+        </span>
+      )}
       <span className="editorial-item-card__status-label">
         {CONTENT_SEO_EDITORIAL_STATUS_LABELS[item.status]}
       </span>

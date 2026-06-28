@@ -728,6 +728,8 @@ export type EditorialPublishStatus =
   | "publish_error"
   | "scheduled";
 
+export type EditorialScheduledPublishSource = "ped_planned_date" | "manual";
+
 export interface EditorialPublishingPayload {
   title: string;
   handle: string;
@@ -751,6 +753,11 @@ export interface EditorialPublishingPayload {
   shopifySeoSynced?: boolean | null;
   shopifySeoSyncedAt?: string | null;
   shopifySeoError?: string | null;
+  scheduledPublishAt?: string | null;
+  scheduledPublishTimezone?: string | null;
+  scheduledPublishSource?: EditorialScheduledPublishSource | null;
+  sourcePlannedDate?: string | null;
+  scheduledPublishTime?: string | null;
 }
 
 export interface EditorialPublishingUpdateRequest {

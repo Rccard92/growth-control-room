@@ -114,11 +114,14 @@ async def shopify_status(
     if store is None or store.connection_status != "connected":
         return ShopifyStatusResponse(connected=False)
 
+    from app.services.content.editorial_schedule_utils import resolve_editorial_timezone
+
     return ShopifyStatusResponse(
         connected=True,
         shop_domain=store.shop_domain,
         shop_name=store.shop_name,
         last_sync_at=store.last_sync_at,
+        timezone=resolve_editorial_timezone(store),
     )
 
 

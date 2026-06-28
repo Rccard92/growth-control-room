@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.26-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Added automatic Shopify scheduling from editorial planned date
+- Publication tab now defaults to schedule mode for future PED dates
+- Added scheduled publish metadata and calendar badges
+- Added guardrails against scheduling in the past
+
 ## [0.5.25-alpha] - 2026-06-13
 
 Tipo: Alpha patch

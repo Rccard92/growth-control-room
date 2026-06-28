@@ -19,6 +19,7 @@ export interface ShopifyStatus {
   shopDomain?: string | null;
   shopName?: string | null;
   lastSyncAt?: string | null;
+  timezone?: string | null;
 }
 
 export interface ShopifyScopesResponse {
