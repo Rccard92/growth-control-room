@@ -35,6 +35,7 @@ META_DESCRIPTION_RECOMMENDED_MAX = 160
 SEO_REQUIRED_MESSAGE = (
     "SEO title e meta description sono obbligatori per creare un articolo Shopify completo."
 )
+SCHEDULE_MUST_BE_FUTURE_MESSAGE = "La data programmata deve essere futura."
 ARTICLE_SEO_METAFIELD_NAMESPACE = "global"
 ARTICLE_SEO_TITLE_KEY = "title_tag"
 ARTICLE_SEO_DESCRIPTION_KEY = "description_tag"
@@ -463,7 +464,7 @@ def validate_publishing_payload(
             resolved_schedule,
             timezone_name=normalized.scheduled_publish_timezone,
         ):
-            errors.append("La data di pubblicazione programmata deve essere futura.")
+            errors.append(SCHEDULE_MUST_BE_FUTURE_MESSAGE)
     seo_errors, _seo_warnings = validate_publishing_seo(normalized, for_publish=for_publish)
     errors.extend(seo_errors)
     return errors
@@ -509,18 +510,15 @@ def _apply_publish_mode_to_article_input(
     *,
     mode: EditorialPublishMode,
 ) -> None:
-    from datetime import timezone
-
     if mode == "publish_now":
         article_input["isPublished"] = True
-        article_input["publishDate"] = datetime.now(timezone.utc).isoformat()
         return
 
     if mode == "schedule":
         scheduled_at = resolve_scheduled_publish_at_from_payload(payload)
         if scheduled_at is None:
             raise ValueError("Data di pubblicazione programmata obbligatoria.")
-        article_input["isPublished"] = True
+        article_input["isPublished"] = False
         article_input["publishDate"] = scheduled_at.isoformat()
         return
 
@@ -608,6 +606,11 @@ def format_handle_conflict_error(message: str) -> str | None:
 
 def format_shopify_publish_error(message: str) -> str:
     lowered = message.lower()
+    if "can't set ispublished" in lowered and "future publish date" in lowered:
+        return (
+            "Shopify non permette di pubblicare subito e programmare una data futura insieme. "
+            "Usa la modalità Programmato."
+        )
     if "author" in lowered and ("null" in lowered or "obbligator" in lowered):
         return "Shopify ha rifiutato l'articolo: author obbligatorio."
     if message.startswith("Errore GraphQL Shopify:"):
@@ -637,6 +640,8 @@ def shopify_publish_http_status(message: str, status_code: int | None = None) ->
 
 def classify_shopify_publish_error_code(message: str) -> str:
     lowered = message.lower()
+    if "can't set ispublished" in lowered and "future publish date" in lowered:
+        return "shopify_schedule_is_published_conflict"
     if "field `seo`" in lowered or "field 'seo'" in lowered:
         return "shopify_article_seo_field_invalid"
     if "metafield" in lowered:

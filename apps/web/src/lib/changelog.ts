@@ -9,6 +9,17 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: "0.5.27-alpha",
+    date: "2026-06-13",
+    type: "Alpha patch",
+    items: [
+      "Fixed Shopify scheduled article mapping",
+      "Schedule mode no longer sends isPublished=true with future publishDate",
+      "Added guardrails for past scheduled publish dates",
+      "Kept SEO metafields in scheduled article publishing",
+    ],
+  },
+  {
     version: "0.5.26-alpha",
     date: "2026-06-13",
     type: "Alpha patch",

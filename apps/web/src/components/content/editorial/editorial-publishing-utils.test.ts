@@ -118,6 +118,14 @@ describe("editorial-publishing-utils sync", () => {
     expect(message).toContain("campo GraphQL non supportato");
   });
 
+  it("aggiunge hint per errore isPublished con data futura", () => {
+    const message = formatPublishingError(
+      "Errore invio articolo Shopify.",
+      new Error("Can't set isPublished to true and also set a future publish date."),
+    );
+    expect(message).toContain("modalità Programmato");
+  });
+
   it("data futura mostra azione Programma su Shopify", () => {
     const action = getPrimaryPublishAction({
       plannedDate: "2099-07-05",

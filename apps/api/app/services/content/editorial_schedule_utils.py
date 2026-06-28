@@ -178,7 +178,7 @@ def apply_ped_schedule_defaults(
                 "source_planned_date": planned_date.isoformat(),
                 "scheduled_publish_time": format_publish_time(publish_time_value),
                 "publish_date": iso_value,
-                "is_published": True,
+                "is_published": False,
             }
         )
 

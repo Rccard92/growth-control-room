@@ -325,7 +325,7 @@ def _apply_publish_result_to_row(
         publish_date = scheduled_at.isoformat() if scheduled_at else publishing.publish_date
         publishing = publishing.model_copy(
             update={
-                "is_published": True,
+                "is_published": False,
                 "mode": "schedule",
                 "publish_date": publish_date,
                 "scheduled_publish_at": publish_date,

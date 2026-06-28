@@ -109,7 +109,7 @@ export function EditorialPublishingTab({
       publishDate: scheduledAt,
       sourcePlannedDate: value,
       mode: "schedule",
-      isPublished: true,
+      isPublished: false,
     });
   }
 
@@ -120,7 +120,7 @@ export function EditorialPublishingTab({
       scheduledPublishAt: scheduledAt,
       publishDate: scheduledAt,
       mode: "schedule",
-      isPublished: true,
+      isPublished: false,
     });
   }
 
@@ -144,7 +144,7 @@ export function EditorialPublishingTab({
       const scheduledAt = buildScheduledPublishAt(scheduleDate, scheduleTime, editorialTimezone);
       updates.scheduledPublishAt = scheduledAt;
       updates.publishDate = scheduledAt;
-      updates.isPublished = true;
+      updates.isPublished = false;
       updates.scheduledPublishTimezone = editorialTimezone;
     } else if (mode === "draft") {
       updates.isPublished = false;

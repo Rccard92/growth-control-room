@@ -949,7 +949,7 @@ def test_publish_schedule_success_sets_scheduled_status() -> None:
         "scheduledPublishTime": "09:00",
         "sourcePlannedDate": "2026-07-05",
         "scheduledPublishAt": "2026-07-05T09:00:00+02:00",
-        "isPublished": True,
+        "isPublished": False,
         "publishDate": "2026-07-05T09:00:00+02:00",
     }
     row = _sample_row(publishing_payload=publishing_payload)
@@ -1016,10 +1016,11 @@ def test_publish_schedule_success_sets_scheduled_status() -> None:
                                 EditorialPublishShopifyRequest(mode="schedule"),
                             )
                         create_input = mock_client.create_article.await_args.args[0]
-                        assert create_input["isPublished"] is True
+                        assert create_input["isPublished"] is False
                         assert create_input["publishDate"] == "2026-07-05T09:00:00+02:00"
                         assert "metafields" in create_input
                         assert row.publish_status == "scheduled"
+                        assert row.publishing_payload["isPublished"] is False
                         assert row.last_publish_error is None
 
     asyncio.run(run())

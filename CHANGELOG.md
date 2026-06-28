@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti a Growth Control Room sono documentate qui.
 Il progetto è in fase **Alpha** — versioni `0.x.x-alpha`.
 
+## [0.5.27-alpha] - 2026-06-13
+
+Tipo: Alpha patch
+
+- Fixed Shopify scheduled article mapping
+- Schedule mode no longer sends isPublished=true with future publishDate
+- Added guardrails for past scheduled publish dates
+- Kept SEO metafields in scheduled article publishing
+
 ## [0.5.26-alpha] - 2026-06-13
 
 Tipo: Alpha patch

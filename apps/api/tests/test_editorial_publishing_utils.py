@@ -15,6 +15,7 @@ from app.services.content.editorial_publishing_utils import (
     build_article_create_input,
     build_article_seo_metafields,
     build_article_update_input,
+    classify_shopify_publish_error_code,
     build_publishing_payload_from_article,
     compute_editorial_article_hash,
     enrich_article_with_hash,
@@ -222,7 +223,39 @@ def test_build_article_update_input_publish_now() -> None:
     update_input = build_article_update_input(payload, mode="publish_now")
     assert "blogId" not in update_input
     assert update_input["isPublished"] is True
-    assert "publishDate" in update_input
+    assert "publishDate" not in update_input
+
+
+def test_build_article_create_input_publish_now() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    article_input = build_article_create_input(
+        payload,
+        blog_gid="gid://shopify/Blog/99",
+        mode="publish_now",
+    )
+    assert article_input["isPublished"] is True
+    assert "publishDate" not in article_input
+
+
+def test_build_article_create_input_draft() -> None:
+    payload = build_publishing_payload_from_article(_sample_article())
+    payload = payload.model_copy(update={"publish_date": "2026-07-05T09:00:00+02:00"})
+    article_input = build_article_create_input(
+        payload,
+        blog_gid="gid://shopify/Blog/99",
+        mode="draft",
+    )
+    assert article_input["isPublished"] is False
+    assert "publishDate" not in article_input
+
+
+def test_format_shopify_publish_error_schedule_is_published_conflict() -> None:
+    raw = "Can't set isPublished to true and also set a future publish date."
+    formatted = format_shopify_publish_error(raw)
+    assert "modalità Programmato" in formatted
+    assert (
+        classify_shopify_publish_error_code(raw) == "shopify_schedule_is_published_conflict"
+    )
 
 
 def test_format_handle_conflict_error() -> None:

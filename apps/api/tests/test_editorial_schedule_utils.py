@@ -12,7 +12,9 @@ from app.services.content.editorial_schedule_utils import (
     sync_ped_schedule_on_planned_date_change,
 )
 from app.services.content.editorial_publishing_utils import (
+    SCHEDULE_MUST_BE_FUTURE_MESSAGE,
     build_article_create_input,
+    build_article_update_input,
     build_publishing_payload_from_article,
     validate_publishing_payload,
 )
@@ -37,6 +39,7 @@ def test_apply_ped_schedule_defaults_future_sets_schedule_mode() -> None:
     assert updated.mode == "schedule"
     assert updated.scheduled_publish_source == "ped_planned_date"
     assert updated.scheduled_publish_at == "2026-07-05T09:00:00+02:00"
+    assert updated.is_published is False
 
 
 def test_apply_ped_schedule_defaults_past_sets_draft_mode() -> None:
@@ -115,7 +118,32 @@ def test_build_article_create_input_schedule_has_publish_date_and_metafields() -
         blog_gid="gid://shopify/Blog/1",
         mode="schedule",
     )
-    assert article_input["isPublished"] is True
+    assert article_input["isPublished"] is False
+    assert article_input["publishDate"] == "2026-07-05T09:00:00+02:00"
+    assert "seo" not in article_input
+    assert "metafields" in article_input
+
+
+def test_build_article_update_input_schedule_has_publish_date_and_metafields() -> None:
+    from app.schemas.content_seo_editorial import EditorialArticlePayload
+
+    article = EditorialArticlePayload(
+        title="Guida",
+        handle="guida",
+        excerpt="",
+        body_html="<p>Ok</p>",
+        seo_title="SEO",
+        meta_description="Meta",
+        tags=[],
+        author_name="Redazione",
+    )
+    publishing = build_publishing_payload_from_article(
+        article,
+        planned_date=date(2026, 7, 5),
+        timezone_name="Europe/Rome",
+    )
+    article_input = build_article_update_input(publishing, mode="schedule")
+    assert article_input["isPublished"] is False
     assert article_input["publishDate"] == "2026-07-05T09:00:00+02:00"
     assert "seo" not in article_input
     assert "metafields" in article_input
@@ -135,7 +163,7 @@ def test_validate_schedule_in_past_returns_error() -> None:
         scheduled_publish_timezone="Europe/Rome",
     )
     errors = validate_publishing_payload(publishing, for_publish=True)
-    assert any("futura" in err.lower() for err in errors)
+    assert SCHEDULE_MUST_BE_FUTURE_MESSAGE in errors
 
 
 def test_resolve_editorial_timezone_fallback() -> None:

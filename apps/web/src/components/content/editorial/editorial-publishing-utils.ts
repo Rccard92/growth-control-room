@@ -218,7 +218,7 @@ export function applyPedScheduleDefaults(
       sourcePlannedDate: options.plannedDate.slice(0, 10),
       scheduledPublishTime: publishTime,
       publishDate: scheduledAt,
-      isPublished: true,
+      isPublished: false,
     };
   }
   return {
@@ -518,6 +518,14 @@ export function formatPublishingError(baseMessage: string, error: unknown): stri
   if (message.includes("Field 'seo'") || message.includes("Field `seo`")) {
     message +=
       " Il publisher sta ancora usando un campo GraphQL non supportato. Controllare query Shopify.";
+  }
+  if (
+    message.includes("Can't set isPublished") ||
+    message.includes("future publish date") ||
+    message.includes("pubblicare subito e programmare")
+  ) {
+    message +=
+      " Shopify non permette di pubblicare subito e programmare una data futura insieme. Usa la modalità Programmato.";
   }
   return message;
 }
