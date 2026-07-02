@@ -280,6 +280,168 @@ GCR_METADATA: dict[str, dict[str, str]] = {
         "gcr_recommendation_reason": "Ottimizzazione con revisione mirata.",
         "description": "Ottimizza articoli SEO esistenti.",
     },
+    "claude_seo_audit": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Audit SEO completo con output strutturato e priorità azioni.",
+        "description": "Audit SEO full-site: crawlability, indexazione, on-page e fix prioritari.",
+    },
+    "claude_seo_page": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Analisi pagina singola con output mirato.",
+        "description": "Analizza una singola pagina con regole Claude SEO adattate alla Growth Control Room.",
+    },
+    "claude_seo_technical": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Revisione tecnica approfondita con segnali strutturati.",
+        "description": "Revisione SEO tecnica: robots, canonical, redirect, indexazione e blocker.",
+    },
+    "claude_seo_content": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Analisi contenuto con qualità e intent di ricerca.",
+        "description": "Analisi qualità contenuto, allineamento keyword, E-E-A-T e raccomandazioni editoriali.",
+    },
+    "claude_seo_content_brief": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Brief strutturato con outline e keyword mirate.",
+        "description": "Genera brief SEO con search intent, outline, keyword e template per tipo pagina.",
+    },
+    "claude_seo_schema": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Structured data con JSON-LD controllato.",
+        "description": "Analizza e propone miglioramenti Schema.org e JSON-LD per pagine ecommerce e contenuti.",
+    },
+    "claude_seo_geo": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Skill SEO avanzata: output strutturato con contesto pagina.",
+        "description": "Valuta la pagina per AI Search, citabilità, chiarezza semantica ed entità.",
+    },
+    "claude_seo_images": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Task mirato su alt text e segnali immagine.",
+        "description": "Analizza alt text, naming, formati, peso immagini e opportunità SEO immagini.",
+    },
+    "claude_seo_sitemap_analyze": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Analisi sitemap con output strutturato.",
+        "description": "Analizza copertura sitemap XML, orphan pages e gap di indicizzazione.",
+    },
+    "claude_seo_sitemap_generate": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Generazione struttura sitemap con priorità URL.",
+        "description": "Propone o affina struttura sitemap XML con priorità e changefreq.",
+    },
+    "claude_seo_plan": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Roadmap SEO strategica con output multi-sezione.",
+        "description": "Roadmap SEO strategica con iniziative prioritarie, timeline e KPI.",
+    },
+    "claude_seo_competitor_pages": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Analisi competitiva con confronto SERP strutturato.",
+        "description": "Analizza landing competitor per gap contenuto, overlap SERP e differenziazione.",
+    },
+    "claude_seo_hreflang": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommendation_reason": "Audit hreflang mirato con raccomandazioni implementative.",
+        "description": "Audit tag hreflang e guida implementazione per siti multilingua.",
+    },
+    "claude_seo_programmatic": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Strategia programmatic SEO con pattern URL e template.",
+        "description": "Template programmatic SEO, pattern URL e strategie di scala per cataloghi grandi.",
+    },
+    "claude_seo_cluster": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Clustering keyword con architettura hub-and-spoke.",
+        "description": "Clustering keyword hub-and-spoke con overlap SERP e architettura contenuti.",
+    },
+    "claude_seo_sxo": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Audit SXO che combina SEO e segnali UX.",
+        "description": "Audit Search Experience Optimization: CTR, engagement e miglioramenti conversion-oriented.",
+    },
+    "claude_seo_ecommerce": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Analisi ecommerce Shopify con segnali trust e strutturati.",
+        "description": "Analizza product/collection SEO, trust, conversion intent, contenuti ecommerce e segnali strutturati.",
+    },
+    "claude_seo_flow": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Workflow SEO end-to-end con output orchestrato.",
+        "description": "Orchestrazione workflow SEO tra audit, contenuto, tecnico e reporting.",
+    },
+    "claude_seo_google": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Integrazione Google Search Console pianificata.",
+        "description": "Report performance e indicizzazione da Google Search Console e Analytics.",
+    },
+    "claude_seo_firecrawl": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Crawl profondo via Firecrawl non ancora disponibile.",
+        "description": "Crawl sito su larga scala via Firecrawl per audit e estrazione contenuti.",
+    },
+    "claude_seo_dataforseo": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Intelligence SERP via DataForSEO pianificata.",
+        "description": "Dati SERP, metriche keyword e marketplace intelligence via DataForSEO.",
+    },
+    "claude_seo_backlinks": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Analisi backlink con API esterna pianificata.",
+        "description": "Profilo backlink, link tossici e opportunità link building.",
+    },
+    "claude_seo_local": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Local SEO con dati locali non ancora integrati.",
+        "description": "Audit local SEO: NAP, Google Business Profile, citazioni e contenuti geo.",
+    },
+    "claude_seo_maps": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Ottimizzazione Maps con API Google pianificata.",
+        "description": "Ottimizzazione Google Maps e local listing con segnali recensioni e location.",
+    },
+    "claude_seo_drift_baseline": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Baseline SEO storica pianificata.",
+        "description": "Snapshot baseline SEO per ranking, contenuto e salute tecnica nel tempo.",
+    },
+    "claude_seo_drift_compare": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Confronto drift SEO pianificato.",
+        "description": "Confronta stato SEO attuale vs baseline per rilevare drift ranking e tecnico.",
+    },
+    "claude_seo_image_gen": {
+        "ui_category": "seo_advanced",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Generazione immagini SEO con provider esterno pianificata.",
+        "description": "Generazione AI di hero image, OG image e asset visual per SEO.",
+    },
     "email_campaign_strategy": {
         "ui_category": "email_ads",
         "gcr_recommended_model": "gpt-5.4",
@@ -377,6 +539,40 @@ def _op(
         cost_sensitivity=cost,
         description=description or label,
         recommended_use=recommended_use,
+        warning_notes=warning_notes,
+        status=status,
+        enabled=enabled,
+    )
+
+
+_SEO_SKILL_EXTERNAL_WARNING = "Richiede integrazione esterna non ancora disponibile."
+
+
+def _seo_skill_op(
+    skill_key: str,
+    label: str,
+    tier: str,
+    *,
+    status: OperationStatus = "implemented",
+    enabled: bool = True,
+    recommended_use: str = "",
+    warning_notes: str | None = None,
+) -> AiOperationDefinition:
+    env_key = "OPENAI_MODEL_PREMIUM" if tier == "premium" else "OPENAI_MODEL_STANDARD"
+    max_tokens = 4500 if tier == "premium" else 3000
+    temperature = 0.35 if tier == "premium" else 0.4
+    tier_label = "Premium" if tier == "premium" else "Standard"
+    return _op(
+        f"claude_{skill_key}",
+        label,
+        "seo_skills",
+        skill_key,
+        "generic",
+        tier,
+        env_key,
+        max_tokens,
+        temperature,
+        recommended_use=recommended_use or f"{tier_label}: skill SEO con output JSON strutturato.",
         warning_notes=warning_notes,
         status=status,
         enabled=enabled,
@@ -750,6 +946,97 @@ def _build_registry() -> dict[str, AiOperationDefinition]:
         _op("seo_article_outline", "Outline articolo SEO", "content_seo", "article_outline", "blog_brief", "standard", "OPENAI_MODEL_STANDARD", 2500, 0.5, status="planned", enabled=False, recommended_use="Standard per outline."),
         _op("seo_article_generation", "Articolo SEO", "content_seo", "generate_seo_article", "article_draft", "premium", "OPENAI_MODEL_PREMIUM", 6000, 0.6, status="planned", enabled=False, recommended_use="Premium per articoli SEO lunghi."),
         _op("seo_article_optimization", "Ottimizzazione articolo SEO", "content_seo", "optimize_article", "article_draft", "standard", "OPENAI_MODEL_STANDARD", 3000, 0.45, status="planned", enabled=False, recommended_use="Standard per ottimizzazione."),
+        # Claude SEO Skill Library
+        _seo_skill_op("seo_audit", "SEO Audit sito", "premium"),
+        _seo_skill_op("seo_page", "SEO pagina singola", "standard"),
+        _seo_skill_op("seo_technical", "SEO tecnico", "premium"),
+        _seo_skill_op("seo_content", "SEO contenuto", "premium"),
+        _seo_skill_op("seo_content_brief", "Brief contenuto SEO", "standard"),
+        _seo_skill_op("seo_schema", "Schema markup SEO", "standard"),
+        _seo_skill_op("seo_geo", "AI Search / GEO audit", "premium"),
+        _seo_skill_op("seo_images", "SEO immagini", "standard"),
+        _seo_skill_op("seo_sitemap_analyze", "Analisi sitemap", "standard"),
+        _seo_skill_op("seo_sitemap_generate", "Generazione sitemap", "standard"),
+        _seo_skill_op("seo_plan", "Piano SEO strategico", "premium"),
+        _seo_skill_op("seo_competitor_pages", "Pagine competitor", "premium"),
+        _seo_skill_op("seo_hreflang", "Hreflang audit", "standard"),
+        _seo_skill_op("seo_programmatic", "Programmatic SEO", "premium"),
+        _seo_skill_op("seo_cluster", "Keyword clustering", "premium"),
+        _seo_skill_op("seo_sxo", "Search Experience Optimization", "premium"),
+        _seo_skill_op("seo_ecommerce", "SEO ecommerce", "premium"),
+        _seo_skill_op("seo_flow", "Workflow SEO", "premium"),
+        _seo_skill_op(
+            "seo_google",
+            "Google Search Console",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_firecrawl",
+            "Crawl Firecrawl",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_dataforseo",
+            "Intelligence DataForSEO",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_backlinks",
+            "Analisi backlink",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_local",
+            "Local SEO",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_maps",
+            "Google Maps / local listings",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_drift_baseline",
+            "SEO drift baseline",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_drift_compare",
+            "SEO drift compare",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
+        _seo_skill_op(
+            "seo_image_gen",
+            "Generazione immagini SEO",
+            "premium",
+            status="planned",
+            enabled=False,
+            warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
+        ),
         # Email/Ads futuri
         _op("email_campaign_strategy", "Strategia email", "email", "campaign_strategy", "generic", "premium", "OPENAI_MODEL_PREMIUM", 4000, 0.5, status="planned", enabled=False, recommended_use="Premium per strategia campagna complessa."),
         _op("email_copy_generation", "Copy email", "email", "generate_copy", "generic", "standard", "OPENAI_MODEL_STANDARD", 2500, 0.55, status="planned", enabled=False, recommended_use="Standard per email marketing."),
@@ -771,6 +1058,16 @@ _INFERENCE_INDEX: list[tuple[str, str, str, str | None, str]] = [
 
 def get_operation(operation_key: str) -> AiOperationDefinition | None:
     return AI_OPERATIONS.get(operation_key)
+
+
+def get_operation_key_for_seo_skill(skill_key: str) -> str:
+    normalized = skill_key.strip()
+    if not normalized:
+        raise ValueError("skill_key vuoto")
+    operation_key = normalized if normalized.startswith("claude_") else f"claude_{normalized}"
+    if operation_key not in AI_OPERATIONS:
+        raise ValueError(f"Operazione SEO Skill non registrata: {skill_key}")
+    return operation_key
 
 
 def list_operations(*, include_planned: bool = True) -> list[AiOperationDefinition]:

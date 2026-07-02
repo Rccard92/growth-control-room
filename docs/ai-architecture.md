@@ -139,6 +139,14 @@ Errori OpenAI (`BadRequestError`, accesso modello) vengono loggati in `AiUsageLo
 - Claude è disponibile per il runtime SEO Skill futuro; non sostituisce automaticamente OpenAI nei moduli già implementati.
 - Le richieste Claude vengono loggate in `ai_usage_logs` con `provider=claude`; il pricing Claude è ancora da aggiungere in `pricing.py`.
 
+### SEO Skill Operations
+
+- Ogni skill del catalogo Claude SEO ha una `operation_key` registrata con prefisso `claude_seo_` in `operation_registry.py`.
+- Mapping helper: `get_operation_key_for_seo_skill("seo_geo")` → `claude_seo_geo`.
+- Il provider effettivo delle future esecuzioni può essere `openai` o `claude` tramite `provider_router`; il prefisso `claude_seo_` indica l'origine logica della skill, non obbliga l'uso del provider Claude.
+- Le skill prompt-only sono `status=implemented`; quelle con integrazioni esterne (Google, Firecrawl, DataForSEO, backlink, local, drift, image gen) restano `planned` finché mancano connector/API.
+- Categoria UI Model Settings: `seo_advanced` (raggruppate con le altre operazioni SEO avanzate).
+
 ---
 
 ## Regola obbligatoria: Brand Intelligence Context
