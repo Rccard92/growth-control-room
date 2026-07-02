@@ -175,6 +175,9 @@ export function formatSeoSkillRunError(err: unknown): string {
   if (lowered.includes("risposta vuota") || lowered.includes("risposta openai vuota")) {
     return "OpenAI ha restituito una risposta vuota. Riprova con un modello più stabile o con provider Claude.";
   }
+  if (lowered.includes("json valido") || lowered.includes("non è json valido")) {
+    return "OpenAI non ha restituito un JSON valido. Riprova l'analisi o usa un modello più stabile.";
+  }
   if (lowered.includes("not available") || lowered.includes("non disponibile")) {
     return "Una o più skill selezionate non sono disponibili.";
   }

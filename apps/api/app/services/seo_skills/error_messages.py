@@ -13,6 +13,16 @@ OPENAI_EMPTY_RESPONSE_RUN_MESSAGE = (
     "Riprova con un modello più stabile o con provider Claude."
 )
 
+OPENAI_INVALID_JSON_USER_MESSAGE = (
+    "Il modello AI non ha restituito un JSON valido. "
+    "Riprova o usa un modello più stabile."
+)
+
+OPENAI_INVALID_JSON_RUN_MESSAGE = (
+    "OpenAI non ha restituito un JSON valido. "
+    "Riprova l'analisi o usa un modello più stabile."
+)
+
 
 def humanize_skill_error(exc: Exception, *, provider: str = "") -> str:
     raw = str(exc).strip()
@@ -23,6 +33,15 @@ def humanize_skill_error(exc: Exception, *, provider: str = "") -> str:
         if provider_name == "openai":
             return OPENAI_EMPTY_RESPONSE_RUN_MESSAGE
         return OPENAI_EMPTY_RESPONSE_USER_MESSAGE
+
+    if (
+        "risposta openai non è json valido" in lowered
+        or "non ha restituito un json valido" in lowered
+        or "non è json valido" in lowered
+    ):
+        if provider_name == "openai":
+            return OPENAI_INVALID_JSON_RUN_MESSAGE
+        return OPENAI_INVALID_JSON_USER_MESSAGE
 
     if "provider is not configured" in lowered or "non configurato" in lowered:
         if "claude" in lowered:

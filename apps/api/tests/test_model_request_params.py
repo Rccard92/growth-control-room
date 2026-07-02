@@ -62,3 +62,30 @@ def test_reasoning_effort_on_gpt5_family() -> None:
 def test_known_supported_models_include_gpt5() -> None:
     assert is_known_supported_model("gpt-5.4-mini")
     assert is_known_supported_model("gpt-4o-mini")
+
+
+def test_build_openai_request_params_with_json_schema_uses_structured_outputs() -> None:
+    schema = {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}
+    params = build_openai_request_params(
+        _resolved("gpt-4o-mini"),
+        system_prompt="system",
+        user_prompt="user",
+        timeout=30.0,
+        json_schema=schema,
+        json_schema_name="seo_skill_output",
+    )
+    response_format = params["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["strict"] is True
+    assert response_format["json_schema"]["name"] == "seo_skill_output"
+    assert response_format["json_schema"]["schema"] == schema
+
+
+def test_build_openai_request_params_without_json_schema_uses_json_object() -> None:
+    params = build_openai_request_params(
+        _resolved("gpt-4o-mini"),
+        system_prompt="system",
+        user_prompt="user",
+        timeout=30.0,
+    )
+    assert params["response_format"] == {"type": "json_object"}

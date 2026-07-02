@@ -71,6 +71,110 @@ def get_output_schema_instruction(skill_key: str) -> str:
     return f"Skill key: {skill_key}\n\n{SEO_SKILL_OUTPUT_SCHEMA_DESCRIPTION}"
 
 
+def _strict_object_schema(
+    *,
+    properties: dict[str, Any],
+    required: list[str] | None = None,
+) -> dict[str, Any]:
+    keys = required if required is not None else list(properties.keys())
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": keys,
+        "additionalProperties": False,
+    }
+
+
+def _enum_schema(values: frozenset[str]) -> dict[str, Any]:
+    return {"type": "string", "enum": sorted(values)}
+
+
+def get_seo_skill_output_json_schema() -> dict[str, Any]:
+    """OpenAI Structured Outputs JSON Schema for normalized SEO skill output."""
+    finding_schema = _strict_object_schema(
+        properties={
+            "severity": _enum_schema(ALLOWED_SEVERITIES),
+            "area": {"type": "string"},
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "evidence": {"type": "string"},
+            "recommendation": {"type": "string"},
+            "howToValidate": {"type": "string"},
+            "priority": _enum_schema(ALLOWED_PRIORITIES),
+        },
+    )
+    recommendation_schema = _strict_object_schema(
+        properties={
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "priority": _enum_schema(ALLOWED_PRIORITIES),
+            "impact": _enum_schema(ALLOWED_PRIORITIES),
+            "effort": _enum_schema(ALLOWED_EFFORTS),
+        },
+    )
+    task_schema = _strict_object_schema(
+        properties={
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "priority": _enum_schema(ALLOWED_PRIORITIES),
+            "ownerType": _enum_schema(ALLOWED_OWNER_TYPES),
+            "estimatedEffort": _enum_schema(ALLOWED_EFFORTS),
+        },
+    )
+    artifacts_schema = _strict_object_schema(
+        properties={
+            "jsonLd": {
+                "type": "array",
+                "items": _strict_object_schema(
+                    properties={
+                        "@type": {"type": "string"},
+                        "name": {"type": "string"},
+                        "description": {"type": "string"},
+                    },
+                ),
+            },
+            "markdownReport": {"type": "string"},
+            "shopifySidekickPrompts": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "implementationNotes": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+    )
+    return _strict_object_schema(
+        properties={
+            "skillKey": {"type": "string"},
+            "summary": {"type": "string"},
+            "score": {
+                "anyOf": [
+                    {"type": "integer"},
+                    {"type": "null"},
+                ],
+            },
+            "findings": {
+                "type": "array",
+                "items": finding_schema,
+            },
+            "recommendations": {
+                "type": "array",
+                "items": recommendation_schema,
+            },
+            "tasks": {
+                "type": "array",
+                "items": task_schema,
+            },
+            "artifacts": artifacts_schema,
+            "warnings": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+    )
+
+
 def _empty_artifacts() -> dict[str, Any]:
     return {
         "jsonLd": [],

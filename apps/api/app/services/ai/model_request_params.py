@@ -56,6 +56,8 @@ def build_openai_request_params(
     user_prompt: str,
     structured_json: bool = True,
     timeout: float,
+    json_schema: dict | None = None,
+    json_schema_name: str | None = None,
 ) -> dict[str, Any]:
     family = infer_model_family(resolved.model)
     kwargs: dict[str, Any] = {
@@ -85,6 +87,16 @@ def build_openai_request_params(
             kwargs["reasoning_effort"] = resolved.reasoning_effort
 
     if structured_json:
-        kwargs["response_format"] = {"type": "json_object"}
+        if json_schema is not None:
+            kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": json_schema_name or "structured_response",
+                    "strict": True,
+                    "schema": json_schema,
+                },
+            }
+        else:
+            kwargs["response_format"] = {"type": "json_object"}
 
     return kwargs

@@ -427,6 +427,54 @@ def test_run_single_seo_skill_uses_operation_key_claude_seo_geo() -> None:
     asyncio.run(run())
 
 
+def test_run_single_seo_skill_openai_passes_json_schema() -> None:
+    async def run() -> None:
+        session = AsyncMock()
+        skill = _available_skill()
+        captured_kwargs: dict[str, object] = {}
+
+        async def _capture_provider(**kwargs: object) -> dict:
+            captured_kwargs.update(kwargs)
+            return {"summary": "ok"}
+
+        with (
+            patch(
+                "app.services.seo_skills.skill_runner.get_seo_skill_by_key",
+                return_value=skill,
+            ),
+            patch(
+                "app.services.seo_skills.skill_runner.collect_skill_input",
+                new=AsyncMock(return_value=_skill_input(warnings=[])),
+            ),
+            patch(
+                "app.services.seo_skills.skill_runner.build_skill_system_prompt",
+                return_value="system",
+            ),
+            patch(
+                "app.services.seo_skills.skill_runner.build_skill_user_prompt",
+                return_value="user",
+            ),
+            patch(
+                "app.services.seo_skills.skill_runner.generate_structured_json_with_provider",
+                new=AsyncMock(side_effect=_capture_provider),
+            ),
+        ):
+            await run_single_seo_skill(
+                session,
+                uuid4(),
+                "seo_geo",
+                "url",
+                url="https://example.com",
+                provider="openai",
+            )
+
+        assert captured_kwargs["json_schema_name"] == "seo_skill_output"
+        assert isinstance(captured_kwargs["json_schema"], dict)
+        assert captured_kwargs["json_schema"]["type"] == "object"
+
+    asyncio.run(run())
+
+
 def test_catalog_skill_seo_geo_is_available_for_runner() -> None:
     skill = get_seo_skill_by_key("seo_geo")
     assert skill is not None

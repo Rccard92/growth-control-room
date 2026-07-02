@@ -19,6 +19,8 @@ async def generate_structured_json_with_provider(
     timeout: float = 60.0,
     model: str | None = None,
     prompt_cache_key: str | None = None,
+    json_schema: dict | None = None,
+    json_schema_name: str | None = None,
 ) -> dict[str, Any]:
     normalized_provider = (provider or "openai").strip().lower()
 
@@ -30,6 +32,8 @@ async def generate_structured_json_with_provider(
             timeout=timeout,
             model=model,
             prompt_cache_key=prompt_cache_key,
+            json_schema=json_schema,
+            json_schema_name=json_schema_name,
         )
 
     if normalized_provider == "claude":

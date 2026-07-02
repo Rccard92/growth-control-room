@@ -31,7 +31,10 @@ from app.services.ai.usage_service import (
     record_usage_log,
     truncate_preview,
 )
-from app.services.seo_skills.error_messages import OPENAI_EMPTY_RESPONSE_USER_MESSAGE
+from app.services.seo_skills.error_messages import (
+    OPENAI_EMPTY_RESPONSE_USER_MESSAGE,
+    OPENAI_INVALID_JSON_USER_MESSAGE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,18 +163,70 @@ class _SchemaParseError(Exception):
         response: Any | None,
         message: str,
         empty_content: bool = False,
+        invalid_json: bool = False,
     ) -> None:
         super().__init__(message)
         self.content = content
         self.response = response
         self.error_message = message
         self.empty_content = empty_content
+        self.invalid_json = invalid_json
 
 
 def _user_message_for_parse_error(parse_exc: _SchemaParseError) -> str:
     if parse_exc.empty_content:
         return OPENAI_EMPTY_RESPONSE_USER_MESSAGE
+    if parse_exc.invalid_json:
+        return OPENAI_INVALID_JSON_USER_MESSAGE
     return parse_exc.error_message
+
+
+def _strip_code_fences(content: str) -> str:
+    stripped = content.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) < 2:
+        return stripped
+    if lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def _extract_json_object_substring(content: str) -> str | None:
+    start = content.find("{")
+    end = content.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    return content[start : end + 1]
+
+
+def _try_parse_json_object(content: str) -> dict[str, Any] | None:
+    candidates = [content.strip(), _strip_code_fences(content)]
+    extracted = _extract_json_object_substring(content)
+    if extracted:
+        candidates.append(extracted)
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _log_invalid_json_response(content: str) -> None:
+    preview = content[:500]
+    if len(content) > 500:
+        preview = f"{preview}..."
+    logger.warning("OpenAI invalid JSON response preview=%s", preview)
 
 
 def _log_empty_openai_response(
@@ -201,19 +256,14 @@ def _parse_json_object_response(response: Any) -> tuple[dict[str, Any], str]:
             message="Risposta OpenAI vuota",
             empty_content=True,
         )
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError as exc:
+    parsed = _try_parse_json_object(content)
+    if parsed is None:
+        _log_invalid_json_response(content)
         raise _SchemaParseError(
             content=content,
             response=response,
             message="Risposta OpenAI non è JSON valido",
-        ) from exc
-    if not isinstance(parsed, dict):
-        raise _SchemaParseError(
-            content=content,
-            response=response,
-            message="Risposta OpenAI deve essere un oggetto JSON",
+            invalid_json=True,
         )
     return parsed, content
 
@@ -288,6 +338,8 @@ async def _call_openai(
     system_prompt: str,
     user_prompt: str,
     timeout: float,
+    json_schema: dict | None = None,
+    json_schema_name: str | None = None,
 ) -> Any:
     kwargs = build_openai_request_params(
         resolved,
@@ -295,6 +347,8 @@ async def _call_openai(
         user_prompt=user_prompt,
         structured_json=True,
         timeout=timeout,
+        json_schema=json_schema,
+        json_schema_name=json_schema_name,
     )
     return await client.chat.completions.create(**kwargs)
 
@@ -351,6 +405,8 @@ async def generate_structured_json(
     timeout: float = 60.0,
     model: str | None = None,
     prompt_cache_key: str | None = None,
+    json_schema: dict | None = None,
+    json_schema_name: str | None = None,
 ) -> dict[str, Any]:
     session_factory = get_session_factory()
     async with session_factory() as session:
@@ -394,6 +450,8 @@ async def generate_structured_json(
             user_prompt=user_prompt,
             structured_json=True,
             timeout=timeout,
+            json_schema=json_schema,
+            json_schema_name=json_schema_name,
         )
         response = await _call_openai(
             client,
@@ -401,6 +459,8 @@ async def generate_structured_json(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             timeout=timeout,
+            json_schema=json_schema,
+            json_schema_name=json_schema_name,
         )
         try:
             parsed, content = _parse_json_object_response(response)
@@ -435,6 +495,8 @@ async def generate_structured_json(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     timeout=timeout,
+                    json_schema=json_schema,
+                    json_schema_name=json_schema_name,
                 )
                 last_request_params = build_openai_request_params(
                     active_resolved,
@@ -442,6 +504,8 @@ async def generate_structured_json(
                     user_prompt=user_prompt,
                     structured_json=True,
                     timeout=timeout,
+                    json_schema=json_schema,
+                    json_schema_name=json_schema_name,
                 )
                 parsed, content = _parse_json_object_response(response)
             elif (
@@ -466,6 +530,8 @@ async def generate_structured_json(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     timeout=timeout,
+                    json_schema=json_schema,
+                    json_schema_name=json_schema_name,
                 )
                 last_request_params = build_openai_request_params(
                     active_resolved,
@@ -473,6 +539,8 @@ async def generate_structured_json(
                     user_prompt=user_prompt,
                     structured_json=True,
                     timeout=timeout,
+                    json_schema=json_schema,
+                    json_schema_name=json_schema_name,
                 )
                 parsed, content = _parse_json_object_response(response)
             else:
@@ -521,6 +589,8 @@ async def generate_structured_json(
                 user_prompt=user_prompt,
                 structured_json=True,
                 timeout=timeout,
+                json_schema=json_schema,
+                json_schema_name=json_schema_name,
             )
         _log_openai_failure(
             metadata=metadata,

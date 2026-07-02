@@ -1,7 +1,12 @@
 """Tests for SEO skill output schema normalization."""
 
 from app.services.seo_skills.output_schema import (
+    ALLOWED_EFFORTS,
+    ALLOWED_OWNER_TYPES,
+    ALLOWED_PRIORITIES,
+    ALLOWED_SEVERITIES,
     get_minimal_empty_skill_output,
+    get_seo_skill_output_json_schema,
     normalize_skill_output,
 )
 
@@ -84,3 +89,48 @@ def test_normalize_skill_output_does_not_crash_on_none() -> None:
     normalized = normalize_skill_output("seo_audit", None)
     assert normalized["skillKey"] == "seo_audit"
     assert normalized["warnings"] == []
+
+
+def _assert_strict_object_schema(schema: dict) -> None:
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+    assert set(schema["required"]) == set(schema["properties"].keys())
+
+
+def test_get_seo_skill_output_json_schema_has_required_top_level_fields() -> None:
+    schema = get_seo_skill_output_json_schema()
+    _assert_strict_object_schema(schema)
+    assert set(schema["required"]) == {
+        "skillKey",
+        "summary",
+        "score",
+        "findings",
+        "recommendations",
+        "tasks",
+        "artifacts",
+        "warnings",
+    }
+
+
+def test_get_seo_skill_output_json_schema_nested_objects_are_strict() -> None:
+    schema = get_seo_skill_output_json_schema()
+    findings = schema["properties"]["findings"]["items"]
+    recommendations = schema["properties"]["recommendations"]["items"]
+    tasks = schema["properties"]["tasks"]["items"]
+    artifacts = schema["properties"]["artifacts"]
+
+    _assert_strict_object_schema(findings)
+    _assert_strict_object_schema(recommendations)
+    _assert_strict_object_schema(tasks)
+    _assert_strict_object_schema(artifacts)
+
+    assert set(findings["properties"]["severity"]["enum"]) == set(ALLOWED_SEVERITIES)
+    assert set(findings["properties"]["priority"]["enum"]) == set(ALLOWED_PRIORITIES)
+    assert set(recommendations["properties"]["impact"]["enum"]) == set(ALLOWED_PRIORITIES)
+    assert set(recommendations["properties"]["effort"]["enum"]) == set(ALLOWED_EFFORTS)
+    assert set(tasks["properties"]["ownerType"]["enum"]) == set(ALLOWED_OWNER_TYPES)
+    assert set(tasks["properties"]["estimatedEffort"]["enum"]) == set(ALLOWED_EFFORTS)
+    assert "jsonLd" in artifacts["properties"]
+    assert "markdownReport" in artifacts["properties"]
+    assert "shopifySidekickPrompts" in artifacts["properties"]
+    assert "implementationNotes" in artifacts["properties"]

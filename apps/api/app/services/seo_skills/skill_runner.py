@@ -24,7 +24,10 @@ from app.services.seo_skills.exceptions import (
     SkillInputCollectionError,
 )
 from app.services.seo_skills.input_collector import collect_skill_input
-from app.services.seo_skills.output_schema import normalize_skill_output
+from app.services.seo_skills.output_schema import (
+    get_seo_skill_output_json_schema,
+    normalize_skill_output,
+)
 from app.services.seo_skills.prompt_builder import (
     build_skill_system_prompt,
     build_skill_user_prompt,
@@ -227,6 +230,13 @@ async def run_single_seo_skill(
         url=url,
     )
 
+    schema_kwargs: dict[str, Any] = {}
+    if normalized_provider == "openai":
+        schema_kwargs = {
+            "json_schema": get_seo_skill_output_json_schema(),
+            "json_schema_name": "seo_skill_output",
+        }
+
     try:
         raw_output = await generate_structured_json_with_provider(
             provider=normalized_provider,
@@ -236,6 +246,7 @@ async def run_single_seo_skill(
             timeout=SKILL_RUN_TIMEOUT_SECONDS,
             model=None,
             prompt_cache_key=prompt_cache_key,
+            **schema_kwargs,
         )
     except (
         ValueError,

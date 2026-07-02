@@ -151,6 +151,14 @@ describe("formatSeoSkillRunError", () => {
       "Something went wrong",
     );
   });
+
+  it("maps invalid JSON error", () => {
+    expect(
+      formatSeoSkillRunError(new Error("Risposta OpenAI non è JSON valido")),
+    ).toBe(
+      "OpenAI non ha restituito un JSON valido. Riprova l'analisi o usa un modello più stabile.",
+    );
+  });
 });
 
 describe("matchesCategoryFilter", () => {
