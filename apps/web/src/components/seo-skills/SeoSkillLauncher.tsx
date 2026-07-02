@@ -1,5 +1,9 @@
-import type { SeoSkillCatalogItem, SeoSkillProvider, SeoSkillRun } from "@gcr/shared";
-import { canSubmitLauncher } from "./seo-skills-utils";
+import type { SeoSkillCatalogItem, SeoSkillProvider, SeoSkillRun, SeoSkillRunStatus } from "@gcr/shared";
+import {
+  canSubmitLauncher,
+  formatSeoSkillRunStatus,
+  type SeoSkillRunResultsSummary,
+} from "./seo-skills-utils";
 
 interface SeoSkillLauncherProps {
   selectedSkillKeys: string[];
@@ -12,7 +16,9 @@ interface SeoSkillLauncherProps {
   isSubmitting: boolean;
   submitError?: string | null;
   lastStartedRun?: SeoSkillRun | null;
-  runStatus?: string | null;
+  runStatus?: SeoSkillRunStatus | string | null;
+  runStatusLabel?: string | null;
+  runSummary?: SeoSkillRunResultsSummary | null;
 }
 
 export function SeoSkillLauncher({
@@ -27,6 +33,8 @@ export function SeoSkillLauncher({
   submitError,
   lastStartedRun,
   runStatus,
+  runStatusLabel,
+  runSummary,
 }: SeoSkillLauncherProps) {
   const selectedLabels = skills
     .filter((skill) => selectedSkillKeys.includes(skill.key))
@@ -37,6 +45,9 @@ export function SeoSkillLauncher({
     targetUrl,
     isSubmitting,
   });
+
+  const displayStatus = runStatusLabel ?? formatSeoSkillRunStatus(runStatus ?? lastStartedRun?.status);
+  const isPartialFailed = (runStatus ?? lastStartedRun?.status) === "partial_failed";
 
   return (
     <aside className="seo-skill-launcher gcr-card">
@@ -113,10 +124,33 @@ export function SeoSkillLauncher({
       )}
 
       {lastStartedRun && (
-        <div className="seo-skill-launcher__feedback seo-skill-launcher__feedback--success">
-          <strong>Run avviata</strong>
-          <p>ID: {lastStartedRun.id}</p>
-          <p>Stato: {runStatus ?? lastStartedRun.status}</p>
+        <div
+          className={`seo-skill-launcher__feedback ${
+            isPartialFailed
+              ? "seo-skill-launcher__feedback--warn"
+              : "seo-skill-launcher__feedback--success"
+          }`}
+        >
+          <strong>Analisi avviata</strong>
+          <p>Stato: {displayStatus}</p>
+          {isPartialFailed && (
+            <p>
+              Alcune skill non sono riuscite. Il dettaglio sarà visibile nel pannello risultati.
+            </p>
+          )}
+          {runSummary && (
+            <>
+              <p>
+                {runSummary.selectedCount} skill selezionate — {runSummary.completedCount} completate
+                {runSummary.failedCount > 0 ? `, ${runSummary.failedCount} fallite` : ""}
+              </p>
+              {runSummary.firstFailure && (
+                <p>
+                  {runSummary.firstFailure.label}: {runSummary.firstFailure.errorMessage}
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 

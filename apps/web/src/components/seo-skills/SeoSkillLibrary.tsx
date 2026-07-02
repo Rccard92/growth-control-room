@@ -8,7 +8,9 @@ import {
 import { SeoSkillCard } from "./SeoSkillCard";
 import { SeoSkillLauncher } from "./SeoSkillLauncher";
 import {
+  buildRunResultsSummary,
   formatSeoSkillRunError,
+  formatSeoSkillRunStatus,
   getSkillDisabledReason,
   isSkillSelectable,
   matchesCategoryFilter,
@@ -42,6 +44,17 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
   const filteredSkills = useMemo(
     () => skills.filter((skill) => matchesCategoryFilter(skill, categoryFilter)),
     [skills, categoryFilter],
+  );
+
+  const skillsByKey = useMemo(
+    () => new Map(skills.map((skill) => [skill.key, skill])),
+    [skills],
+  );
+
+  const runStatus = runQuery.data?.run.status ?? lastStartedRun?.status;
+  const runSummary = useMemo(
+    () => buildRunResultsSummary(runQuery.data?.results, skillsByKey),
+    [runQuery.data?.results, skillsByKey],
   );
 
   const handleToggleSkill = (skillKey: string) => {
@@ -187,7 +200,9 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
           isSubmitting={startMutation.isPending}
           submitError={submitError}
           lastStartedRun={lastStartedRun}
-          runStatus={runQuery.data?.run.status ?? lastStartedRun?.status}
+          runStatus={runStatus}
+          runStatusLabel={formatSeoSkillRunStatus(runStatus)}
+          runSummary={runSummary}
         />
       </div>
     </div>

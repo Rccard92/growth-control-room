@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from openai import BadRequestError
+import pytest
 
 from app.services.ai.ai_client import (
     AiRequestMetadata,
@@ -97,3 +98,21 @@ def test_bad_request_error_message_is_readable() -> None:
             mock_log.assert_awaited()
 
     asyncio.run(run())
+
+
+def test_empty_openai_response_maps_to_user_message() -> None:
+    from app.services.ai.ai_client import (
+        _SchemaParseError,
+        _parse_json_object_response,
+        _user_message_for_parse_error,
+    )
+    from app.services.seo_skills.error_messages import OPENAI_EMPTY_RESPONSE_USER_MESSAGE
+
+    response = MagicMock()
+    response.choices = [MagicMock(message=MagicMock(content=""))]
+
+    with pytest.raises(_SchemaParseError) as exc_info:
+        _parse_json_object_response(response)
+
+    assert exc_info.value.empty_content is True
+    assert _user_message_for_parse_error(exc_info.value) == OPENAI_EMPTY_RESPONSE_USER_MESSAGE

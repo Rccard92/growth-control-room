@@ -15,6 +15,7 @@ from app.db.session import get_session_factory
 from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
 from app.schemas.seo_skills import SeoSkillCatalogItem, SeoSkillRunCreateRequest
 from app.services.seo_skills.catalog_loader import get_seo_skill_by_key
+from app.services.seo_skills.error_messages import humanize_skill_error
 from app.services.seo_skills.exceptions import (
     SeoSkillRunError,
     SeoSkillRunnerError,
@@ -261,7 +262,7 @@ async def process_seo_skill_run(run_id: UUID) -> None:
                     exc,
                 )
                 result.status = "failed"
-                result.error_message = str(exc)
+                result.error_message = humanize_skill_error(exc, provider=run.provider)
                 result.completed_at = _utcnow()
                 failed_count += 1
             else:

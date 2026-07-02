@@ -3,6 +3,7 @@ import {
   formatSkillCategory,
   formatSkillRuntime,
   formatSkillStatus,
+  formatDefaultProvider,
 } from "./seo-skills-utils";
 
 interface SeoSkillCardProps {
@@ -51,10 +52,9 @@ export function SeoSkillCard({
         <span className={`seo-skill-badge seo-skill-badge--runtime seo-skill-badge--runtime-${skill.runtime}`}>
           {formatSkillRuntime(skill.runtime)}
         </span>
-        <span className="seo-skill-badge seo-skill-badge--provider">
-          {skill.defaultProvider}
-        </span>
       </div>
+
+      <p className="seo-skill-card__default-provider">{formatDefaultProvider(String(skill.defaultProvider))}</p>
 
       <div className="seo-skill-card__meta">
         <span className="seo-skill-card__meta-label">Comando</span>

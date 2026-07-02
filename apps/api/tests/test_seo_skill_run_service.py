@@ -65,6 +65,7 @@ def _build_run(
     selected_skills=None,
     results=None,
     status="pending",
+    provider="claude",
 ) -> SeoSkillRun:
     run_id = run_id or uuid4()
     selected = selected_skills or ["seo_geo", "seo_page"]
@@ -73,7 +74,7 @@ def _build_run(
         project_id=project_id,
         target_type="url",
         url="https://example.com/page",
-        provider="claude",
+        provider=provider,
         selected_skills=selected,
         status=status,
         progress_percent=0,
@@ -349,6 +350,45 @@ def test_process_seo_skill_run_partial_failed() -> None:
         statuses = {result.skill_key: result.status for result in run_row.results}
         assert statuses["seo_geo"] == "completed"
         assert statuses["seo_page"] == "failed"
+        failed_page = next(result for result in run_row.results if result.skill_key == "seo_page")
+        assert failed_page.error_message == "provider failed"
+
+    asyncio.run(run())
+
+
+def test_process_seo_skill_run_partial_failed_humanizes_empty_openai() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_row = _build_run(project_id=project_id, provider="openai")
+        session, factory = _process_session_factory(run_row)
+
+        async def skill_output(**kwargs: object) -> dict:
+            if kwargs["skill_key"] == "seo_page":
+                raise SeoSkillProviderError("Risposta OpenAI vuota")
+            return {
+                "skillKey": kwargs["skill_key"],
+                "score": 70,
+                "findings": [],
+                "recommendations": [],
+                "tasks": [],
+                "artifacts": {},
+                "warnings": [],
+            }
+
+        with (
+            patch(
+                "app.services.seo_skills.run_service.get_session_factory",
+                return_value=factory,
+            ),
+            patch(
+                "app.services.seo_skills.run_service.run_single_seo_skill",
+                new=AsyncMock(side_effect=skill_output),
+            ),
+        ):
+            await process_seo_skill_run(run_row.id)
+
+        failed_page = next(result for result in run_row.results if result.skill_key == "seo_page")
+        assert "risposta vuota" in failed_page.error_message.lower()
 
     asyncio.run(run())
 

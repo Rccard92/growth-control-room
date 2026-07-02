@@ -356,7 +356,7 @@ def test_run_single_seo_skill_provider_error_is_readable() -> None:
         ):
             with pytest.raises(
                 SeoSkillProviderError,
-                match="SEO skill provider request failed",
+                match="Errore temporaneo del provider AI",
             ):
                 await run_single_seo_skill(
                     session,
@@ -422,6 +422,7 @@ def test_run_single_seo_skill_uses_operation_key_claude_seo_geo() -> None:
         assert metadata.job_id == str(run_id)
         assert metadata.module == "seo_skills"
         assert metadata.entity_type == "url"
+        assert metadata.context_profile == "seo_skill_audit"
 
     asyncio.run(run())
 

@@ -125,6 +125,16 @@ def test_claude_seo_implemented_operations() -> None:
         assert op.status == "implemented"
         assert op.enabled is True
         assert op.ui_category == "seo_advanced"
+        assert op.recommended_tier != "cheap"
+        assert op.context_profile == "seo_skill_audit"
+
+
+def test_claude_seo_page_uses_standard_tokens() -> None:
+    op = get_operation("claude_seo_page")
+    assert op is not None
+    assert op.recommended_tier == "standard"
+    assert op.recommended_max_output_tokens >= 3500
+    assert op.recommended_temperature == 0.30
 
 
 def test_claude_seo_planned_operations() -> None:

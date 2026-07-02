@@ -10,12 +10,13 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.seo_skills import SeoSkillCatalogItem
-from app.services.ai.ai_client import AiRequestMetadata, OpenAIRequestError
+from app.services.ai.ai_client import AiRequestMetadata
 from app.services.ai.context_profiles import build_prompt_cache_key
-from app.services.ai.exceptions import ClaudeNotConfiguredError, ClaudeRequestError
+from app.services.ai.exceptions import ClaudeNotConfiguredError, ClaudeRequestError, OpenAIRequestError
 from app.services.ai.operation_registry import get_operation_key_for_seo_skill
 from app.services.ai.provider_router import generate_structured_json_with_provider
 from app.services.seo_skills.catalog_loader import get_seo_skill_by_key
+from app.services.seo_skills.error_messages import humanize_skill_error
 from app.services.seo_skills.exceptions import (
     SeoSkillNotAvailableError,
     SeoSkillProviderError,
@@ -119,7 +120,7 @@ def _build_ai_metadata(
         entity_type=target_type,
         entity_id=str(target_id) if target_id else None,
         job_id=str(run_id) if run_id else None,
-        context_profile="generic",
+        context_profile="seo_skill_audit",
     )
 
 
@@ -250,7 +251,9 @@ async def run_single_seo_skill(
             run_id,
             exc,
         )
-        raise SeoSkillProviderError(f"SEO skill provider request failed: {exc}") from exc
+        raise SeoSkillProviderError(
+            humanize_skill_error(exc, provider=normalized_provider)
+        ) from exc
 
     if not isinstance(raw_output, dict):
         raise SeoSkillRunnerError("SEO skill provider returned a non-object JSON response")

@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { SeoSkillCatalogItem } from "@gcr/shared";
+import type { SeoSkillCatalogItem, SeoSkillRunResult } from "@gcr/shared";
 import {
+  buildRunResultsSummary,
   canSubmitLauncher,
+  formatDefaultProvider,
   formatSeoSkillRunError,
+  formatSeoSkillRunStatus,
+  formatSkillRuntime,
   getSkillDisabledReason,
   isSkillSelectable,
   matchesCategoryFilter,
@@ -50,6 +54,67 @@ describe("getSkillDisabledReason", () => {
     expect(
       getSkillDisabledReason(makeSkill({ runtime: "connector_required" })),
     ).toBe("Runtime non ancora supportato");
+  });
+});
+
+describe("formatSeoSkillRunStatus", () => {
+  it("maps partial_failed to Italian label", () => {
+    expect(formatSeoSkillRunStatus("partial_failed")).toBe("Completata con errori");
+  });
+});
+
+describe("formatSkillRuntime", () => {
+  it("maps prompt_only to Analisi AI", () => {
+    expect(formatSkillRuntime("prompt_only")).toBe("Analisi AI");
+  });
+});
+
+describe("formatDefaultProvider", () => {
+  it("shows provider predefinito label", () => {
+    expect(formatDefaultProvider("claude")).toBe("Provider predefinito: Claude");
+  });
+});
+
+describe("buildRunResultsSummary", () => {
+  it("summarizes completed and failed skills", () => {
+    const skills = new Map<string, SeoSkillCatalogItem>([
+      [
+        "seo_page",
+        {
+          ...makeSkill(),
+          key: "seo_page",
+          label: "Page SEO",
+        },
+      ],
+    ]);
+    const results: SeoSkillRunResult[] = [
+      {
+        id: "1",
+        runId: "run-1",
+        projectId: "proj-1",
+        skillKey: "seo_geo",
+        status: "completed",
+      },
+      {
+        id: "2",
+        runId: "run-1",
+        projectId: "proj-1",
+        skillKey: "seo_page",
+        status: "failed",
+        errorMessage: "OpenAI ha restituito una risposta vuota.",
+      },
+    ];
+
+    const summary = buildRunResultsSummary(results, skills);
+    expect(summary).toEqual({
+      selectedCount: 2,
+      completedCount: 1,
+      failedCount: 1,
+      firstFailure: {
+        label: "Page SEO",
+        errorMessage: "OpenAI ha restituito una risposta vuota.",
+      },
+    });
   });
 });
 

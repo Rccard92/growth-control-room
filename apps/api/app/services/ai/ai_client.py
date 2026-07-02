@@ -31,6 +31,7 @@ from app.services.ai.usage_service import (
     record_usage_log,
     truncate_preview,
 )
+from app.services.seo_skills.error_messages import OPENAI_EMPTY_RESPONSE_USER_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -152,11 +153,43 @@ def _extract_usage(response: Any) -> dict[str, int]:
 
 
 class _SchemaParseError(Exception):
-    def __init__(self, *, content: str, response: Any | None, message: str) -> None:
+    def __init__(
+        self,
+        *,
+        content: str,
+        response: Any | None,
+        message: str,
+        empty_content: bool = False,
+    ) -> None:
         super().__init__(message)
         self.content = content
         self.response = response
         self.error_message = message
+        self.empty_content = empty_content
+
+
+def _user_message_for_parse_error(parse_exc: _SchemaParseError) -> str:
+    if parse_exc.empty_content:
+        return OPENAI_EMPTY_RESPONSE_USER_MESSAGE
+    return parse_exc.error_message
+
+
+def _log_empty_openai_response(
+    *,
+    response: Any | None,
+    metadata: AiRequestMetadata,
+    resolved: AiResolvedModel,
+) -> None:
+    usage = _extract_usage(response) if response is not None else {}
+    logger.warning(
+        "OpenAI empty response module=%s operation_key=%s context_profile=%s "
+        "model=%s output_tokens=%s",
+        metadata.module,
+        metadata.operation_key,
+        metadata.context_profile,
+        resolved.model,
+        usage.get("output_tokens", 0),
+    )
 
 
 def _parse_json_object_response(response: Any) -> tuple[dict[str, Any], str]:
@@ -166,6 +199,7 @@ def _parse_json_object_response(response: Any) -> tuple[dict[str, Any], str]:
             content=content,
             response=response,
             message="Risposta OpenAI vuota",
+            empty_content=True,
         )
     try:
         parsed = json.loads(content)
@@ -371,8 +405,48 @@ async def generate_structured_json(
         try:
             parsed, content = _parse_json_object_response(response)
         except _SchemaParseError as parse_exc:
+            if parse_exc.empty_content:
+                _log_empty_openai_response(
+                    response=parse_exc.response,
+                    metadata=metadata,
+                    resolved=active_resolved,
+                )
             if (
+                parse_exc.empty_content
+                and metadata.module == "seo_skills"
+                and active_resolved.policy_source != "empty_response_retry"
+            ):
+                async with session_factory() as retry_session:
+                    active_resolved = await resolve_standard_fallback(
+                        retry_session, metadata.project_id
+                    )
+                    active_resolved = active_resolved.model_copy(
+                        update={"policy_source": "empty_response_retry"}
+                    )
+                    await retry_session.commit()
+                logger.warning(
+                    "OpenAI empty response; retry with standard tier (project=%s module=%s)",
+                    metadata.project_id,
+                    metadata.module,
+                )
+                response = await _call_openai(
+                    client,
+                    resolved=active_resolved,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    timeout=timeout,
+                )
+                last_request_params = build_openai_request_params(
+                    active_resolved,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    structured_json=True,
+                    timeout=timeout,
+                )
+                parsed, content = _parse_json_object_response(response)
+            elif (
                 settings.ai_enable_model_fallback_on_schema_error
+                and not parse_exc.empty_content
                 and active_resolved.policy_source != "schema_fallback_retry"
             ):
                 schema_retried = True
@@ -402,7 +476,9 @@ async def generate_structured_json(
                 )
                 parsed, content = _parse_json_object_response(response)
             else:
-                raise OpenAIRequestError(parse_exc.error_message) from parse_exc
+                raise OpenAIRequestError(
+                    _user_message_for_parse_error(parse_exc)
+                ) from parse_exc
     except OpenAINotConfiguredError:
         raise
     except OpenAIRequestError:
@@ -432,7 +508,7 @@ async def generate_structured_json(
                 error_message=error_message,
             )
         )
-        raise OpenAIRequestError(error_message)
+        raise OpenAIRequestError(_user_message_for_parse_error(parse_exc))
     except OpenAIError as exc:
         status = "error"
         error_type = type(exc).__name__

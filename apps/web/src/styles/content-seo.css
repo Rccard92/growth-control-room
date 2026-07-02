@@ -2634,6 +2634,18 @@
   color: #a7f3d0;
 }
 
+.seo-skill-launcher__feedback--warn {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  color: #fcd34d;
+}
+
+.seo-skill-card__default-provider {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
 .seo-skill-launcher__submit {
   width: 100%;
 }

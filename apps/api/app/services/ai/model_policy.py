@@ -61,6 +61,11 @@ PROFILE_PARAMS: dict[str, dict[str, object]] = {
         "temperature": 0.2,
         "reasoning_if_available": True,
     },
+    "seo_skill_audit": {
+        "tier": AiModelTier.STANDARD,
+        "max_output_tokens": 4500,
+        "temperature": 0.3,
+    },
 }
 
 

@@ -1,4 +1,4 @@
-import type { SeoSkillCatalogItem } from "@gcr/shared";
+import type { SeoSkillCatalogItem, SeoSkillRunResult, SeoSkillRunStatus } from "@gcr/shared";
 
 export const SEO_SKILL_CATEGORY_FILTERS = [
   { key: "all", label: "Tutte" },
@@ -47,11 +47,29 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const RUNTIME_LABELS: Record<string, string> = {
-  prompt_only: "Prompt only",
+  prompt_only: "Analisi AI",
   connector_required: "Connector richiesto",
   external_api_required: "API esterna richiesta",
   planned: "Pianificato",
 };
+
+const RUN_STATUS_LABELS: Record<string, string> = {
+  pending: "In attesa",
+  running: "Analisi in corso",
+  completed: "Completata",
+  partial_failed: "Completata con errori",
+  failed: "Fallita",
+};
+
+export interface SeoSkillRunResultsSummary {
+  selectedCount: number;
+  completedCount: number;
+  failedCount: number;
+  firstFailure?: {
+    label: string;
+    errorMessage: string;
+  };
+}
 
 export function isSkillSelectable(skill: SeoSkillCatalogItem): boolean {
   return skill.enabled && skill.status === "available" && skill.runtime === "prompt_only";
@@ -85,6 +103,45 @@ export function formatSkillRuntime(runtime: string): string {
   return RUNTIME_LABELS[runtime] ?? formatSkillCategory(runtime);
 }
 
+export function formatSeoSkillRunStatus(status?: SeoSkillRunStatus | string | null): string {
+  if (!status) return "";
+  return RUN_STATUS_LABELS[status] ?? formatSkillCategory(status);
+}
+
+export function formatDefaultProvider(provider: string): string {
+  const normalized = provider.trim();
+  if (!normalized) return "Provider predefinito: —";
+  const label = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  return `Provider predefinito: ${label}`;
+}
+
+export function buildRunResultsSummary(
+  results: SeoSkillRunResult[] | undefined,
+  skillsByKey: Map<string, SeoSkillCatalogItem>,
+): SeoSkillRunResultsSummary | null {
+  if (!results?.length) return null;
+
+  const completedCount = results.filter((item) => item.status === "completed").length;
+  const failedCount = results.filter((item) => item.status === "failed").length;
+  const firstFailed = results.find((item) => item.status === "failed");
+
+  const summary: SeoSkillRunResultsSummary = {
+    selectedCount: results.length,
+    completedCount,
+    failedCount,
+  };
+
+  if (firstFailed) {
+    const label = skillsByKey.get(firstFailed.skillKey)?.label ?? firstFailed.skillKey;
+    summary.firstFailure = {
+      label,
+      errorMessage: firstFailed.errorMessage?.trim() || "Errore durante l'esecuzione della skill.",
+    };
+  }
+
+  return summary;
+}
+
 export function matchesCategoryFilter(
   skill: SeoSkillCatalogItem,
   filterKey: SeoSkillCategoryFilterKey,
@@ -114,6 +171,9 @@ export function formatSeoSkillRunError(err: unknown): string {
   }
   if (lowered.includes("openai provider is not configured") || lowered.includes("openai non configurato")) {
     return "Provider OpenAI non configurato sul backend.";
+  }
+  if (lowered.includes("risposta vuota") || lowered.includes("risposta openai vuota")) {
+    return "OpenAI ha restituito una risposta vuota. Riprova con un modello più stabile o con provider Claude.";
   }
   if (lowered.includes("not available") || lowered.includes("non disponibile")) {
     return "Una o più skill selezionate non sono disponibili.";

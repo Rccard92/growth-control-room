@@ -288,8 +288,8 @@ GCR_METADATA: dict[str, dict[str, str]] = {
     },
     "claude_seo_page": {
         "ui_category": "seo_advanced",
-        "gcr_recommended_model": "gpt-5.4-mini",
-        "gcr_recommendation_reason": "Analisi pagina singola con output mirato.",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Analisi pagina singola con output strutturato e contesto sufficiente.",
         "description": "Analizza una singola pagina con regole Claude SEO adattate alla Growth Control Room.",
     },
     "claude_seo_technical": {
@@ -306,13 +306,13 @@ GCR_METADATA: dict[str, dict[str, str]] = {
     },
     "claude_seo_content_brief": {
         "ui_category": "seo_advanced",
-        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommended_model": "gpt-5.4",
         "gcr_recommendation_reason": "Brief strutturato con outline e keyword mirate.",
         "description": "Genera brief SEO con search intent, outline, keyword e template per tipo pagina.",
     },
     "claude_seo_schema": {
         "ui_category": "seo_advanced",
-        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommended_model": "gpt-5.4",
         "gcr_recommendation_reason": "Structured data con JSON-LD controllato.",
         "description": "Analizza e propone miglioramenti Schema.org e JSON-LD per pagine ecommerce e contenuti.",
     },
@@ -324,8 +324,8 @@ GCR_METADATA: dict[str, dict[str, str]] = {
     },
     "claude_seo_images": {
         "ui_category": "seo_advanced",
-        "gcr_recommended_model": "gpt-5.4-mini",
-        "gcr_recommendation_reason": "Task mirato su alt text e segnali immagine.",
+        "gcr_recommended_model": "gpt-5.4",
+        "gcr_recommendation_reason": "Task mirato su alt text e segnali immagine con modello standard.",
         "description": "Analizza alt text, naming, formati, peso immagini e opportunità SEO immagini.",
     },
     "claude_seo_sitemap_analyze": {
@@ -354,7 +354,7 @@ GCR_METADATA: dict[str, dict[str, str]] = {
     },
     "claude_seo_hreflang": {
         "ui_category": "seo_advanced",
-        "gcr_recommended_model": "gpt-5.4-mini",
+        "gcr_recommended_model": "gpt-5.4",
         "gcr_recommendation_reason": "Audit hreflang mirato con raccomandazioni implementative.",
         "description": "Audit tag hreflang e guida implementazione per siti multilingua.",
     },
@@ -553,25 +553,32 @@ def _seo_skill_op(
     label: str,
     tier: str,
     *,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+    context_profile: str = "seo_skill_audit",
     status: OperationStatus = "implemented",
     enabled: bool = True,
     recommended_use: str = "",
     warning_notes: str | None = None,
 ) -> AiOperationDefinition:
     env_key = "OPENAI_MODEL_PREMIUM" if tier == "premium" else "OPENAI_MODEL_STANDARD"
-    max_tokens = 4500 if tier == "premium" else 3000
-    temperature = 0.35 if tier == "premium" else 0.4
+    resolved_max_tokens = (
+        max_tokens if max_tokens is not None else (4500 if tier == "premium" else 3500)
+    )
+    resolved_temperature = (
+        temperature if temperature is not None else (0.35 if tier == "premium" else 0.3)
+    )
     tier_label = "Premium" if tier == "premium" else "Standard"
     return _op(
         f"claude_{skill_key}",
         label,
         "seo_skills",
         skill_key,
-        "generic",
+        context_profile,
         tier,
         env_key,
-        max_tokens,
-        temperature,
+        resolved_max_tokens,
+        resolved_temperature,
         recommended_use=recommended_use or f"{tier_label}: skill SEO con output JSON strutturato.",
         warning_notes=warning_notes,
         status=status,
@@ -948,22 +955,100 @@ def _build_registry() -> dict[str, AiOperationDefinition]:
         _op("seo_article_optimization", "Ottimizzazione articolo SEO", "content_seo", "optimize_article", "article_draft", "standard", "OPENAI_MODEL_STANDARD", 3000, 0.45, status="planned", enabled=False, recommended_use="Standard per ottimizzazione."),
         # Claude SEO Skill Library
         _seo_skill_op("seo_audit", "SEO Audit sito", "premium"),
-        _seo_skill_op("seo_page", "SEO pagina singola", "standard"),
+        _seo_skill_op(
+            "seo_page",
+            "SEO pagina singola",
+            "standard",
+            max_tokens=3500,
+            temperature=0.30,
+        ),
         _seo_skill_op("seo_technical", "SEO tecnico", "premium"),
-        _seo_skill_op("seo_content", "SEO contenuto", "premium"),
-        _seo_skill_op("seo_content_brief", "Brief contenuto SEO", "standard"),
-        _seo_skill_op("seo_schema", "Schema markup SEO", "standard"),
-        _seo_skill_op("seo_geo", "AI Search / GEO audit", "premium"),
-        _seo_skill_op("seo_images", "SEO immagini", "standard"),
+        _seo_skill_op(
+            "seo_content",
+            "SEO contenuto",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_content_brief",
+            "Brief contenuto SEO",
+            "standard",
+            max_tokens=4000,
+            temperature=0.35,
+        ),
+        _seo_skill_op(
+            "seo_schema",
+            "Schema markup SEO",
+            "standard",
+            max_tokens=3500,
+            temperature=0.20,
+        ),
+        _seo_skill_op(
+            "seo_geo",
+            "AI Search / GEO audit",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_images",
+            "SEO immagini",
+            "standard",
+            max_tokens=3000,
+            temperature=0.25,
+        ),
         _seo_skill_op("seo_sitemap_analyze", "Analisi sitemap", "standard"),
         _seo_skill_op("seo_sitemap_generate", "Generazione sitemap", "standard"),
-        _seo_skill_op("seo_plan", "Piano SEO strategico", "premium"),
-        _seo_skill_op("seo_competitor_pages", "Pagine competitor", "premium"),
-        _seo_skill_op("seo_hreflang", "Hreflang audit", "standard"),
-        _seo_skill_op("seo_programmatic", "Programmatic SEO", "premium"),
-        _seo_skill_op("seo_cluster", "Keyword clustering", "premium"),
-        _seo_skill_op("seo_sxo", "Search Experience Optimization", "premium"),
-        _seo_skill_op("seo_ecommerce", "SEO ecommerce", "premium"),
+        _seo_skill_op(
+            "seo_plan",
+            "Piano SEO strategico",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_competitor_pages",
+            "Pagine competitor",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_hreflang",
+            "Hreflang audit",
+            "standard",
+            max_tokens=3500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_programmatic",
+            "Programmatic SEO",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_cluster",
+            "Keyword clustering",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_sxo",
+            "Search Experience Optimization",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
+        _seo_skill_op(
+            "seo_ecommerce",
+            "SEO ecommerce",
+            "premium",
+            max_tokens=4500,
+            temperature=0.30,
+        ),
         _seo_skill_op("seo_flow", "Workflow SEO", "premium"),
         _seo_skill_op(
             "seo_google",
