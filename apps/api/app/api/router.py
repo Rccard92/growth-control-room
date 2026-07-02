@@ -1,12 +1,22 @@
 from fastapi import APIRouter
 
-from app.api.routes import ai_model_settings, ai_usage, brand_intelligence, content_seo, health, shopify, shopify_oauth
+from app.api.routes import (
+    ai_model_settings,
+    ai_usage,
+    brand_intelligence,
+    content_seo,
+    health,
+    seo_skills,
+    shopify,
+    shopify_oauth,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(shopify.router)
 api_router.include_router(shopify_oauth.router)
 api_router.include_router(content_seo.router)
+api_router.include_router(seo_skills.router)
 api_router.include_router(brand_intelligence.router)
 api_router.include_router(ai_usage.router)
 api_router.include_router(ai_usage.global_router)

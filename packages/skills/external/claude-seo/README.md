@@ -22,6 +22,13 @@ Growth Control Room adapts selected rules into the internal skill pack at
 | seo-schema | `imported-skills/seo-schema/` | Future structured data |
 | seo-cluster | `imported-skills/seo-cluster/` | Future keyword clustering |
 
+## GCR skill catalog
+
+`skill-catalog.json` in this directory is the **internal Growth Control Room catalog** of upstream Claude SEO skills.
+It exposes structured metadata (status, runtime, integrations, output schema) for the API route
+`GET /projects/{project_id}/seo-skills/catalog` and shared TypeScript types in `packages/shared`.
+This catalog is read-only metadata only; it does not load or execute Claude Code plugin runtime.
+
 ## Not used in GCR v1
 
 The following capabilities from the upstream project are **intentionally excluded**:
