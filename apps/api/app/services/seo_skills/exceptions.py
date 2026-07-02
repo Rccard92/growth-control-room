@@ -25,3 +25,17 @@ class SeoSkillNotAvailableError(SeoSkillRunnerError):
 
 class SeoSkillProviderError(SeoSkillRunnerError):
     pass
+
+
+class SeoSkillRunError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+
+class SeoSkillRunValidationError(SeoSkillRunError):
+    pass
+
+
+class SeoSkillRunNotFoundError(SeoSkillRunError):
+    pass
