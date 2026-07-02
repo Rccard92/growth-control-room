@@ -133,7 +133,7 @@ def test_claude_seo_page_uses_standard_tokens() -> None:
     op = get_operation("claude_seo_page")
     assert op is not None
     assert op.recommended_tier == "standard"
-    assert op.recommended_max_output_tokens >= 3500
+    assert op.recommended_max_output_tokens == 6000
     assert op.recommended_temperature == 0.30
 
 

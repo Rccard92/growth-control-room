@@ -159,6 +159,18 @@ describe("formatSeoSkillRunError", () => {
       "OpenAI non ha restituito un JSON valido. Riprova l'analisi o usa un modello più stabile.",
     );
   });
+
+  it("maps output truncated error", () => {
+    expect(
+      formatSeoSkillRunError(
+        new Error(
+          "OpenAI ha interrotto la risposta perché l'output era troppo lungo.",
+        ),
+      ),
+    ).toBe(
+      "OpenAI ha interrotto la risposta perché l'output era troppo lungo. Riprova l'analisi con meno skill o un modello con più token.",
+    );
+  });
 });
 
 describe("matchesCategoryFilter", () => {

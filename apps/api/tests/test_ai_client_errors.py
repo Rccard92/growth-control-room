@@ -167,14 +167,48 @@ def test_parse_json_object_response_invalid_json_maps_to_user_message() -> None:
     from app.services.seo_skills.error_messages import OPENAI_INVALID_JSON_USER_MESSAGE
 
     response = MagicMock()
-    response.choices = [MagicMock(message=MagicMock(content="not json at all"))]
+    response.choices = [
+        MagicMock(
+            message=MagicMock(content="not json at all"),
+            finish_reason="stop",
+        )
+    ]
 
     with pytest.raises(_SchemaParseError) as exc_info:
         _parse_json_object_response(response)
 
     assert exc_info.value.invalid_json is True
+    assert exc_info.value.output_truncated is False
     assert exc_info.value.error_message == "Risposta OpenAI non è JSON valido"
     assert _user_message_for_parse_error(exc_info.value) == OPENAI_INVALID_JSON_USER_MESSAGE
+
+
+def test_parse_json_object_response_truncated_output_maps_to_truncation_message() -> None:
+    from app.services.ai.ai_client import (
+        _SchemaParseError,
+        _parse_error_code,
+        _parse_json_object_response,
+        _user_message_for_parse_error,
+    )
+    from app.services.seo_skills.error_messages import OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE
+
+    response = MagicMock()
+    response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content='{"skillKey":"seo_page","summary":"La pagina prodotto è già ben impostata'
+            ),
+            finish_reason="length",
+        )
+    ]
+
+    with pytest.raises(_SchemaParseError) as exc_info:
+        _parse_json_object_response(response)
+
+    assert exc_info.value.output_truncated is True
+    assert exc_info.value.invalid_json is True
+    assert _user_message_for_parse_error(exc_info.value) == OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE
+    assert _parse_error_code(exc_info.value) == "output_truncated"
 
 
 def test_generate_structured_json_propagates_json_schema() -> None:

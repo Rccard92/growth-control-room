@@ -63,7 +63,7 @@ PROFILE_PARAMS: dict[str, dict[str, object]] = {
     },
     "seo_skill_audit": {
         "tier": AiModelTier.STANDARD,
-        "max_output_tokens": 4500,
+        "max_output_tokens": 6000,
         "temperature": 0.3,
     },
 }
@@ -184,6 +184,7 @@ def _resolve_from_registry(operation_key: str) -> AiResolvedModel | None:
         tier=tier.value,
         max_output_tokens=op.recommended_max_output_tokens,
         temperature=op.recommended_temperature,
+        reasoning_effort="low" if op.module == "seo_skills" else None,
         fallback_model=_legacy_fallback_model(),
         operation_key=operation_key,
         policy_source="registry_default",
@@ -341,6 +342,13 @@ async def resolve_ai_model(
                 model_name=registry_resolved.model,
             )
             warnings.extend(guardrails)
+            if (
+                resolved_key.startswith("claude_seo_")
+                and not registry_resolved.reasoning_effort
+            ):
+                registry_resolved = registry_resolved.model_copy(
+                    update={"reasoning_effort": "low"}
+                )
             registry_resolved.warning = "; ".join(warnings) if warnings else None
             return registry_resolved
 

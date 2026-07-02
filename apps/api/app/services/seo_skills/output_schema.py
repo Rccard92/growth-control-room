@@ -89,24 +89,28 @@ def _enum_schema(values: frozenset[str]) -> dict[str, Any]:
     return {"type": "string", "enum": sorted(values)}
 
 
+def _string_schema(max_length: int) -> dict[str, Any]:
+    return {"type": "string", "maxLength": max_length}
+
+
 def get_seo_skill_output_json_schema() -> dict[str, Any]:
     """OpenAI Structured Outputs JSON Schema for normalized SEO skill output."""
     finding_schema = _strict_object_schema(
         properties={
             "severity": _enum_schema(ALLOWED_SEVERITIES),
-            "area": {"type": "string"},
-            "title": {"type": "string"},
-            "description": {"type": "string"},
-            "evidence": {"type": "string"},
-            "recommendation": {"type": "string"},
-            "howToValidate": {"type": "string"},
+            "area": _string_schema(80),
+            "title": _string_schema(160),
+            "description": _string_schema(700),
+            "evidence": _string_schema(500),
+            "recommendation": _string_schema(700),
+            "howToValidate": _string_schema(500),
             "priority": _enum_schema(ALLOWED_PRIORITIES),
         },
     )
     recommendation_schema = _strict_object_schema(
         properties={
-            "title": {"type": "string"},
-            "description": {"type": "string"},
+            "title": _string_schema(160),
+            "description": _string_schema(700),
             "priority": _enum_schema(ALLOWED_PRIORITIES),
             "impact": _enum_schema(ALLOWED_PRIORITIES),
             "effort": _enum_schema(ALLOWED_EFFORTS),
@@ -114,8 +118,8 @@ def get_seo_skill_output_json_schema() -> dict[str, Any]:
     )
     task_schema = _strict_object_schema(
         properties={
-            "title": {"type": "string"},
-            "description": {"type": "string"},
+            "title": _string_schema(160),
+            "description": _string_schema(600),
             "priority": _enum_schema(ALLOWED_PRIORITIES),
             "ownerType": _enum_schema(ALLOWED_OWNER_TYPES),
             "estimatedEffort": _enum_schema(ALLOWED_EFFORTS),
@@ -125,29 +129,32 @@ def get_seo_skill_output_json_schema() -> dict[str, Any]:
         properties={
             "jsonLd": {
                 "type": "array",
+                "maxItems": 2,
                 "items": _strict_object_schema(
                     properties={
-                        "@type": {"type": "string"},
-                        "name": {"type": "string"},
-                        "description": {"type": "string"},
+                        "@type": _string_schema(120),
+                        "name": _string_schema(160),
+                        "description": _string_schema(500),
                     },
                 ),
             },
-            "markdownReport": {"type": "string"},
+            "markdownReport": _string_schema(1200),
             "shopifySidekickPrompts": {
                 "type": "array",
-                "items": {"type": "string"},
+                "maxItems": 3,
+                "items": _string_schema(500),
             },
             "implementationNotes": {
                 "type": "array",
-                "items": {"type": "string"},
+                "maxItems": 6,
+                "items": _string_schema(500),
             },
         },
     )
     return _strict_object_schema(
         properties={
-            "skillKey": {"type": "string"},
-            "summary": {"type": "string"},
+            "skillKey": _string_schema(80),
+            "summary": _string_schema(900),
             "score": {
                 "anyOf": [
                     {"type": "integer"},
@@ -156,20 +163,24 @@ def get_seo_skill_output_json_schema() -> dict[str, Any]:
             },
             "findings": {
                 "type": "array",
+                "maxItems": 6,
                 "items": finding_schema,
             },
             "recommendations": {
                 "type": "array",
+                "maxItems": 6,
                 "items": recommendation_schema,
             },
             "tasks": {
                 "type": "array",
+                "maxItems": 8,
                 "items": task_schema,
             },
             "artifacts": artifacts_schema,
             "warnings": {
                 "type": "array",
-                "items": {"type": "string"},
+                "maxItems": 6,
+                "items": _string_schema(300),
             },
         },
     )

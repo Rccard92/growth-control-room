@@ -52,6 +52,10 @@ def test_build_skill_system_prompt_requires_json_only() -> None:
 
     assert "SOLO JSON valido" in prompt
     assert "Non usare markdown fuori dal JSON" in prompt
+    assert "JSON compatto" in prompt
+    assert "Non superare 6 findings" in prompt
+    assert "Non superare 6 recommendations" in prompt
+    assert "Non superare 8 tasks" in prompt
 
 
 def test_build_skill_system_prompt_includes_output_schema() -> None:

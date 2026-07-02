@@ -23,11 +23,22 @@ OPENAI_INVALID_JSON_RUN_MESSAGE = (
     "Riprova l'analisi o usa un modello più stabile."
 )
 
+OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE = (
+    "OpenAI ha interrotto la risposta perché l'output era troppo lungo. "
+    "Riprova l'analisi con meno skill o un modello con più token."
+)
+
+OPENAI_OUTPUT_TRUNCATED_RUN_MESSAGE = OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE
+
 
 def humanize_skill_error(exc: Exception, *, provider: str = "") -> str:
     raw = str(exc).strip()
     lowered = raw.lower()
     provider_name = (provider or "").strip().lower()
+    error_code = getattr(exc, "code", None)
+
+    if error_code == "output_truncated":
+        return OPENAI_OUTPUT_TRUNCATED_RUN_MESSAGE
 
     if "risposta openai vuota" in lowered or "risposta vuota" in lowered:
         if provider_name == "openai":
@@ -42,6 +53,14 @@ def humanize_skill_error(exc: Exception, *, provider: str = "") -> str:
         if provider_name == "openai":
             return OPENAI_INVALID_JSON_RUN_MESSAGE
         return OPENAI_INVALID_JSON_USER_MESSAGE
+
+    if (
+        "output_truncated" in lowered
+        or "interrotto la risposta" in lowered
+        or "output era troppo lungo" in lowered
+        or "troppo lungo" in lowered
+    ):
+        return OPENAI_OUTPUT_TRUNCATED_RUN_MESSAGE
 
     if "provider is not configured" in lowered or "non configurato" in lowered:
         if "claude" in lowered:

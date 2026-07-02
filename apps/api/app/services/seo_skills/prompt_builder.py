@@ -216,9 +216,17 @@ def build_skill_system_prompt(
         f"Istruzioni specifiche skill:\n{skill_specific}",
         (
             "Regole di output:\n"
+            "- Rispondi con JSON compatto e completo.\n"
+            "- Non superare 6 findings.\n"
+            "- Non superare 6 recommendations.\n"
+            "- Non superare 8 tasks.\n"
+            "- Ogni descrizione deve essere concreta ma sintetica.\n"
+            "- markdownReport deve essere breve, massimo 1000 caratteri.\n"
+            "- Non ripetere le stesse raccomandazioni in findings, recommendations e tasks.\n"
             "- Rispondi con SOLO JSON valido.\n"
             "- Non usare markdown fuori dal JSON.\n"
             "- Non aggiungere testo prima o dopo il JSON.\n"
+            "- Chiudi sempre correttamente il JSON.\n"
             "- Non inventare claim, metriche o dati non supportati dall'input.\n"
             "- Basa findings su evidenze tratte dall'input quando possibile.\n"
             "- Fornisci raccomandazioni operative e task eseguibili.\n"

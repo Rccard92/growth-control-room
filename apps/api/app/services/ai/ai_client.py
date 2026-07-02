@@ -34,6 +34,7 @@ from app.services.ai.usage_service import (
 from app.services.seo_skills.error_messages import (
     OPENAI_EMPTY_RESPONSE_USER_MESSAGE,
     OPENAI_INVALID_JSON_USER_MESSAGE,
+    OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -164,6 +165,7 @@ class _SchemaParseError(Exception):
         message: str,
         empty_content: bool = False,
         invalid_json: bool = False,
+        output_truncated: bool = False,
     ) -> None:
         super().__init__(message)
         self.content = content
@@ -171,14 +173,43 @@ class _SchemaParseError(Exception):
         self.error_message = message
         self.empty_content = empty_content
         self.invalid_json = invalid_json
+        self.output_truncated = output_truncated
+
+
+def _parse_error_code(parse_exc: _SchemaParseError) -> str | None:
+    if parse_exc.output_truncated:
+        return "output_truncated"
+    return None
 
 
 def _user_message_for_parse_error(parse_exc: _SchemaParseError) -> str:
     if parse_exc.empty_content:
         return OPENAI_EMPTY_RESPONSE_USER_MESSAGE
+    if parse_exc.output_truncated:
+        return OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE
     if parse_exc.invalid_json:
         return OPENAI_INVALID_JSON_USER_MESSAGE
     return parse_exc.error_message
+
+
+def _raise_openai_parse_error(parse_exc: _SchemaParseError) -> None:
+    raise OpenAIRequestError(
+        _user_message_for_parse_error(parse_exc),
+        code=_parse_error_code(parse_exc),
+    ) from parse_exc
+
+
+def _extract_finish_reason(response: Any | None) -> str | None:
+    if response is None:
+        return None
+    choices = getattr(response, "choices", None)
+    if not choices:
+        return None
+    finish_reason = getattr(choices[0], "finish_reason", None)
+    if finish_reason is None:
+        return None
+    normalized = str(finish_reason).strip()
+    return normalized or None
 
 
 def _strip_code_fences(content: str) -> str:
@@ -222,11 +253,30 @@ def _try_parse_json_object(content: str) -> dict[str, Any] | None:
     return None
 
 
-def _log_invalid_json_response(content: str) -> None:
-    preview = content[:500]
-    if len(content) > 500:
+def _log_invalid_json_response(
+    *,
+    content: str,
+    response: Any | None,
+    metadata: AiRequestMetadata | None = None,
+    resolved: AiResolvedModel | None = None,
+    finish_reason: str | None = None,
+) -> None:
+    preview = content[:800]
+    if len(content) > 800:
         preview = f"{preview}..."
-    logger.warning("OpenAI invalid JSON response preview=%s", preview)
+    logger.warning(
+        "OpenAI invalid JSON response operation_key=%s model=%s finish_reason=%s "
+        "output_chars=%s response_id=%s project_id=%s module=%s preview=%s",
+        (resolved.operation_key if resolved else None)
+        or (metadata.operation_key if metadata else None),
+        resolved.model if resolved else None,
+        finish_reason,
+        len(content),
+        getattr(response, "id", None) if response else None,
+        metadata.project_id if metadata else None,
+        metadata.module if metadata else None,
+        preview,
+    )
 
 
 def _log_empty_openai_response(
@@ -247,8 +297,14 @@ def _log_empty_openai_response(
     )
 
 
-def _parse_json_object_response(response: Any) -> tuple[dict[str, Any], str]:
+def _parse_json_object_response(
+    response: Any,
+    *,
+    metadata: AiRequestMetadata | None = None,
+    resolved: AiResolvedModel | None = None,
+) -> tuple[dict[str, Any], str]:
     content = (response.choices[0].message.content or "").strip()
+    finish_reason = _extract_finish_reason(response)
     if not content:
         raise _SchemaParseError(
             content=content,
@@ -258,12 +314,20 @@ def _parse_json_object_response(response: Any) -> tuple[dict[str, Any], str]:
         )
     parsed = _try_parse_json_object(content)
     if parsed is None:
-        _log_invalid_json_response(content)
+        output_truncated = finish_reason == "length"
+        _log_invalid_json_response(
+            content=content,
+            response=response,
+            metadata=metadata,
+            resolved=resolved,
+            finish_reason=finish_reason,
+        )
         raise _SchemaParseError(
             content=content,
             response=response,
             message="Risposta OpenAI non è JSON valido",
             invalid_json=True,
+            output_truncated=output_truncated,
         )
     return parsed, content
 
@@ -463,7 +527,11 @@ async def generate_structured_json(
             json_schema_name=json_schema_name,
         )
         try:
-            parsed, content = _parse_json_object_response(response)
+            parsed, content = _parse_json_object_response(
+                response,
+                metadata=metadata,
+                resolved=active_resolved,
+            )
         except _SchemaParseError as parse_exc:
             if parse_exc.empty_content:
                 _log_empty_openai_response(
@@ -507,7 +575,11 @@ async def generate_structured_json(
                     json_schema=json_schema,
                     json_schema_name=json_schema_name,
                 )
-                parsed, content = _parse_json_object_response(response)
+                parsed, content = _parse_json_object_response(
+                response,
+                metadata=metadata,
+                resolved=active_resolved,
+            )
             elif (
                 settings.ai_enable_model_fallback_on_schema_error
                 and not parse_exc.empty_content
@@ -542,11 +614,13 @@ async def generate_structured_json(
                     json_schema=json_schema,
                     json_schema_name=json_schema_name,
                 )
-                parsed, content = _parse_json_object_response(response)
+                parsed, content = _parse_json_object_response(
+                response,
+                metadata=metadata,
+                resolved=active_resolved,
+            )
             else:
-                raise OpenAIRequestError(
-                    _user_message_for_parse_error(parse_exc)
-                ) from parse_exc
+                _raise_openai_parse_error(parse_exc)
     except OpenAINotConfiguredError:
         raise
     except OpenAIRequestError:
@@ -576,7 +650,10 @@ async def generate_structured_json(
                 error_message=error_message,
             )
         )
-        raise OpenAIRequestError(_user_message_for_parse_error(parse_exc))
+        raise OpenAIRequestError(
+            _user_message_for_parse_error(parse_exc),
+            code=_parse_error_code(parse_exc),
+        )
     except OpenAIError as exc:
         status = "error"
         error_type = type(exc).__name__

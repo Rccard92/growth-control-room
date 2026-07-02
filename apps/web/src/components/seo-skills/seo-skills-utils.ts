@@ -178,6 +178,13 @@ export function formatSeoSkillRunError(err: unknown): string {
   if (lowered.includes("json valido") || lowered.includes("non è json valido")) {
     return "OpenAI non ha restituito un JSON valido. Riprova l'analisi o usa un modello più stabile.";
   }
+  if (
+    lowered.includes("output_truncated") ||
+    lowered.includes("interrotto la risposta") ||
+    lowered.includes("troppo lungo")
+  ) {
+    return "OpenAI ha interrotto la risposta perché l'output era troppo lungo. Riprova l'analisi con meno skill o un modello con più token.";
+  }
   if (lowered.includes("not available") || lowered.includes("non disponibile")) {
     return "Una o più skill selezionate non sono disponibili.";
   }

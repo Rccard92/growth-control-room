@@ -134,3 +134,20 @@ def test_get_seo_skill_output_json_schema_nested_objects_are_strict() -> None:
     assert "markdownReport" in artifacts["properties"]
     assert "shopifySidekickPrompts" in artifacts["properties"]
     assert "implementationNotes" in artifacts["properties"]
+
+
+def test_get_seo_skill_output_json_schema_has_max_items_limits() -> None:
+    schema = get_seo_skill_output_json_schema()
+    assert schema["properties"]["findings"]["maxItems"] == 6
+    assert schema["properties"]["recommendations"]["maxItems"] == 6
+    assert schema["properties"]["tasks"]["maxItems"] == 8
+    assert schema["properties"]["artifacts"]["properties"]["jsonLd"]["maxItems"] == 2
+
+
+def test_get_seo_skill_output_json_schema_has_max_length_limits() -> None:
+    schema = get_seo_skill_output_json_schema()
+    assert schema["properties"]["summary"]["maxLength"] == 900
+    assert (
+        schema["properties"]["artifacts"]["properties"]["markdownReport"]["maxLength"]
+        == 1200
+    )
