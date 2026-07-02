@@ -2320,3 +2320,331 @@
     min-height: 72px;
   }
 }
+
+/* SEO Skill Library */
+.seo-skill-library {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.seo-skill-library__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seo-skill-library__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--gcr-text);
+}
+
+.seo-skill-library__subtitle {
+  margin: 0;
+  color: var(--gcr-text-muted);
+  font-size: 0.9rem;
+}
+
+.seo-skill-library__counts {
+  margin-bottom: 0;
+}
+
+.seo-skill-library__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seo-skill-library__body {
+  display: grid;
+  grid-template-columns: 1fr min(360px, 100%);
+  gap: 16px;
+  align-items: start;
+}
+
+.seo-skill-library__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.seo-skill-library__empty {
+  padding: 1.25rem;
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 1rem;
+  text-align: left;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.seo-skill-card:hover:not(:disabled) {
+  border-color: rgba(99, 179, 237, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.seo-skill-card--selected {
+  border-color: rgba(99, 179, 237, 0.55);
+  box-shadow: 0 0 16px rgba(99, 179, 237, 0.12);
+}
+
+.seo-skill-card--disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.seo-skill-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seo-skill-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.seo-skill-card__checkbox {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.seo-skill-card__checkbox--checked {
+  background: rgba(99, 179, 237, 0.85);
+  border-color: rgba(99, 179, 237, 0.85);
+  box-shadow: inset 0 0 0 2px rgba(8, 12, 20, 0.9);
+}
+
+.seo-skill-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gcr-text);
+}
+
+.seo-skill-card__category {
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-card__description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.45;
+}
+
+.seo-skill-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seo-skill-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-badge--available {
+  color: #6ee7b7;
+  border-color: rgba(110, 231, 183, 0.25);
+  background: rgba(110, 231, 183, 0.08);
+}
+
+.seo-skill-badge--needs_config {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.25);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.seo-skill-badge--external_required,
+.seo-skill-badge--planned {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.25);
+  background: rgba(147, 197, 253, 0.08);
+}
+
+.seo-skill-badge--provider {
+  text-transform: capitalize;
+}
+
+.seo-skill-card__meta,
+.seo-skill-card__integrations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seo-skill-card__meta-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-card__command {
+  font-size: 0.75rem;
+  color: var(--gcr-text);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.seo-skill-card__chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.seo-skill-card__chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-card__chip--required {
+  color: #fca5a5;
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.seo-skill-card__disabled-reason {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #fbbf24;
+}
+
+.seo-skill-launcher {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 1.25rem;
+}
+
+.seo-skill-launcher__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seo-skill-launcher__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.seo-skill-launcher__subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-launcher__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seo-skill-launcher__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-launcher__target-types {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seo-skill-launcher__target-type {
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.seo-skill-launcher__target-type--active {
+  color: var(--gcr-text);
+  border-color: rgba(99, 179, 237, 0.35);
+  background: rgba(99, 179, 237, 0.08);
+}
+
+.seo-skill-launcher__target-type--soon {
+  color: var(--gcr-text-muted);
+  opacity: 0.7;
+}
+
+.seo-skill-launcher__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gcr-text-muted);
+}
+
+.seo-skill-launcher__selected-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--gcr-text);
+}
+
+.seo-skill-launcher__feedback {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.seo-skill-launcher__feedback p {
+  margin: 4px 0 0;
+}
+
+.seo-skill-launcher__feedback--error {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  color: #fecaca;
+}
+
+.seo-skill-launcher__feedback--success {
+  background: rgba(110, 231, 183, 0.08);
+  border: 1px solid rgba(110, 231, 183, 0.25);
+  color: #a7f3d0;
+}
+
+.seo-skill-launcher__submit {
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .seo-skill-library__body {
+    grid-template-columns: 1fr;
+  }
+
+  .seo-skill-launcher {
+    position: static;
+  }
+}
+
