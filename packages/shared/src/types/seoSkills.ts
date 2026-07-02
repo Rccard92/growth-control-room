@@ -56,3 +56,80 @@ export interface SeoSkillCatalogResponse {
   skills: SeoSkillCatalogItem[];
   counts: SeoSkillCatalogCounts;
 }
+
+export type SeoSkillProvider = "openai" | "claude";
+
+export type SeoSkillRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "partial_failed";
+
+export type SeoSkillRunResultStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed";
+
+export type SeoSkillJsonValue =
+  | Record<string, unknown>
+  | unknown[]
+  | string
+  | number
+  | boolean
+  | null;
+
+export interface SeoSkillRunCreateRequest {
+  targetType: string;
+  targetId?: string;
+  url?: string;
+  selectedSkills: string[];
+  provider?: SeoSkillProvider;
+}
+
+export interface SeoSkillRun {
+  id: string;
+  projectId: string;
+  targetType: string;
+  targetId?: string;
+  url?: string;
+  status: SeoSkillRunStatus;
+  provider: SeoSkillProvider;
+  selectedSkills: string[];
+  progressPercent: number;
+  currentSkill?: string;
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SeoSkillRunResult {
+  id: string;
+  runId: string;
+  projectId: string;
+  skillKey: string;
+  status: SeoSkillRunResultStatus;
+  score?: number;
+  findings?: SeoSkillJsonValue;
+  recommendations?: SeoSkillJsonValue;
+  tasks?: SeoSkillJsonValue;
+  artifacts?: SeoSkillJsonValue;
+  rawOutput?: SeoSkillJsonValue;
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SeoSkillRunDetailResponse {
+  run: SeoSkillRun;
+  results: SeoSkillRunResult[];
+}
+
+export interface SeoSkillRunStartResponse {
+  run: SeoSkillRun;
+}

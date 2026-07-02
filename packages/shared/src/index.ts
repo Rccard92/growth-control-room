@@ -300,4 +300,12 @@ export type {
   SeoSkillCatalogItem,
   SeoSkillCatalogCounts,
   SeoSkillCatalogResponse,
+  SeoSkillProvider,
+  SeoSkillRunStatus,
+  SeoSkillRunResultStatus,
+  SeoSkillRunCreateRequest,
+  SeoSkillRun,
+  SeoSkillRunResult,
+  SeoSkillRunDetailResponse,
+  SeoSkillRunStartResponse,
 } from "./types/seoSkills";
