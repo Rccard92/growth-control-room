@@ -58,7 +58,10 @@ export function SeoSkillRunResultCard({ result, catalogSkills }: SeoSkillRunResu
         <div className="seo-skill-result-card__error">{result.errorMessage}</div>
       )}
 
-      {summary && <p className="seo-skill-result-card__summary">{summary}</p>}
+      <details className="seo-skill-result-section seo-skill-result-section--priority" open={tasks.length > 0}>
+        <summary>Azioni prioritarie ({tasks.length})</summary>
+        <SeoSkillTasksList tasks={tasks} />
+      </details>
 
       <details className="seo-skill-result-section" open={findings.length > 0}>
         <summary>Problemi rilevati ({findings.length})</summary>
@@ -70,15 +73,17 @@ export function SeoSkillRunResultCard({ result, catalogSkills }: SeoSkillRunResu
         <SeoSkillRecommendationsList recommendations={recommendations} />
       </details>
 
-      <details className="seo-skill-result-section" open={tasks.length > 0}>
-        <summary>Task operativi ({tasks.length})</summary>
-        <SeoSkillTasksList tasks={tasks} />
-      </details>
-
       <details className="seo-skill-result-section">
         <summary>Artifacts</summary>
         <SeoSkillArtifactsPanel artifacts={artifacts} />
       </details>
+
+      {summary && (
+        <details className="seo-skill-result-section">
+          <summary>Sintesi</summary>
+          <p className="seo-skill-result-card__summary">{summary}</p>
+        </details>
+      )}
 
       {result.rawOutput && (
         <details className="seo-skill-result-section seo-skill-debug-json">

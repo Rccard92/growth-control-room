@@ -12,7 +12,12 @@ export function SeoSkillTasksList({ tasks }: SeoSkillTasksListProps) {
   return (
     <ul className="seo-skill-tasks-list">
       {tasks.map((task, index) => (
-        <li key={`${task.title}-${index}`} className="seo-skill-task">
+        <li
+          key={`${task.title}-${index}`}
+          className={`seo-skill-task ${
+            task.priority === "high" ? "seo-skill-task--priority-high" : ""
+          }`}
+        >
           <h5 className="seo-skill-task__title">{task.title}</h5>
           {task.description && <p className="seo-skill-task__description">{task.description}</p>}
           <div className="seo-skill-task__meta">

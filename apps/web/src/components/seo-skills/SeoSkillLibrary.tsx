@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import type { SeoSkillProvider, SeoSkillRun } from "@gcr/shared";
 import {
   useSeoSkillCatalog,
@@ -6,17 +7,17 @@ import {
   useSeoSkillRuns,
   useStartSeoSkillRun,
 } from "../../hooks/useSeoSkills";
+import { SeoAuditConfigurator } from "./SeoAuditConfigurator";
+import { SeoAuditPresetPicker } from "./SeoAuditPresetPicker";
 import { SeoSkillCard } from "./SeoSkillCard";
-import { SeoSkillLauncher } from "./SeoSkillLauncher";
 import { SeoSkillRunHistory } from "./SeoSkillRunHistory";
 import { SeoSkillRunPanel } from "./SeoSkillRunPanel";
+import { getAuditPreset } from "./seo-skill-presets";
 import {
-  buildRunResultsSummary,
   formatSeoSkillRunError,
-  formatSeoSkillRunStatus,
   getSkillDisabledReason,
-  isSkillSelectable,
   matchesCategoryFilter,
+  resolvePresetSkills,
   SEO_SKILL_CATEGORY_FILTERS,
   type SeoSkillCategoryFilterKey,
 } from "./seo-skills-utils";
@@ -25,10 +26,18 @@ interface SeoSkillLibraryProps {
   projectId: string;
 }
 
+const AUDIT_FLOW_STEPS = [
+  "Scegli audit",
+  "Inserisci target",
+  "Avvia analisi",
+  "Correggi le priorità",
+] as const;
+
 export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
+  const [selectedPresetKey, setSelectedPresetKey] = useState("page_360");
+  const [manualSkillKeys, setManualSkillKeys] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState<SeoSkillCategoryFilterKey>("all");
-  const [selectedSkills, setSelectedSkills] = useState<Set<string>>(new Set());
-  const [provider, setProvider] = useState<SeoSkillProvider>("claude");
+  const [provider, setProvider] = useState<SeoSkillProvider>("openai");
   const [targetUrl, setTargetUrl] = useState("");
   const [lastStartedRun, setLastStartedRun] = useState<SeoSkillRun | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -41,28 +50,22 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
   const runQuery = useSeoSkillRun(projectId, activeRunId ?? undefined, Boolean(activeRunId));
 
   const skills = catalogQuery.data?.skills ?? [];
-  const counts = catalogQuery.data?.counts;
+  const preset = getAuditPreset(selectedPresetKey) ?? getAuditPreset("page_360")!;
+
+  const resolvedSkills = useMemo(
+    () => resolvePresetSkills(preset, skills, [...manualSkillKeys]),
+    [preset, skills, manualSkillKeys],
+  );
 
   const filteredSkills = useMemo(
     () => skills.filter((skill) => matchesCategoryFilter(skill, categoryFilter)),
     [skills, categoryFilter],
   );
 
-  const skillsByKey = useMemo(
-    () => new Map(skills.map((skill) => [skill.key, skill])),
-    [skills],
-  );
-
-  const runStatus = runQuery.data?.run.status ?? lastStartedRun?.status;
-  const runSummary = useMemo(
-    () => buildRunResultsSummary(runQuery.data?.results, skillsByKey),
-    [runQuery.data?.results, skillsByKey],
-  );
-
   const recentRuns = useMemo(() => (runsQuery.data ?? []).slice(0, 5), [runsQuery.data]);
 
-  const handleToggleSkill = (skillKey: string) => {
-    setSelectedSkills((prev) => {
+  const handleToggleManualSkill = (skillKey: string) => {
+    setManualSkillKeys((prev) => {
       const next = new Set(prev);
       if (next.has(skillKey)) {
         next.delete(skillKey);
@@ -75,11 +78,15 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
 
   const handleSubmit = async () => {
     setSubmitError(null);
+    if (resolvedSkills.availableKeys.length === 0) {
+      setSubmitError("Seleziona almeno una skill disponibile.");
+      return;
+    }
     try {
       const result = await startMutation.mutateAsync({
-        targetType: "url",
+        targetType: preset.targetType,
         url: targetUrl.trim(),
-        selectedSkills: [...selectedSkills],
+        selectedSkills: resolvedSkills.availableKeys,
         provider,
       });
       setLastStartedRun(result.run);
@@ -91,7 +98,7 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
 
   if (catalogQuery.isLoading) {
     return (
-      <div className="seo-skill-library gcr-card">
+      <div className="seo-audit-room gcr-card">
         <div className="gcr-skeleton seo-skeleton-row" />
         <div className="gcr-skeleton seo-skeleton-row" />
         <div className="gcr-skeleton seo-skeleton-row" />
@@ -105,7 +112,7 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
         ? catalogQuery.error.message
         : "Impossibile caricare il catalogo skill.";
     return (
-      <div className="seo-skill-library gcr-card">
+      <div className="seo-audit-room gcr-card">
         <div className="content-seo-banner content-seo-banner--warn">
           <p>{message}</p>
           <button
@@ -121,99 +128,112 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
   }
 
   return (
-    <div className="seo-skill-library">
-      <header className="seo-skill-library__header">
-        <h2 className="seo-skill-library__title">SEO Skill Library</h2>
-        <p className="seo-skill-library__subtitle">
-          Seleziona le skill Claude SEO da eseguire sul target scelto.
+    <div className="seo-audit-room">
+      <header className="seo-audit-room__hero gcr-card">
+        <h2 className="seo-audit-room__title">SEO Audit Control Room</h2>
+        <p className="seo-audit-room__subtitle">
+          Scegli un tipo di analisi, inserisci il target e ottieni problemi, priorità e azioni
+          concrete.
         </p>
+        <ol className="seo-audit-room__flow" aria-label="Flusso audit">
+          {AUDIT_FLOW_STEPS.map((step, index) => (
+            <li key={step} className="seo-audit-room__flow-step">
+              <span className="seo-audit-room__flow-index">{index + 1}</span>
+              <span>{step}</span>
+              {index < AUDIT_FLOW_STEPS.length - 1 && (
+                <span className="seo-audit-room__flow-arrow" aria-hidden>
+                  →
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
       </header>
 
-      {counts && (
-        <div className="seo-skill-library__counts content-seo-kpi-strip content-seo-kpi-strip--compact">
-          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-            <span className="content-seo-kpi__value">{counts.total}</span>
-            <span className="content-seo-kpi__label">Totali</span>
-          </div>
-          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-            <span className="content-seo-kpi__value content-seo-kpi__value--good">
-              {counts.available}
-            </span>
-            <span className="content-seo-kpi__label">Disponibili</span>
-          </div>
-          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-            <span className="content-seo-kpi__value content-seo-kpi__value--warn">
-              {counts.needsConfig}
-            </span>
-            <span className="content-seo-kpi__label">Configurazione richiesta</span>
-          </div>
-          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-            <span className="content-seo-kpi__value">{counts.externalRequired}</span>
-            <span className="content-seo-kpi__label">Esterne</span>
-          </div>
-          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-            <span className="content-seo-kpi__value">{counts.planned}</span>
-            <span className="content-seo-kpi__label">Pianificate</span>
-          </div>
-        </div>
-      )}
+      <div className="seo-audit-room__layout">
+        <div className="seo-audit-room__main">
+          {activeRunId && (
+            <motion.div
+              className="seo-audit-room__results"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <SeoSkillRunPanel
+                projectId={projectId}
+                runId={activeRunId}
+                initialRun={lastStartedRun}
+                catalogSkills={skills}
+              />
+            </motion.div>
+          )}
 
-      <div className="seo-skill-library__filters">
-        {SEO_SKILL_CATEGORY_FILTERS.map((filter) => (
-          <button
-            key={filter.key}
-            type="button"
-            className={`seo-filter-chip ${categoryFilter === filter.key ? "seo-filter-chip--active" : ""}`}
-            onClick={() => setCategoryFilter(filter.key)}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </div>
+          <SeoAuditPresetPicker
+            catalog={skills}
+            selectedKey={selectedPresetKey}
+            onSelect={setSelectedPresetKey}
+            compact={Boolean(activeRunId)}
+          />
 
-      <div className="seo-skill-library__body">
-        <div className="seo-skill-library__grid">
-          {filteredSkills.length === 0 ? (
-            <div className="seo-skill-library__empty gcr-card">
-              Nessuna skill in questa categoria.
-            </div>
-          ) : (
-            filteredSkills.map((skill) => {
-              const selectable = isSkillSelectable(skill);
-              return (
-                <SeoSkillCard
-                  key={skill.key}
-                  skill={skill}
-                  selected={selectedSkills.has(skill.key)}
-                  disabled={!selectable}
-                  disabledReason={getSkillDisabledReason(skill)}
-                  onToggle={handleToggleSkill}
-                />
-              );
-            })
+          {selectedPresetKey !== "custom" && (
+            <details className="seo-audit-room__tech-catalog">
+              <summary>Vedi tutte le skill tecniche</summary>
+              <div className="seo-audit-room__tech-filters">
+                {SEO_SKILL_CATEGORY_FILTERS.map((filter) => (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    className={`seo-filter-chip ${
+                      categoryFilter === filter.key ? "seo-filter-chip--active" : ""
+                    }`}
+                    onClick={() => setCategoryFilter(filter.key)}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+              <div className="seo-audit-room__tech-grid">
+                {filteredSkills.map((skill) => {
+                  const included = preset.includedSkills.includes(skill.key);
+                  return (
+                    <SeoSkillCard
+                      key={skill.key}
+                      skill={skill}
+                      selected={included}
+                      disabled
+                      disabledReason={
+                        included
+                          ? "Inclusa nel preset selezionato"
+                          : getSkillDisabledReason(skill) ?? "Non inclusa nel preset"
+                      }
+                      onToggle={() => undefined}
+                    />
+                  );
+                })}
+              </div>
+            </details>
           )}
         </div>
 
-        <SeoSkillLauncher
-          selectedSkillKeys={[...selectedSkills]}
-          skills={skills}
-          provider={provider}
-          onProviderChange={setProvider}
-          targetUrl={targetUrl}
-          onTargetUrlChange={setTargetUrl}
-          onSubmit={() => void handleSubmit()}
-          isSubmitting={startMutation.isPending}
-          submitError={submitError}
-          lastStartedRun={lastStartedRun}
-          runStatus={runStatus}
-          runStatusLabel={formatSeoSkillRunStatus(runStatus)}
-          runSummary={runSummary}
-          compactFeedback={Boolean(activeRunId)}
-        />
-      </div>
+        <aside className="seo-audit-room__sidebar">
+          <SeoAuditConfigurator
+            preset={preset}
+            catalog={skills}
+            manualSkillKeys={manualSkillKeys}
+            onToggleManualSkill={handleToggleManualSkill}
+            categoryFilter={categoryFilter}
+            onCategoryFilterChange={setCategoryFilter}
+            provider={provider}
+            onProviderChange={setProvider}
+            targetUrl={targetUrl}
+            onTargetUrlChange={setTargetUrl}
+            onSubmit={() => void handleSubmit()}
+            isSubmitting={startMutation.isPending}
+            submitError={submitError}
+            lastStartedRun={lastStartedRun}
+            runStatus={runQuery.data?.run.status ?? lastStartedRun?.status}
+          />
 
-      {(recentRuns.length > 0 || activeRunId) && (
-        <div className="seo-skill-library__results">
           {recentRuns.length > 0 && (
             <SeoSkillRunHistory
               runs={recentRuns}
@@ -221,17 +241,8 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
               onSelectRun={setSelectedRunId}
             />
           )}
-
-          {activeRunId && (
-            <SeoSkillRunPanel
-              projectId={projectId}
-              runId={activeRunId}
-              initialRun={lastStartedRun}
-              catalogSkills={skills}
-            />
-          )}
-        </div>
-      )}
+        </aside>
+      </div>
     </div>
   );
 }

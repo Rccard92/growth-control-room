@@ -19,7 +19,7 @@ import { SeoSkillLibrary } from "../../seo-skills";
 const TABS: { id: SeoOptimizerTab; label: string }[] = [
   { id: "products", label: "Prodotti" },
   { id: "collections", label: "Categorie" },
-  { id: "skills", label: "Skill Library" },
+  { id: "skills", label: "Audit SEO" },
 ];
 
 interface SeoOptimizerRoomProps {

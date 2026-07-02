@@ -26,8 +26,15 @@ export function SeoSkillFindingsList({ findings }: SeoSkillFindingsListProps) {
             {finding.area && <span className="seo-skill-finding__area">{finding.area}</span>}
           </div>
           <h5 className="seo-skill-finding__title">{finding.title}</h5>
+          {finding.whyItMatters && (
+            <p className="seo-skill-finding__meta">
+              <strong>Perché conta:</strong> {finding.whyItMatters}
+            </p>
+          )}
           {finding.description && (
-            <p className="seo-skill-finding__description">{finding.description}</p>
+            <p className="seo-skill-finding__meta">
+              <strong>Cosa succede:</strong> {finding.description}
+            </p>
           )}
           {finding.evidence && (
             <p className="seo-skill-finding__meta">
@@ -36,12 +43,12 @@ export function SeoSkillFindingsList({ findings }: SeoSkillFindingsListProps) {
           )}
           {finding.recommendation && (
             <p className="seo-skill-finding__meta">
-              <strong>Raccomandazione:</strong> {finding.recommendation}
+              <strong>Come risolvere:</strong> {finding.recommendation}
             </p>
           )}
           {finding.howToValidate && (
             <p className="seo-skill-finding__meta">
-              <strong>Verifica:</strong> {finding.howToValidate}
+              <strong>Come verificare:</strong> {finding.howToValidate}
             </p>
           )}
         </li>

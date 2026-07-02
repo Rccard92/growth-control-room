@@ -1,12 +1,12 @@
+import { motion } from "framer-motion";
 import type { SeoSkillCatalogItem, SeoSkillRun } from "@gcr/shared";
 import { useSeoSkillRun } from "../../hooks/useSeoSkills";
+import { SeoAuditSummaryCard } from "./SeoAuditSummaryCard";
 import { SeoSkillRunResultCard } from "./SeoSkillRunResultCard";
 import {
-  buildRunPanelSummary,
   formatRunPanelHeadline,
   formatRunTimestamp,
   formatSeoSkillRunStatus,
-  getSkillDisplayName,
 } from "./seo-skills-utils";
 
 interface SeoSkillRunPanelProps {
@@ -25,7 +25,6 @@ export function SeoSkillRunPanel({
   const runQuery = useSeoSkillRun(projectId, runId, Boolean(runId));
   const run = runQuery.data?.run ?? initialRun;
   const results = runQuery.data?.results ?? [];
-  const summary = buildRunPanelSummary(results);
 
   if (runQuery.isLoading && !run) {
     return (
@@ -42,12 +41,14 @@ export function SeoSkillRunPanel({
 
   const headline = formatRunPanelHeadline(run.status);
   const statusLabel = formatSeoSkillRunStatus(run.status);
-  const selectedSkillLabels = run.selectedSkills.map((key) =>
-    getSkillDisplayName(key, catalogSkills),
-  );
 
   return (
-    <section className="seo-skill-run-panel gcr-card">
+    <motion.section
+      className="seo-skill-run-panel"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
       <header className="seo-skill-run-panel__header">
         <div>
           <h3 className="seo-skill-run-panel__title">{headline}</h3>
@@ -58,62 +59,18 @@ export function SeoSkillRunPanel({
         )}
       </header>
 
-      <div className="seo-skill-run-panel__meta">
-        <p>
+      <SeoAuditSummaryCard run={run} results={results} />
+
+      <div className="seo-skill-run-panel__meta seo-skill-run-panel__meta--compact">
+        <span>
           <strong>Stato:</strong> {statusLabel}
-        </p>
-        <p>
-          <strong>Provider:</strong> {run.provider}
-        </p>
-        {run.url && (
-          <p>
-            <strong>URL:</strong> {run.url}
-          </p>
-        )}
-        <p>
+        </span>
+        <span>
           <strong>Avviata:</strong> {formatRunTimestamp(run.startedAt ?? run.createdAt)}
-        </p>
-        <p>
+        </span>
+        <span>
           <strong>Completata:</strong> {formatRunTimestamp(run.completedAt)}
-        </p>
-      </div>
-
-      {selectedSkillLabels.length > 0 && (
-        <div className="seo-skill-run-panel__skills">
-          <strong>Skill selezionate:</strong>
-          <ul>
-            {selectedSkillLabels.map((label) => (
-              <li key={label}>{label}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="seo-skill-run-panel__summary content-seo-kpi-strip content-seo-kpi-strip--compact">
-        <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-          <span className="content-seo-kpi__value">{summary.total}</span>
-          <span className="content-seo-kpi__label">Totali</span>
-        </div>
-        <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-          <span className="content-seo-kpi__value content-seo-kpi__value--good">
-            {summary.completed}
-          </span>
-          <span className="content-seo-kpi__label">Completate</span>
-        </div>
-        <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-          <span className="content-seo-kpi__value content-seo-kpi__value--warn">
-            {summary.failed}
-          </span>
-          <span className="content-seo-kpi__label">Fallite</span>
-        </div>
-        <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-          <span className="content-seo-kpi__value">{summary.running}</span>
-          <span className="content-seo-kpi__label">In corso</span>
-        </div>
-        <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
-          <span className="content-seo-kpi__value">{summary.pending}</span>
-          <span className="content-seo-kpi__label">In attesa</span>
-        </div>
+        </span>
       </div>
 
       {run.errorMessage && (
@@ -131,12 +88,12 @@ export function SeoSkillRunPanel({
           ))}
         </div>
       ) : (
-        <p className="seo-skill-run-panel__empty">
+        <p className="seo-skill-run-panel__empty gcr-card">
           {run.status === "pending" || run.status === "running"
             ? "In attesa dei risultati delle skill…"
             : "Nessun risultato disponibile per questa run."}
         </p>
       )}
-    </section>
+    </motion.section>
   );
 }

@@ -150,7 +150,7 @@ describe("SeoSkillRunPanel", () => {
 
     expect(html).toContain("Analisi completata");
     expect(html).toContain("Risultati analisi");
-    expect(html).toContain("Completate");
+    expect(html).toContain("Skill completate");
     expect(html).toContain("Page SEO");
   });
 

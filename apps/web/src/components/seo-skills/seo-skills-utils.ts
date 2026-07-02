@@ -1,4 +1,5 @@
 import type { SeoSkillCatalogItem, SeoSkillRunResult, SeoSkillRunStatus } from "@gcr/shared";
+import type { SeoAuditPreset } from "./seo-skill-presets";
 
 export const SEO_SKILL_CATEGORY_FILTERS = [
   { key: "all", label: "Tutte" },
@@ -79,9 +80,31 @@ export interface SeoSkillFindingView {
   area: string;
   title: string;
   description: string;
+  whyItMatters: string;
   evidence: string;
   recommendation: string;
   howToValidate: string;
+}
+
+export type SeoAuditScoreBand = "good" | "warn" | "critical" | "none";
+
+export interface SeoAuditDashboardSummary {
+  averageScore: number | null;
+  scoreBand: SeoAuditScoreBand;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  totalFindings: number;
+  totalTasks: number;
+  completedSkills: number;
+  failedSkills: number;
+  totalSkills: number;
+}
+
+export interface ResolvedPresetSkills {
+  availableKeys: string[];
+  unavailableKeys: string[];
+  unavailableSkills: SeoSkillCatalogItem[];
 }
 
 export interface SeoSkillRecommendationView {
@@ -269,6 +292,7 @@ export function normalizeFindings(value: unknown): SeoSkillFindingView[] {
 
     const severity = asString(data.severity) || "info";
     const priority = asString(data.priority) || "medium";
+    const whyItMatters = asString(data.whyItMatters) || asString(data.impact);
     normalized.push({
       severity,
       severityLabel: getSeverityLabel(severity),
@@ -277,6 +301,7 @@ export function normalizeFindings(value: unknown): SeoSkillFindingView[] {
       area: truncateText(asString(data.area), 120),
       title: truncateText(title, 200),
       description: truncateText(description),
+      whyItMatters: truncateText(whyItMatters, 500),
       evidence: truncateText(asString(data.evidence)),
       recommendation: truncateText(asString(data.recommendation)),
       howToValidate: truncateText(asString(data.howToValidate)),
@@ -393,6 +418,92 @@ export function getResultArtifacts(result: SeoSkillRunResult): SeoSkillArtifacts
   }
   const raw = getRawOutputRecord(result);
   return normalizeArtifacts(raw.artifacts);
+}
+
+export function getScoreBand(score: number | null): SeoAuditScoreBand {
+  if (score === null) return "none";
+  if (score >= 80) return "good";
+  if (score >= 60) return "warn";
+  return "critical";
+}
+
+export function resolvePresetSkills(
+  preset: SeoAuditPreset,
+  catalog: SeoSkillCatalogItem[],
+  manualSkillKeys: string[] = [],
+): ResolvedPresetSkills {
+  const skillsByKey = new Map(catalog.map((skill) => [skill.key, skill]));
+  const sourceKeys =
+    preset.key === "custom"
+      ? manualSkillKeys
+      : [...new Set(preset.includedSkills)];
+
+  const availableKeys: string[] = [];
+  const unavailableKeys: string[] = [];
+  const unavailableSkills: SeoSkillCatalogItem[] = [];
+
+  for (const key of sourceKeys) {
+    const skill = skillsByKey.get(key);
+    if (skill && isSkillSelectable(skill)) {
+      if (!availableKeys.includes(key)) {
+        availableKeys.push(key);
+      }
+    } else {
+      if (!unavailableKeys.includes(key)) {
+        unavailableKeys.push(key);
+      }
+      if (skill && !unavailableSkills.some((item) => item.key === skill.key)) {
+        unavailableSkills.push(skill);
+      }
+    }
+  }
+
+  return { availableKeys, unavailableKeys, unavailableSkills };
+}
+
+export function buildAuditDashboardSummary(
+  results: SeoSkillRunResult[] | undefined,
+): SeoAuditDashboardSummary {
+  const items = results ?? [];
+  const completedWithScore = items.filter(
+    (item) => item.status === "completed" && getResultScore(item) !== null,
+  );
+  const scores = completedWithScore
+    .map((item) => getResultScore(item))
+    .filter((score): score is number => score !== null);
+
+  const averageScore =
+    scores.length > 0
+      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : null;
+
+  let criticalCount = 0;
+  let highCount = 0;
+  let mediumCount = 0;
+  let totalTasks = 0;
+
+  for (const result of items) {
+    const findings = getResultFindings(result);
+    for (const finding of findings) {
+      if (finding.severity === "critical") criticalCount += 1;
+      else if (finding.severity === "high") highCount += 1;
+      else if (finding.severity === "medium") mediumCount += 1;
+    }
+    totalTasks += getResultTasks(result).length;
+  }
+
+  return {
+    averageScore,
+    scoreBand: getScoreBand(averageScore),
+    criticalCount,
+    highCount,
+    mediumCount,
+    totalFindings: criticalCount + highCount + mediumCount,
+    totalTasks,
+    completedSkills: items.filter((item) => item.status === "completed").length,
+    failedSkills: items.filter((item) => item.status === "failed").length,
+    totalSkills: items.length,
+  };
 }
 
 export function buildRunPanelSummary(
