@@ -34,7 +34,7 @@ export interface SeoSkillCatalogItem {
   source: string;
   upstreamCommand: string;
   status: SeoSkillStatus;
-  defaultProvider: string;
+  defaultProvider: SeoSkillProvider | string;
   requires: string[];
   optionalIntegrations: string[];
   requiredIntegrations: string[];
@@ -80,30 +80,37 @@ export type SeoSkillJsonValue =
   | boolean
   | null;
 
+export type SeoSkillTargetType =
+  | "url"
+  | "shopify_product"
+  | "shopify_collection"
+  | "article"
+  | "domain";
+
 export interface SeoSkillRunCreateRequest {
-  targetType: string;
-  targetId?: string;
-  url?: string;
+  targetType: SeoSkillTargetType | string;
+  targetId?: string | null;
+  url?: string | null;
   selectedSkills: string[];
-  provider?: SeoSkillProvider;
+  provider: SeoSkillProvider;
 }
 
 export interface SeoSkillRun {
   id: string;
   projectId: string;
   targetType: string;
-  targetId?: string;
-  url?: string;
+  targetId?: string | null;
+  url?: string | null;
   status: SeoSkillRunStatus;
-  provider: SeoSkillProvider;
+  provider: SeoSkillProvider | string;
   selectedSkills: string[];
   progressPercent: number;
-  currentSkill?: string;
-  errorMessage?: string;
-  startedAt?: string;
-  completedAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  currentSkill?: string | null;
+  errorMessage?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface SeoSkillRunResult {
@@ -112,17 +119,17 @@ export interface SeoSkillRunResult {
   projectId: string;
   skillKey: string;
   status: SeoSkillRunResultStatus;
-  score?: number;
-  findings?: SeoSkillJsonValue;
-  recommendations?: SeoSkillJsonValue;
-  tasks?: SeoSkillJsonValue;
-  artifacts?: SeoSkillJsonValue;
-  rawOutput?: SeoSkillJsonValue;
-  errorMessage?: string;
-  startedAt?: string;
-  completedAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  score?: number | null;
+  findings?: unknown[] | null;
+  recommendations?: unknown[] | null;
+  tasks?: unknown[] | null;
+  artifacts?: Record<string, unknown> | null;
+  rawOutput?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface SeoSkillRunDetailResponse {

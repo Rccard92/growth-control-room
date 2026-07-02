@@ -103,4 +103,12 @@ export const queryKeys = {
   aiModelSettings: {
     list: (projectId: string) => ["aiModelSettings", projectId] as const,
   },
+  seoSkills: {
+    catalog: (projectId: string) => ["seo-skills", "catalog", projectId] as const,
+    runs: (projectId: string) => ["seo-skills", "runs", projectId] as const,
+    run: (projectId: string, runId: string) =>
+      ["seo-skills", "run", projectId, runId] as const,
+    runResults: (projectId: string, runId: string) =>
+      ["seo-skills", "run-results", projectId, runId] as const,
+  },
 };
