@@ -130,6 +130,15 @@ Errori OpenAI (`BadRequestError`, accesso modello) vengono loggati in `AiUsageLo
 
 `brand_intelligence`, `product_seo`, `content_seo`, `blog_brief`, `article_generator` (+ operazioni batch BI/editorial).
 
+### Multi-provider Claude (SEO Skill Library)
+
+- I servizi esistenti **restano** su `apps/api/app/services/ai/ai_client.py` tramite `generate_structured_json()`.
+- I nuovi moduli SEO Skill futuri possono usare `apps/api/app/services/ai/provider_router.py` con `generate_structured_json_with_provider(provider="openai"|"claude", ...)`.
+- Le chiamate Anthropic devono passare **solo** da `claude_client.py` (mai SDK diretto nei servizi).
+- Nessuna API key AI lato frontend.
+- Claude è disponibile per il runtime SEO Skill futuro; non sostituisce automaticamente OpenAI nei moduli già implementati.
+- Le richieste Claude vengono loggate in `ai_usage_logs` con `provider=claude`; il pricing Claude è ancora da aggiungere in `pricing.py`.
+
 ---
 
 ## Regola obbligatoria: Brand Intelligence Context

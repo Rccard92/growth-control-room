@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     shopify_redirect_uri: str | None = None
     frontend_url: str | None = None
     openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    claude_model: str = "claude-3-5-sonnet-latest"
+    claude_model_fast: str | None = None
+    claude_model_deep: str | None = None
+    claude_timeout_seconds: float = 90.0
     openai_model: str = "gpt-4o-mini"
     openai_model_cheap: str | None = None
     openai_model_standard: str | None = None

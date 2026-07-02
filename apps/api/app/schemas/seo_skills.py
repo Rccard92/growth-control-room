@@ -5,6 +5,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
+SeoSkillProvider = Literal["openai", "claude"]
+
+
 class SeoSkillCatalogItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -55,7 +58,7 @@ class SeoSkillRunCreateRequest(BaseModel):
     target_id: UUID | None = Field(default=None, alias="targetId")
     url: str | None = None
     selected_skills: list[str] = Field(alias="selectedSkills")
-    provider: str = "claude"
+    provider: SeoSkillProvider = "claude"
 
 
 class SeoSkillRunRead(BaseModel):
@@ -67,7 +70,7 @@ class SeoSkillRunRead(BaseModel):
     target_id: UUID | None = Field(default=None, serialization_alias="targetId")
     url: str | None = None
     status: str
-    provider: str
+    provider: SeoSkillProvider
     selected_skills: list[str] = Field(serialization_alias="selectedSkills")
     progress_percent: int = Field(serialization_alias="progressPercent")
     current_skill: str | None = Field(default=None, serialization_alias="currentSkill")

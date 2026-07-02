@@ -10,6 +10,10 @@ API_APP = REPO_ROOT / "apps" / "api" / "app"
 ALLOWED_OPENAI_FILES = {
     API_APP / "services" / "ai" / "ai_client.py",
 }
+ALLOWED_ANTHROPIC_FILES = {
+    API_APP / "services" / "ai" / "claude_client.py",
+    API_APP / "services" / "ai" / "provider_router.py",
+}
 OPENAI_MODEL_ALLOWED_FILES = {
     API_APP / "core" / "config.py",
     API_APP / "services" / "ai" / "model_policy.py",
@@ -36,6 +40,17 @@ def test_no_direct_openai_sdk_outside_ai_client() -> None:
         if _file_mentions(source, "AsyncOpenAI(") or _file_mentions(source, "chat.completions"):
             violations.append(str(path.relative_to(REPO_ROOT)))
     assert violations == [], f"Direct OpenAI usage outside ai_client: {violations}"
+
+
+def test_no_direct_anthropic_sdk_outside_allowed_files() -> None:
+    violations: list[str] = []
+    for path in _python_files_under(API_APP):
+        if path in ALLOWED_ANTHROPIC_FILES:
+            continue
+        source = path.read_text(encoding="utf-8")
+        if _file_mentions(source, "AsyncAnthropic(") or _file_mentions(source, "from anthropic"):
+            violations.append(str(path.relative_to(REPO_ROOT)))
+    assert violations == [], f"Direct Anthropic usage outside allowed files: {violations}"
 
 
 def test_openai_model_env_only_in_allowed_files() -> None:
