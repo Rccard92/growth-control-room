@@ -3,10 +3,13 @@ import type { SeoSkillProvider, SeoSkillRun } from "@gcr/shared";
 import {
   useSeoSkillCatalog,
   useSeoSkillRun,
+  useSeoSkillRuns,
   useStartSeoSkillRun,
 } from "../../hooks/useSeoSkills";
 import { SeoSkillCard } from "./SeoSkillCard";
 import { SeoSkillLauncher } from "./SeoSkillLauncher";
+import { SeoSkillRunHistory } from "./SeoSkillRunHistory";
+import { SeoSkillRunPanel } from "./SeoSkillRunPanel";
 import {
   buildRunResultsSummary,
   formatSeoSkillRunError,
@@ -28,15 +31,14 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
   const [provider, setProvider] = useState<SeoSkillProvider>("claude");
   const [targetUrl, setTargetUrl] = useState("");
   const [lastStartedRun, setLastStartedRun] = useState<SeoSkillRun | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const catalogQuery = useSeoSkillCatalog(projectId);
+  const runsQuery = useSeoSkillRuns(projectId);
   const startMutation = useStartSeoSkillRun(projectId);
-  const runQuery = useSeoSkillRun(
-    projectId,
-    lastStartedRun?.id,
-    Boolean(lastStartedRun?.id),
-  );
+  const activeRunId = selectedRunId ?? lastStartedRun?.id ?? null;
+  const runQuery = useSeoSkillRun(projectId, activeRunId ?? undefined, Boolean(activeRunId));
 
   const skills = catalogQuery.data?.skills ?? [];
   const counts = catalogQuery.data?.counts;
@@ -56,6 +58,8 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
     () => buildRunResultsSummary(runQuery.data?.results, skillsByKey),
     [runQuery.data?.results, skillsByKey],
   );
+
+  const recentRuns = useMemo(() => (runsQuery.data ?? []).slice(0, 5), [runsQuery.data]);
 
   const handleToggleSkill = (skillKey: string) => {
     setSelectedSkills((prev) => {
@@ -79,6 +83,7 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
         provider,
       });
       setLastStartedRun(result.run);
+      setSelectedRunId(result.run.id);
     } catch (err) {
       setSubmitError(formatSeoSkillRunError(err));
     }
@@ -203,8 +208,30 @@ export function SeoSkillLibrary({ projectId }: SeoSkillLibraryProps) {
           runStatus={runStatus}
           runStatusLabel={formatSeoSkillRunStatus(runStatus)}
           runSummary={runSummary}
+          compactFeedback={Boolean(activeRunId)}
         />
       </div>
+
+      {(recentRuns.length > 0 || activeRunId) && (
+        <div className="seo-skill-library__results">
+          {recentRuns.length > 0 && (
+            <SeoSkillRunHistory
+              runs={recentRuns}
+              selectedRunId={activeRunId}
+              onSelectRun={setSelectedRunId}
+            />
+          )}
+
+          {activeRunId && (
+            <SeoSkillRunPanel
+              projectId={projectId}
+              runId={activeRunId}
+              initialRun={lastStartedRun}
+              catalogSkills={skills}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

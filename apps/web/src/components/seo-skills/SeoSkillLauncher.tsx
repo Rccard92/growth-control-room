@@ -19,6 +19,7 @@ interface SeoSkillLauncherProps {
   runStatus?: SeoSkillRunStatus | string | null;
   runStatusLabel?: string | null;
   runSummary?: SeoSkillRunResultsSummary | null;
+  compactFeedback?: boolean;
 }
 
 export function SeoSkillLauncher({
@@ -35,6 +36,7 @@ export function SeoSkillLauncher({
   runStatus,
   runStatusLabel,
   runSummary,
+  compactFeedback = false,
 }: SeoSkillLauncherProps) {
   const selectedLabels = skills
     .filter((skill) => selectedSkillKeys.includes(skill.key))
@@ -129,16 +131,16 @@ export function SeoSkillLauncher({
             isPartialFailed
               ? "seo-skill-launcher__feedback--warn"
               : "seo-skill-launcher__feedback--success"
-          }`}
+          } ${compactFeedback ? "seo-skill-launcher__feedback--compact" : ""}`}
         >
-          <strong>Analisi avviata</strong>
+          <strong>{compactFeedback ? "Analisi avviata" : "Analisi avviata"}</strong>
           <p>Stato: {displayStatus}</p>
-          {isPartialFailed && (
+          {!compactFeedback && isPartialFailed && (
             <p>
               Alcune skill non sono riuscite. Il dettaglio sarà visibile nel pannello risultati.
             </p>
           )}
-          {runSummary && (
+          {!compactFeedback && runSummary && (
             <>
               <p>
                 {runSummary.selectedCount} skill selezionate — {runSummary.completedCount} completate
