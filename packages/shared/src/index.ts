@@ -295,6 +295,8 @@ export type {
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";
 export type {
   GrowthAuditEvent,
+  GrowthAuditInventoryCounts,
+  GrowthAuditInventoryFilter,
   GrowthAuditMode,
   GrowthAuditPage,
   GrowthAuditPageSource,
@@ -306,6 +308,7 @@ export type {
   GrowthAuditRun,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
+  GrowthAuditRunSummary,
   GrowthAuditRunStatus,
   GrowthAuditRunsListResponse,
   GrowthAuditStartResponse,

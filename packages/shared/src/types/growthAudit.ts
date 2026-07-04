@@ -17,6 +17,7 @@ export type GrowthAuditPhase =
   | "classification"
   | "analysis"
   | "ready_for_analysis"
+  | "finalization"
   | "completed"
   | "failed";
 export type GrowthAuditPageType =
@@ -24,7 +25,9 @@ export type GrowthAuditPageType =
   | "product"
   | "collection"
   | "blog"
+  | "blog_article"
   | "article"
+  | "static_page"
   | "page"
   | "policy"
   | "cart"
@@ -40,7 +43,41 @@ export type GrowthAuditPageStatus =
   | "analyzed"
   | "failed"
   | "skipped";
-export type GrowthAuditPageSource = "seed" | "sitemap" | "crawl" | "manual";
+export type GrowthAuditPageSource =
+  | "seed"
+  | "sitemap"
+  | "shopify_product"
+  | "shopify_collection"
+  | "shopify_page"
+  | "shopify_blog"
+  | "crawl"
+  | "manual";
+
+export type GrowthAuditInventoryFilter =
+  | "all"
+  | "homepage"
+  | "product"
+  | "collection"
+  | "blog"
+  | "static_page"
+  | "unknown";
+
+export interface GrowthAuditRunSummary {
+  message?: string;
+  pagesDiscovered?: number;
+  pagesClassified?: number;
+  pagesAnalyzed?: number;
+  includeAiAnalysis?: boolean;
+  auditMode?: string;
+  sources?: {
+    seed?: number;
+    sitemap?: number;
+    shopify?: number;
+  };
+  pageTypes?: Record<string, number>;
+  nextStep?: string;
+  warning?: string | null;
+}
 
 export interface GrowthAuditRunCreateRequest {
   rootUrl: string;
@@ -67,7 +104,7 @@ export interface GrowthAuditRun {
   totalPages?: number | null;
   currentUrl?: string | null;
   config?: Record<string, unknown> | null;
-  summary?: Record<string, unknown> | null;
+  summary?: GrowthAuditRunSummary | null;
   siteScore?: number | null;
   seoScore?: number | null;
   geoScore?: number | null;
@@ -87,9 +124,9 @@ export interface GrowthAuditPage {
   url: string;
   normalizedUrl: string;
   path?: string | null;
-  pageType: string;
-  source: string;
-  status: string;
+  pageType: GrowthAuditPageType | string;
+  source: GrowthAuditPageSource | string;
+  status: GrowthAuditPageStatus | string;
   priority: string;
   title?: string | null;
   metaDescription?: string | null;
@@ -121,6 +158,18 @@ export interface GrowthAuditEvent {
   progressPercent?: number | null;
   payload?: Record<string, unknown> | null;
   createdAt?: string | null;
+}
+
+export interface GrowthAuditInventoryCounts {
+  total: number;
+  homepage: number;
+  product: number;
+  collection: number;
+  blog: number;
+  staticPage: number;
+  unknown: number;
+  bySource: Record<string, number>;
+  byStatus: Record<string, number>;
 }
 
 export interface GrowthAuditRunDetailResponse {

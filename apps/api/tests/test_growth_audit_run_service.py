@@ -116,6 +116,8 @@ def test_process_growth_audit_run_completes_with_summary() -> None:
         audit_run = _build_run(project_id=project_id, run_id=run_id)
 
         session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
         session.commit = AsyncMock()
 
         execute_result = MagicMock()
@@ -126,16 +128,91 @@ def test_process_growth_audit_run_completes_with_summary() -> None:
         session_factory.return_value.__aenter__ = AsyncMock(return_value=session)
         session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        with patch(
-            "app.services.growth_audit.run_service.get_session_factory",
-            return_value=session_factory,
+        with (
+            patch(
+                "app.services.growth_audit.run_service.get_session_factory",
+                return_value=session_factory,
+            ),
+            patch(
+                "app.services.growth_audit.run_service.discover_sitemap_urls",
+                new=AsyncMock(
+                    return_value=(
+                        ["https://example.com/products/a", "https://example.com/pages/about"],
+                        [{"type": "sitemap_found", "message": "ok", "count": 2}],
+                    )
+                ),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.discover_shopify_urls",
+                new=AsyncMock(
+                    return_value=(
+                        [
+                            {
+                                "url": "https://example.com/products/a",
+                                "source": "shopify_product",
+                                "pageType": "product",
+                                "title": "Product A",
+                                "metadata": {},
+                            }
+                        ],
+                        [{"type": "shopify_urls_found", "message": "ok", "count": 1}],
+                    )
+                ),
+            ),
         ):
             await process_growth_audit_run(run_id)
 
         assert audit_run.status == "completed"
+        assert audit_run.phase == "finalization"
         assert audit_run.progress_percent == 100
         assert audit_run.summary is not None
-        assert "message" in audit_run.summary
+        assert audit_run.summary["pagesDiscovered"] >= 2
+        assert "sources" in audit_run.summary
+        assert "pageTypes" in audit_run.summary
+        assert audit_run.pages_discovered >= 2
+
+    asyncio.run(run())
+
+
+def test_process_growth_audit_run_keeps_seed_when_sitemap_fails() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_id = uuid4()
+        audit_run = _build_run(project_id=project_id, run_id=run_id)
+
+        session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        execute_result = MagicMock()
+        execute_result.scalar_one_or_none.return_value = audit_run
+        session.execute = AsyncMock(return_value=execute_result)
+
+        session_factory = MagicMock()
+        session_factory.return_value.__aenter__ = AsyncMock(return_value=session)
+        session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        with (
+            patch(
+                "app.services.growth_audit.run_service.get_session_factory",
+                return_value=session_factory,
+            ),
+            patch(
+                "app.services.growth_audit.run_service.discover_sitemap_urls",
+                new=AsyncMock(side_effect=RuntimeError("sitemap down")),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.discover_shopify_urls",
+                new=AsyncMock(return_value=([], [{"type": "shopify_urls_missing", "message": "none"}])),
+            ),
+        ):
+            await process_growth_audit_run(run_id)
+
+        assert audit_run.status == "completed"
+        assert audit_run.pages_discovered == 1
+        assert audit_run.summary is not None
+        assert audit_run.summary.get("warning")
 
     asyncio.run(run())
 

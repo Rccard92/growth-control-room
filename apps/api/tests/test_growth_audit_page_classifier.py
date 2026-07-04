@@ -24,12 +24,12 @@ def test_classify_blog() -> None:
     assert classify_page_type("https://example.com/blogs/news") == "blog"
 
 
-def test_classify_article() -> None:
-    assert classify_page_type("https://example.com/blogs/news/my-post") == "article"
+def test_classify_blog_article() -> None:
+    assert classify_page_type("https://example.com/blogs/news/my-post") == "blog_article"
 
 
-def test_classify_page() -> None:
-    assert classify_page_type("https://example.com/pages/about") == "page"
+def test_classify_static_page() -> None:
+    assert classify_page_type("https://example.com/pages/about") == "static_page"
 
 
 def test_classify_policy() -> None:

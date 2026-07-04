@@ -28,6 +28,9 @@ from app.services.growth_audit.page_classifier import (
     classify_page_type,
     get_default_skill_bundle_for_page_type,
 )
+from app.services.growth_audit.page_inventory import merge_discovered_urls
+from app.services.growth_audit.shopify_url_discovery import discover_shopify_urls
+from app.services.growth_audit.sitemap_discovery import discover_sitemap_urls
 from app.services.growth_audit.url_utils import (
     extract_domain,
     get_url_path,
@@ -38,6 +41,7 @@ from app.services.growth_audit.url_utils import (
 logger = logging.getLogger(__name__)
 
 MAX_LIST_LIMIT = 100
+MAX_DISCOVERY_PAGES = 300
 SUPPORTED_PROVIDERS = {"openai", "claude"}
 
 
@@ -69,6 +73,127 @@ def _validate_create_request(request: GrowthAuditRunCreateRequest) -> tuple[str,
     }
 
     return normalized_root, domain, config
+
+
+def _resolve_max_pages(config: dict | None) -> int:
+    raw = (config or {}).get("maxPages", 50)
+    try:
+        max_pages = int(raw)
+    except (TypeError, ValueError):
+        max_pages = 50
+    return max(1, min(max_pages, MAX_DISCOVERY_PAGES))
+
+
+def _count_inventory_sources(items: list[dict]) -> dict[str, int]:
+    counts = {"seed": 0, "sitemap": 0, "shopify": 0}
+    for item in items:
+        source = item.get("source", "")
+        if source == "seed":
+            counts["seed"] += 1
+        elif source == "sitemap":
+            counts["sitemap"] += 1
+        elif source.startswith("shopify_"):
+            counts["shopify"] += 1
+    return counts
+
+
+def _count_inventory_page_types(items: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        page_type = item.get("pageType") or "unknown"
+        counts[page_type] = counts.get(page_type, 0) + 1
+    return counts
+
+
+async def _persist_discovery_events(
+    session: AsyncSession,
+    *,
+    run: GrowthAuditRun,
+    events: list[dict],
+    phase: str = "discovery",
+    progress_percent: int = 10,
+) -> None:
+    for event in events:
+        event_type = event.get("type", "discovery_info")
+        message = event.get("message", "Discovery event")
+        payload = {
+            key: value
+            for key, value in event.items()
+            if key not in {"type", "message"}
+        }
+        await create_growth_audit_event(
+            session,
+            run_id=run.id,
+            project_id=run.project_id,
+            event_type=event_type,
+            phase=phase,
+            message=message,
+            progress_percent=progress_percent,
+            payload=payload or None,
+        )
+
+
+async def _upsert_inventory_pages(
+    session: AsyncSession,
+    *,
+    run: GrowthAuditRun,
+    inventory_items: list[dict],
+    now: datetime,
+) -> int:
+    existing_by_url = {
+        page.normalized_url: page for page in run.pages
+    }
+    classified_count = 0
+
+    for item in inventory_items:
+        normalized_url = item["normalizedUrl"]
+        page_type = item.get("pageType") or classify_page_type(
+            normalized_url,
+            title=item.get("title"),
+            metadata=item.get("metadata"),
+        )
+        skill_bundle = get_default_skill_bundle_for_page_type(page_type)
+        metadata = {
+            **(item.get("metadata") or {}),
+            "skillBundle": skill_bundle,
+        }
+
+        page = existing_by_url.get(normalized_url)
+        if page is None:
+            page = GrowthAuditPage(
+                run_id=run.id,
+                project_id=run.project_id,
+                url=item["url"],
+                normalized_url=normalized_url,
+                path=item.get("path") or get_url_path(normalized_url),
+                page_type=page_type,
+                source=item.get("source", "seed"),
+                status="classified",
+                priority="high" if item.get("source") == "seed" else "normal",
+                title=item.get("title"),
+                discovered_at=now,
+                classified_at=now,
+                page_metadata=metadata,
+            )
+            session.add(page)
+            existing_by_url[normalized_url] = page
+        else:
+            page.url = item["url"]
+            page.path = item.get("path") or get_url_path(normalized_url)
+            page.page_type = page_type
+            page.source = item.get("source", page.source)
+            page.status = "classified"
+            page.title = item.get("title") or page.title
+            page.discovered_at = page.discovered_at or now
+            page.classified_at = now
+            page.page_metadata = {
+                **(page.page_metadata or {}),
+                **metadata,
+            }
+
+        classified_count += 1
+
+    return classified_count
 
 
 async def create_growth_audit_event(
@@ -201,9 +326,12 @@ async def process_growth_audit_run(run_id: UUID) -> None:
             return
 
         now = _utcnow()
+        max_pages = _resolve_max_pages(run.config)
+        root_domain = run.normalized_domain
+
         run.status = "discovering"
         run.phase = "discovery"
-        run.started_at = now
+        run.started_at = run.started_at or now
         run.progress_percent = 10
         run.current_url = run.root_url
         await create_growth_audit_event(
@@ -212,97 +340,149 @@ async def process_growth_audit_run(run_id: UUID) -> None:
             project_id=run.project_id,
             event_type="discovery_started",
             phase="discovery",
-            message="Discovery avviata (MVP: solo pagina seed).",
+            message="Discovery avviata: sitemap e dati Shopify.",
             progress_percent=10,
         )
         await session.commit()
 
-        run.status = "classifying"
-        run.phase = "classification"
-        run.progress_percent = 35
-        await create_growth_audit_event(
+        sitemap_urls: list[str] = []
+        shopify_items: list[dict] = []
+        discovery_events: list[dict] = []
+
+        try:
+            sitemap_urls, sitemap_events = await discover_sitemap_urls(
+                run.root_url,
+                max_urls=max_pages,
+            )
+            discovery_events.extend(sitemap_events)
+        except Exception as exc:
+            logger.warning("Sitemap discovery failed for run %s: %s", run_id, exc)
+            discovery_events.append(
+                {
+                    "type": "sitemap_error",
+                    "message": "Errore durante la discovery sitemap.",
+                    "count": 0,
+                }
+            )
+
+        try:
+            shopify_items, shopify_events = await discover_shopify_urls(
+                session,
+                run.project_id,
+                run.root_url,
+                max_urls=max_pages,
+            )
+            discovery_events.extend(shopify_events)
+        except Exception as exc:
+            logger.warning("Shopify discovery failed for run %s: %s", run_id, exc)
+            discovery_events.append(
+                {
+                    "type": "shopify_urls_missing",
+                    "message": "Errore durante la discovery Shopify.",
+                    "count": 0,
+                }
+            )
+
+        await _persist_discovery_events(
             session,
-            run_id=run.id,
-            project_id=run.project_id,
-            event_type="classification_started",
-            phase="classification",
-            message="Classificazione pagine in corso.",
-            progress_percent=35,
+            run=run,
+            events=discovery_events,
+            phase="discovery",
+            progress_percent=25,
         )
         await session.commit()
 
-        classified_count = 0
-        for page in run.pages:
-            page_type = classify_page_type(page.url, title=page.title)
-            skill_bundle = get_default_skill_bundle_for_page_type(page_type)
-            page.page_type = page_type
-            page.status = "classified"
-            page.classified_at = _utcnow()
-            page.page_metadata = {
-                **(page.page_metadata or {}),
-                "skillBundle": skill_bundle,
-            }
-            classified_count += 1
+        inventory_items = merge_discovered_urls(
+            seed_url=run.root_url,
+            sitemap_urls=sitemap_urls,
+            shopify_items=shopify_items,
+            max_pages=max_pages,
+            root_domain=root_domain,
+        )
 
+        classified_count = await _upsert_inventory_pages(
+            session,
+            run=run,
+            inventory_items=inventory_items,
+            now=now,
+        )
+
+        source_counts = _count_inventory_sources(inventory_items)
+        page_type_counts = _count_inventory_page_types(inventory_items)
+
+        run.pages_discovered = len(inventory_items)
         run.pages_classified = classified_count
-        run.status = "ready_for_analysis"
-        run.phase = "ready_for_analysis"
+        run.total_pages = len(inventory_items)
+        run.current_url = None
         run.progress_percent = 60
+        run.status = "ready_for_analysis"
+        run.phase = "analysis"
+
+        inventory_message = (
+            f"Inventario completato con {len(inventory_items)} pagine."
+            if len(inventory_items) > 1
+            else "Inventario completato con sola pagina seed."
+        )
         await create_growth_audit_event(
             session,
             run_id=run.id,
             project_id=run.project_id,
-            event_type="analysis_ready",
-            phase="ready_for_analysis",
-            message="Pagine classificate, pronte per analisi.",
+            event_type="inventory_completed",
+            phase="analysis",
+            message=inventory_message,
             progress_percent=60,
-            payload={"pagesClassified": classified_count},
+            payload={
+                "pagesDiscovered": len(inventory_items),
+                "pagesClassified": classified_count,
+                "sources": source_counts,
+                "pageTypes": page_type_counts,
+            },
         )
         await session.commit()
 
         include_ai = bool((run.config or {}).get("includeAiAnalysis"))
-        if include_ai:
-            await create_growth_audit_event(
-                session,
-                run_id=run.id,
-                project_id=run.project_id,
-                event_type="analysis_skipped",
-                phase="ready_for_analysis",
-                message="Analisi AI disabilitata in questo step.",
-                progress_percent=60,
-            )
-        else:
-            await create_growth_audit_event(
-                session,
-                run_id=run.id,
-                project_id=run.project_id,
-                event_type="analysis_skipped",
-                phase="ready_for_analysis",
-                message="Analisi AI non inclusa in questa configurazione.",
-                progress_percent=60,
-            )
+        await create_growth_audit_event(
+            session,
+            run_id=run.id,
+            project_id=run.project_id,
+            event_type="analysis_skipped",
+            phase="analysis",
+            message="Analisi AI non abilitata in questo step.",
+            progress_percent=60,
+            payload={"includeAiAnalysis": include_ai},
+        )
         await session.commit()
 
+        warning_message = None
+        if len(inventory_items) <= 1:
+            warning_message = (
+                "Solo la pagina seed è stata trovata. Verifica sitemap o sincronizzazione Shopify."
+            )
+
         run.status = "completed"
-        run.phase = "completed"
+        run.phase = "finalization"
         run.progress_percent = 100
         run.completed_at = _utcnow()
         run.current_url = None
         run.summary = {
-            "message": "Audit skeleton completato. Discovery sitemap e analisi skill arriveranno nel prossimo step.",
-            "pagesDiscovered": run.pages_discovered,
-            "pagesClassified": run.pages_classified,
+            "message": "Page inventory completed. AI page analysis is not enabled yet.",
+            "pagesDiscovered": len(inventory_items),
+            "pagesClassified": classified_count,
             "pagesAnalyzed": 0,
             "includeAiAnalysis": include_ai,
             "auditMode": run.audit_mode,
+            "sources": source_counts,
+            "pageTypes": page_type_counts,
+            "nextStep": "Enable page-level technical and AI analysis.",
+            "warning": warning_message,
         }
         await create_growth_audit_event(
             session,
             run_id=run.id,
             project_id=run.project_id,
             event_type="run_completed",
-            phase="completed",
-            message="Growth Audit completato (skeleton MVP).",
+            phase="finalization",
+            message="Growth Audit completato: inventario pagine pronto.",
             progress_percent=100,
             payload=run.summary,
         )

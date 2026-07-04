@@ -22,10 +22,10 @@ def classify_page_type(
         return "collection"
     if path.startswith("/blogs/"):
         if path.count("/") >= 3:
-            return "article"
+            return "blog_article"
         return "blog"
     if path.startswith("/pages/"):
-        return "page"
+        return "static_page"
     if any(
         segment in path
         for segment in (
@@ -66,7 +66,9 @@ def get_default_skill_bundle_for_page_type(page_type: str) -> list[str]:
         "product": ["seo-audit", "geo-audit", "cro-audit"],
         "collection": ["seo-audit", "geo-audit"],
         "blog": ["seo-audit", "geo-audit"],
+        "blog_article": ["seo-audit", "geo-audit"],
         "article": ["seo-audit", "geo-audit"],
+        "static_page": ["seo-audit", "geo-audit"],
         "page": ["seo-audit", "geo-audit"],
         "policy": ["seo-audit"],
         "other": ["seo-audit"],

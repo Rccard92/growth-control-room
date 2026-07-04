@@ -171,6 +171,118 @@
   font-weight: 600;
 }
 
+.growth-audit-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr);
+  gap: 12px;
+}
+
+.growth-audit-kpi-grid--inventory {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.growth-audit-inventory-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(237, 180, 99, 0.08);
+  border: 1px solid rgba(237, 180, 99, 0.2);
+  color: var(--gcr-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.growth-audit-inventory {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.growth-audit-inventory__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.growth-audit-inventory__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-inventory-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.growth-audit-inventory-filter {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--gcr-text-muted);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.growth-audit-inventory-filter--active {
+  border-color: rgba(99, 179, 237, 0.45);
+  background: rgba(99, 179, 237, 0.12);
+  color: rgba(99, 179, 237, 0.95);
+}
+
+.growth-audit-source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.growth-audit-source-badge--seed {
+  background: rgba(99, 179, 237, 0.15);
+  color: rgba(99, 179, 237, 0.95);
+}
+
+.growth-audit-source-badge--sitemap {
+  background: rgba(72, 187, 120, 0.15);
+  color: rgba(72, 187, 120, 0.95);
+}
+
+.growth-audit-source-badge--shopify-product,
+.growth-audit-source-badge--shopify-collection,
+.growth-audit-source-badge--shopify-page,
+.growth-audit-source-badge--shopify-blog {
+  background: rgba(237, 180, 99, 0.15);
+  color: rgba(237, 200, 140, 0.95);
+}
+
+.growth-audit-source-badge--other {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-pages-table__url-sub {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--gcr-text-muted);
+  word-break: break-all;
+}
+
+.growth-audit-action-placeholder {
+  font-size: 0.78rem;
+  color: var(--gcr-text-muted);
+  font-style: italic;
+}
+
+.growth-audit-events--compact .growth-audit-events__item {
+  padding: 6px 8px;
+  gap: 6px 10px;
+}
+
 .growth-audit-run-error {
   margin: 0;
   color: #f56565;
@@ -368,11 +480,16 @@
     flex-direction: column;
   }
 
+  .growth-audit-form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .growth-audit-events__item {
     grid-template-columns: 1fr;
   }
 
-  .growth-audit-kpi-grid {
+  .growth-audit-kpi-grid,
+  .growth-audit-kpi-grid--inventory {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useParams } from "react-router-dom";
+import type { GrowthAuditInventoryFilter } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
 import { SeoSkillLibrary } from "../components/seo-skills";
 import {
@@ -11,12 +12,20 @@ import {
 import { useProject } from "../hooks/useProjects";
 import { useShopifyStatus } from "../hooks/useShopify";
 import {
+  GROWTH_AUDIT_INVENTORY_FILTERS,
+  GROWTH_AUDIT_MAX_PAGES_OPTIONS,
+  aggregatePageInventory,
+  filterInventoryPages,
   getDefaultRootUrl,
+  getGrowthAuditInventoryFilterLabel,
   getGrowthAuditPageSourceLabel,
   getGrowthAuditPageStatusLabel,
   getGrowthAuditPageTypeLabel,
   getGrowthAuditPhaseLabel,
+  getGrowthAuditSourceBadgeClass,
   getGrowthAuditStatusLabel,
+  getInventoryKpiItems,
+  getInventoryMessage,
 } from "../lib/growth-audit-utils";
 import { APP_ROUTES } from "../routes/config";
 
@@ -28,10 +37,8 @@ const GROWTH_AUDIT_FLOW_STEPS = [
 ] as const;
 
 const GROWTH_AUDIT_ROADMAP = [
-  "Crawler sitemap e Shopify URL discovery",
-  "Classificazione automatica pagine",
-  "Full Site Audit con progress bar",
-  "Dashboard pagine e priorità",
+  "Analisi tecnica e AI per tipologia di pagina",
+  "Dashboard priorità e scoring pagina",
   "Rescan singola pagina",
   "Integrazioni: PageSpeed, Search Console, GA4, Google Ads, Firecrawl/DataForSEO",
 ] as const;
@@ -50,6 +57,8 @@ export function GrowthAuditPage() {
   );
   const [rootUrlOverride, setRootUrlOverride] = useState<string | null>(null);
   const rootUrl = rootUrlOverride ?? defaultRootUrl;
+  const [maxPages, setMaxPages] = useState<number>(50);
+  const [inventoryFilter, setInventoryFilter] = useState<GrowthAuditInventoryFilter>("all");
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
 
   useEffect(() => {
@@ -68,31 +77,19 @@ export function GrowthAuditPage() {
   const pages = runDetail?.pages ?? [];
   const events = runDetail?.events ?? [];
   const recentEvents = [...events].reverse().slice(0, 5);
-  const summaryMessage =
-    typeof activeRun?.summary?.message === "string" ? activeRun.summary.message : null;
-
-  const kpiItems = [
-    {
-      label: "Site Score",
-      value: activeRun?.siteScore != null ? String(activeRun.siteScore) : "—",
-      meta: activeRun?.siteScore != null ? "Da run attiva" : "Non ancora disponibile",
-    },
-    {
-      label: "Pagine scoperte",
-      value: activeRun ? String(activeRun.pagesDiscovered) : "—",
-      meta: activeRun ? "Aggiornato dalla run" : "Non ancora disponibile",
-    },
-    {
-      label: "Problemi critici",
-      value: runDetail?.findingsCount ? String(runDetail.findingsCount) : "—",
-      meta: runDetail?.findingsCount ? "Finding registrati" : "Non ancora disponibile",
-    },
-    {
-      label: "Task aperti",
-      value: runDetail?.tasksCount ? String(runDetail.tasksCount) : "—",
-      meta: runDetail?.tasksCount ? "Task registrati" : "Non ancora disponibile",
-    },
-  ];
+  const summary = activeRun?.summary ?? null;
+  const summaryMessage = typeof summary?.message === "string" ? summary.message : null;
+  const inventoryMessage = getInventoryMessage(activeRun?.pagesDiscovered ?? 0, summary);
+  const filteredPages = useMemo(
+    () => filterInventoryPages(pages, inventoryFilter),
+    [pages, inventoryFilter],
+  );
+  const inventoryCounts = useMemo(() => aggregatePageInventory(pages), [pages]);
+  const inventoryKpiItems = useMemo(
+    () => getInventoryKpiItems(pages, summary),
+    [pages, summary],
+  );
+  const showInventoryKpis = activeRun?.status === "completed" && pages.length > 0;
 
   const handleStartAudit = async () => {
     const trimmed = rootUrl.trim();
@@ -102,7 +99,7 @@ export function GrowthAuditPage() {
       rootUrl: trimmed,
       provider: "openai",
       auditMode: "full_site_mvp",
-      maxPages: 50,
+      maxPages,
       includeAiAnalysis: false,
     });
     setActiveRunId(response.run.id);
@@ -151,42 +148,86 @@ export function GrowthAuditPage() {
         </ol>
       </section>
 
-      <div className="growth-audit-kpi-grid">
-        {kpiItems.map((kpi) => (
-          <div key={kpi.label} className="content-seo-kpi gcr-card content-seo-kpi--compact">
-            <span className="content-seo-kpi__value">{kpi.value}</span>
-            <span className="content-seo-kpi__label">{kpi.label}</span>
-            <span className="growth-audit-kpi-grid__meta">{kpi.meta}</span>
+      {showInventoryKpis ? (
+        <div className="growth-audit-kpi-grid growth-audit-kpi-grid--inventory">
+          {inventoryKpiItems.map((kpi) => (
+            <div key={kpi.label} className="content-seo-kpi gcr-card content-seo-kpi--compact">
+              <span className="content-seo-kpi__value">{kpi.value}</span>
+              <span className="content-seo-kpi__label">{kpi.label}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="growth-audit-kpi-grid">
+          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
+            <span className="content-seo-kpi__value">
+              {activeRun ? String(activeRun.pagesDiscovered) : "—"}
+            </span>
+            <span className="content-seo-kpi__label">Pagine scoperte</span>
           </div>
-        ))}
-      </div>
+          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
+            <span className="content-seo-kpi__value">—</span>
+            <span className="content-seo-kpi__label">Site Score</span>
+            <span className="growth-audit-kpi-grid__meta">Prossimo step</span>
+          </div>
+          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
+            <span className="content-seo-kpi__value">
+              {runDetail?.findingsCount ? String(runDetail.findingsCount) : "—"}
+            </span>
+            <span className="content-seo-kpi__label">Problemi critici</span>
+          </div>
+          <div className="content-seo-kpi gcr-card content-seo-kpi--compact">
+            <span className="content-seo-kpi__value">
+              {runDetail?.tasksCount ? String(runDetail.tasksCount) : "—"}
+            </span>
+            <span className="content-seo-kpi__label">Task aperti</span>
+          </div>
+        </div>
+      )}
 
       <section className="growth-audit-full-site gcr-card">
         <div className="growth-audit-full-site__header">
           <div>
             <h2 className="growth-audit-full-site__title">Full Site Audit</h2>
             <p className="growth-audit-full-site__description">
-              Scansiona il sito, classifica homepage, prodotti, categorie, articoli e landing, poi
-              applica analisi diverse in base al tipo di pagina.
+              Scopre URL da sitemap e dati Shopify sincronizzati, classifica le pagine e crea
+              l&apos;inventario operativo del sito.
             </p>
           </div>
         </div>
 
         <div className="growth-audit-skeleton-banner">
-          Nel prossimo step abiliteremo discovery sitemap e crawl multi-pagina. In questa fase la run
-          crea una pagina seed e la classifica automaticamente.
+          Discovery attiva: sitemap XML, sitemap index e URL Shopify già sincronizzati. L&apos;analisi
+          AI per pagina arriverà nel prossimo step.
         </div>
 
-        <label className="growth-audit-url-field">
-          <span className="growth-audit-url-field__label">Dominio o URL principale</span>
-          <input
-            type="url"
-            className="gcr-input"
-            value={rootUrl}
-            onChange={(event) => setRootUrlOverride(event.target.value)}
-            placeholder="https://example.com"
-          />
-        </label>
+        <div className="growth-audit-form-grid">
+          <label className="growth-audit-url-field">
+            <span className="growth-audit-url-field__label">Dominio o URL principale</span>
+            <input
+              type="url"
+              className="gcr-input"
+              value={rootUrl}
+              onChange={(event) => setRootUrlOverride(event.target.value)}
+              placeholder="https://example.com"
+            />
+          </label>
+
+          <label className="growth-audit-url-field">
+            <span className="growth-audit-url-field__label">Pagine massime</span>
+            <select
+              className="gcr-input"
+              value={maxPages}
+              onChange={(event) => setMaxPages(Number(event.target.value))}
+            >
+              {GROWTH_AUDIT_MAX_PAGES_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <button
           type="button"
@@ -250,9 +291,13 @@ export function GrowthAuditPage() {
               <p className="growth-audit-run-panel__summary">{summaryMessage}</p>
             )}
 
+            {inventoryMessage && (
+              <p className="growth-audit-inventory-message">{inventoryMessage}</p>
+            )}
+
             {recentEvents.length > 0 && (
-              <div className="growth-audit-events">
-                <h4 className="growth-audit-events__title">Ultimi eventi</h4>
+              <div className="growth-audit-events growth-audit-events--compact">
+                <h4 className="growth-audit-events__title">Eventi recenti</h4>
                 <ul className="growth-audit-events__list">
                   {recentEvents.map((event) => (
                     <li key={event.id} className="growth-audit-events__item">
@@ -272,28 +317,67 @@ export function GrowthAuditPage() {
             )}
 
             {pages.length > 0 && (
-              <div className="growth-audit-pages-table-wrap">
-                <h4 className="growth-audit-pages-table__title">Pagine</h4>
-                <table className="growth-audit-pages-table">
-                  <thead>
-                    <tr>
-                      <th>URL</th>
-                      <th>Tipo</th>
-                      <th>Stato</th>
-                      <th>Fonte</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pages.map((page) => (
-                      <tr key={page.id}>
-                        <td className="growth-audit-pages-table__url">{page.url}</td>
-                        <td>{getGrowthAuditPageTypeLabel(page.pageType)}</td>
-                        <td>{getGrowthAuditPageStatusLabel(page.status)}</td>
-                        <td>{getGrowthAuditPageSourceLabel(page.source)}</td>
+              <div className="growth-audit-inventory">
+                <div className="growth-audit-inventory__header">
+                  <div>
+                    <h4 className="growth-audit-inventory__title">Inventario pagine</h4>
+                    <p className="growth-audit-inventory__subtitle">
+                      {inventoryCounts.total} pagine totali · {filteredPages.length} visibili con
+                      filtro corrente
+                    </p>
+                  </div>
+                </div>
+
+                <div className="growth-audit-inventory-filters" role="tablist" aria-label="Filtri tipo pagina">
+                  {GROWTH_AUDIT_INVENTORY_FILTERS.map((filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      className={`growth-audit-inventory-filter${
+                        inventoryFilter === filter ? " growth-audit-inventory-filter--active" : ""
+                      }`}
+                      onClick={() => setInventoryFilter(filter)}
+                    >
+                      {getGrowthAuditInventoryFilterLabel(filter)}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="growth-audit-pages-table-wrap">
+                  <table className="growth-audit-pages-table">
+                    <thead>
+                      <tr>
+                        <th>URL</th>
+                        <th>Tipo</th>
+                        <th>Fonte</th>
+                        <th>Stato</th>
+                        <th>Score</th>
+                        <th>Azione</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredPages.map((page) => (
+                        <tr key={page.id}>
+                          <td className="growth-audit-pages-table__url">
+                            <div>{page.title || page.url}</div>
+                            <div className="growth-audit-pages-table__url-sub">{page.url}</div>
+                          </td>
+                          <td>{getGrowthAuditPageTypeLabel(page.pageType)}</td>
+                          <td>
+                            <span className={getGrowthAuditSourceBadgeClass(page.source)}>
+                              {getGrowthAuditPageSourceLabel(page.source)}
+                            </span>
+                          </td>
+                          <td>{getGrowthAuditPageStatusLabel(page.status)}</td>
+                          <td>{page.score ?? "—"}</td>
+                          <td>
+                            <span className="growth-audit-action-placeholder">Analisi in arrivo</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -304,8 +388,8 @@ export function GrowthAuditPage() {
         <header className="growth-audit-manual-section__header">
           <h2 className="growth-audit-manual-section__title">Audit guidato su URL</h2>
           <p className="growth-audit-manual-section__description">
-            Usa questa modalità per analizzare subito una pagina specifica mentre prepariamo il full
-            site audit.
+            Modalità complementare per analizzare subito una pagina specifica mentre l&apos;inventario
+            full site viene costruito.
           </p>
         </header>
         <SeoSkillLibrary projectId={projectId} />

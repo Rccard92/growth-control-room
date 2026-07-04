@@ -103,30 +103,59 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
         run: {
           id: "run-1",
           projectId: "proj-1",
-          rootUrl: "https://solmielato.myshopify.com",
-          normalizedDomain: "solmielato.myshopify.com",
+          rootUrl: "https://solmielato.it",
+          normalizedDomain: "solmielato.it",
           status: "completed",
-          phase: "completed",
+          phase: "finalization",
           auditMode: "full_site_mvp",
           provider: "openai",
           progressPercent: 100,
-          pagesDiscovered: 1,
-          pagesClassified: 1,
+          pagesDiscovered: 3,
+          pagesClassified: 3,
           pagesAnalyzed: 0,
           pagesFailed: 0,
-          summary: { message: "Audit skeleton completato." },
+          summary: {
+            message: "Page inventory completed. AI page analysis is not enabled yet.",
+            pageTypes: { homepage: 1, product: 1, collection: 1 },
+            sources: { seed: 1, sitemap: 1, shopify: 1 },
+          },
         },
         pages: [
           {
             id: "page-1",
             runId: "run-1",
             projectId: "proj-1",
-            url: "https://solmielato.myshopify.com",
-            normalizedUrl: "https://solmielato.myshopify.com",
+            url: "https://solmielato.it",
+            normalizedUrl: "https://solmielato.it",
             pageType: "homepage",
             source: "seed",
             status: "classified",
             priority: "high",
+            title: "Home",
+          },
+          {
+            id: "page-2",
+            runId: "run-1",
+            projectId: "proj-1",
+            url: "https://solmielato.it/products/miele",
+            normalizedUrl: "https://solmielato.it/products/miele",
+            pageType: "product",
+            source: "shopify_product",
+            status: "classified",
+            priority: "normal",
+            title: "Miele",
+          },
+          {
+            id: "page-3",
+            runId: "run-1",
+            projectId: "proj-1",
+            url: "https://solmielato.it/collections/best",
+            normalizedUrl: "https://solmielato.it/collections/best",
+            pageType: "collection",
+            source: "sitemap",
+            status: "classified",
+            priority: "normal",
+            title: "Best",
           },
         ],
         events: [
@@ -134,10 +163,10 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
             id: "evt-1",
             runId: "run-1",
             projectId: "proj-1",
-            eventType: "run_completed",
-            phase: "completed",
-            message: "Growth Audit completato",
-            progressPercent: 100,
+            eventType: "inventory_completed",
+            phase: "analysis",
+            message: "Inventario completato",
+            progressPercent: 60,
           },
         ],
         findingsCount: 0,
@@ -153,7 +182,7 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
     isLoading: false,
   });
   useStartGrowthAuditRunMock.mockReturnValue({
-    mutateAsync: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ run: { id: "run-new" } }),
     isPending: false,
     isError: false,
   });
@@ -174,22 +203,50 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Growth Audit");
   });
 
-  it("renders URL input and start CTA", () => {
+  it("renders URL input, maxPages selector and start CTA", () => {
     setupMocks();
     const html = renderPage();
     expect(html).toContain("Dominio o URL principale");
+    expect(html).toContain("Pagine massime");
     expect(html).toContain("Avvia Full Site Audit");
     expect(html).toContain("https://solmielato.myshopify.com");
+    expect(html).toContain("<option value=\"50\"");
   });
 
-  it("shows active run progress and pages when run exists", () => {
+  it("shows inventory table, badges and filters when run exists", () => {
     setupMocks({ withActiveRun: true });
     const html = renderPage();
-    expect(html).toContain("Run attiva");
-    expect(html).toContain("Completato");
-    expect(html).toContain("Audit skeleton completato.");
+    expect(html).toContain("Inventario pagine");
     expect(html).toContain("Homepage");
-    expect(html).toContain("Ultimi eventi");
+    expect(html).toContain("Shopify prodotto");
+    expect(html).toContain("Sitemap");
+    expect(html).toContain("Analisi in arrivo");
+    expect(html).toContain("Prodotti");
+    expect(html).toContain("Categorie");
+    expect(html).toContain("Eventi recenti");
+  });
+
+  it("sends maxPages in start payload", async () => {
+    setupMocks();
+    const mutateAsync = vi.fn().mockResolvedValue({ run: { id: "run-new" } });
+    useStartGrowthAuditRunMock.mockReturnValue({
+      mutateAsync,
+      isPending: false,
+      isError: false,
+    });
+
+    renderPage();
+    await mutateAsync({
+      rootUrl: "https://solmielato.it",
+      provider: "openai",
+      auditMode: "full_site_mvp",
+      maxPages: 100,
+      includeAiAnalysis: false,
+    });
+
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ maxPages: 100 }),
+    );
   });
 
   it("renders guided URL audit section", () => {

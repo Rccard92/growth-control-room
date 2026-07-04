@@ -25,6 +25,7 @@ GrowthAuditPhase = Literal[
     "classification",
     "analysis",
     "ready_for_analysis",
+    "finalization",
     "completed",
     "failed",
 ]
@@ -33,7 +34,9 @@ GrowthAuditPageType = Literal[
     "product",
     "collection",
     "blog",
+    "blog_article",
     "article",
+    "static_page",
     "page",
     "policy",
     "cart",
@@ -51,7 +54,16 @@ GrowthAuditPageStatus = Literal[
     "failed",
     "skipped",
 ]
-GrowthAuditPageSource = Literal["seed", "sitemap", "crawl", "manual"]
+GrowthAuditPageSource = Literal[
+    "seed",
+    "sitemap",
+    "shopify_product",
+    "shopify_collection",
+    "shopify_page",
+    "shopify_blog",
+    "crawl",
+    "manual",
+]
 
 
 class GrowthAuditRunCreateRequest(BaseModel):
