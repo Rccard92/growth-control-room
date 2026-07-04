@@ -7,7 +7,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -205,14 +205,33 @@ async def _upsert_inventory_pages(
     return classified_count
 
 
-def _pages_to_scan(run: GrowthAuditRun, max_pages: int) -> list[GrowthAuditPage]:
-    scan_limit = min(max_pages, run.total_pages or 0, MAX_TECHNICAL_SCAN_PAGES)
-    eligible = [
-        page
-        for page in run.pages
-        if page.status in ("classified", "discovered", "pending")
-    ]
-    return eligible[:scan_limit]
+async def _load_pages_to_scan(
+    session: AsyncSession,
+    *,
+    run: GrowthAuditRun,
+    max_pages: int,
+) -> list[GrowthAuditPage]:
+    scan_limit = min(max_pages, run.total_pages or max_pages, MAX_TECHNICAL_SCAN_PAGES)
+    priority_rank = case(
+        (GrowthAuditPage.priority == "high", 0),
+        else_=1,
+    )
+    stmt = (
+        select(GrowthAuditPage)
+        .where(
+            GrowthAuditPage.run_id == run.id,
+            GrowthAuditPage.project_id == run.project_id,
+            GrowthAuditPage.status.in_(("classified", "discovered", "pending")),
+        )
+        .order_by(
+            priority_rank.asc(),
+            GrowthAuditPage.depth.asc().nulls_last(),
+            GrowthAuditPage.url.asc(),
+        )
+        .limit(scan_limit)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def _fetch_page_scan(
@@ -387,11 +406,29 @@ async def _run_technical_scan_phase(
     inventory_count: int,
     now: datetime,
 ) -> None:
-    pages = _pages_to_scan(run, max_pages)
+    pages = await _load_pages_to_scan(session, run=run, max_pages=max_pages)
     total_to_scan = len(pages)
 
     run.pages_analyzed = run.pages_analyzed or 0
     run.pages_failed = run.pages_failed or 0
+
+    if total_to_scan == 1 and inventory_count > 1:
+        await create_growth_audit_event(
+            session,
+            run_id=run.id,
+            project_id=run.project_id,
+            event_type="technical_scan_page_mismatch",
+            phase="technical_scan",
+            message=(
+                "Inventario contiene più pagine, ma la scansione tecnica ne ha caricate solo una. "
+                "Verifica query/status."
+            ),
+            progress_percent=65,
+            payload={
+                "pagesDiscovered": inventory_count,
+                "pagesToScan": total_to_scan,
+            },
+        )
 
     run.status = "analyzing"
     run.phase = "technical_scan"
