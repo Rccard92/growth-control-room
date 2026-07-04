@@ -1,13 +1,12 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { GrowthAuditPageResult } from "@gcr/shared";
-import { GrowthAuditPageAiAnalysisPanel } from "../components/growth-audit/GrowthAuditPageAiAnalysisPanel";
-import { GrowthAuditPageDetailHeader } from "../components/growth-audit/page-detail/GrowthAuditPageDetailHeader";
-import { GrowthAuditPageDetailKpiStrip } from "../components/growth-audit/page-detail/GrowthAuditPageDetailKpiStrip";
-import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailShopifySection";
-import { GrowthAuditPageDetailSidebar } from "../components/growth-audit/page-detail/GrowthAuditPageDetailSidebar";
-import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailTechnicalSection";
 import { GrowthAuditPriorityActionsPanel } from "../components/growth-audit/GrowthAuditPriorityActionsPanel";
+import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailShopifySection";
+import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailTechnicalSection";
+import { GrowthAuditPageWorkspaceAiSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAiSection";
+import { GrowthAuditPageWorkspaceHeader } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceHeader";
+import { GrowthAuditPageWorkspaceSidebar } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceSidebar";
 import {
   useGrowthAuditFindings,
   useGrowthAuditPageResults,
@@ -16,6 +15,8 @@ import {
   useRescanGrowthAuditPage,
 } from "../hooks/useGrowthAudit";
 import {
+  buildGrowthAuditPageImprovementItems,
+  buildGrowthAuditPriorityActions,
   getFindingsForPage,
   getTasksForPage,
   isGrowthAuditRunActive,
@@ -90,6 +91,17 @@ export function GrowthAuditPageDetailPage() {
   const mappedEntity = page ? mapGrowthAuditPageToSeoEntity(page) : null;
   const aiAvailable = page?.status === "analyzed";
 
+  const priorityActionsCount = useMemo(() => {
+    if (!page) return 0;
+    return buildGrowthAuditPriorityActions({
+      page,
+      findings: pageFindings,
+      tasks: pageTasks,
+      improvementItems: buildGrowthAuditPageImprovementItems(page, pageFindings),
+      aiResults: pageResults,
+    }).length;
+  }, [page, pageFindings, pageTasks, pageResults]);
+
   const canRescan = Boolean(
     projectId &&
       runId &&
@@ -100,7 +112,7 @@ export function GrowthAuditPageDetailPage() {
 
   if (!projectId || !runId || !pageId) {
     return (
-      <div className="growth-audit-page-detail">
+      <div className="growth-audit-workspace growth-audit-page-detail">
         <p>Parametri mancanti per il dettaglio pagina.</p>
       </div>
     );
@@ -108,7 +120,7 @@ export function GrowthAuditPageDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="growth-audit-page-detail">
+      <div className="growth-audit-workspace growth-audit-page-detail">
         <p className="growth-audit-page-detail__loading">Caricamento pagina…</p>
       </div>
     );
@@ -116,7 +128,7 @@ export function GrowthAuditPageDetailPage() {
 
   if (isError) {
     return (
-      <div className="growth-audit-page-detail">
+      <div className="growth-audit-workspace growth-audit-page-detail">
         <div className="gcr-alert gcr-alert--error" role="alert">
           {error instanceof Error ? error.message : "Impossibile caricare il dettaglio pagina."}
         </div>
@@ -129,7 +141,7 @@ export function GrowthAuditPageDetailPage() {
 
   if (!page) {
     return (
-      <div className="growth-audit-page-detail">
+      <div className="growth-audit-workspace growth-audit-page-detail">
         <p className="growth-audit-page-detail__empty">Pagina non trovata in questo run.</p>
         <Link to={APP_ROUTES.projectGrowthAudit(projectId)} className="gcr-btn gcr-btn--secondary">
           ← Torna all&apos;audit
@@ -139,11 +151,14 @@ export function GrowthAuditPageDetailPage() {
   }
 
   return (
-    <div className="growth-audit-page-detail">
-      <GrowthAuditPageDetailHeader
+    <div className="growth-audit-workspace growth-audit-page-detail">
+      <GrowthAuditPageWorkspaceHeader
         projectId={projectId}
         page={page}
         runStatus={runStatus}
+        findingsCount={pageFindings.length}
+        tasksCount={pageTasks.length}
+        latestAiResult={latestAiResult}
         isRescanning={rescanPage.isPending}
         canRescan={canRescan}
         onRescan={async (clearPreviousOpenItems) => {
@@ -156,56 +171,39 @@ export function GrowthAuditPageDetailPage() {
         onScrollToSection={scrollToSection}
       />
 
-      <GrowthAuditPageDetailKpiStrip
-        page={page}
-        openFindingsCount={pageFindings.length}
-        openTasksCount={pageTasks.length}
-        latestAiResult={latestAiResult}
-      />
-
-      <div className="growth-audit-page-detail__layout">
-        <main className="growth-audit-page-detail__main">
+      <div className="growth-audit-workspace__layout">
+        <main className="growth-audit-workspace__main">
           <GrowthAuditPriorityActionsPanel
             page={page}
             findings={pageFindings}
             tasks={pageTasks}
             aiResults={pageResults}
+            maxItems={6}
+            workspace
           />
 
           <GrowthAuditPageDetailShopifySection projectId={projectId} page={page} />
 
-          <section
-            id="section-ai"
-            className="growth-audit-page-detail__section growth-audit-page-detail__ai"
-          >
-            <h2 className="growth-audit-page-detail__section-title">AI/GEO/CRO</h2>
-            <p className="growth-audit-page-detail__ai-intro">
-              Usa questa analisi solo sulle pagine prioritarie. L&apos;analisi usa AI e può
-              generare costi.
-            </p>
-            {aiAvailable ? (
-              <GrowthAuditPageAiAnalysisPanel
-                projectId={projectId}
-                runId={runId}
-                page={page}
-                runStatus={runStatus}
-              />
-            ) : (
-              <p className="growth-audit-page-detail__empty">
-                Completa prima la scansione tecnica della pagina per abilitare l&apos;analisi
-                AI/GEO/CRO.
-              </p>
-            )}
-          </section>
+          <GrowthAuditPageWorkspaceAiSection
+            projectId={projectId}
+            runId={runId}
+            page={page}
+            runStatus={runStatus}
+            aiAvailable={Boolean(aiAvailable)}
+          />
 
           <GrowthAuditPageDetailTechnicalSection page={page} />
         </main>
 
-        <GrowthAuditPageDetailSidebar
+        <GrowthAuditPageWorkspaceSidebar
           page={page}
-          onScrollToSection={scrollToSection}
+          priorityActionsCount={priorityActionsCount}
+          openFindingsCount={pageFindings.length}
+          openTasksCount={pageTasks.length}
+          hasAiResult={Boolean(latestAiResult)}
           shopifySectionAvailable={Boolean(mappedEntity)}
           aiSectionAvailable={Boolean(aiAvailable)}
+          onScrollToSection={scrollToSection}
         />
       </div>
     </div>

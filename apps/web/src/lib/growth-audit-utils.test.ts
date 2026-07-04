@@ -36,6 +36,7 @@ import {
   buildGrowthAuditPagePriorityItems,
   buildGrowthAuditSiteIssueClusters,
   buildGrowthAuditAiCoverageStats,
+  buildGrowthAuditPageWorkflowSteps,
   getGrowthAuditPriorityLevelLabel,
 } from "./growth-audit-utils";
 
@@ -768,6 +769,53 @@ describe("growth-audit-utils", () => {
       expect(stats.productsWithoutAi).toBe(1);
       expect(stats.strategicWithoutAi).toBe(1);
       expect(stats.aiAnalyzedPages).toBe(1);
+    });
+  });
+
+  describe("buildGrowthAuditPageWorkflowSteps", () => {
+    it("marks AI step done when result exists", () => {
+      const steps = buildGrowthAuditPageWorkflowSteps({
+        page: {
+          id: "p1",
+          runId: "run",
+          projectId: "proj",
+          url: "https://example.com/products/a",
+          normalizedUrl: "https://example.com/products/a",
+          pageType: "product",
+          source: "shopify_product",
+          status: "analyzed",
+          priority: "normal",
+          score: 70,
+        },
+        priorityActionsCount: 2,
+        hasAiResult: true,
+        shopifyEditable: true,
+        openFindingsCount: 1,
+      });
+      const aiStep = steps.find((step) => step.key === "ai");
+      expect(aiStep?.status).toBe("done");
+    });
+
+    it("marks modify step available for Shopify product", () => {
+      const steps = buildGrowthAuditPageWorkflowSteps({
+        page: {
+          id: "p1",
+          runId: "run",
+          projectId: "proj",
+          url: "https://example.com/products/a",
+          normalizedUrl: "https://example.com/products/a",
+          pageType: "product",
+          source: "shopify_product",
+          status: "analyzed",
+          priority: "normal",
+        },
+        priorityActionsCount: 0,
+        hasAiResult: false,
+        shopifyEditable: true,
+        openFindingsCount: 0,
+      });
+      const editStep = steps.find((step) => step.key === "edit");
+      expect(editStep?.status).toBe("available");
     });
   });
 });

@@ -11,10 +11,13 @@ export function GrowthAuditPageDetailTechnicalSection({
   return (
     <section
       id="technical-data"
-      className="growth-audit-page-detail__section growth-audit-page-detail__technical-details"
+      className="growth-audit-technical-collapsible growth-audit-workspace-section"
     >
-      <details className="growth-audit-page-detail__technical-collapsible">
-        <summary>Mostra dati tecnici</summary>
+      <details className="growth-audit-technical-collapsible__details">
+        <summary className="growth-audit-technical-collapsible__summary">Dati tecnici</summary>
+        <p className="growth-audit-technical-collapsible__description">
+          Dettagli usati per calcolare lo score tecnico. Utili per debug e verifica.
+        </p>
         <GrowthAuditPageTechnicalSummary page={page} />
       </details>
     </section>

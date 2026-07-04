@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { GrowthAuditFinding, GrowthAuditPage, GrowthAuditPageResult, GrowthAuditTask } from "@gcr/shared";
 import {
   buildGrowthAuditPageImprovementItems,
@@ -19,6 +20,8 @@ export interface GrowthAuditPriorityActionsPanelProps {
   aiResults?: GrowthAuditPageResult[];
   maxItems?: number;
   compact?: boolean;
+  sectionId?: string;
+  workspace?: boolean;
 }
 
 function isCommercePage(page: GrowthAuditPage): boolean {
@@ -61,7 +64,10 @@ export function GrowthAuditPriorityActionsPanel({
   aiResults,
   maxItems,
   compact = false,
+  sectionId,
+  workspace = false,
 }: GrowthAuditPriorityActionsPanelProps) {
+  const [showAll, setShowAll] = useState(false);
   const improvementItems = buildGrowthAuditPageImprovementItems(page, findings);
   const allActions = buildGrowthAuditPriorityActions({
     page,
@@ -70,7 +76,10 @@ export function GrowthAuditPriorityActionsPanel({
     improvementItems,
     aiResults,
   });
-  const actions = maxItems != null ? allActions.slice(0, maxItems) : allActions;
+  const resolvedSectionId = sectionId ?? (compact ? "section-priority" : "priority-actions");
+  const shouldLimit = maxItems != null && !showAll;
+  const actions = shouldLimit ? allActions.slice(0, maxItems) : allActions;
+  const hasHiddenActions = maxItems != null && allActions.length > maxItems;
 
   const highPriorityCount = allActions.filter(
     (action) => action.priority === "critical" || action.priority === "high",
@@ -82,8 +91,8 @@ export function GrowthAuditPriorityActionsPanel({
 
   return (
     <section
-      id="section-priority"
-      className={`growth-audit-priority-actions growth-audit-page-detail__section growth-audit-page-detail__priority${compact ? " growth-audit-priority-actions--compact" : ""}`}
+      id={resolvedSectionId}
+      className={`growth-audit-priority-actions${workspace ? " growth-audit-workspace-section" : " growth-audit-page-detail__section growth-audit-page-detail__priority"}${compact ? " growth-audit-priority-actions--compact" : ""}`}
     >
       <header className="growth-audit-priority-actions__header">
         <h2 className="growth-audit-priority-actions__title">Cosa sistemare prima</h2>
@@ -208,6 +217,18 @@ export function GrowthAuditPriorityActionsPanel({
             );
           })}
         </ul>
+      )}
+
+      {hasHiddenActions && !compact && (
+        <div className="growth-audit-priority-actions__expand">
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+            onClick={() => setShowAll((current) => !current)}
+          >
+            {showAll ? "Mostra meno" : `Mostra tutte (${allActions.length})`}
+          </button>
+        </div>
       )}
     </section>
   );

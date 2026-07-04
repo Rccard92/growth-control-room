@@ -191,38 +191,63 @@ function renderDetailPage() {
   );
 }
 
+function indexOfOrFail(html: string, needle: string): number {
+  const index = html.indexOf(needle);
+  expect(index).toBeGreaterThanOrEqual(0);
+  return index;
+}
+
 describe("GrowthAuditPageDetailPage", () => {
-  it("renders page detail workspace with priority section", () => {
+  it("renders workspace layout with sticky header", () => {
     setupDetailMocks();
     const html = renderDetailPage();
-    expect(html).toContain("Dettaglio pagina");
+    expect(html).toContain("growth-audit-workspace");
+    expect(html).toContain("growth-audit-workspace-header--sticky");
+    expect(html).toContain("Torna al Growth Audit");
+    expect(html).toContain("Prodotto");
+    expect(html).toContain("Riscansiona pagina");
+    expect(html).toContain("Modifica Shopify");
+    expect(html).toContain("Analizza AI/GEO/CRO");
+  });
+
+  it("renders priority section before Shopify with workspace anchors", () => {
+    setupDetailMocks();
+    const html = renderDetailPage();
+    const priorityIndex = indexOfOrFail(html, 'id="priority-actions"');
+    const shopifyIndex = indexOfOrFail(html, 'id="shopify-edit"');
+    const aiIndex = indexOfOrFail(html, 'id="ai-geo-cro"');
+    expect(priorityIndex).toBeLessThan(shopifyIndex);
+    expect(shopifyIndex).toBeLessThan(aiIndex);
     expect(html).toContain("Cosa sistemare prima");
     expect(html).toContain("Dove intervenire");
-    expect(html).toContain("Azioni totali");
-    expect(html).toContain("Torna all");
-    expect(html).toContain("Prodotto");
-    expect(html).toContain("https://solmielato.it/products/miele");
+    expect(html).toContain("Workflow consigliato");
   });
 
-  it("renders Modifica Shopify section for shopify_product", () => {
+  it("renders Shopify callout and AI cost warning", () => {
     setupDetailMocks();
     const html = renderDetailPage();
-    expect(html).toContain("Modifica Shopify");
-    expect(html).toContain("riscansiona la pagina");
-  });
-
-  it("renders AI/GEO/CRO section", () => {
-    setupDetailMocks();
-    const html = renderDetailPage();
-    expect(html).toContain("AI/GEO/CRO");
-    expect(html).toContain("pagine prioritarie");
+    expect(html).toContain(
+      "Dopo aver salvato su Shopify, clicca Riscansiona pagina per aggiornare score e problemi.",
+    );
+    expect(html).toContain("genera una chiamata AI");
     expect(html).toContain("Analizza questa pagina");
   });
 
-  it("renders collapsible technical data section", () => {
+  it("renders collapsible technical data as secondary section", () => {
     setupDetailMocks();
     const html = renderDetailPage();
-    expect(html).toContain("Mostra dati tecnici");
+    expect(html).toContain('id="technical-data"');
+    expect(html).toContain("Dati tecnici");
+    expect(html).toContain("Dettagli usati per calcolare lo score tecnico");
     expect(html).toContain("<details");
+  });
+
+  it("does not render duplicate main sections for improvements/problems/tasks", () => {
+    setupDetailMocks();
+    const html = renderDetailPage();
+    expect(html).not.toContain("Come migliorare questa pagina");
+    expect(html).not.toContain("Problemi prioritari");
+    expect(html).not.toContain("growth-audit-tasks__title");
+    expect(html).not.toContain("growth-audit-findings__title");
   });
 });

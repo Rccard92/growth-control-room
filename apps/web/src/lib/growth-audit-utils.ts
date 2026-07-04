@@ -2220,3 +2220,105 @@ export function buildGrowthAuditAiCoverageStats(
     coveragePercent,
   };
 }
+
+export type GrowthAuditWorkflowStepStatus =
+  | "todo"
+  | "available"
+  | "done"
+  | "recommended";
+
+export type GrowthAuditWorkflowStep = {
+  key: string;
+  label: string;
+  status: GrowthAuditWorkflowStepStatus;
+  anchorId?: string;
+};
+
+const STRATEGIC_WORKFLOW_PAGE_TYPES = new Set([
+  "product",
+  "collection",
+  "landing_page",
+  "homepage",
+  "blog_article",
+  "blog",
+  "article",
+]);
+
+export function getGrowthAuditWorkspaceOperativeNote(pageType: string): string {
+  const normalized = pageType.toLowerCase();
+  if (normalized === "product") {
+    return "Per pagine prodotto, parti da trust, CTA, immagini, meta e descrizione. Dopo ogni modifica importante, riscansiona.";
+  }
+  if (normalized === "collection") {
+    return "Per collection, lavora su testo categoria, intent commerciale, schema e linking interno.";
+  }
+  if (normalized === "blog_article" || normalized === "blog" || normalized === "article") {
+    return "Per articoli, lavora su intent, struttura, E-E-A-T, FAQ e linking verso prodotti.";
+  }
+  return "Correggi title, meta, schema e contenuti. Dopo modifiche Shopify o on-page, riscansiona la pagina per aggiornare score e problemi.";
+}
+
+export function buildGrowthAuditPageWorkflowSteps(input: {
+  page: GrowthAuditPage;
+  priorityActionsCount: number;
+  hasAiResult: boolean;
+  shopifyEditable: boolean;
+  openFindingsCount: number;
+}): GrowthAuditWorkflowStep[] {
+  const { page, priorityActionsCount, hasAiResult, shopifyEditable, openFindingsCount } = input;
+  const isAnalyzed = page.status === "analyzed";
+  const isStrategic = STRATEGIC_WORKFLOW_PAGE_TYPES.has((page.pageType ?? "").toLowerCase());
+  const canRescan = page.status !== "analyzing";
+  const hasScore = page.score != null;
+
+  const priorityStatus: GrowthAuditWorkflowStepStatus =
+    priorityActionsCount > 0
+      ? "recommended"
+      : isAnalyzed
+        ? "done"
+        : "available";
+
+  const modifyStatus: GrowthAuditWorkflowStepStatus = shopifyEditable
+    ? openFindingsCount > 0
+      ? "recommended"
+      : "available"
+    : "todo";
+
+  const aiStatus: GrowthAuditWorkflowStepStatus = hasAiResult
+    ? "done"
+    : isAnalyzed && isStrategic && !hasAiResult
+      ? "recommended"
+      : isAnalyzed
+        ? "available"
+        : "todo";
+
+  const rescanStatus: GrowthAuditWorkflowStepStatus = canRescan ? "available" : "todo";
+
+  const verifyStatus: GrowthAuditWorkflowStepStatus = hasScore
+    ? page.score != null && page.score < 80
+      ? "recommended"
+      : "done"
+    : canRescan
+      ? "available"
+      : "todo";
+
+  return [
+    { key: "priority", label: "Priorità", status: priorityStatus, anchorId: "priority-actions" },
+    { key: "edit", label: "Modifica", status: modifyStatus, anchorId: "shopify-edit" },
+    { key: "ai", label: "Analisi AI", status: aiStatus, anchorId: "ai-geo-cro" },
+    { key: "rescan", label: "Rescan", status: rescanStatus },
+    { key: "verify", label: "Verifica", status: verifyStatus, anchorId: "technical-data" },
+  ];
+}
+
+export function getGrowthAuditWorkflowStepStatusLabel(
+  status: GrowthAuditWorkflowStepStatus,
+): string {
+  const labels: Record<GrowthAuditWorkflowStepStatus, string> = {
+    todo: "Da fare",
+    available: "Disponibile",
+    done: "Completato",
+    recommended: "Consigliato",
+  };
+  return labels[status];
+}
