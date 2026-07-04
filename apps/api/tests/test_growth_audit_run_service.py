@@ -600,3 +600,60 @@ def test_get_growth_audit_run_detail_not_found() -> None:
             await get_growth_audit_run_detail(session, uuid4(), uuid4())
 
     asyncio.run(run())
+
+
+def test_process_growth_audit_run_emits_shopify_entities_mapped_event() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_id = uuid4()
+        audit_run = _build_run(project_id=project_id, run_id=run_id)
+        audit_run.total_pages = 2
+        scan_pages = _build_scan_pages(project_id=project_id, run_id=run_id, count=2)
+
+        session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        session.execute = _mock_session_execute(audit_run, scan_pages)
+
+        session_factory = MagicMock()
+        session_factory.return_value.__aenter__ = AsyncMock(return_value=session)
+        session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        mapped_events: list[str] = []
+
+        async def track_event(_session, **kwargs):
+            if kwargs.get("event_type") == "shopify_entities_mapped":
+                mapped_events.append(kwargs["event_type"])
+
+        with (
+            patch(
+                "app.services.growth_audit.run_service.get_session_factory",
+                return_value=session_factory,
+            ),
+            patch(
+                "app.services.growth_audit.run_service.scan_page_technical",
+                new=AsyncMock(return_value=_mock_scan_result("https://example.com")),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.discover_sitemap_urls",
+                new=AsyncMock(return_value=([], [])),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.discover_shopify_urls",
+                new=AsyncMock(return_value=([], [])),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.resolve_shopify_entities_for_pages",
+                new=AsyncMock(return_value=2),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.create_growth_audit_event",
+                new=AsyncMock(side_effect=track_event),
+            ),
+        ):
+            await process_growth_audit_run(run_id)
+
+        assert mapped_events == ["shopify_entities_mapped"]
+
+    asyncio.run(run())

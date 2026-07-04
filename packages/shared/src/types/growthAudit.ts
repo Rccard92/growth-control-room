@@ -149,6 +149,12 @@ export interface GrowthAuditRun {
   updatedAt?: string | null;
 }
 
+export type GrowthAuditSourceEntityType =
+  | "shopify_product"
+  | "shopify_collection"
+  | "shopify_page"
+  | "shopify_article";
+
 export interface GrowthAuditPage {
   id: string;
   runId: string;
@@ -176,6 +182,12 @@ export interface GrowthAuditPage {
   analyzedAt?: string | null;
   errorMessage?: string | null;
   metadata?: Record<string, unknown> | null;
+  sourceEntityType?: GrowthAuditSourceEntityType | string | null;
+  sourceEntityId?: string | null;
+  sourceEntityGid?: string | null;
+  sourceEntityHandle?: string | null;
+  sourceEntityTitle?: string | null;
+  sourceEntitySyncedAt?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }

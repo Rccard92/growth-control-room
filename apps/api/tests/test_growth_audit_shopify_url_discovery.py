@@ -24,14 +24,19 @@ def test_discover_shopify_urls_builds_product_and_collection_urls() -> None:
         session = AsyncMock()
 
         product = MagicMock()
+        product.id = uuid4()
         product.handle = "honey-jar"
         product.title = "Honey Jar"
         product.shopify_gid = "gid://shopify/Product/1"
+        product.updated_at = None
+        product.updated_at_shopify = None
 
         collection = MagicMock()
+        collection.id = uuid4()
         collection.handle = "summer"
         collection.title = "Summer"
         collection.shopify_gid = "gid://shopify/Collection/1"
+        collection.updated_at = None
 
         query_results = [
             [product],
@@ -62,6 +67,9 @@ def test_discover_shopify_urls_builds_product_and_collection_urls() -> None:
         assert len(items) == 2
         assert items[0]["url"] == "https://example.com/products/honey-jar"
         assert items[1]["url"] == "https://example.com/collections/summer"
+        assert items[0]["sourceEntityType"] == "shopify_product"
+        assert items[0]["sourceEntityId"] == product.id
+        assert items[0]["metadata"]["shopify"]["entityId"] == str(product.id)
         assert any(event["type"] == "shopify_urls_found" for event in events)
 
     asyncio.run(run())

@@ -81,6 +81,21 @@ class GrowthAuditPage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_growth_audit_pages_project_id_normalized_url", "project_id", "normalized_url"),
         Index("ix_growth_audit_pages_run_id_status", "run_id", "status"),
         Index("ix_growth_audit_pages_run_id_score", "run_id", "score"),
+        Index(
+            "ix_growth_audit_pages_project_id_source_entity_type",
+            "project_id",
+            "source_entity_type",
+        ),
+        Index(
+            "ix_growth_audit_pages_source_entity_type_id",
+            "source_entity_type",
+            "source_entity_id",
+        ),
+        Index(
+            "ix_growth_audit_pages_run_id_source_entity_type",
+            "run_id",
+            "source_entity_type",
+        ),
     )
 
     run_id: Mapped[uuid.UUID] = mapped_column(
@@ -127,6 +142,18 @@ class GrowthAuditPage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     page_metadata: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata",
         JSONB,
+        nullable=True,
+    )
+    source_entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source_entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    source_entity_gid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_entity_handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_entity_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_entity_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
     )
 

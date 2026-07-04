@@ -8,6 +8,7 @@ import type {
   GrowthAuditRunStatus,
   GrowthAuditRunSummary,
   GrowthAuditScoreFilter,
+  GrowthAuditSourceEntityType,
   GrowthAuditTask,
 } from "@gcr/shared";
 
@@ -73,6 +74,13 @@ const PAGE_SOURCE_LABELS: Record<string, string> = {
   shopify_blog: "Shopify blog",
   crawl: "Crawl",
   manual: "Manuale",
+};
+
+const SOURCE_ENTITY_TYPE_LABELS: Record<string, string> = {
+  shopify_product: "Prodotto Shopify",
+  shopify_collection: "Collection Shopify",
+  shopify_page: "Pagina Shopify",
+  shopify_article: "Articolo Shopify",
 };
 
 const INVENTORY_FILTER_LABELS: Record<GrowthAuditInventoryFilter, string> = {
@@ -148,6 +156,46 @@ export function getGrowthAuditPageStatusLabel(status?: string | null): string {
 export function getGrowthAuditPageSourceLabel(source?: string | null): string {
   if (!source) return "—";
   return PAGE_SOURCE_LABELS[source] ?? source;
+}
+
+export function getGrowthAuditSourceEntityTypeLabel(
+  type?: GrowthAuditSourceEntityType | string | null,
+): string {
+  if (!type) return "Non collegata";
+  return SOURCE_ENTITY_TYPE_LABELS[type] ?? "Non collegata";
+}
+
+export function isGrowthAuditPageShopifyLinked(page: GrowthAuditPage): boolean {
+  return Boolean(page.sourceEntityType);
+}
+
+export function getGrowthAuditShopifyLinkBadgeLabel(page: GrowthAuditPage): string {
+  return isGrowthAuditPageShopifyLinked(page) ? "Collegata" : "Non collegata";
+}
+
+export function getGrowthAuditShopifyLinkBadgeClass(page: GrowthAuditPage): string {
+  return isGrowthAuditPageShopifyLinked(page)
+    ? "growth-audit-shopify-entity-badge growth-audit-shopify-entity-badge--linked"
+    : "growth-audit-shopify-entity-badge growth-audit-shopify-entity-badge--unlinked";
+}
+
+export function getGrowthAuditShopifyEditorMicrocopy(
+  page: GrowthAuditPage,
+): string | null {
+  if (!page.sourceEntityType) return null;
+  if (
+    page.sourceEntityType === "shopify_product" ||
+    page.sourceEntityType === "shopify_collection"
+  ) {
+    return "Nel prossimo step potrai modificare title, meta description, alt immagini e altri campi Shopify direttamente da qui.";
+  }
+  if (
+    page.sourceEntityType === "shopify_page" ||
+    page.sourceEntityType === "shopify_article"
+  ) {
+    return "Modifica Shopify per questa tipologia in arrivo.";
+  }
+  return null;
 }
 
 export function getGrowthAuditInventoryFilterLabel(filter: GrowthAuditInventoryFilter): string {

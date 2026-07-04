@@ -151,6 +151,30 @@ class GrowthAuditPageRead(BaseModel):
         default=None,
         serialization_alias="metadata",
     )
+    source_entity_type: str | None = Field(
+        default=None,
+        serialization_alias="sourceEntityType",
+    )
+    source_entity_id: UUID | None = Field(
+        default=None,
+        serialization_alias="sourceEntityId",
+    )
+    source_entity_gid: str | None = Field(
+        default=None,
+        serialization_alias="sourceEntityGid",
+    )
+    source_entity_handle: str | None = Field(
+        default=None,
+        serialization_alias="sourceEntityHandle",
+    )
+    source_entity_title: str | None = Field(
+        default=None,
+        serialization_alias="sourceEntityTitle",
+    )
+    source_entity_synced_at: datetime | None = Field(
+        default=None,
+        serialization_alias="sourceEntitySyncedAt",
+    )
     created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
     updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
 

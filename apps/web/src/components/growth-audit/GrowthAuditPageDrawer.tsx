@@ -9,6 +9,9 @@ import {
   getGrowthAuditPageTypeLabel,
   getGrowthAuditScoreBadgeClass,
   getGrowthAuditSourceBadgeClass,
+  getGrowthAuditShopifyEditorMicrocopy,
+  getGrowthAuditSourceEntityTypeLabel,
+  isGrowthAuditPageShopifyLinked,
   isGrowthAuditRunActive,
 } from "../../lib/growth-audit-utils";
 import { GrowthAuditPageFindingsPanel } from "./GrowthAuditPageFindingsPanel";
@@ -105,6 +108,8 @@ export function GrowthAuditPageDrawer({
       onRescan,
   );
   const rescanLabel = page.status === "failed" ? "Riprova scansione" : "Riscansiona pagina";
+  const shopifyLinked = isGrowthAuditPageShopifyLinked(page);
+  const shopifyEditorMicrocopy = getGrowthAuditShopifyEditorMicrocopy(page);
 
   async function handleConfirmRescan() {
     if (!onRescan || !runId || !page) return;
@@ -265,6 +270,41 @@ export function GrowthAuditPageDrawer({
             {page.errorMessage}
           </div>
         )}
+
+        <section className="growth-audit-page-drawer__section growth-audit-shopify-entity-card">
+          <h4 className="growth-audit-page-drawer__section-title">
+            {shopifyLinked ? "Entità Shopify collegata" : "Entità Shopify"}
+          </h4>
+          {shopifyLinked ? (
+            <div className="growth-audit-shopify-entity-card__body">
+              <p>
+                <span className="growth-audit-shopify-entity-card__label">Tipo:</span>{" "}
+                {getGrowthAuditSourceEntityTypeLabel(page.sourceEntityType)}
+              </p>
+              {page.sourceEntityTitle && (
+                <p>
+                  <span className="growth-audit-shopify-entity-card__label">Titolo:</span>{" "}
+                  {page.sourceEntityTitle}
+                </p>
+              )}
+              {page.sourceEntityHandle && (
+                <p>
+                  <span className="growth-audit-shopify-entity-card__label">Handle:</span>{" "}
+                  {page.sourceEntityHandle}
+                </p>
+              )}
+              {shopifyEditorMicrocopy && (
+                <p className="growth-audit-shopify-entity-card__microcopy">
+                  {shopifyEditorMicrocopy}
+                </p>
+              )}
+            </div>
+          ) : (
+            <span className="growth-audit-shopify-entity-badge growth-audit-shopify-entity-badge--unlinked">
+              Nessuna entità Shopify collegata
+            </span>
+          )}
+        </section>
 
         <GrowthAuditPageFindingsPanel findings={findings} />
         <GrowthAuditPageTasksPanel tasks={tasks} />

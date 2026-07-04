@@ -203,6 +203,50 @@ describe("GrowthAuditPageDrawer", () => {
 
     expect(html).toContain("Nessun problema tecnico prioritario rilevato per questa pagina.");
     expect(html).toContain("Nessun task tecnico aperto per questa pagina.");
+    expect(html).toContain("Nessuna entità Shopify collegata");
+  });
+
+  it("renders linked Shopify entity card with title and handle", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={{
+          ...samplePage,
+          sourceEntityType: "shopify_product",
+          sourceEntityTitle: "Miele Premium Shopify",
+          sourceEntityHandle: "miele",
+        }}
+        findings={[]}
+        tasks={[]}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Entità Shopify collegata");
+    expect(html).toContain("Prodotto Shopify");
+    expect(html).toContain("Miele Premium Shopify");
+    expect(html).toContain("miele");
+    expect(html).toContain("Nel prossimo step potrai modificare title");
+  });
+
+  it("renders in-arrivo microcopy for linked Shopify page entity", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={{
+          ...samplePage,
+          sourceEntityType: "shopify_page",
+          sourceEntityTitle: "Chi siamo",
+          sourceEntityHandle: "chi-siamo",
+        }}
+        findings={[]}
+        tasks={[]}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Pagina Shopify");
+    expect(html).toContain("Modifica Shopify per questa tipologia in arrivo.");
   });
 
   it("returns null when closed", () => {

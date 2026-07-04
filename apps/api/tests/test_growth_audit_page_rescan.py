@@ -401,3 +401,149 @@ def test_rescan_route_returns_200() -> None:
         assert "riscansionata" in response.message.lower()
 
     asyncio.run(run())
+
+
+def test_rescan_updates_shopify_entity_mapping() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_id = uuid4()
+        page_id = uuid4()
+        entity_id = uuid4()
+        audit_run = _build_completed_run(project_id, run_id)
+        page = _build_analyzed_page(project_id=project_id, run_id=run_id, page_id=page_id)
+
+        session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        events: list[str] = []
+        resolved = {
+            "sourceEntityType": "shopify_product",
+            "sourceEntityId": entity_id,
+            "sourceEntityGid": "gid://shopify/Product/9",
+            "sourceEntityHandle": "a",
+            "sourceEntityTitle": "Product A",
+            "sourceEntitySyncedAt": datetime.now(UTC),
+            "metadata": {"shopify": {"handle": "a", "entityType": "product"}},
+        }
+
+        async def track_event(_session, **kwargs):
+            events.append(kwargs["event_type"])
+
+        with (
+            patch(
+                "app.services.growth_audit.run_service.get_growth_audit_run",
+                new=AsyncMock(return_value=audit_run),
+            ),
+            patch(
+                "app.services.growth_audit.run_service._get_growth_audit_page",
+                new=AsyncMock(return_value=page),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.scan_page_technical",
+                new=AsyncMock(return_value=_mock_scan_result(page.url)),
+            ),
+            patch("app.services.growth_audit.run_service.score_technical_scan"),
+            patch(
+                "app.services.growth_audit.run_service._supersede_page_open_items",
+                new=AsyncMock(return_value=(0, 0)),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.recompute_growth_audit_run_summary",
+                new=AsyncMock(),
+            ),
+            patch(
+                "app.services.growth_audit.run_service._count_open_findings_and_tasks",
+                new=AsyncMock(return_value=(0, 0)),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.resolve_shopify_entity_for_page",
+                new=AsyncMock(return_value=resolved),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.create_growth_audit_event",
+                new=AsyncMock(side_effect=track_event),
+            ),
+        ):
+            await rescan_growth_audit_page(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+            )
+
+        assert page.source_entity_type == "shopify_product"
+        assert page.source_entity_id == entity_id
+        assert page.source_entity_handle == "a"
+        assert "page_shopify_entity_mapped" in events
+
+    asyncio.run(run())
+
+
+def test_rescan_preserves_existing_mapping_when_resolve_returns_none() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_id = uuid4()
+        page_id = uuid4()
+        existing_entity_id = uuid4()
+        audit_run = _build_completed_run(project_id, run_id)
+        page = _build_analyzed_page(project_id=project_id, run_id=run_id, page_id=page_id)
+        page.source_entity_type = "shopify_product"
+        page.source_entity_id = existing_entity_id
+        page.source_entity_handle = "existing-handle"
+
+        session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        with (
+            patch(
+                "app.services.growth_audit.run_service.get_growth_audit_run",
+                new=AsyncMock(return_value=audit_run),
+            ),
+            patch(
+                "app.services.growth_audit.run_service._get_growth_audit_page",
+                new=AsyncMock(return_value=page),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.scan_page_technical",
+                new=AsyncMock(return_value=_mock_scan_result(page.url)),
+            ),
+            patch("app.services.growth_audit.run_service.score_technical_scan"),
+            patch(
+                "app.services.growth_audit.run_service._supersede_page_open_items",
+                new=AsyncMock(return_value=(0, 0)),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.recompute_growth_audit_run_summary",
+                new=AsyncMock(),
+            ),
+            patch(
+                "app.services.growth_audit.run_service._count_open_findings_and_tasks",
+                new=AsyncMock(return_value=(0, 0)),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.resolve_shopify_entity_for_page",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.services.growth_audit.run_service.create_growth_audit_event",
+                new=AsyncMock(),
+            ),
+        ):
+            await rescan_growth_audit_page(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+            )
+
+        assert page.source_entity_type == "shopify_product"
+        assert page.source_entity_id == existing_entity_id
+        assert page.source_entity_handle == "existing-handle"
+
+    asyncio.run(run())

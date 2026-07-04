@@ -122,6 +122,9 @@ function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boo
             title: "Miele",
             httpStatus: options?.withTechnicalScan ? 200 : null,
             score: options?.withTechnicalScan ? 55 : null,
+            sourceEntityType: "shopify_product",
+            sourceEntityHandle: "miele",
+            sourceEntityTitle: "Miele",
           },
           {
             id: "page-3",
@@ -257,6 +260,9 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("200");
     expect(html).toContain("Dettaglio");
     expect(html).toContain("Buona");
+    expect(html).toContain("Shopify");
+    expect(html).toContain("Collegata");
+    expect(html).toContain("Non collegata");
   });
 
   it("shows Site Score and pagesAnalyzed from technical scan", () => {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -16,6 +17,58 @@ from app.services.growth_audit.url_utils import normalize_root_url
 from app.services.shopify.connect import get_shopify_store_for_project
 
 logger = logging.getLogger(__name__)
+
+
+def _entity_synced_at(entity: Any, *, is_product: bool = False) -> datetime | None:
+    if is_product:
+        return getattr(entity, "updated_at_shopify", None) or getattr(
+            entity, "updated_at", None
+        )
+    return getattr(entity, "updated_at", None)
+
+
+def _build_mapped_entity_item(
+    *,
+    store_id: UUID,
+    url: str,
+    source: str,
+    page_type: str,
+    title: str,
+    source_entity_type: str,
+    entity_label: str,
+    entity: Any,
+    extra_metadata: dict[str, Any] | None = None,
+    is_product: bool = False,
+) -> dict[str, Any]:
+    synced_at = _entity_synced_at(entity, is_product=is_product)
+    metadata: dict[str, Any] = {
+        "shopifyGid": entity.shopify_gid,
+        "handle": entity.handle,
+        "entityType": entity_label,
+        "shopify": {
+            "storeId": str(store_id),
+            "entityType": entity_label,
+            "entityId": str(entity.id),
+            "gid": entity.shopify_gid,
+            "handle": entity.handle,
+            "title": entity.title,
+        },
+        **(extra_metadata or {}),
+    }
+    item: dict[str, Any] = {
+        "url": url,
+        "source": source,
+        "pageType": page_type,
+        "title": title,
+        "sourceEntityType": source_entity_type,
+        "sourceEntityId": entity.id,
+        "sourceEntityGid": entity.shopify_gid,
+        "sourceEntityHandle": entity.handle,
+        "sourceEntityTitle": entity.title,
+        "sourceEntitySyncedAt": synced_at,
+        "metadata": metadata,
+    }
+    return item
 
 
 def _build_url(root_url: str, path: str) -> str | None:
@@ -72,17 +125,17 @@ async def discover_shopify_urls(
             if not url:
                 continue
             items.append(
-                {
-                    "url": url,
-                    "source": "shopify_product",
-                    "pageType": "product",
-                    "title": product.title,
-                    "metadata": {
-                        "shopifyGid": product.shopify_gid,
-                        "handle": product.handle,
-                        "entityType": "product",
-                    },
-                }
+                _build_mapped_entity_item(
+                    store_id=store.id,
+                    url=url,
+                    source="shopify_product",
+                    page_type="product",
+                    title=product.title,
+                    source_entity_type="shopify_product",
+                    entity_label="product",
+                    entity=product,
+                    is_product=True,
+                )
             )
         remaining = max(0, max_urls - len(items))
 
@@ -105,17 +158,16 @@ async def discover_shopify_urls(
             if not url:
                 continue
             items.append(
-                {
-                    "url": url,
-                    "source": "shopify_collection",
-                    "pageType": "collection",
-                    "title": collection.title,
-                    "metadata": {
-                        "shopifyGid": collection.shopify_gid,
-                        "handle": collection.handle,
-                        "entityType": "collection",
-                    },
-                }
+                _build_mapped_entity_item(
+                    store_id=store.id,
+                    url=url,
+                    source="shopify_collection",
+                    page_type="collection",
+                    title=collection.title,
+                    source_entity_type="shopify_collection",
+                    entity_label="collection",
+                    entity=collection,
+                )
             )
         remaining = max(0, max_urls - len(items))
 
@@ -138,17 +190,16 @@ async def discover_shopify_urls(
             if not url:
                 continue
             items.append(
-                {
-                    "url": url,
-                    "source": "shopify_page",
-                    "pageType": "static_page",
-                    "title": page.title,
-                    "metadata": {
-                        "shopifyGid": page.shopify_gid,
-                        "handle": page.handle,
-                        "entityType": "page",
-                    },
-                }
+                _build_mapped_entity_item(
+                    store_id=store.id,
+                    url=url,
+                    source="shopify_page",
+                    page_type="static_page",
+                    title=page.title,
+                    source_entity_type="shopify_page",
+                    entity_label="page",
+                    entity=page,
+                )
             )
         remaining = max(0, max_urls - len(items))
 
@@ -208,18 +259,17 @@ async def discover_shopify_urls(
             if not url:
                 continue
             items.append(
-                {
-                    "url": url,
-                    "source": "shopify_blog",
-                    "pageType": "blog_article",
-                    "title": article.title,
-                    "metadata": {
-                        "shopifyGid": article.shopify_gid,
-                        "handle": article.handle,
-                        "blogHandle": blog_handle,
-                        "entityType": "article",
-                    },
-                }
+                _build_mapped_entity_item(
+                    store_id=store.id,
+                    url=url,
+                    source="shopify_blog",
+                    page_type="blog_article",
+                    title=article.title,
+                    source_entity_type="shopify_article",
+                    entity_label="article",
+                    entity=article,
+                    extra_metadata={"blogHandle": blog_handle},
+                )
             )
 
     if items:

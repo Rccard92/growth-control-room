@@ -40,6 +40,8 @@ import {
   getGrowthAuditPhaseLabel,
   getGrowthAuditScoreBadgeClass,
   getGrowthAuditSeverityBadgeClass,
+  getGrowthAuditShopifyLinkBadgeClass,
+  getGrowthAuditShopifyLinkBadgeLabel,
   getGrowthAuditSourceBadgeClass,
   getGrowthAuditStatusLabel,
   getInventoryKpiItems,
@@ -498,6 +500,7 @@ export function GrowthAuditPage() {
                         <th>URL</th>
                         <th>Tipo</th>
                         <th>Fonte</th>
+                        <th>Shopify</th>
                         <th>HTTP</th>
                         <th>Score</th>
                         <th>Title</th>
@@ -535,6 +538,13 @@ export function GrowthAuditPage() {
                           <td>
                             <span className={getGrowthAuditSourceBadgeClass(page.source)}>
                               {getGrowthAuditPageSourceLabel(page.source)}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className={`growth-audit-pages-table__shopify-badge ${getGrowthAuditShopifyLinkBadgeClass(page)}`}
+                            >
+                              {getGrowthAuditShopifyLinkBadgeLabel(page)}
                             </span>
                           </td>
                           <td>{page.httpStatus ?? "—"}</td>

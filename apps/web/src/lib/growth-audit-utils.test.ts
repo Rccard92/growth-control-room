@@ -15,8 +15,12 @@ import {
   getGrowthAuditPhaseLabel,
   getGrowthAuditScoreBadgeClass,
   getGrowthAuditScoreBand,
+  getGrowthAuditShopifyEditorMicrocopy,
+  getGrowthAuditShopifyLinkBadgeLabel,
   getGrowthAuditSourceBadgeClass,
+  getGrowthAuditSourceEntityTypeLabel,
   getGrowthAuditStatusLabel,
+  isGrowthAuditPageShopifyLinked,
   getInventoryMessage,
   getTasksForPage,
   getTopPriorityFindings,
@@ -86,6 +90,31 @@ describe("growth-audit-utils", () => {
     expect(getGrowthAuditSourceBadgeClass("seed")).toContain("--seed");
     expect(getGrowthAuditSourceBadgeClass("shopify_product")).toContain("--shopify-product");
     expect(getGrowthAuditSourceBadgeClass("sitemap")).toContain("--sitemap");
+  });
+
+  it("returns Shopify source entity type labels", () => {
+    expect(getGrowthAuditSourceEntityTypeLabel("shopify_product")).toBe("Prodotto Shopify");
+    expect(getGrowthAuditSourceEntityTypeLabel("shopify_collection")).toBe("Collection Shopify");
+    expect(getGrowthAuditSourceEntityTypeLabel("shopify_page")).toBe("Pagina Shopify");
+    expect(getGrowthAuditSourceEntityTypeLabel("shopify_article")).toBe("Articolo Shopify");
+    expect(getGrowthAuditSourceEntityTypeLabel(null)).toBe("Non collegata");
+  });
+
+  it("detects Shopify linked pages and editor microcopy", () => {
+    const linked: GrowthAuditPage = {
+      ...samplePages[1],
+      sourceEntityType: "shopify_product",
+      sourceEntityHandle: "a",
+      sourceEntityTitle: "Product A",
+    };
+    expect(isGrowthAuditPageShopifyLinked(linked)).toBe(true);
+    expect(getGrowthAuditShopifyLinkBadgeLabel(linked)).toBe("Collegata");
+    expect(getGrowthAuditShopifyEditorMicrocopy(linked)).toContain("Nel prossimo step");
+
+    const unlinked = samplePages[0];
+    expect(isGrowthAuditPageShopifyLinked(unlinked)).toBe(false);
+    expect(getGrowthAuditShopifyLinkBadgeLabel(unlinked)).toBe("Non collegata");
+    expect(getGrowthAuditShopifyEditorMicrocopy(unlinked)).toBeNull();
   });
 
   it("aggregates inventory counts", () => {

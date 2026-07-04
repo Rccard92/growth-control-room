@@ -62,6 +62,28 @@ def _build_inventory_item(
     }
 
 
+_SOURCE_ENTITY_KEYS = (
+    "sourceEntityType",
+    "sourceEntityId",
+    "sourceEntityGid",
+    "sourceEntityHandle",
+    "sourceEntityTitle",
+    "sourceEntitySyncedAt",
+)
+
+
+def _attach_source_entity_fields(
+    item: dict[str, Any] | None,
+    source: dict[str, Any],
+) -> dict[str, Any] | None:
+    if item is None:
+        return None
+    for key in _SOURCE_ENTITY_KEYS:
+        if key in source:
+            item[key] = source[key]
+    return item
+
+
 def merge_discovered_urls(
     seed_url: str,
     sitemap_urls: list[str],
@@ -104,6 +126,7 @@ def merge_discovered_urls(
             title=shopify_item.get("title"),
             metadata=shopify_item.get("metadata"),
         )
+        item = _attach_source_entity_fields(item, shopify_item)
         _upsert(item, prefer_shopify=True)
 
     for sitemap_url in sitemap_urls:

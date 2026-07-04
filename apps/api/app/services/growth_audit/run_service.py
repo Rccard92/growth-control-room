@@ -31,6 +31,11 @@ from app.services.growth_audit.page_classifier import (
 )
 from app.services.growth_audit.page_inventory import merge_discovered_urls
 from app.services.growth_audit.page_technical_scanner import scan_page_technical
+from app.services.growth_audit.shopify_entity_resolver import (
+    apply_shopify_entity_mapping_to_page,
+    resolve_shopify_entities_for_pages,
+    resolve_shopify_entity_for_page,
+)
 from app.services.growth_audit.shopify_url_discovery import discover_shopify_urls
 from app.services.growth_audit.sitemap_discovery import discover_sitemap_urls
 from app.services.growth_audit.technical_scoring import score_technical_scan
@@ -151,6 +156,29 @@ async def _persist_discovery_events(
         )
 
 
+def _apply_source_entity_from_inventory_item(page: GrowthAuditPage, item: dict) -> None:
+    source_entity_type = item.get("sourceEntityType")
+    if not source_entity_type:
+        return
+
+    page.source_entity_type = source_entity_type
+    page.source_entity_id = item.get("sourceEntityId")
+    page.source_entity_gid = item.get("sourceEntityGid")
+    page.source_entity_handle = item.get("sourceEntityHandle")
+    page.source_entity_title = item.get("sourceEntityTitle")
+    page.source_entity_synced_at = item.get("sourceEntitySyncedAt")
+
+    shopify_metadata = (item.get("metadata") or {}).get("shopify")
+    if shopify_metadata:
+        page.page_metadata = {
+            **(page.page_metadata or {}),
+            "shopify": {
+                **((page.page_metadata or {}).get("shopify") or {}),
+                **shopify_metadata,
+            },
+        }
+
+
 async def _upsert_inventory_pages(
     session: AsyncSession,
     *,
@@ -208,6 +236,8 @@ async def _upsert_inventory_pages(
                 **(page.page_metadata or {}),
                 **metadata,
             }
+
+        _apply_source_entity_from_inventory_item(page, item)
 
         classified_count += 1
 
@@ -810,6 +840,20 @@ async def process_growth_audit_run(run_id: UUID) -> None:
             now=now,
         )
 
+        await session.flush()
+        mapped_count = await resolve_shopify_entities_for_pages(session, list(run.pages))
+        if mapped_count > 0:
+            await create_growth_audit_event(
+                session,
+                run_id=run.id,
+                project_id=run.project_id,
+                event_type="shopify_entities_mapped",
+                phase="analysis",
+                message=f"Collegate {mapped_count} pagine a entità Shopify.",
+                progress_percent=60,
+                payload={"mappedCount": mapped_count},
+            )
+
         source_counts = _count_inventory_sources(inventory_items)
         page_type_counts = _count_inventory_page_types(inventory_items)
 
@@ -1327,6 +1371,32 @@ async def rescan_growth_audit_page(
         create_page_event=False,
         event_phase="page_rescan",
     )
+
+    try:
+        resolved = await resolve_shopify_entity_for_page(session, page)
+        if resolved is not None:
+            apply_shopify_entity_mapping_to_page(page, resolved)
+            await create_growth_audit_event(
+                session,
+                run_id=run.id,
+                project_id=project_id,
+                event_type="page_shopify_entity_mapped",
+                phase="page_rescan",
+                message=f"Entità Shopify collegata: {page.url}",
+                progress_percent=run.progress_percent,
+                payload={
+                    "pageId": str(page.id),
+                    "sourceEntityType": resolved.get("sourceEntityType"),
+                    "sourceEntityId": str(resolved.get("sourceEntityId")),
+                    "sourceEntityHandle": resolved.get("sourceEntityHandle"),
+                },
+            )
+    except Exception as exc:
+        logger.warning(
+            "Failed to resolve Shopify entity during rescan for %s: %s",
+            page.url,
+            exc,
+        )
 
     await recompute_growth_audit_run_summary(
         session,

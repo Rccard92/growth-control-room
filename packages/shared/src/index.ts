@@ -309,6 +309,7 @@ export type {
   GrowthAuditPageSource,
   GrowthAuditPageStatus,
   GrowthAuditPageStatusFilter,
+  GrowthAuditSourceEntityType,
   GrowthAuditPageType,
   GrowthAuditPagesListResponse,
   GrowthAuditPhase,
