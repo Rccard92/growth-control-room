@@ -17,6 +17,11 @@ export const APP_ROUTES = {
   newProject: "/projects/new",
   project: (id: string) => `/projects/${id}`,
   projectGrowthAudit: (id: string) => `/projects/${id}/audit`,
+  projectGrowthAuditPageDetail: (
+    projectId: string,
+    runId: string,
+    pageId: string,
+  ) => `/projects/${projectId}/audit/runs/${runId}/pages/${pageId}`,
   projectBrandIntelligence: (id: string) => `/projects/${id}/brand-intelligence`,
   projectIntegrations: (id: string) => `/projects/${id}/integrations`,
   projectShopify: (id: string) => `/projects/${id}/shopify`,

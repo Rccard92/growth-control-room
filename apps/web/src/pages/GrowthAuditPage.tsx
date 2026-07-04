@@ -7,13 +7,11 @@ import type {
   GrowthAuditScoreFilter,
 } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
-import { GrowthAuditPageDrawer } from "../components/growth-audit/GrowthAuditPageDrawer";
 import {
   useGrowthAuditFindings,
   useGrowthAuditRun,
   useGrowthAuditRuns,
   useGrowthAuditTasks,
-  useRescanGrowthAuditPage,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
 import { useProject } from "../hooks/useProjects";
@@ -31,7 +29,6 @@ import {
   formatGrowthAuditScore,
   formatPageFindingsCount,
   getDefaultRootUrl,
-  getFindingsForPage,
   getGrowthAuditInventoryFilterLabel,
   getGrowthAuditPageInventoryStatusLabel,
   getGrowthAuditPageScoreLabel,
@@ -46,12 +43,9 @@ import {
   getGrowthAuditStatusLabel,
   getInventoryKpiItems,
   getInventoryMessage,
-  getTasksForPage,
   getTechnicalKpiItems,
   getTopOpenTasks,
   getTopPriorityFindings,
-  sortGrowthAuditFindings,
-  sortGrowthAuditTasks,
 } from "../lib/growth-audit-utils";
 import { APP_ROUTES } from "../routes/config";
 
@@ -81,7 +75,6 @@ export function GrowthAuditPage() {
   const { data: shopifyStatus } = useShopifyStatus(id);
   const { data: runs } = useGrowthAuditRuns(projectId);
   const startRun = useStartGrowthAuditRun(projectId);
-  const rescanPage = useRescanGrowthAuditPage(projectId);
 
   const defaultRootUrl = useMemo(
     () => getDefaultRootUrl(shopifyStatus?.shopDomain),
@@ -94,11 +87,6 @@ export function GrowthAuditPage() {
   const [scoreFilter, setScoreFilter] = useState<GrowthAuditScoreFilter>("all");
   const [statusFilter, setStatusFilter] = useState<GrowthAuditPageStatusFilter>("all");
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedPageId(null);
-  }, [activeRunId]);
 
   useEffect(() => {
     if (activeRunId) return;
@@ -110,21 +98,23 @@ export function GrowthAuditPage() {
     }
   }, [runs, activeRunId]);
 
-  const { data: runDetail } = useGrowthAuditRun(projectId, activeRunId, Boolean(activeRunId));
+  const resolvedRunId = activeRunId ?? runs?.[0]?.id;
+
+  const { data: runDetail } = useGrowthAuditRun(projectId, resolvedRunId, Boolean(resolvedRunId));
   const runStatus = runDetail?.run.status;
   const { data: findings = [] } = useGrowthAuditFindings(
     projectId,
-    activeRunId,
+    resolvedRunId,
     undefined,
     runStatus,
-    Boolean(activeRunId),
+    Boolean(resolvedRunId),
   );
   const { data: tasks = [] } = useGrowthAuditTasks(
     projectId,
-    activeRunId,
+    resolvedRunId,
     { status: "open" },
     runStatus,
-    Boolean(activeRunId),
+    Boolean(resolvedRunId),
   );
 
   const activeRun = runDetail?.run;
@@ -159,25 +149,6 @@ export function GrowthAuditPage() {
     }
     return map;
   }, [pages]);
-  const selectedPage = useMemo(
-    () => pages.find((page) => page.id === selectedPageId) ?? null,
-    [pages, selectedPageId],
-  );
-  const selectedPageFindings = useMemo(
-    () => sortGrowthAuditFindings(getFindingsForPage(findings, selectedPageId)),
-    [findings, selectedPageId],
-  );
-  const selectedPageTasks = useMemo(
-    () => sortGrowthAuditTasks(getTasksForPage(tasks, selectedPageId)),
-    [tasks, selectedPageId],
-  );
-
-  useEffect(() => {
-    if (!selectedPageId) return;
-    if (!pages.some((page) => page.id === selectedPageId)) {
-      setSelectedPageId(null);
-    }
-  }, [pages, selectedPageId]);
 
   const showInventoryKpis =
     activeRun?.status === "completed" &&
@@ -511,20 +482,7 @@ export function GrowthAuditPage() {
                     </thead>
                     <tbody>
                       {filteredPages.map((page) => (
-                        <tr
-                          key={page.id}
-                          className="growth-audit-pages-table__row--clickable"
-                          onClick={() => setSelectedPageId(page.id)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              setSelectedPageId(page.id);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`Apri dettaglio pagina ${page.url}`}
-                        >
+                        <tr key={page.id} className="growth-audit-pages-table__row">
                           <td className="growth-audit-pages-table__url">
                             <div>{page.title || page.url}</div>
                             <div className="growth-audit-pages-table__url-sub">{page.url}</div>
@@ -562,16 +520,20 @@ export function GrowthAuditPage() {
                           </td>
                           <td>{getGrowthAuditPageInventoryStatusLabel(page.status)}</td>
                           <td>
-                            <button
-                              type="button"
-                              className="growth-audit-pages-table__action gcr-btn gcr-btn--secondary gcr-btn--sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedPageId(page.id);
-                              }}
-                            >
-                              Dettaglio
-                            </button>
+                            {resolvedRunId ? (
+                              <Link
+                                to={APP_ROUTES.projectGrowthAuditPageDetail(
+                                  projectId,
+                                  resolvedRunId,
+                                  page.id,
+                                )}
+                                className="growth-audit-pages-table__action gcr-btn gcr-btn--secondary gcr-btn--sm"
+                              >
+                                Gestisci
+                              </Link>
+                            ) : (
+                              <span className="growth-audit-pages-table__action">—</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -636,32 +598,13 @@ export function GrowthAuditPage() {
 
             {showTechnicalSections && (
               <p className="growth-audit-technical-note">
-                La scansione tecnica è deterministica. Per SEO/GEO/CRO avanzato apri una pagina
-                analizzata e usa la tab AI/GEO/CRO nel drawer.
+                La scansione tecnica è deterministica. Per lavorare su una pagina apri Gestisci
+                dall&apos;inventario e usa la scheda full-screen.
               </p>
             )}
           </div>
         )}
       </section>
-
-      <GrowthAuditPageDrawer
-        open={Boolean(selectedPage)}
-        page={selectedPage}
-        findings={selectedPageFindings}
-        tasks={selectedPageTasks}
-        projectId={projectId}
-        runId={activeRunId}
-        runStatus={activeRun?.status}
-        isRescanning={rescanPage.isPending}
-        onRescan={async ({ runId, pageId, clearPreviousOpenItems }) => {
-          await rescanPage.mutateAsync({
-            runId,
-            pageId,
-            payload: { clearPreviousOpenItems },
-          });
-        }}
-        onClose={() => setSelectedPageId(null)}
-      />
 
       <section className="growth-audit-ai-next gcr-card">
         <div className="growth-audit-ai-next__header">
@@ -669,8 +612,8 @@ export function GrowthAuditPage() {
           <span className="growth-audit-ai-next__badge">Disponibile</span>
         </div>
         <p className="growth-audit-ai-next__description">
-          Apri una pagina già scansionata e usa la tab AI/GEO/CRO nel drawer per analizzare
-          manualmente le pagine prioritarie. Il prompt varia in base al tipo di pagina.
+          Apri Gestisci su una pagina già scansionata per analizzare manualmente le pagine
+          prioritarie nella scheda full-screen. Il prompt varia in base al tipo di pagina.
         </p>
         <ul className="growth-audit-ai-next__list">
           {GROWTH_AUDIT_AI_NEXT_BULLETS.map((item) => (

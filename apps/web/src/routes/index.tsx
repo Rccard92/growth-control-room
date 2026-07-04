@@ -6,6 +6,7 @@ import { BrandIntelligencePage } from "../pages/BrandIntelligencePage";
 import { ChangelogPage } from "../pages/ChangelogPage";
 import { ContentPage } from "../pages/ContentPage";
 import { GrowthAuditPage } from "../pages/GrowthAuditPage";
+import { GrowthAuditPageDetailPage } from "../pages/GrowthAuditPageDetailPage";
 import { IntegrationsPage } from "../pages/IntegrationsPage";
 import { LoginPage } from "../pages/LoginPage";
 import { PrivacyPolicyPage } from "../pages/PrivacyPolicyPage";
@@ -30,6 +31,7 @@ export function AppRoutes() {
       <Route path="projects/:id" element={<AppShell showSidebar />}>
         <Route index element={<ProjectOverviewPage />} />
         <Route path="audit" element={<GrowthAuditPage />} />
+        <Route path="audit/runs/:runId/pages/:pageId" element={<GrowthAuditPageDetailPage />} />
         <Route path="brand-intelligence" element={<BrandIntelligencePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="shopify" element={<ShopifyPage />} />

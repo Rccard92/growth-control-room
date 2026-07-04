@@ -150,6 +150,7 @@ function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boo
             httpStatus: options?.withTechnicalScan ? 200 : null,
             score: options?.withTechnicalScan ? 55 : null,
             sourceEntityType: "shopify_product",
+            sourceEntityId: "prod-1",
             sourceEntityHandle: "miele",
             sourceEntityTitle: "Miele",
           },
@@ -285,7 +286,8 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Problemi");
     expect(html).toContain("82");
     expect(html).toContain("200");
-    expect(html).toContain("Dettaglio");
+    expect(html).toContain("Gestisci");
+    expect(html).toContain("/projects/proj-1/audit/runs/run-1/pages/page-1");
     expect(html).toContain("Buona");
     expect(html).toContain("Shopify");
     expect(html).toContain("Collegata");
@@ -352,7 +354,7 @@ describe("GrowthAuditPage", () => {
     setupMocks();
     const html = renderPage();
     expect(html).toContain("Analisi AI/GEO/CRO");
-    expect(html).toContain("tab AI/GEO/CRO nel drawer");
+    expect(html).toContain("scheda full-screen");
     expect(html).toContain("Prodotto: SEO ecommerce, schema Product, immagini, CRO e trust.");
     expect(html).toContain("Blog: contenuto, intent, E-E-A-T, GEO e linking interno.");
     expect(html).toContain("Collection: intent commerciale, schema, testo categoria e UX catalogo.");

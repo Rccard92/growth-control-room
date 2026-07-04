@@ -1178,3 +1178,95 @@ export function buildGrowthAuditPageImprovementItems(
 
   return items;
 }
+
+export type GrowthAuditPriorityActionKind = "finding" | "task" | "improvement";
+
+export interface GrowthAuditPriorityAction {
+  kind: GrowthAuditPriorityActionKind;
+  key: string;
+  title: string;
+  category: string;
+  priority: string;
+  description?: string;
+  recommendation: string;
+  howToValidate?: string;
+  ownerType?: string;
+  effort?: string;
+}
+
+function _findingToPriorityAction(finding: GrowthAuditFinding): GrowthAuditPriorityAction {
+  return {
+    kind: "finding",
+    key: `finding-${finding.id}`,
+    title: finding.title,
+    category: finding.category,
+    priority: finding.severity,
+    description: finding.description ?? undefined,
+    recommendation: finding.recommendation ?? "Nessuna raccomandazione disponibile.",
+    howToValidate: finding.howToValidate ?? undefined,
+    effort: finding.effort ?? undefined,
+  };
+}
+
+function _taskToPriorityAction(task: GrowthAuditTask): GrowthAuditPriorityAction {
+  return {
+    kind: "task",
+    key: `task-${task.id}`,
+    title: task.title,
+    category: "task",
+    priority: task.priority,
+    description: task.description ?? undefined,
+    recommendation: task.description ?? task.title,
+    howToValidate: undefined,
+    ownerType: task.ownerType,
+    effort: task.estimatedEffort,
+  };
+}
+
+function _improvementToPriorityAction(item: GrowthAuditPageImprovementItem): GrowthAuditPriorityAction {
+  return {
+    kind: "improvement",
+    key: `improvement-${item.key}`,
+    title: item.title,
+    category: item.label,
+    priority: item.status === "issue" ? "high" : "medium",
+    description: item.description,
+    recommendation: item.recommendation,
+    howToValidate: item.howToValidate,
+  };
+}
+
+export function buildGrowthAuditPagePriorityActions(
+  page: GrowthAuditPage,
+  findings: GrowthAuditFinding[],
+  tasks: GrowthAuditTask[],
+): GrowthAuditPriorityAction[] {
+  const sortedFindings = sortGrowthAuditFindings(findings);
+  const sortedTasks = sortGrowthAuditTasks(tasks);
+  const improvementItems = buildGrowthAuditPageImprovementItems(page, findings);
+
+  const criticalHighFindings = sortedFindings.filter((f) =>
+    f.severity === "critical" || f.severity === "high",
+  );
+  const mediumFindings = sortedFindings.filter((f) => f.severity === "medium");
+  const highTasks = sortedTasks.filter((t) => t.priority === "high");
+  const mediumTasks = sortedTasks.filter((t) => t.priority === "medium");
+  const improvementActions = improvementItems
+    .filter((item) => item.status === "issue" || item.status === "warning")
+    .map(_improvementToPriorityAction);
+
+  const ordered: GrowthAuditPriorityAction[] = [
+    ...criticalHighFindings.map(_findingToPriorityAction),
+    ...highTasks.map(_taskToPriorityAction),
+    ...improvementActions,
+    ...mediumFindings.map(_findingToPriorityAction),
+    ...mediumTasks.map(_taskToPriorityAction),
+  ];
+
+  const seen = new Set<string>();
+  return ordered.filter((action) => {
+    if (seen.has(action.key)) return false;
+    seen.add(action.key);
+    return true;
+  });
+}
