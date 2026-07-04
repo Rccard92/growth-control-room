@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { GrowthAuditPage } from "@gcr/shared";
-import { GrowthAuditPageDrawer } from "./GrowthAuditPageDrawer";
+import type { GrowthAuditFinding, GrowthAuditPage } from "@gcr/shared";
+import {
+  GrowthAuditPageDrawer,
+  handleDrawerEscapeKey,
+} from "./GrowthAuditPageDrawer";
 
 const samplePage: GrowthAuditPage = {
   id: "page-1",
@@ -31,8 +34,50 @@ const samplePage: GrowthAuditPage = {
   },
 };
 
+const sampleFinding: GrowthAuditFinding = {
+  id: "finding-1",
+  runId: "run-1",
+  projectId: "proj-1",
+  pageId: "page-1",
+  category: "seo",
+  severity: "critical",
+  priority: "high",
+  title: "Title troppo corto",
+  recommendation: "Estendi il title con keyword e brand.",
+  status: "open",
+};
+
+describe("handleDrawerEscapeKey", () => {
+  it("calls onClose when Escape is pressed", () => {
+    const onClose = vi.fn();
+    handleDrawerEscapeKey({ key: "Escape" } as KeyboardEvent, onClose);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("does not call onClose for other keys", () => {
+    const onClose = vi.fn();
+    handleDrawerEscapeKey({ key: "Enter" } as KeyboardEvent, onClose);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
 describe("GrowthAuditPageDrawer", () => {
-  it("renders URL, score and technical fields", () => {
+  it("renders role dialog and aria-modal", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={samplePage}
+        findings={[]}
+        tasks={[]}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-modal="true"');
+  });
+
+  it("renders URL, score, page type and Chiudi button", () => {
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -46,11 +91,42 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain("https://solmielato.it/products/miele");
     expect(html).toContain("82");
     expect(html).toContain("Buona");
+    expect(html).toContain("Prodotto");
+    expect(html).toContain("Chiudi");
+    expect(html).toContain('aria-label="Chiudi"');
+  });
+
+  it("renders technical fields and disabled rescan button", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={samplePage}
+        findings={[]}
+        tasks={[]}
+        onClose={() => undefined}
+      />,
+    );
+
     expect(html).toContain("Miele di Limone");
     expect(html).toContain("Miele biologico siciliano dal gusto delicato.");
-    expect(html).toContain("https://solmielato.it/products/miele");
     expect(html).toContain("Product, WebPage");
     expect(html).toContain("Riscansiona pagina — in arrivo");
+    expect(html).toContain("disabled");
+  });
+
+  it("renders Come risolvere when findings have recommendation", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={samplePage}
+        findings={[sampleFinding]}
+        tasks={[]}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Come risolvere");
+    expect(html).toContain("Estendi il title con keyword e brand.");
   });
 
   it("renders empty states when no findings or tasks", () => {

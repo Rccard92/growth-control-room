@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import type { GrowthAuditFinding, GrowthAuditPage, GrowthAuditTask } from "@gcr/shared";
 import {
   formatGrowthAuditScore,
@@ -21,6 +22,10 @@ interface GrowthAuditPageDrawerProps {
   onClose: () => void;
 }
 
+export function handleDrawerEscapeKey(event: KeyboardEvent, onClose: () => void): void {
+  if (event.key === "Escape") onClose();
+}
+
 export function GrowthAuditPageDrawer({
   open,
   page,
@@ -29,6 +34,24 @@ export function GrowthAuditPageDrawer({
   onClose,
 }: GrowthAuditPageDrawerProps) {
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      handleDrawerEscapeKey(event, onClose);
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onClose]);
 
   if (!open || !page) return null;
 
@@ -43,39 +66,54 @@ export function GrowthAuditPageDrawer({
     }
   }
 
-  return (
+  const scoreLabel = getGrowthAuditPageScoreLabel(page.score);
+
+  const drawerContent = (
     <div
       className="growth-audit-page-drawer-backdrop"
       onClick={onClose}
       role="presentation"
     >
       <aside
-        className="growth-audit-page-drawer gcr-card"
+        className="growth-audit-page-drawer"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
-        aria-label="Dettaglio pagina"
+        aria-modal="true"
+        aria-labelledby={titleId}
       >
         <header className="growth-audit-page-drawer__header">
           <div className="growth-audit-page-drawer__header-main">
-            <p className="gcr-card__label">Dettaglio pagina</p>
-            <h3>{getGrowthAuditPageTypeLabel(page.pageType)}</h3>
-            <p className="growth-audit-page-drawer__url">
-              <code>{page.url}</code>
+            <p className="growth-audit-page-drawer__label">Dettaglio pagina</p>
+            <h3 id={titleId}>{getGrowthAuditPageTypeLabel(page.pageType)}</h3>
+            <p className="growth-audit-page-drawer__url" title={page.url}>
+              {page.url}
             </p>
-            <div className="growth-audit-page-drawer__meta">
+            <div className="growth-audit-page-drawer__score-hero">
               <span className={getGrowthAuditScoreBadgeClass(page.score)}>
-                <span className="growth-audit-page-drawer__score">
-                  {formatGrowthAuditScore(page.score)} {getGrowthAuditPageScoreLabel(page.score)}
+                <span className="growth-audit-page-drawer__score-value">
+                  {formatGrowthAuditScore(page.score)}
                 </span>
               </span>
-              <span>{getGrowthAuditPageInventoryStatusLabel(page.status)}</span>
+              <span className="growth-audit-page-drawer__score-label">{scoreLabel}</span>
+            </div>
+            <div className="growth-audit-page-drawer__badges">
+              <span className="growth-audit-page-drawer__badge">
+                {getGrowthAuditPageInventoryStatusLabel(page.status)}
+              </span>
               <span className={getGrowthAuditSourceBadgeClass(page.source)}>
                 {getGrowthAuditPageSourceLabel(page.source)}
               </span>
-              <span>HTTP {page.httpStatus ?? "—"}</span>
+              <span className="growth-audit-page-drawer__badge">
+                HTTP {page.httpStatus ?? "—"}
+              </span>
             </div>
           </div>
-          <button type="button" className="gcr-btn gcr-btn--secondary" onClick={onClose}>
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary"
+            onClick={onClose}
+            aria-label="Chiudi"
+          >
             Chiudi
           </button>
         </header>
@@ -107,10 +145,16 @@ export function GrowthAuditPageDrawer({
           </div>
         )}
 
-        <GrowthAuditPageTechnicalSummary page={page} />
         <GrowthAuditPageFindingsPanel findings={findings} />
         <GrowthAuditPageTasksPanel tasks={tasks} />
+        <GrowthAuditPageTechnicalSummary page={page} />
       </aside>
     </div>
   );
+
+  if (typeof document === "undefined") {
+    return drawerContent;
+  }
+
+  return createPortal(drawerContent, document.body);
 }
