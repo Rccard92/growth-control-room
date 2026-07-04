@@ -15,6 +15,8 @@ import {
   getGrowthAuditPhaseLabel,
   getGrowthAuditScoreBadgeClass,
   getGrowthAuditScoreBand,
+  buildGrowthAuditPageImprovementItems,
+  getGrowthAuditImprovementHeadline,
   getGrowthAuditShopifyEditorMicrocopy,
   getGrowthAuditShopifyLinkBadgeLabel,
   getGrowthAuditSourceBadgeClass,
@@ -24,6 +26,7 @@ import {
   getInventoryMessage,
   getTasksForPage,
   getTopPriorityFindings,
+  mapGrowthAuditPageToSeoEntity,
   sortGrowthAuditFindings,
 } from "./growth-audit-utils";
 
@@ -293,5 +296,79 @@ describe("growth-audit-utils", () => {
     expect(formatPageFindingsCount(0)).toBe("Nessun problema");
     expect(formatPageFindingsCount(1)).toBe("1 problema");
     expect(formatPageFindingsCount(2)).toBe("2 problemi");
+  });
+
+  it("buildGrowthAuditPageImprovementItems returns items even with empty findings", () => {
+    const page: GrowthAuditPage = {
+      id: "page-1",
+      runId: "run",
+      projectId: "proj",
+      url: "https://example.com/products/a",
+      normalizedUrl: "https://example.com/products/a",
+      pageType: "product",
+      source: "shopify_product",
+      status: "analyzed",
+      priority: "normal",
+      title: "Prodotto test",
+      metaDescription: "Descrizione meta abbastanza lunga per superare la soglia minima consigliata.",
+      h1: "Prodotto test",
+      httpStatus: 200,
+      score: 86,
+      canonicalUrl: "https://example.com/products/a",
+      metadata: {
+        technical: {
+          schemaTypes: ["WebPage"],
+          imagesTotal: 3,
+          imagesMissingAlt: 2,
+          linksInternal: 5,
+          linksExternal: 1,
+          robots: { noindex: false, nofollow: false },
+        },
+      },
+    };
+
+    const items = buildGrowthAuditPageImprovementItems(page, []);
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.some((item) => item.key === "http")).toBe(true);
+    expect(items.find((item) => item.key === "productSchema")?.status).toBe("warning");
+    expect(items.find((item) => item.key === "imagesAlt")?.status).toBe("warning");
+  });
+
+  it("getGrowthAuditImprovementHeadline reports Buona and gap 14 for score 86", () => {
+    const headline = getGrowthAuditImprovementHeadline({
+      ...samplePages[1],
+      score: 86,
+    });
+    expect(headline.label).toBe("Buona");
+    expect(headline.gap).toBe(14);
+    expect(headline.text).toContain("86/100");
+    expect(headline.text).toContain("14 punti");
+  });
+
+  it("mapGrowthAuditPageToSeoEntity maps linked product and collection", () => {
+    expect(
+      mapGrowthAuditPageToSeoEntity({
+        ...samplePages[1],
+        sourceEntityType: "shopify_product",
+        sourceEntityId: "prod-99",
+      }),
+    ).toEqual({ entityType: "product", entityId: "prod-99" });
+
+    expect(
+      mapGrowthAuditPageToSeoEntity({
+        ...samplePages[0],
+        pageType: "collection",
+        sourceEntityType: "shopify_collection",
+        sourceEntityId: "col-12",
+      }),
+    ).toEqual({ entityType: "collection", entityId: "col-12" });
+
+    expect(
+      mapGrowthAuditPageToSeoEntity({
+        ...samplePages[0],
+        sourceEntityType: "shopify_page",
+        sourceEntityId: "page-1",
+      }),
+    ).toBeNull();
   });
 });

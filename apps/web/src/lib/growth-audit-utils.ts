@@ -598,3 +598,574 @@ export function getGrowthAuditPageInventoryStatusLabel(status?: string | null): 
   }
   return getGrowthAuditPageStatusLabel(status);
 }
+
+export type GrowthAuditImprovementStatus = "ok" | "warning" | "issue" | "unknown";
+
+export interface GrowthAuditPageImprovementItem {
+  key: string;
+  label: string;
+  status: GrowthAuditImprovementStatus;
+  title: string;
+  description: string;
+  recommendation: string;
+  howToValidate: string;
+  evidence?: string;
+}
+
+const IMPROVEMENT_STATUS_LABELS: Record<GrowthAuditImprovementStatus, string> = {
+  ok: "OK",
+  warning: "Migliorabile",
+  issue: "Problema",
+  unknown: "Non disponibile",
+};
+
+const FINDING_KEYWORDS: Record<string, string[]> = {
+  http: ["http status", "http"],
+  title: ["title"],
+  titleLength: ["lunghezza title", "title troppo", "title corto"],
+  meta: ["meta description", "meta"],
+  metaLength: ["lunghezza meta", "meta description"],
+  h1: ["h1"],
+  h1Count: ["h1 multipl", "più h1", "h1 singol"],
+  canonical: ["canonical"],
+  robots: ["noindex", "robots"],
+  schema: ["json-ld", "schema", "structured data"],
+  productSchema: ["product schema", "schema product"],
+  collectionSchema: ["collection schema", "breadcrumb", "itemlist"],
+  imagesAlt: ["alt", "immagini"],
+  openGraph: ["open graph", "og:"],
+};
+
+function readTechnicalRaw(page: GrowthAuditPage): Record<string, unknown> | null {
+  return readTechnicalBlock(page);
+}
+
+function findMatchingFinding(
+  findings: GrowthAuditFinding[],
+  keywords: string[],
+): GrowthAuditFinding | undefined {
+  return findings.find((finding) => {
+    const haystack = `${finding.title} ${finding.description ?? ""}`.toLowerCase();
+    return keywords.some((keyword) => haystack.includes(keyword));
+  });
+}
+
+function elevateFromFinding(
+  item: GrowthAuditPageImprovementItem,
+  finding: GrowthAuditFinding | undefined,
+): GrowthAuditPageImprovementItem {
+  if (!finding) return item;
+  const elevatedStatus: GrowthAuditImprovementStatus =
+    finding.severity === "critical" || finding.severity === "high"
+      ? "issue"
+      : item.status === "ok"
+        ? "warning"
+        : item.status;
+  return {
+    ...item,
+    status: elevatedStatus,
+    recommendation: finding.recommendation || item.recommendation,
+    howToValidate: finding.howToValidate || item.howToValidate,
+    evidence: finding.evidence || item.evidence,
+  };
+}
+
+function buildItem(
+  partial: Omit<GrowthAuditPageImprovementItem, "label"> & { label?: string },
+  findings: GrowthAuditFinding[],
+  keywords: string[],
+): GrowthAuditPageImprovementItem {
+  const item: GrowthAuditPageImprovementItem = {
+    label: partial.label ?? partial.title,
+    ...partial,
+  };
+  return elevateFromFinding(item, findMatchingFinding(findings, keywords));
+}
+
+export function getGrowthAuditImprovementStatusLabel(
+  status: GrowthAuditImprovementStatus,
+): string {
+  return IMPROVEMENT_STATUS_LABELS[status];
+}
+
+export function getGrowthAuditImprovementHeadline(page: GrowthAuditPage): {
+  score: number | null;
+  gap: number | null;
+  label: string;
+  text: string;
+} {
+  const score = page.score ?? null;
+  const label = getGrowthAuditPageScoreLabel(score);
+  const gap = score == null ? null : Math.max(0, 100 - score);
+  const scoreText = score == null ? "—" : String(score);
+  const gapText = gap == null ? "—" : String(gap);
+  const text =
+    score == null
+      ? "Score non disponibile per questa pagina."
+      : `Score ${scoreText}/100 — ${label}. Gap rispetto a 100: ${gapText} punti.`;
+  return { score, gap, label, text };
+}
+
+export function getGrowthAuditImprovementSummaryText(page: GrowthAuditPage): string {
+  const score = page.score;
+  if (score == null) {
+    return "Esegui una scansione tecnica per ottenere suggerimenti mirati.";
+  }
+  if (score >= 80) {
+    return "La pagina non presenta problemi tecnici prioritari, ma può ancora migliorare su alcuni dettagli per aumentare solidità SEO.";
+  }
+  if (score >= 60) {
+    return "Pagina da migliorare: ci sono elementi tecnici da sistemare per avvicinarsi a uno score ottimale.";
+  }
+  return "Pagina critica: intervenire sulle priorità indicate prima di ottimizzazioni minori.";
+}
+
+export function mapGrowthAuditPageToSeoEntity(
+  page: GrowthAuditPage,
+): { entityType: "product" | "collection"; entityId: string } | null {
+  if (page.sourceEntityType === "shopify_product" && page.sourceEntityId) {
+    return { entityType: "product", entityId: page.sourceEntityId };
+  }
+  if (page.sourceEntityType === "shopify_collection" && page.sourceEntityId) {
+    return { entityType: "collection", entityId: page.sourceEntityId };
+  }
+  return null;
+}
+
+export function buildGrowthAuditPageImprovementItems(
+  page: GrowthAuditPage,
+  findings: GrowthAuditFinding[],
+): GrowthAuditPageImprovementItem[] {
+  const technical = getGrowthAuditPageTechnicalMetadata(page);
+  const technicalRaw = readTechnicalRaw(page);
+  const h1Count =
+    typeof technicalRaw?.h1Count === "number" ? (technicalRaw.h1Count as number) : null;
+  const openGraph =
+    technicalRaw?.openGraph && typeof technicalRaw.openGraph === "object"
+      ? (technicalRaw.openGraph as Record<string, unknown>)
+      : null;
+
+  const items: GrowthAuditPageImprovementItem[] = [];
+
+  const httpStatus = page.httpStatus;
+  if (httpStatus == null) {
+    items.push(
+      buildItem(
+        {
+          key: "http",
+          label: "HTTP",
+          status: "unknown",
+          title: "HTTP status",
+          description: "Lo status HTTP non è disponibile nella scansione.",
+          recommendation: "Dato non disponibile nella scansione tecnica attuale.",
+          howToValidate: "Riesegui la scansione tecnica della pagina.",
+        },
+        findings,
+        FINDING_KEYWORDS.http,
+      ),
+    );
+  } else {
+    const httpOk = httpStatus >= 200 && httpStatus < 300;
+    items.push(
+      buildItem(
+        {
+          key: "http",
+          label: "HTTP",
+          status: httpOk ? "ok" : "issue",
+          title: "HTTP status",
+          description: httpOk
+            ? `La pagina risponde con status ${httpStatus}.`
+            : `La pagina risponde con status ${httpStatus}, fuori dal range 2xx.`,
+          recommendation: httpOk
+            ? "Nessuna azione richiesta."
+            : "Verifica che la pagina sia raggiungibile e restituisca 200.",
+          howToValidate: "Apri l'URL e controlla lo status nella scheda Network.",
+          evidence: `HTTP ${httpStatus}`,
+        },
+        findings,
+        FINDING_KEYWORDS.http,
+      ),
+    );
+  }
+
+  const title = page.title?.trim() ?? "";
+  if (!title) {
+    items.push(
+      buildItem(
+        {
+          key: "title",
+          label: "Title",
+          status: "issue",
+          title: "Title presente",
+          description: "Il tag title non è presente o è vuoto.",
+          recommendation: "Aggiungi un title descrittivo e unico di 30-65 caratteri.",
+          howToValidate: "Ispeziona il sorgente HTML e verifica il tag <title>.",
+        },
+        findings,
+        FINDING_KEYWORDS.title,
+      ),
+    );
+  } else {
+    items.push(
+      buildItem(
+        {
+          key: "title",
+          label: "Title",
+          status: "ok",
+          title: "Title presente",
+          description: "Il title è presente.",
+          recommendation: "Nessuna azione richiesta.",
+          howToValidate: "Verifica che il title sia visibile nel sorgente HTML.",
+          evidence: title,
+        },
+        findings,
+        FINDING_KEYWORDS.title,
+      ),
+    );
+    const titleLen = title.length;
+    const titleLenOk = titleLen >= 30 && titleLen <= 65;
+    items.push(
+      buildItem(
+        {
+          key: "titleLength",
+          label: "Title length",
+          status: titleLenOk ? "ok" : "warning",
+          title: "Lunghezza title",
+          description: titleLenOk
+            ? `Il title ha ${titleLen} caratteri (range consigliato 30-65).`
+            : `Il title ha ${titleLen} caratteri, fuori dal range 30-65.`,
+          recommendation: titleLenOk
+            ? "Nessuna azione richiesta."
+            : "Riscrivi il title tra 30 e 65 caratteri includendo keyword e brand.",
+          howToValidate: "Conta i caratteri del title nel sorgente o in SERP preview.",
+          evidence: `${titleLen} caratteri`,
+        },
+        findings,
+        FINDING_KEYWORDS.titleLength,
+      ),
+    );
+  }
+
+  const meta = page.metaDescription?.trim() ?? "";
+  if (!meta) {
+    items.push(
+      buildItem(
+        {
+          key: "meta",
+          label: "Meta description",
+          status: "issue",
+          title: "Meta description",
+          description: "La meta description non è presente o è vuota.",
+          recommendation: "Aggiungi una meta description tra 80 e 165 caratteri.",
+          howToValidate: "Verifica il tag meta description nel sorgente HTML.",
+        },
+        findings,
+        FINDING_KEYWORDS.meta,
+      ),
+    );
+  } else {
+    items.push(
+      buildItem(
+        {
+          key: "meta",
+          label: "Meta description",
+          status: "ok",
+          title: "Meta description presente",
+          description: "La meta description è presente.",
+          recommendation: "Nessuna azione richiesta.",
+          howToValidate: "Verifica il tag meta description nel sorgente.",
+          evidence: meta.slice(0, 120) + (meta.length > 120 ? "…" : ""),
+        },
+        findings,
+        FINDING_KEYWORDS.meta,
+      ),
+    );
+    const metaLen = meta.length;
+    const metaLenOk = metaLen >= 80 && metaLen <= 165;
+    items.push(
+      buildItem(
+        {
+          key: "metaLength",
+          label: "Meta length",
+          status: metaLenOk ? "ok" : "warning",
+          title: "Lunghezza meta description",
+          description: metaLenOk
+            ? `La meta description ha ${metaLen} caratteri (range 80-165).`
+            : `La meta description ha ${metaLen} caratteri, fuori dal range 80-165.`,
+          recommendation: metaLenOk
+            ? "Nessuna azione richiesta."
+            : "Riscrivi la meta description tra 80 e 165 caratteri.",
+          howToValidate: "Conta i caratteri della meta description.",
+          evidence: `${metaLen} caratteri`,
+        },
+        findings,
+        FINDING_KEYWORDS.metaLength,
+      ),
+    );
+  }
+
+  const h1 = page.h1?.trim() ?? "";
+  items.push(
+    buildItem(
+      {
+        key: "h1",
+        label: "H1",
+        status: h1 ? "ok" : "issue",
+        title: "H1 presente",
+        description: h1 ? "L'H1 è presente." : "L'H1 non è presente o è vuoto.",
+        recommendation: h1
+          ? "Nessuna azione richiesta."
+          : "Aggiungi un H1 unico e descrittivo allineato al title.",
+        howToValidate: "Verifica un solo tag <h1> nel sorgente HTML.",
+        evidence: h1 || undefined,
+      },
+      findings,
+      FINDING_KEYWORDS.h1,
+    ),
+  );
+
+  if (h1Count == null) {
+    items.push(
+      buildItem(
+        {
+          key: "h1Count",
+          label: "H1 singolo",
+          status: "unknown",
+          title: "H1 singolo",
+          description: "Il conteggio H1 non è disponibile nella scansione.",
+          recommendation: "Dato non disponibile nella scansione tecnica attuale.",
+          howToValidate: "Ispeziona manualmente il numero di tag <h1> nella pagina.",
+        },
+        findings,
+        FINDING_KEYWORDS.h1Count,
+      ),
+    );
+  } else {
+    items.push(
+      buildItem(
+        {
+          key: "h1Count",
+          label: "H1 singolo",
+          status: h1Count === 1 ? "ok" : "warning",
+          title: "H1 singolo",
+          description:
+            h1Count === 1
+              ? "La pagina ha un solo H1."
+              : `La pagina ha ${h1Count} tag H1.`,
+          recommendation:
+            h1Count === 1
+              ? "Nessuna azione richiesta."
+              : "Mantieni un solo H1 per pagina.",
+          howToValidate: "Conta i tag <h1> nel sorgente HTML.",
+          evidence: `${h1Count} H1`,
+        },
+        findings,
+        FINDING_KEYWORDS.h1Count,
+      ),
+    );
+  }
+
+  const canonical = page.canonicalUrl?.trim() ?? "";
+  items.push(
+    buildItem(
+      {
+        key: "canonical",
+        label: "Canonical",
+        status: canonical ? "ok" : "warning",
+        title: "Canonical URL",
+        description: canonical
+          ? "Il canonical è presente."
+          : "Il canonical non è presente.",
+        recommendation: canonical
+          ? "Nessuna azione richiesta."
+          : "Aggiungi un link rel=canonical verso l'URL preferito.",
+        howToValidate: "Verifica <link rel=\"canonical\"> nel sorgente.",
+        evidence: canonical || undefined,
+      },
+      findings,
+      FINDING_KEYWORDS.canonical,
+    ),
+  );
+
+  const noindex = technical.robots?.noindex === true;
+  items.push(
+    buildItem(
+      {
+        key: "robots",
+        label: "Robots",
+        status: noindex ? "issue" : "ok",
+        title: "Robots noindex",
+        description: noindex
+          ? "La pagina ha noindex attivo."
+          : "Nessuna restrizione noindex rilevata.",
+        recommendation: noindex
+          ? "Rimuovi noindex se la pagina deve essere indicizzata."
+          : "Nessuna azione richiesta.",
+        howToValidate: "Verifica meta robots o X-Robots-Tag.",
+      },
+      findings,
+      FINDING_KEYWORDS.robots,
+    ),
+  );
+
+  const hasSchema = technical.schemaTypes.length > 0;
+  items.push(
+    buildItem(
+      {
+        key: "schema",
+        label: "JSON-LD",
+        status: hasSchema ? "ok" : "warning",
+        title: "JSON-LD / Schema",
+        description: hasSchema
+          ? `Schema rilevati: ${technical.schemaTypes.join(", ")}.`
+          : "Nessuno schema JSON-LD rilevato.",
+        recommendation: hasSchema
+          ? "Nessuna azione richiesta."
+          : "Aggiungi markup JSON-LD appropriato al tipo di pagina.",
+        howToValidate: "Cerca script type=\"application/ld+json\" nel sorgente.",
+        evidence: hasSchema ? technical.schemaTypes.join(", ") : undefined,
+      },
+      findings,
+      FINDING_KEYWORDS.schema,
+    ),
+  );
+
+  if (page.pageType === "product") {
+    const hasProduct = technical.schemaTypes.some((t) =>
+      t.toLowerCase().includes("product"),
+    );
+    items.push(
+      buildItem(
+        {
+          key: "productSchema",
+          label: "Product schema",
+          status: hasProduct ? "ok" : "warning",
+          title: "Schema Product",
+          description: hasProduct
+            ? "Schema Product rilevato."
+            : "Schema Product non rilevato per pagina prodotto.",
+          recommendation: hasProduct
+            ? "Nessuna azione richiesta."
+            : "Aggiungi markup Product con nome, immagine e offerta.",
+          howToValidate: "Verifica JSON-LD Product nel sorgente o Rich Results Test.",
+        },
+        findings,
+        FINDING_KEYWORDS.productSchema,
+      ),
+    );
+  }
+
+  if (page.pageType === "collection") {
+    const hasCollectionSchema = technical.schemaTypes.some((t) => {
+      const lower = t.toLowerCase();
+      return (
+        lower.includes("collection") ||
+        lower.includes("breadcrumb") ||
+        lower.includes("itemlist")
+      );
+    });
+    items.push(
+      buildItem(
+        {
+          key: "collectionSchema",
+          label: "Collection schema",
+          status: hasCollectionSchema ? "ok" : "warning",
+          title: "Schema Collection",
+          description: hasCollectionSchema
+            ? "Schema collection/breadcrumb rilevato."
+            : "Schema Collection o BreadcrumbList non rilevato.",
+          recommendation: hasCollectionSchema
+            ? "Nessuna azione richiesta."
+            : "Aggiungi BreadcrumbList o CollectionPage markup.",
+          howToValidate: "Verifica JSON-LD nel sorgente.",
+        },
+        findings,
+        FINDING_KEYWORDS.collectionSchema,
+      ),
+    );
+  }
+
+  if (technical.imagesMissingAlt == null) {
+    items.push(
+      buildItem(
+        {
+          key: "imagesAlt",
+          label: "Immagini alt",
+          status: "unknown",
+          title: "Immagini senza alt",
+          description: "Il conteggio immagini senza alt non è disponibile.",
+          recommendation: "Dato non disponibile nella scansione tecnica attuale.",
+          howToValidate: "Ispeziona manualmente gli attributi alt delle immagini.",
+        },
+        findings,
+        FINDING_KEYWORDS.imagesAlt,
+      ),
+    );
+  } else {
+    const missingAlt = technical.imagesMissingAlt;
+    items.push(
+      buildItem(
+        {
+          key: "imagesAlt",
+          label: "Immagini alt",
+          status: missingAlt === 0 ? "ok" : "warning",
+          title: "Immagini senza alt",
+          description:
+            missingAlt === 0
+              ? "Tutte le immagini rilevate hanno attributo alt."
+              : `${missingAlt} immagini senza attributo alt.`,
+          recommendation:
+            missingAlt === 0
+              ? "Nessuna azione richiesta."
+              : "Aggiungi testi alt descrittivi a tutte le immagini.",
+          howToValidate: "Verifica attributi alt nel sorgente o DevTools.",
+          evidence: missingAlt === 0 ? undefined : `${missingAlt} senza alt`,
+        },
+        findings,
+        FINDING_KEYWORDS.imagesAlt,
+      ),
+    );
+  }
+
+  if (openGraph) {
+    const hasOg =
+      Boolean(openGraph.title) || Boolean(openGraph.description) || Boolean(openGraph.image);
+    items.push(
+      buildItem(
+        {
+          key: "openGraph",
+          label: "Open Graph",
+          status: hasOg ? "ok" : "warning",
+          title: "Open Graph",
+          description: hasOg
+            ? "Tag Open Graph rilevati."
+            : "Tag Open Graph incompleti o assenti.",
+          recommendation: hasOg
+            ? "Nessuna azione richiesta."
+            : "Aggiungi og:title, og:description e og:image.",
+          howToValidate: "Verifica meta property og:* nel sorgente.",
+        },
+        findings,
+        FINDING_KEYWORDS.openGraph,
+      ),
+    );
+  } else {
+    items.push(
+      buildItem(
+        {
+          key: "openGraph",
+          label: "Open Graph",
+          status: "unknown",
+          title: "Open Graph",
+          description: "I dati Open Graph non sono disponibili nella scansione persistita.",
+          recommendation: "Dato non disponibile nella scansione tecnica attuale.",
+          howToValidate: "Verifica manualmente meta property og:* nel sorgente.",
+        },
+        findings,
+        FINDING_KEYWORDS.openGraph,
+      ),
+    );
+  }
+
+  return items;
+}

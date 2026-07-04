@@ -50,6 +50,33 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useRescanGrowthAuditPage: useRescanGrowthAuditPageMock,
 }));
 
+vi.mock("../hooks/useContentSeo", () => ({
+  useProductSeoDetail: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })),
+  useCollectionSeoDetail: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })),
+  useProductsSeo: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })),
+  useCollectionsSeo: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })),
+}));
+
 function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boolean }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({

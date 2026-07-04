@@ -6,6 +6,34 @@ import {
   handleDrawerEscapeKey,
 } from "./GrowthAuditPageDrawer";
 
+const { useProductSeoDetailMock, useCollectionSeoDetailMock, useProductsSeoMock, useCollectionsSeoMock } =
+  vi.hoisted(() => ({
+    useProductSeoDetailMock: vi.fn(),
+    useCollectionSeoDetailMock: vi.fn(),
+    useProductsSeoMock: vi.fn(),
+    useCollectionsSeoMock: vi.fn(),
+  }));
+
+vi.mock("../../hooks/useContentSeo", () => ({
+  useProductSeoDetail: useProductSeoDetailMock,
+  useCollectionSeoDetail: useCollectionSeoDetailMock,
+  useProductsSeo: useProductsSeoMock,
+  useCollectionsSeo: useCollectionsSeoMock,
+}));
+
+function setupSeoDetailMocks() {
+  const idleQuery = {
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  };
+  useProductSeoDetailMock.mockReturnValue(idleQuery);
+  useCollectionSeoDetailMock.mockReturnValue(idleQuery);
+  useProductsSeoMock.mockReturnValue(idleQuery);
+  useCollectionsSeoMock.mockReturnValue(idleQuery);
+}
+
 const samplePage: GrowthAuditPage = {
   id: "page-1",
   runId: "run-1",
@@ -54,6 +82,12 @@ const rescanProps = {
   onRescan: vi.fn().mockResolvedValue(undefined),
 };
 
+function countDrawerTabs(html: string): number {
+  const tablist = html.split('aria-label="Sezioni dettaglio pagina"')[1] ?? "";
+  const tabSection = tablist.split("growth-audit-page-drawer__tab-panels")[0] ?? "";
+  return (tabSection.match(/role="tab"/g) ?? []).length;
+}
+
 describe("handleDrawerEscapeKey", () => {
   it("calls onClose when Escape is pressed", () => {
     const onClose = vi.fn();
@@ -70,6 +104,7 @@ describe("handleDrawerEscapeKey", () => {
 
 describe("GrowthAuditPageDrawer", () => {
   it("renders role dialog and aria-modal", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -84,7 +119,8 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain('aria-modal="true"');
   });
 
-  it("renders URL, score, page type and Chiudi button", () => {
+  it("renders URL, score, page type, tab bar and Chiudi button", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -101,9 +137,15 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain("Prodotto");
     expect(html).toContain("Chiudi");
     expect(html).toContain('aria-label="Chiudi"');
+    expect(html).toContain("Overview");
+    expect(html).toContain("Miglioramenti");
+    expect(html).toContain("Problemi");
+    expect(html).toContain("Task");
+    expect(html).toContain("Dati tecnici");
   });
 
-  it("renders technical fields and enabled rescan button when run is completed", () => {
+  it("renders overview riepilogo and enabled rescan button when run is completed", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -115,11 +157,9 @@ describe("GrowthAuditPageDrawer", () => {
       />,
     );
 
-    expect(html).toContain("Miele di Limone");
-    expect(html).toContain("Miele biologico siciliano dal gusto delicato.");
-    expect(html).toContain("Product, WebPage");
+    expect(html).toContain("Riepilogo");
+    expect(html).toContain("Score tecnico 82");
     expect(html).toContain("Riscansiona pagina");
-    expect(html).not.toContain("in arrivo");
     expect(html).not.toContain("disabled");
     expect(html).toContain(
       "Usalo dopo aver corretto title, meta, immagini, schema o altri elementi tecnici.",
@@ -127,6 +167,7 @@ describe("GrowthAuditPageDrawer", () => {
   });
 
   it("shows Riprova scansione label for failed pages", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -143,6 +184,7 @@ describe("GrowthAuditPageDrawer", () => {
   });
 
   it("disables rescan while run is active", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -159,6 +201,7 @@ describe("GrowthAuditPageDrawer", () => {
   });
 
   it("shows loading label when isRescanning", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -175,22 +218,8 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain("disabled");
   });
 
-  it("renders Come risolvere when findings have recommendation", () => {
-    const html = renderToStaticMarkup(
-      <GrowthAuditPageDrawer
-        open
-        page={samplePage}
-        findings={[sampleFinding]}
-        tasks={[]}
-        onClose={() => undefined}
-      />,
-    );
-
-    expect(html).toContain("Come risolvere");
-    expect(html).toContain("Estendi il title con keyword e brand.");
-  });
-
-  it("renders empty states when no findings or tasks", () => {
+  it("renders overview empty Shopify state when not linked", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -201,23 +230,25 @@ describe("GrowthAuditPageDrawer", () => {
       />,
     );
 
-    expect(html).toContain("Nessun problema tecnico prioritario rilevato per questa pagina.");
-    expect(html).toContain("Nessun task tecnico aperto per questa pagina.");
     expect(html).toContain("Nessuna entità Shopify collegata");
+    expect(countDrawerTabs(html)).toBe(5);
   });
 
-  it("renders linked Shopify entity card with title and handle", () => {
+  it("renders linked Shopify entity card and Modifica Shopify tab for editable product", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
         page={{
           ...samplePage,
           sourceEntityType: "shopify_product",
+          sourceEntityId: "prod-shopify-1",
           sourceEntityTitle: "Miele Premium Shopify",
           sourceEntityHandle: "miele",
         }}
         findings={[]}
         tasks={[]}
+        {...rescanProps}
         onClose={() => undefined}
       />,
     );
@@ -226,10 +257,34 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain("Prodotto Shopify");
     expect(html).toContain("Miele Premium Shopify");
     expect(html).toContain("miele");
-    expect(html).toContain("Nel prossimo step potrai modificare title");
+    expect(html).toContain("Modifica Shopify");
+    expect(html).toContain("Usa la tab Modifica Shopify");
+    expect(html).not.toContain("Nel prossimo step potrai modificare title");
+    expect(countDrawerTabs(html)).toBe(6);
   });
 
-  it("renders in-arrivo microcopy for linked Shopify page entity", () => {
+  it("does not show Modifica Shopify tab without sourceEntityId", () => {
+    setupSeoDetailMocks();
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={{
+          ...samplePage,
+          sourceEntityType: "shopify_product",
+          sourceEntityTitle: "Miele",
+          sourceEntityHandle: "miele",
+        }}
+        findings={[sampleFinding]}
+        tasks={[]}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(countDrawerTabs(html)).toBe(5);
+  });
+
+  it("renders in-arrivo microcopy for linked Shopify page entity on overview", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
@@ -246,10 +301,12 @@ describe("GrowthAuditPageDrawer", () => {
     );
 
     expect(html).toContain("Pagina Shopify");
-    expect(html).toContain("Modifica Shopify per questa tipologia in arrivo.");
+    expect(html).toContain("Modifica Shopify per pagine e articoli in arrivo.");
+    expect(countDrawerTabs(html)).toBe(5);
   });
 
   it("returns null when closed", () => {
+    setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open={false}
