@@ -111,4 +111,13 @@ export const queryKeys = {
     runResults: (projectId: string, runId: string) =>
       ["seo-skills", "run-results", projectId, runId] as const,
   },
+  growthAudit: {
+    runs: (projectId: string) => ["growth-audit", "runs", projectId] as const,
+    run: (projectId: string, runId: string) =>
+      ["growth-audit", "run", projectId, runId] as const,
+    pages: (projectId: string, runId: string) =>
+      ["growth-audit", "pages", projectId, runId] as const,
+    events: (projectId: string, runId: string) =>
+      ["growth-audit", "events", projectId, runId] as const,
+  },
 };

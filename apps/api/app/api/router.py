@@ -5,6 +5,7 @@ from app.api.routes import (
     ai_usage,
     brand_intelligence,
     content_seo,
+    growth_audit,
     health,
     seo_skills,
     shopify,
@@ -17,6 +18,7 @@ api_router.include_router(shopify.router)
 api_router.include_router(shopify_oauth.router)
 api_router.include_router(content_seo.router)
 api_router.include_router(seo_skills.router)
+api_router.include_router(growth_audit.router)
 api_router.include_router(brand_intelligence.router)
 api_router.include_router(ai_usage.router)
 api_router.include_router(ai_usage.global_router)

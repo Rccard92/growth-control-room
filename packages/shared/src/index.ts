@@ -294,7 +294,24 @@ export type {
 } from "./types/brand-intelligence";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";
 export type {
-  SeoSkillStatus,
+  GrowthAuditEvent,
+  GrowthAuditMode,
+  GrowthAuditPage,
+  GrowthAuditPageSource,
+  GrowthAuditPageStatus,
+  GrowthAuditPageType,
+  GrowthAuditPagesListResponse,
+  GrowthAuditPhase,
+  GrowthAuditProvider,
+  GrowthAuditRun,
+  GrowthAuditRunCreateRequest,
+  GrowthAuditRunDetailResponse,
+  GrowthAuditRunStatus,
+  GrowthAuditRunsListResponse,
+  GrowthAuditStartResponse,
+  GrowthAuditEventsListResponse,
+} from "./types/growthAudit";
+export type {
   SeoSkillRuntime,
   SeoSkillRiskLevel,
   SeoSkillCategory,

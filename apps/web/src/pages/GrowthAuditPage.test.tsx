@@ -11,6 +11,9 @@ const {
   useSeoSkillRunsMock,
   useSeoSkillRunMock,
   useStartSeoSkillRunMock,
+  useGrowthAuditRunsMock,
+  useGrowthAuditRunMock,
+  useStartGrowthAuditRunMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
@@ -19,6 +22,9 @@ const {
   useSeoSkillRunsMock: vi.fn(),
   useSeoSkillRunMock: vi.fn(),
   useStartSeoSkillRunMock: vi.fn(),
+  useGrowthAuditRunsMock: vi.fn(),
+  useGrowthAuditRunMock: vi.fn(),
+  useStartGrowthAuditRunMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -44,7 +50,13 @@ vi.mock("../hooks/useSeoSkills", () => ({
   useStartSeoSkillRun: useStartSeoSkillRunMock,
 }));
 
-function setupMocks() {
+vi.mock("../hooks/useGrowthAudit", () => ({
+  useGrowthAuditRuns: useGrowthAuditRunsMock,
+  useGrowthAuditRun: useGrowthAuditRunMock,
+  useStartGrowthAuditRun: useStartGrowthAuditRunMock,
+}));
+
+function setupMocks(options?: { withActiveRun?: boolean }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
     data: { id: "proj-1", name: "Solmielato" },
@@ -85,6 +97,66 @@ function setupMocks() {
     mutateAsync: vi.fn(),
     isPending: false,
   });
+
+  const activeRun = options?.withActiveRun
+    ? {
+        run: {
+          id: "run-1",
+          projectId: "proj-1",
+          rootUrl: "https://solmielato.myshopify.com",
+          normalizedDomain: "solmielato.myshopify.com",
+          status: "completed",
+          phase: "completed",
+          auditMode: "full_site_mvp",
+          provider: "openai",
+          progressPercent: 100,
+          pagesDiscovered: 1,
+          pagesClassified: 1,
+          pagesAnalyzed: 0,
+          pagesFailed: 0,
+          summary: { message: "Audit skeleton completato." },
+        },
+        pages: [
+          {
+            id: "page-1",
+            runId: "run-1",
+            projectId: "proj-1",
+            url: "https://solmielato.myshopify.com",
+            normalizedUrl: "https://solmielato.myshopify.com",
+            pageType: "homepage",
+            source: "seed",
+            status: "classified",
+            priority: "high",
+          },
+        ],
+        events: [
+          {
+            id: "evt-1",
+            runId: "run-1",
+            projectId: "proj-1",
+            eventType: "run_completed",
+            phase: "completed",
+            message: "Growth Audit completato",
+            progressPercent: 100,
+          },
+        ],
+        findingsCount: 0,
+        tasksCount: 0,
+      }
+    : undefined;
+
+  useGrowthAuditRunsMock.mockReturnValue({
+    data: activeRun ? [activeRun.run] : [],
+  });
+  useGrowthAuditRunMock.mockReturnValue({
+    data: activeRun,
+    isLoading: false,
+  });
+  useStartGrowthAuditRunMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+  });
 }
 
 function renderPage() {
@@ -102,12 +174,22 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Growth Audit");
   });
 
-  it("shows Full Site Audit in preparation", () => {
+  it("renders URL input and start CTA", () => {
     setupMocks();
     const html = renderPage();
-    expect(html).toContain("Full Site Audit");
-    expect(html).toContain("In preparazione");
-    expect(html).toContain("Prepara Full Audit");
+    expect(html).toContain("Dominio o URL principale");
+    expect(html).toContain("Avvia Full Site Audit");
+    expect(html).toContain("https://solmielato.myshopify.com");
+  });
+
+  it("shows active run progress and pages when run exists", () => {
+    setupMocks({ withActiveRun: true });
+    const html = renderPage();
+    expect(html).toContain("Run attiva");
+    expect(html).toContain("Completato");
+    expect(html).toContain("Audit skeleton completato.");
+    expect(html).toContain("Homepage");
+    expect(html).toContain("Ultimi eventi");
   });
 
   it("renders guided URL audit section", () => {
