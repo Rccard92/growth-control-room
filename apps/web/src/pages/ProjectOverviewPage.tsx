@@ -105,11 +105,11 @@ export function ProjectOverviewPage() {
         Shortcuts
       </h2>
       <div className="gcr-grid gcr-grid--4">
-        <CommandCard icon="↗" label="Growth Audit" description="Analizza sito, pagine, SEO, GEO e priorità CRO" to={APP_ROUTES.projectGrowthAudit(id!)} />
+        <CommandCard icon="↗" label="Growth Audit" description="Analizza sito, prodotti, collection e priorità operative." to={APP_ROUTES.projectGrowthAudit(id!)} />
         <CommandCard icon="◎" label="Brand Intelligence" description="Profilo brand e contesto AI" to={APP_ROUTES.projectBrandIntelligence(id!)} />
         <CommandCard icon="⬡" label="Integration Center" description="Connettori e grafo dati" to={APP_ROUTES.projectIntegrations(id!)} />
         <CommandCard icon="🛍" label="Shopify" description="Store, ordini, KPI" to={APP_ROUTES.projectShopify(id!)} />
-        <CommandCard icon="✎" label="Content SEO" description="PED, bozze blog, idee AI" to={APP_ROUTES.projectContent(id!)} />
+        <CommandCard icon="✎" label="Content SEO" description="Organizza blog, ricette, brief e calendario editoriale." to={APP_ROUTES.projectContent(id!)} />
         <CommandCard icon="✦" label="AI Brief" description="Insight e azioni consigliate" to={APP_ROUTES.projectAiBrief(id!)} />
       </div>
     </motion.div>

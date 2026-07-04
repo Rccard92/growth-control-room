@@ -1242,6 +1242,10 @@
 }
 
 /* Content SEO page tabs */
+.content-seo-audit-redirect-card {
+  margin-bottom: 1.25rem;
+}
+
 .content-seo-tabs {
   display: flex;
   flex-wrap: wrap;
