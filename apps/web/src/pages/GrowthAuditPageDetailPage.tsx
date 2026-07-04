@@ -7,7 +7,7 @@ import { GrowthAuditPageDetailKpiStrip } from "../components/growth-audit/page-d
 import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailShopifySection";
 import { GrowthAuditPageDetailSidebar } from "../components/growth-audit/page-detail/GrowthAuditPageDetailSidebar";
 import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailTechnicalSection";
-import { GrowthAuditPagePriorityActions } from "../components/growth-audit/page-detail/GrowthAuditPagePriorityActions";
+import { GrowthAuditPriorityActionsPanel } from "../components/growth-audit/GrowthAuditPriorityActionsPanel";
 import {
   useGrowthAuditFindings,
   useGrowthAuditPageResults,
@@ -165,10 +165,11 @@ export function GrowthAuditPageDetailPage() {
 
       <div className="growth-audit-page-detail__layout">
         <main className="growth-audit-page-detail__main">
-          <GrowthAuditPagePriorityActions
+          <GrowthAuditPriorityActionsPanel
             page={page}
             findings={pageFindings}
             tasks={pageTasks}
+            aiResults={pageResults}
           />
 
           <GrowthAuditPageDetailShopifySection projectId={projectId} page={page} />

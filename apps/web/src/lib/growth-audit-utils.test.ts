@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GrowthAuditPage } from "@gcr/shared";
+import type { GrowthAuditFinding, GrowthAuditPage, GrowthAuditTask } from "@gcr/shared";
 import {
   aggregatePageInventory,
   filterInventoryPages,
@@ -16,7 +16,11 @@ import {
   getGrowthAuditScoreBadgeClass,
   getGrowthAuditScoreBand,
   buildGrowthAuditPageImprovementItems,
+  buildGrowthAuditPriorityActions,
+  getGrowthAuditEffortLabel,
   getGrowthAuditImprovementHeadline,
+  getGrowthAuditPriorityActionLabel,
+  getGrowthAuditWhereToFix,
   getGrowthAuditShopifyEditorMicrocopy,
   getGrowthAuditShopifyLinkBadgeLabel,
   getGrowthAuditSourceBadgeClass,
@@ -28,6 +32,7 @@ import {
   getTopPriorityFindings,
   mapGrowthAuditPageToSeoEntity,
   sortGrowthAuditFindings,
+  normalizeGrowthAuditPriorityDedupeKey,
 } from "./growth-audit-utils";
 
 const samplePages: GrowthAuditPage[] = [
@@ -370,5 +375,214 @@ describe("growth-audit-utils", () => {
         sourceEntityId: "page-1",
       }),
     ).toBeNull();
+  });
+
+  describe("buildGrowthAuditPriorityActions", () => {
+    const productPage: GrowthAuditPage = {
+      id: "page-prod",
+      runId: "run-1",
+      projectId: "proj-1",
+      url: "https://example.com/products/a",
+      normalizedUrl: "https://example.com/products/a",
+      pageType: "product",
+      source: "shopify_product",
+      status: "analyzed",
+      priority: "normal",
+      sourceEntityType: "shopify_product",
+      sourceEntityId: "prod-1",
+    };
+
+    const baseFinding = (
+      overrides: Partial<GrowthAuditFinding> & Pick<GrowthAuditFinding, "id" | "title" | "severity">,
+    ): GrowthAuditFinding => ({
+      runId: "run-1",
+      projectId: "proj-1",
+      pageId: "page-prod",
+      category: "seo",
+      priority: "high",
+      status: "open",
+      recommendation: "Fix consigliato",
+      ...overrides,
+    });
+
+    const baseTask = (
+      overrides: Partial<GrowthAuditTask> & Pick<GrowthAuditTask, "id" | "title">,
+    ): GrowthAuditTask => ({
+      runId: "run-1",
+      projectId: "proj-1",
+      pageId: "page-prod",
+      ownerType: "seo",
+      priority: "medium",
+      estimatedEffort: "low",
+      status: "open",
+      ...overrides,
+    });
+
+    it("maps open finding to action with source finding", () => {
+      const actions = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [baseFinding({ id: "f1", title: "Title debole", severity: "high" })],
+        tasks: [],
+        improvementItems: [],
+      });
+      expect(actions).toHaveLength(1);
+      expect(actions[0].source).toBe("finding");
+      expect(actions[0].priority).toBe("high");
+    });
+
+    it("maps open task to action", () => {
+      const actions = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [],
+        tasks: [baseTask({ id: "t1", title: "Aggiorna meta" })],
+        improvementItems: [],
+      });
+      expect(actions).toHaveLength(1);
+      expect(actions[0].source).toBe("task");
+    });
+
+    it("ignores completed and superseded tasks", () => {
+      const actions = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [],
+        tasks: [
+          baseTask({ id: "t1", title: "Fatto", status: "completed" }),
+          baseTask({ id: "t2", title: "Sostituito", status: "superseded" }),
+        ],
+        improvementItems: [],
+      });
+      expect(actions).toHaveLength(0);
+    });
+
+    it("includes improvement warnings", () => {
+      const actions = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [],
+        tasks: [],
+        improvementItems: [
+          {
+            key: "imagesAlt",
+            label: "images",
+            status: "warning",
+            title: "Alt immagini",
+            description: "Mancano alt.",
+            recommendation: "Aggiungi alt descrittivi.",
+            howToValidate: "Controlla le immagini.",
+          },
+        ],
+      });
+      expect(actions).toHaveLength(1);
+      expect(actions[0].source).toBe("improvement");
+      expect(actions[0].priority).toBe("medium");
+    });
+
+    it("deduplicates similar titles across sources", () => {
+      const actions = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [
+          baseFinding({
+            id: "f1",
+            title: "Title debole",
+            severity: "high",
+            recommendation: "Migliora il title",
+          }),
+          baseFinding({
+            id: "f2",
+            title: "Title debole",
+            severity: "medium",
+            recommendation: "Migliora il title",
+          }),
+        ],
+        tasks: [],
+        improvementItems: [],
+      });
+      expect(actions).toHaveLength(1);
+      expect(actions[0].source).toBe("finding");
+      expect(actions[0].priority).toBe("high");
+    });
+
+    it("orders critical before high before medium", () => {
+      const actions = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [
+          baseFinding({ id: "f1", title: "Medio", severity: "medium" }),
+          baseFinding({ id: "f2", title: "Critico", severity: "critical" }),
+          baseFinding({ id: "f3", title: "Alto", severity: "high" }),
+        ],
+        tasks: [],
+        improvementItems: [],
+      });
+      expect(actions.map((action) => action.priority)).toEqual(["critical", "high", "medium"]);
+    });
+
+    it("prioritizes CRO/Ads on product pages at same priority", () => {
+      const actions = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [
+          baseFinding({ id: "f1", title: "SEO issue", severity: "high", category: "seo" }),
+          baseFinding({
+            id: "f2",
+            title: "CTA debole",
+            severity: "high",
+            category: "cro",
+            recommendation: "Rafforza CTA",
+          }),
+        ],
+        tasks: [],
+        improvementItems: [],
+      });
+      expect(actions[0].category).toBe("cro");
+      expect(actions[1].category).toBe("seo");
+    });
+
+    it("getGrowthAuditWhereToFix maps title and schema cases", () => {
+      const titleAction = buildGrowthAuditPriorityActions({
+        page: productPage,
+        findings: [
+          baseFinding({
+            id: "f1",
+            title: "Meta description mancante",
+            severity: "high",
+            category: "seo",
+          }),
+        ],
+        tasks: [],
+        improvementItems: [],
+      })[0];
+
+      expect(getGrowthAuditWhereToFix(titleAction, productPage)).toContain("Shopify");
+
+      const schemaAction = {
+        id: "schema-1",
+        source: "finding" as const,
+        category: "schema" as const,
+        priority: "medium" as const,
+        ownerType: "dev" as const,
+        effort: "medium" as const,
+        title: "Schema incompleto",
+        description: "",
+        recommendation: "Aggiungi Product schema",
+      };
+      expect(getGrowthAuditWhereToFix(schemaAction, productPage)).toContain("Tema Shopify");
+    });
+
+    it("normalizeGrowthAuditPriorityDedupeKey normalizes case and accents", () => {
+      const keyA = normalizeGrowthAuditPriorityDedupeKey({
+        title: "Title Debole",
+        category: "seo",
+        recommendation: "Migliora il Title",
+      });
+      const keyB = normalizeGrowthAuditPriorityDedupeKey({
+        title: "title debole",
+        category: "seo",
+        recommendation: "migliora il title",
+      });
+      expect(keyA).toBe(keyB);
+    });
+
+    it("getGrowthAuditPriorityActionLabel returns Italian labels", () => {
+      expect(getGrowthAuditPriorityActionLabel("critical")).toBe("Critico");
+      expect(getGrowthAuditEffortLabel("low")).toBe("Basso");
+    });
   });
 });

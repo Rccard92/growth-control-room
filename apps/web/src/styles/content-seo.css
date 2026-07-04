@@ -4534,3 +4534,236 @@
   }
 }
 
+/* Growth Audit — unified priority actions panel (Step 2) */
+.growth-audit-priority-actions {
+  scroll-margin-top: 1rem;
+}
+
+.growth-audit-priority-actions__header {
+  margin-bottom: 1.25rem;
+}
+
+.growth-audit-priority-actions__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+}
+
+.growth-audit-priority-actions__subtitle,
+.growth-audit-priority-actions__microcopy {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.5;
+}
+
+.growth-audit-priority-actions__microcopy--commerce {
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.growth-audit-priority-actions__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.growth-audit-priority-actions__kpi {
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.growth-audit-priority-actions__kpi-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.growth-audit-priority-actions__kpi-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-priority-actions__empty {
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.growth-audit-priority-actions__empty p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.55;
+}
+
+.growth-audit-priority-actions__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.growth-audit-priority-action-card {
+  padding: 1.25rem;
+  border-radius: 10px;
+  background: var(--gcr-surface, rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.growth-audit-priority-action-card--critical {
+  border-left: 4px solid #ef4444;
+}
+
+.growth-audit-priority-action-card--high {
+  border-left: 4px solid #f97316;
+}
+
+.growth-audit-priority-action-card--medium {
+  border-left: 4px solid #eab308;
+}
+
+.growth-audit-priority-action-card--low,
+.growth-audit-priority-action-card--info {
+  border-left: 4px solid #64748b;
+}
+
+.growth-audit-priority-action-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  font-size: 0.78rem;
+}
+
+.growth-audit-priority-action-card__badge {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.growth-audit-priority-action-card--critical .growth-audit-priority-action-card__badge {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.growth-audit-priority-action-card--high .growth-audit-priority-action-card__badge {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+}
+
+.growth-audit-priority-action-card--medium .growth-audit-priority-action-card__badge {
+  background: rgba(234, 179, 8, 0.18);
+  color: #fde047;
+}
+
+.growth-audit-priority-action-card--low .growth-audit-priority-action-card__badge,
+.growth-audit-priority-action-card--info .growth-audit-priority-action-card__badge {
+  background: rgba(100, 116, 139, 0.18);
+  color: #cbd5e1;
+}
+
+.growth-audit-priority-action-card__category,
+.growth-audit-priority-action-card__owner,
+.growth-audit-priority-action-card__effort {
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-priority-action-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.growth-audit-priority-action-card__description,
+.growth-audit-priority-action-card__evidence,
+.growth-audit-priority-action-card__why {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.growth-audit-priority-action-card__field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.growth-audit-priority-action-card__recommendation {
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.growth-audit-priority-action-card__recommendation p,
+.growth-audit-priority-action-card__where p,
+.growth-audit-priority-action-card__validate p {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.growth-audit-priority-action-card__where {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.growth-audit-priority-action-card__validate {
+  font-size: 0.9rem;
+}
+
+.growth-audit-priority-action-card__links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.growth-audit-priority-action-card__link {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--gcr-accent, #6366f1);
+  text-decoration: none;
+}
+
+.growth-audit-priority-action-card__link:hover {
+  text-decoration: underline;
+}
+
+.growth-audit-priority-action-card__rescan-note {
+  font-size: 0.78rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-priority-actions--compact .growth-audit-priority-actions__kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 768px) {
+  .growth-audit-priority-actions__kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+

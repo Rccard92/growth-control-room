@@ -197,6 +197,8 @@ describe("GrowthAuditPageDetailPage", () => {
     const html = renderDetailPage();
     expect(html).toContain("Dettaglio pagina");
     expect(html).toContain("Cosa sistemare prima");
+    expect(html).toContain("Dove intervenire");
+    expect(html).toContain("Azioni totali");
     expect(html).toContain("Torna all");
     expect(html).toContain("Prodotto");
     expect(html).toContain("https://solmielato.it/products/miele");

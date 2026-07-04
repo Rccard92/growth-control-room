@@ -112,7 +112,7 @@ export function GrowthAuditPageDetailSidebar({
             <button
               type="button"
               className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-              onClick={() => onScrollToSection("section-shopify")}
+              onClick={() => onScrollToSection("shopify-edit")}
             >
               Modifica Shopify
             </button>
@@ -129,7 +129,7 @@ export function GrowthAuditPageDetailSidebar({
           <button
             type="button"
             className="gcr-btn gcr-btn--secondary gcr-btn--sm"
-            onClick={() => onScrollToSection("section-technical")}
+            onClick={() => onScrollToSection("technical-data")}
           >
             Dati tecnici
           </button>

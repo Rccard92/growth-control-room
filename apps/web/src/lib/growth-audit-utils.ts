@@ -3,6 +3,7 @@ import type {
   GrowthAuditInventoryCounts,
   GrowthAuditInventoryFilter,
   GrowthAuditPage,
+  GrowthAuditPageResult,
   GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
   GrowthAuditRunStatus,
@@ -1179,94 +1180,520 @@ export function buildGrowthAuditPageImprovementItems(
   return items;
 }
 
-export type GrowthAuditPriorityActionKind = "finding" | "task" | "improvement";
+export type GrowthAuditPriorityActionCategory =
+  | "technical"
+  | "seo"
+  | "content"
+  | "geo"
+  | "cro"
+  | "ads"
+  | "shopify"
+  | "images"
+  | "schema"
+  | "unknown";
 
-export interface GrowthAuditPriorityAction {
-  kind: GrowthAuditPriorityActionKind;
-  key: string;
+export type GrowthAuditPriorityActionPriority =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "info";
+
+export type GrowthAuditPriorityActionSource =
+  | "finding"
+  | "task"
+  | "improvement"
+  | "ai_result";
+
+export type GrowthAuditPriorityActionOwnerType =
+  | "seo"
+  | "content"
+  | "dev"
+  | "design"
+  | "ads"
+  | "unknown";
+
+export type GrowthAuditPriorityActionEffort = "low" | "medium" | "high" | "unknown";
+
+export type GrowthAuditPriorityAction = {
+  id: string;
+  source: GrowthAuditPriorityActionSource;
+  category: GrowthAuditPriorityActionCategory;
+  priority: GrowthAuditPriorityActionPriority;
+  ownerType: GrowthAuditPriorityActionOwnerType;
+  effort: GrowthAuditPriorityActionEffort;
   title: string;
-  category: string;
-  priority: string;
-  description?: string;
+  description: string;
+  whyItMatters?: string;
+  evidence?: string;
   recommendation: string;
   howToValidate?: string;
-  ownerType?: string;
-  effort?: string;
+  whereToFix?: string;
+  relatedFindingId?: string;
+  relatedTaskId?: string;
+  status?: string;
+};
+
+const PRIORITY_ACTION_CATEGORY_ORDER: Record<GrowthAuditPriorityActionCategory, number> = {
+  cro: 0,
+  ads: 1,
+  geo: 2,
+  content: 3,
+  seo: 4,
+  shopify: 5,
+  images: 6,
+  schema: 7,
+  technical: 8,
+  unknown: 9,
+};
+
+const OWNER_TYPE_ORDER: Record<GrowthAuditPriorityActionOwnerType, number> = {
+  ads: 0,
+  content: 1,
+  design: 2,
+  seo: 3,
+  dev: 4,
+  unknown: 5,
+};
+
+const EFFORT_ORDER: Record<GrowthAuditPriorityActionEffort, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  unknown: 3,
+};
+
+const PRIORITY_ACTION_LABELS: Record<GrowthAuditPriorityActionPriority, string> = {
+  critical: "Critico",
+  high: "Alto",
+  medium: "Medio",
+  low: "Basso",
+  info: "Info",
+};
+
+const EFFORT_LABELS: Record<GrowthAuditPriorityActionEffort, string> = {
+  low: "Basso",
+  medium: "Medio",
+  high: "Alto",
+  unknown: "—",
+};
+
+const CATEGORY_LABELS: Record<GrowthAuditPriorityActionCategory, string> = {
+  technical: "Tecnico",
+  seo: "SEO",
+  content: "Contenuto",
+  geo: "GEO",
+  cro: "CRO",
+  ads: "Ads",
+  shopify: "Shopify",
+  images: "Immagini",
+  schema: "Schema",
+  unknown: "Altro",
+};
+
+const EXCLUDED_ITEM_STATUSES = new Set(["completed", "dismissed", "superseded"]);
+
+function _normalizePriorityText(value?: string | null): string {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function normalizeGrowthAuditPriorityDedupeKey(input: {
+  title: string;
+  category: GrowthAuditPriorityActionCategory;
+  recommendation?: string | null;
+}): string {
+  return [
+    _normalizePriorityText(input.title),
+    input.category,
+    _normalizePriorityText(input.recommendation),
+  ].join("|");
+}
+
+function _normalizePriorityLevel(value?: string | null): GrowthAuditPriorityActionPriority {
+  const normalized = (value ?? "").toLowerCase();
+  if (
+    normalized === "critical" ||
+    normalized === "high" ||
+    normalized === "medium" ||
+    normalized === "low" ||
+    normalized === "info"
+  ) {
+    return normalized;
+  }
+  return "medium";
+}
+
+function _normalizeCategory(value?: string | null): GrowthAuditPriorityActionCategory {
+  const normalized = (value ?? "").toLowerCase();
+  if (normalized in CATEGORY_LABELS) {
+    return normalized as GrowthAuditPriorityActionCategory;
+  }
+  if (normalized === "task") return "unknown";
+  return "unknown";
+}
+
+function _normalizeOwnerType(value?: string | null): GrowthAuditPriorityActionOwnerType {
+  const normalized = (value ?? "").toLowerCase();
+  if (
+    normalized === "seo" ||
+    normalized === "content" ||
+    normalized === "dev" ||
+    normalized === "design" ||
+    normalized === "ads"
+  ) {
+    return normalized;
+  }
+  return "unknown";
+}
+
+function _normalizeEffort(value?: string | null): GrowthAuditPriorityActionEffort {
+  const normalized = (value ?? "").toLowerCase();
+  if (normalized === "low" || normalized === "medium" || normalized === "high") {
+    return normalized;
+  }
+  return "unknown";
+}
+
+function _inferOwnerTypeFromCategory(
+  category: GrowthAuditPriorityActionCategory,
+): GrowthAuditPriorityActionOwnerType {
+  if (category === "ads") return "ads";
+  if (category === "cro" || category === "content" || category === "geo") return "content";
+  if (category === "technical" || category === "schema" || category === "images") return "dev";
+  if (category === "seo" || category === "shopify") return "seo";
+  return "unknown";
+}
+
+function _pageHasAiAnalysis(
+  page: GrowthAuditPage,
+  aiResults?: GrowthAuditPageResult[],
+): boolean {
+  if (page.metadata?.ai && typeof page.metadata.ai === "object") return true;
+  return Boolean(aiResults?.some((result) => result.status === "completed"));
+}
+
+function _isCommercePage(page: GrowthAuditPage): boolean {
+  return page.pageType === "product" || page.pageType === "landing_page";
+}
+
+function _comparePriorityActions(
+  a: GrowthAuditPriorityAction,
+  b: GrowthAuditPriorityAction,
+  page: GrowthAuditPage,
+  hasAiAnalysis: boolean,
+): number {
+  const priorityDiff =
+    (SEVERITY_ORDER[a.priority] ?? 99) - (SEVERITY_ORDER[b.priority] ?? 99);
+  if (priorityDiff !== 0) return priorityDiff;
+
+  if (_isCommercePage(page)) {
+    const categoryDiff =
+      (PRIORITY_ACTION_CATEGORY_ORDER[a.category] ?? 99) -
+      (PRIORITY_ACTION_CATEGORY_ORDER[b.category] ?? 99);
+    if (categoryDiff !== 0) return categoryDiff;
+  } else if (hasAiAnalysis) {
+    const geoBoost = (category: GrowthAuditPriorityActionCategory) =>
+      category === "geo" ? -1 : 0;
+    const geoDiff = geoBoost(a.category) - geoBoost(b.category);
+    if (geoDiff !== 0) return geoDiff;
+  }
+
+  if (_isCommercePage(page)) {
+    const ownerDiff =
+      (OWNER_TYPE_ORDER[a.ownerType] ?? 99) - (OWNER_TYPE_ORDER[b.ownerType] ?? 99);
+    if (ownerDiff !== 0) return ownerDiff;
+  }
+
+  const effortDiff = (EFFORT_ORDER[a.effort] ?? 99) - (EFFORT_ORDER[b.effort] ?? 99);
+  if (effortDiff !== 0) return effortDiff;
+
+  return a.title.localeCompare(b.title);
+}
+
+function _dedupePriorityActions(actions: GrowthAuditPriorityAction[]): GrowthAuditPriorityAction[] {
+  const seen = new Set<string>();
+  const result: GrowthAuditPriorityAction[] = [];
+  for (const action of actions) {
+    const key = normalizeGrowthAuditPriorityDedupeKey({
+      title: action.title,
+      category: action.category,
+      recommendation: action.recommendation,
+    });
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(action);
+  }
+  return result;
 }
 
 function _findingToPriorityAction(finding: GrowthAuditFinding): GrowthAuditPriorityAction {
-  return {
-    kind: "finding",
-    key: `finding-${finding.id}`,
+  const category = _normalizeCategory(finding.category);
+  const priority = _normalizePriorityLevel(finding.severity);
+  const ownerType = _normalizeOwnerType(finding.metadata?.ownerType as string | undefined) ||
+    _inferOwnerTypeFromCategory(category);
+  const action: GrowthAuditPriorityAction = {
+    id: `finding-${finding.id}`,
+    source: "finding",
+    category,
+    priority,
+    ownerType,
+    effort: _normalizeEffort(finding.effort),
     title: finding.title,
-    category: finding.category,
-    priority: finding.severity,
-    description: finding.description ?? undefined,
+    description: finding.description ?? "",
+    whyItMatters: finding.impact ? `Impatto stimato: ${finding.impact}` : undefined,
+    evidence: finding.evidence ?? undefined,
     recommendation: finding.recommendation ?? "Nessuna raccomandazione disponibile.",
     howToValidate: finding.howToValidate ?? undefined,
-    effort: finding.effort ?? undefined,
+    relatedFindingId: finding.id,
+    status: finding.status,
   };
+  return action;
 }
 
 function _taskToPriorityAction(task: GrowthAuditTask): GrowthAuditPriorityAction {
-  return {
-    kind: "task",
-    key: `task-${task.id}`,
+  const priority = _normalizePriorityLevel(task.priority);
+  const ownerType = _normalizeOwnerType(task.ownerType);
+  const action: GrowthAuditPriorityAction = {
+    id: `task-${task.id}`,
+    source: "task",
+    category: "unknown",
+    priority,
+    ownerType,
+    effort: _normalizeEffort(task.estimatedEffort),
     title: task.title,
-    category: "task",
-    priority: task.priority,
-    description: task.description ?? undefined,
-    recommendation: task.description ?? task.title,
+    description: task.description ?? "",
+    recommendation: task.description?.trim() || task.title,
     howToValidate: undefined,
-    ownerType: task.ownerType,
-    effort: task.estimatedEffort,
+    relatedTaskId: task.id,
+    status: task.status,
   };
+  return action;
 }
 
-function _improvementToPriorityAction(item: GrowthAuditPageImprovementItem): GrowthAuditPriorityAction {
-  return {
-    kind: "improvement",
-    key: `improvement-${item.key}`,
+function _improvementToPriorityAction(
+  item: GrowthAuditPageImprovementItem,
+): GrowthAuditPriorityAction {
+  const category = _normalizeCategory(item.label);
+  const priority: GrowthAuditPriorityActionPriority =
+    item.status === "issue" ? "high" : "medium";
+  const action: GrowthAuditPriorityAction = {
+    id: `improvement-${item.key}`,
+    source: "improvement",
+    category,
+    priority,
+    ownerType: _inferOwnerTypeFromCategory(category),
+    effort: "medium",
     title: item.title,
-    category: item.label,
-    priority: item.status === "issue" ? "high" : "medium",
     description: item.description,
+    evidence: item.evidence,
     recommendation: item.recommendation,
     howToValidate: item.howToValidate,
+    status: item.status,
   };
+  return action;
 }
 
+type InlineAiFinding = {
+  category?: string;
+  severity?: string;
+  title?: string;
+  description?: string;
+  evidence?: string;
+  recommendation?: string;
+  howToValidate?: string;
+  impact?: string;
+  effort?: string;
+};
+
+function _aiInlineFindingToAction(
+  finding: InlineAiFinding,
+  resultId: string,
+  index: number,
+): GrowthAuditPriorityAction | null {
+  const title = (finding.title ?? "").trim();
+  if (!title) return null;
+  const category = _normalizeCategory(finding.category);
+  const priority = _normalizePriorityLevel(finding.severity);
+  const action: GrowthAuditPriorityAction = {
+    id: `ai-${resultId}-${index}`,
+    source: "ai_result",
+    category,
+    priority,
+    ownerType: _inferOwnerTypeFromCategory(category),
+    effort: _normalizeEffort(finding.effort),
+    title,
+    description: finding.description ?? "",
+    whyItMatters: finding.impact ? `Impatto stimato: ${finding.impact}` : undefined,
+    evidence: finding.evidence,
+    recommendation: finding.recommendation ?? "Nessuna raccomandazione disponibile.",
+    howToValidate: finding.howToValidate,
+    status: "open",
+  };
+  return action;
+}
+
+export function buildGrowthAuditPriorityActions(input: {
+  page: GrowthAuditPage;
+  findings: GrowthAuditFinding[];
+  tasks: GrowthAuditTask[];
+  improvementItems: GrowthAuditPageImprovementItem[];
+  aiResults?: GrowthAuditPageResult[];
+}): GrowthAuditPriorityAction[] {
+  const { page, findings, tasks, improvementItems, aiResults } = input;
+  const hasAiAnalysis = _pageHasAiAnalysis(page, aiResults);
+
+  const openFindings = findings.filter(
+    (finding) => finding.status === "open" && !EXCLUDED_ITEM_STATUSES.has(finding.status),
+  );
+  const openTasks = tasks.filter(
+    (task) => task.status === "open" && !EXCLUDED_ITEM_STATUSES.has(task.status),
+  );
+  const improvementActions = improvementItems
+    .filter((item) => item.status === "issue" || item.status === "warning")
+    .map(_improvementToPriorityAction);
+
+  const findingDedupeKeys = new Set(
+    openFindings.map((finding) =>
+      normalizeGrowthAuditPriorityDedupeKey({
+        title: finding.title,
+        category: _normalizeCategory(finding.category),
+        recommendation: finding.recommendation,
+      }),
+    ),
+  );
+
+  const aiInlineActions: GrowthAuditPriorityAction[] = [];
+  for (const result of aiResults ?? []) {
+    if (result.status !== "completed") continue;
+    const inlineFindings = Array.isArray(result.findings) ? result.findings : [];
+    inlineFindings.forEach((rawFinding, index) => {
+      if (!rawFinding || typeof rawFinding !== "object") return;
+      const finding = rawFinding as InlineAiFinding;
+      const category = _normalizeCategory(finding.category);
+      const dedupeKey = normalizeGrowthAuditPriorityDedupeKey({
+        title: finding.title ?? "",
+        category,
+        recommendation: finding.recommendation,
+      });
+      if (findingDedupeKeys.has(dedupeKey)) return;
+      const action = _aiInlineFindingToAction(finding, result.id, index);
+      if (action) {
+        aiInlineActions.push(action);
+        findingDedupeKeys.add(dedupeKey);
+      }
+    });
+  }
+
+  const rawActions: GrowthAuditPriorityAction[] = [
+    ...openFindings.map((finding) => {
+      const action = _findingToPriorityAction(finding);
+      return { ...action, whereToFix: getGrowthAuditWhereToFix(action, page) };
+    }),
+    ...openTasks.map((task) => {
+      const action = _taskToPriorityAction(task);
+      return { ...action, whereToFix: getGrowthAuditWhereToFix(action, page) };
+    }),
+    ...improvementActions.map((action) => ({
+      ...action,
+      whereToFix: getGrowthAuditWhereToFix(action, page),
+    })),
+    ...aiInlineActions.map((action) => ({
+      ...action,
+      whereToFix: getGrowthAuditWhereToFix(action, page),
+    })),
+  ];
+
+  const deduped = _dedupePriorityActions(rawActions);
+  return deduped.sort((a, b) => _comparePriorityActions(a, b, page, hasAiAnalysis));
+}
+
+/** @deprecated Use buildGrowthAuditPriorityActions instead */
 export function buildGrowthAuditPagePriorityActions(
   page: GrowthAuditPage,
   findings: GrowthAuditFinding[],
   tasks: GrowthAuditTask[],
 ): GrowthAuditPriorityAction[] {
-  const sortedFindings = sortGrowthAuditFindings(findings);
-  const sortedTasks = sortGrowthAuditTasks(tasks);
-  const improvementItems = buildGrowthAuditPageImprovementItems(page, findings);
-
-  const criticalHighFindings = sortedFindings.filter((f) =>
-    f.severity === "critical" || f.severity === "high",
-  );
-  const mediumFindings = sortedFindings.filter((f) => f.severity === "medium");
-  const highTasks = sortedTasks.filter((t) => t.priority === "high");
-  const mediumTasks = sortedTasks.filter((t) => t.priority === "medium");
-  const improvementActions = improvementItems
-    .filter((item) => item.status === "issue" || item.status === "warning")
-    .map(_improvementToPriorityAction);
-
-  const ordered: GrowthAuditPriorityAction[] = [
-    ...criticalHighFindings.map(_findingToPriorityAction),
-    ...highTasks.map(_taskToPriorityAction),
-    ...improvementActions,
-    ...mediumFindings.map(_findingToPriorityAction),
-    ...mediumTasks.map(_taskToPriorityAction),
-  ];
-
-  const seen = new Set<string>();
-  return ordered.filter((action) => {
-    if (seen.has(action.key)) return false;
-    seen.add(action.key);
-    return true;
+  return buildGrowthAuditPriorityActions({
+    page,
+    findings,
+    tasks,
+    improvementItems: buildGrowthAuditPageImprovementItems(page, findings),
   });
+}
+
+export function getGrowthAuditPriorityActionLabel(
+  priority: GrowthAuditPriorityActionPriority | string,
+): string {
+  return PRIORITY_ACTION_LABELS[priority as GrowthAuditPriorityActionPriority] ?? priority;
+}
+
+export function getGrowthAuditPriorityActionBadgeClass(
+  priority: GrowthAuditPriorityActionPriority | string,
+): string {
+  const normalized = _normalizePriorityLevel(priority);
+  return `growth-audit-priority-action-card growth-audit-priority-action-card--${normalized}`;
+}
+
+export function getGrowthAuditPriorityActionCategoryLabel(
+  category: GrowthAuditPriorityActionCategory | string,
+): string {
+  return CATEGORY_LABELS[category as GrowthAuditPriorityActionCategory] ?? category;
+}
+
+export function getGrowthAuditEffortLabel(
+  effort: GrowthAuditPriorityActionEffort | string,
+): string {
+  return EFFORT_LABELS[effort as GrowthAuditPriorityActionEffort] ?? effort;
+}
+
+export function getGrowthAuditWhereToFix(
+  action: GrowthAuditPriorityAction,
+  page: GrowthAuditPage,
+): string {
+  if (action.whereToFix) return action.whereToFix;
+
+  const haystack = `${action.title} ${action.description} ${action.recommendation} ${action.category}`
+    .toLowerCase();
+
+  if (
+    haystack.includes("title") ||
+    haystack.includes("meta") ||
+    haystack.includes("canonical") ||
+    haystack.includes("h1")
+  ) {
+    return "Modifica Shopify → campi SEO / contenuto";
+  }
+  if (haystack.includes("alt") || haystack.includes("immagin")) {
+    return "Modifica Shopify → immagini/alt";
+  }
+  if (haystack.includes("schema") || action.category === "schema") {
+    return "Tema Shopify / dati strutturati";
+  }
+  if (
+    action.category === "cro" ||
+    haystack.includes("trust") ||
+    haystack.includes("cta") ||
+    haystack.includes("conversion")
+  ) {
+    return "Modifica Shopify → descrizione prodotto o sezioni pagina";
+  }
+  if (action.category === "geo" || action.category === "content") {
+    return "Contenuto pagina / FAQ / struttura semantica";
+  }
+  if (
+    action.category === "technical" ||
+    action.ownerType === "dev" ||
+    haystack.includes("performance")
+  ) {
+    return "Sviluppo / tema Shopify";
+  }
+  if (mapGrowthAuditPageToSeoEntity(page)) {
+    return "Modifica Shopify → campi SEO / contenuto";
+  }
+  return "Contenuto pagina / implementazione on-page";
 }

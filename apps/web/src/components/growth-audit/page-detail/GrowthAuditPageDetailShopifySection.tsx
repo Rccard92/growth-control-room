@@ -62,7 +62,7 @@ export function GrowthAuditPageDetailShopifySection({
 
   return (
     <section
-      id="section-shopify"
+      id="shopify-edit"
       className="growth-audit-page-detail__section growth-audit-page-detail__shopify"
     >
       <h2 className="growth-audit-page-detail__section-title">Modifica Shopify</h2>

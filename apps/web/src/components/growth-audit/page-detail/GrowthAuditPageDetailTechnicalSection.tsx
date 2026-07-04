@@ -10,7 +10,7 @@ export function GrowthAuditPageDetailTechnicalSection({
 }: GrowthAuditPageDetailTechnicalSectionProps) {
   return (
     <section
-      id="section-technical"
+      id="technical-data"
       className="growth-audit-page-detail__section growth-audit-page-detail__technical-details"
     >
       <details className="growth-audit-page-detail__technical-collapsible">
