@@ -295,12 +295,18 @@ export type {
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";
 export type {
   GrowthAuditEvent,
+  GrowthAuditFinding,
+  GrowthAuditFindingCategory,
+  GrowthAuditFindingSeverity,
+  GrowthAuditFindingsFilters,
+  GrowthAuditFindingsListResponse,
   GrowthAuditInventoryCounts,
   GrowthAuditInventoryFilter,
   GrowthAuditMode,
   GrowthAuditPage,
   GrowthAuditPageSource,
   GrowthAuditPageStatus,
+  GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
   GrowthAuditPagesListResponse,
   GrowthAuditPhase,
@@ -311,7 +317,12 @@ export type {
   GrowthAuditRunSummary,
   GrowthAuditRunStatus,
   GrowthAuditRunsListResponse,
+  GrowthAuditScoreFilter,
   GrowthAuditStartResponse,
+  GrowthAuditTask,
+  GrowthAuditTaskOwnerType,
+  GrowthAuditTasksFilters,
+  GrowthAuditTasksListResponse,
   GrowthAuditEventsListResponse,
 } from "./types/growthAudit";
 export type {

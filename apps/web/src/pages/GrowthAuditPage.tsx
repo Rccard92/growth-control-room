@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useParams } from "react-router-dom";
-import type { GrowthAuditInventoryFilter } from "@gcr/shared";
+import type {
+  GrowthAuditInventoryFilter,
+  GrowthAuditPageStatusFilter,
+  GrowthAuditScoreFilter,
+} from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
 import { SeoSkillLibrary } from "../components/seo-skills";
 import {
+  useGrowthAuditFindings,
   useGrowthAuditRun,
   useGrowthAuditRuns,
+  useGrowthAuditTasks,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
 import { useProject } from "../hooks/useProjects";
@@ -14,18 +20,29 @@ import { useShopifyStatus } from "../hooks/useShopify";
 import {
   GROWTH_AUDIT_INVENTORY_FILTERS,
   GROWTH_AUDIT_MAX_PAGES_OPTIONS,
+  GROWTH_AUDIT_SCORE_FILTERS,
+  GROWTH_AUDIT_STATUS_FILTERS,
   aggregatePageInventory,
+  countFindingsByPageId,
   filterInventoryPages,
+  filterInventoryPagesByScore,
+  filterInventoryPagesByStatus,
+  formatGrowthAuditScore,
   getDefaultRootUrl,
   getGrowthAuditInventoryFilterLabel,
   getGrowthAuditPageSourceLabel,
   getGrowthAuditPageStatusLabel,
   getGrowthAuditPageTypeLabel,
   getGrowthAuditPhaseLabel,
+  getGrowthAuditScoreBadgeClass,
+  getGrowthAuditSeverityBadgeClass,
   getGrowthAuditSourceBadgeClass,
   getGrowthAuditStatusLabel,
   getInventoryKpiItems,
   getInventoryMessage,
+  getTechnicalKpiItems,
+  getTopOpenTasks,
+  getTopPriorityFindings,
 } from "../lib/growth-audit-utils";
 import { APP_ROUTES } from "../routes/config";
 
@@ -37,8 +54,7 @@ const GROWTH_AUDIT_FLOW_STEPS = [
 ] as const;
 
 const GROWTH_AUDIT_ROADMAP = [
-  "Analisi tecnica e AI per tipologia di pagina",
-  "Dashboard priorità e scoring pagina",
+  "Analisi AI/GEO/CRO differenziata per tipologia di pagina",
   "Rescan singola pagina",
   "Integrazioni: PageSpeed, Search Console, GA4, Google Ads, Firecrawl/DataForSEO",
 ] as const;
@@ -59,6 +75,8 @@ export function GrowthAuditPage() {
   const rootUrl = rootUrlOverride ?? defaultRootUrl;
   const [maxPages, setMaxPages] = useState<number>(50);
   const [inventoryFilter, setInventoryFilter] = useState<GrowthAuditInventoryFilter>("all");
+  const [scoreFilter, setScoreFilter] = useState<GrowthAuditScoreFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<GrowthAuditPageStatusFilter>("all");
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
 
   useEffect(() => {
@@ -72,6 +90,21 @@ export function GrowthAuditPage() {
   }, [runs, activeRunId]);
 
   const { data: runDetail } = useGrowthAuditRun(projectId, activeRunId, Boolean(activeRunId));
+  const runStatus = runDetail?.run.status;
+  const { data: findings = [] } = useGrowthAuditFindings(
+    projectId,
+    activeRunId,
+    undefined,
+    runStatus,
+    Boolean(activeRunId),
+  );
+  const { data: tasks = [] } = useGrowthAuditTasks(
+    projectId,
+    activeRunId,
+    { status: "open" },
+    runStatus,
+    Boolean(activeRunId),
+  );
 
   const activeRun = runDetail?.run;
   const pages = runDetail?.pages ?? [];
@@ -80,16 +113,44 @@ export function GrowthAuditPage() {
   const summary = activeRun?.summary ?? null;
   const summaryMessage = typeof summary?.message === "string" ? summary.message : null;
   const inventoryMessage = getInventoryMessage(activeRun?.pagesDiscovered ?? 0, summary);
-  const filteredPages = useMemo(
-    () => filterInventoryPages(pages, inventoryFilter),
-    [pages, inventoryFilter],
-  );
+  const findingsByPageId = useMemo(() => countFindingsByPageId(findings), [findings]);
+  const filteredPages = useMemo(() => {
+    const byType = filterInventoryPages(pages, inventoryFilter);
+    const byScore = filterInventoryPagesByScore(byType, scoreFilter);
+    return filterInventoryPagesByStatus(byScore, statusFilter);
+  }, [pages, inventoryFilter, scoreFilter, statusFilter]);
   const inventoryCounts = useMemo(() => aggregatePageInventory(pages), [pages]);
   const inventoryKpiItems = useMemo(
     () => getInventoryKpiItems(pages, summary),
     [pages, summary],
   );
-  const showInventoryKpis = activeRun?.status === "completed" && pages.length > 0;
+  const technicalKpiItems = useMemo(
+    () =>
+      getTechnicalKpiItems(activeRun, runDetail?.findingsCount, runDetail?.tasksCount),
+    [activeRun, runDetail?.findingsCount, runDetail?.tasksCount],
+  );
+  const priorityFindings = useMemo(() => getTopPriorityFindings(findings, 10), [findings]);
+  const openTasks = useMemo(() => getTopOpenTasks(tasks, 10), [tasks]);
+  const pageUrlById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const page of pages) {
+      map[page.id] = page.url;
+    }
+    return map;
+  }, [pages]);
+  const showInventoryKpis =
+    activeRun?.status === "completed" &&
+    pages.length > 0 &&
+    !activeRun.siteScore &&
+    !summary?.averageTechnicalScore;
+  const showTechnicalKpis =
+    Boolean(activeRun?.siteScore != null || summary?.averageTechnicalScore != null) ||
+    activeRun?.status === "analyzing" ||
+    activeRun?.status === "partial_failed";
+  const showTechnicalSections =
+    activeRun?.status === "completed" ||
+    activeRun?.status === "partial_failed" ||
+    activeRun?.status === "analyzing";
 
   const handleStartAudit = async () => {
     const trimmed = rootUrl.trim();
@@ -148,7 +209,22 @@ export function GrowthAuditPage() {
         </ol>
       </section>
 
-      {showInventoryKpis ? (
+      {showTechnicalKpis ? (
+        <div className="growth-audit-kpi-grid">
+          {technicalKpiItems.map((kpi) => (
+            <div key={kpi.label} className="content-seo-kpi gcr-card content-seo-kpi--compact">
+              {kpi.label === "Site Score" ? (
+                <span className={getGrowthAuditScoreBadgeClass(kpi.score)}>
+                  {kpi.value}
+                </span>
+              ) : (
+                <span className="content-seo-kpi__value">{kpi.value}</span>
+              )}
+              <span className="content-seo-kpi__label">{kpi.label}</span>
+            </div>
+          ))}
+        </div>
+      ) : showInventoryKpis ? (
         <div className="growth-audit-kpi-grid growth-audit-kpi-grid--inventory">
           {inventoryKpiItems.map((kpi) => (
             <div key={kpi.label} className="content-seo-kpi gcr-card content-seo-kpi--compact">
@@ -190,15 +266,15 @@ export function GrowthAuditPage() {
           <div>
             <h2 className="growth-audit-full-site__title">Full Site Audit</h2>
             <p className="growth-audit-full-site__description">
-              Scopre URL da sitemap e dati Shopify sincronizzati, classifica le pagine e crea
-              l&apos;inventario operativo del sito.
+              Scopre URL da sitemap e dati Shopify sincronizzati, classifica le pagine e avvia
+              la scansione tecnica deterministica.
             </p>
           </div>
         </div>
 
         <div className="growth-audit-skeleton-banner">
-          Discovery attiva: sitemap XML, sitemap index e URL Shopify già sincronizzati. L&apos;analisi
-          AI per pagina arriverà nel prossimo step.
+          Scansione tecnica attiva: title, meta, canonical, H1, schema, immagini e link.
+          Questa scansione è deterministica e non usa AI.
         </div>
 
         <div className="growth-audit-form-grid">
@@ -278,7 +354,10 @@ export function GrowthAuditPage() {
             <div className="growth-audit-run-stats">
               <span>Pagine scoperte: {activeRun.pagesDiscovered}</span>
               <span>Classificate: {activeRun.pagesClassified}</span>
-              <span>Analizzate: {activeRun.pagesAnalyzed}</span>
+              <span>
+                Analizzate: {activeRun.pagesAnalyzed}
+                {activeRun.totalPages ? ` / ${activeRun.totalPages}` : ""}
+              </span>
             </div>
 
             {activeRun.currentUrl && (
@@ -343,6 +422,36 @@ export function GrowthAuditPage() {
                   ))}
                 </div>
 
+                <div className="growth-audit-inventory-filters growth-audit-inventory-filters--secondary">
+                  {GROWTH_AUDIT_SCORE_FILTERS.map((filter) => (
+                    <button
+                      key={filter.value}
+                      type="button"
+                      className={`growth-audit-inventory-filter${
+                        scoreFilter === filter.value ? " growth-audit-inventory-filter--active" : ""
+                      }`}
+                      onClick={() => setScoreFilter(filter.value)}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="growth-audit-inventory-filters growth-audit-inventory-filters--secondary">
+                  {GROWTH_AUDIT_STATUS_FILTERS.map((filter) => (
+                    <button
+                      key={filter.value}
+                      type="button"
+                      className={`growth-audit-inventory-filter${
+                        statusFilter === filter.value ? " growth-audit-inventory-filter--active" : ""
+                      }`}
+                      onClick={() => setStatusFilter(filter.value)}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="growth-audit-pages-table-wrap">
                   <table className="growth-audit-pages-table">
                     <thead>
@@ -350,9 +459,11 @@ export function GrowthAuditPage() {
                         <th>URL</th>
                         <th>Tipo</th>
                         <th>Fonte</th>
-                        <th>Stato</th>
+                        <th>HTTP</th>
                         <th>Score</th>
-                        <th>Azione</th>
+                        <th>Title</th>
+                        <th>Problemi</th>
+                        <th>Stato</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -368,17 +479,83 @@ export function GrowthAuditPage() {
                               {getGrowthAuditPageSourceLabel(page.source)}
                             </span>
                           </td>
-                          <td>{getGrowthAuditPageStatusLabel(page.status)}</td>
-                          <td>{page.score ?? "—"}</td>
+                          <td>{page.httpStatus ?? "—"}</td>
                           <td>
-                            <span className="growth-audit-action-placeholder">Analisi in arrivo</span>
+                            <span className={getGrowthAuditScoreBadgeClass(page.score)}>
+                              {formatGrowthAuditScore(page.score)}
+                            </span>
                           </td>
+                          <td className="growth-audit-pages-table__title">
+                            {page.title ?? "—"}
+                          </td>
+                          <td>{findingsByPageId[page.id] ?? "—"}</td>
+                          <td>{getGrowthAuditPageStatusLabel(page.status)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
+            )}
+
+            {showTechnicalSections && priorityFindings.length > 0 && (
+              <section className="growth-audit-findings gcr-card">
+                <h4 className="growth-audit-findings__title">Problemi prioritari</h4>
+                <ul className="growth-audit-findings__list">
+                  {priorityFindings.map((finding) => (
+                    <li key={finding.id} className="growth-audit-findings__item">
+                      <span className={getGrowthAuditSeverityBadgeClass(finding.severity)}>
+                        {finding.severity}
+                      </span>
+                      <div className="growth-audit-findings__content">
+                        <strong>{finding.title}</strong>
+                        {finding.pageId && pageUrlById[finding.pageId] && (
+                          <p className="growth-audit-findings__url">
+                            {pageUrlById[finding.pageId]}
+                          </p>
+                        )}
+                        {finding.recommendation && (
+                          <p className="growth-audit-findings__recommendation">
+                            {finding.recommendation}
+                          </p>
+                        )}
+                        {finding.howToValidate && (
+                          <p className="growth-audit-findings__validate">
+                            Verifica: {finding.howToValidate}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {showTechnicalSections && openTasks.length > 0 && (
+              <section className="growth-audit-tasks gcr-card">
+                <h4 className="growth-audit-tasks__title">Task aperti</h4>
+                <ul className="growth-audit-tasks__list">
+                  {openTasks.map((task) => (
+                    <li key={task.id} className="growth-audit-tasks__item">
+                      <div className="growth-audit-tasks__meta">
+                        <span className="growth-audit-tasks__priority">{task.priority}</span>
+                        <span className="growth-audit-tasks__owner">{task.ownerType}</span>
+                      </div>
+                      <strong>{task.title}</strong>
+                      {task.description && (
+                        <p className="growth-audit-tasks__description">{task.description}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {showTechnicalSections && (
+              <p className="growth-audit-technical-note">
+                Questa scansione è tecnica e deterministica. Nel prossimo step aggiungeremo
+                analisi AI/GEO/CRO differenziata per tipo pagina.
+              </p>
             )}
           </div>
         )}

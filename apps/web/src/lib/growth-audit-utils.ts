@@ -1,10 +1,14 @@
 import type {
+  GrowthAuditFinding,
   GrowthAuditInventoryCounts,
   GrowthAuditInventoryFilter,
   GrowthAuditPage,
+  GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
   GrowthAuditRunStatus,
   GrowthAuditRunSummary,
+  GrowthAuditScoreFilter,
+  GrowthAuditTask,
 } from "@gcr/shared";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -25,6 +29,7 @@ const PHASE_LABELS: Record<string, string> = {
   discovery: "Discovery",
   classification: "Classificazione",
   analysis: "Analisi",
+  technical_scan: "Scansione tecnica",
   ready_for_analysis: "Pronto per analisi",
   finalization: "Finalizzazione",
   completed: "Completato",
@@ -53,6 +58,7 @@ const PAGE_STATUS_LABELS: Record<string, string> = {
   pending: "In attesa",
   discovered: "Scoperta",
   classified: "Classificata",
+  analyzing: "In analisi",
   analyzed: "Analizzata",
   failed: "Fallita",
   skipped: "Saltata",
@@ -90,6 +96,34 @@ export const GROWTH_AUDIT_INVENTORY_FILTERS: GrowthAuditInventoryFilter[] = [
   "static_page",
   "unknown",
 ];
+
+export const GROWTH_AUDIT_SCORE_FILTERS: { value: GrowthAuditScoreFilter; label: string }[] = [
+  { value: "all", label: "Tutte" },
+  { value: "critical", label: "Critiche <60" },
+  { value: "warning", label: "Da migliorare 60-79" },
+  { value: "good", label: "Buone 80+" },
+];
+
+export const GROWTH_AUDIT_STATUS_FILTERS: { value: GrowthAuditPageStatusFilter; label: string }[] =
+  [
+    { value: "all", label: "Tutte" },
+    { value: "analyzed", label: "Analizzate" },
+    { value: "failed", label: "Fallite" },
+  ];
+
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4,
+};
+
+const PRIORITY_ORDER: Record<string, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
 
 export function getGrowthAuditStatusLabel(status?: GrowthAuditRunStatus | string | null): string {
   if (!status) return "—";
@@ -177,6 +211,120 @@ export function filterInventoryPages(
   return pages.filter((page) => normalizePageTypeForFilter(page.pageType) === filter);
 }
 
+export function getGrowthAuditScoreBand(score?: number | null): "none" | "good" | "warning" | "critical" {
+  if (score == null) return "none";
+  if (score >= 80) return "good";
+  if (score >= 60) return "warning";
+  return "critical";
+}
+
+export function getGrowthAuditScoreBadgeClass(score?: number | null): string {
+  const band = getGrowthAuditScoreBand(score);
+  return `growth-audit-score-badge growth-audit-score-badge--${band}`;
+}
+
+export function formatGrowthAuditScore(score?: number | null): string {
+  if (score == null) return "—";
+  return String(score);
+}
+
+export function filterInventoryPagesByScore(
+  pages: GrowthAuditPage[],
+  scoreFilter: GrowthAuditScoreFilter,
+): GrowthAuditPage[] {
+  if (scoreFilter === "all") return pages;
+  return pages.filter((page) => {
+    const band = getGrowthAuditScoreBand(page.score);
+    if (scoreFilter === "critical") return band === "critical";
+    if (scoreFilter === "warning") return band === "warning";
+    if (scoreFilter === "good") return band === "good";
+    return true;
+  });
+}
+
+export function filterInventoryPagesByStatus(
+  pages: GrowthAuditPage[],
+  statusFilter: GrowthAuditPageStatusFilter,
+): GrowthAuditPage[] {
+  if (statusFilter === "all") return pages;
+  return pages.filter((page) => page.status === statusFilter);
+}
+
+export function countFindingsByPageId(findings: GrowthAuditFinding[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const finding of findings) {
+    if (!finding.pageId) continue;
+    counts[finding.pageId] = (counts[finding.pageId] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export function getTopPriorityFindings(findings: GrowthAuditFinding[], limit = 10): GrowthAuditFinding[] {
+  return [...findings]
+    .sort((a, b) => {
+      const severityDiff =
+        (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99);
+      if (severityDiff !== 0) return severityDiff;
+      return (a.title || "").localeCompare(b.title || "");
+    })
+    .slice(0, limit);
+}
+
+export function getTopOpenTasks(tasks: GrowthAuditTask[], limit = 10): GrowthAuditTask[] {
+  return [...tasks]
+    .filter((task) => task.status === "open")
+    .sort((a, b) => {
+      const priorityDiff =
+        (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99);
+      if (priorityDiff !== 0) return priorityDiff;
+      return (a.title || "").localeCompare(b.title || "");
+    })
+    .slice(0, limit);
+}
+
+export function getGrowthAuditSeverityBadgeClass(severity?: string | null): string {
+  const normalized = severity || "medium";
+  return `growth-audit-severity-badge growth-audit-severity-badge--${normalized}`;
+}
+
+export function getTechnicalKpiItems(
+  run?: {
+    siteScore?: number | null;
+    pagesDiscovered?: number;
+    pagesAnalyzed?: number;
+    summary?: GrowthAuditRunSummary | null;
+  } | null,
+  findingsCount?: number,
+  tasksCount?: number,
+) {
+  const summary = run?.summary;
+  const criticalHigh =
+    (summary?.criticalFindings ?? 0) + (summary?.highFindings ?? 0) || findingsCount || 0;
+  return [
+    {
+      label: "Site Score",
+      value: run?.siteScore != null ? String(run.siteScore) : "—",
+      score: run?.siteScore,
+    },
+    {
+      label: "Pagine scoperte",
+      value: String(run?.pagesDiscovered ?? summary?.pagesDiscovered ?? "—"),
+    },
+    {
+      label: "Pagine analizzate",
+      value: String(run?.pagesAnalyzed ?? summary?.pagesAnalyzed ?? "—"),
+    },
+    {
+      label: "Problemi critici/alti",
+      value: criticalHigh > 0 ? String(criticalHigh) : "—",
+    },
+    {
+      label: "Task aperti",
+      value: String(summary?.tasksOpen ?? tasksCount ?? "—"),
+    },
+  ];
+}
+
 export function aggregatePageInventory(pages: GrowthAuditPage[]): GrowthAuditInventoryCounts {
   const counts: GrowthAuditInventoryCounts = {
     total: pages.length,
@@ -213,12 +361,15 @@ export function getInventoryMessage(
   pagesDiscovered: number,
   summary?: GrowthAuditRunSummary | null,
 ): string | null {
+  if (summary?.message?.includes("Technical page scan completed")) {
+    return "Scansione tecnica completata. Nel prossimo step aggiungeremo analisi AI/GEO/CRO per tipo pagina.";
+  }
   if (summary?.warning) return summary.warning;
   if (pagesDiscovered > 1) {
-    return "Inventario creato. Nel prossimo step potrai avviare l'analisi per tipologia di pagina.";
+    return "Inventario creato. La scansione tecnica analizza ogni pagina scoperta.";
   }
   if (pagesDiscovered === 1) {
-    return "È stata trovata solo la pagina seed. Nel prossimo step potremmo dover configurare meglio sitemap o discovery Shopify.";
+    return "È stata trovata solo la pagina seed. Verifica sitemap o discovery Shopify.";
   }
   return null;
 }

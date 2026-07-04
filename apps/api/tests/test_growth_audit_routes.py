@@ -17,10 +17,12 @@ from app.api.routes.growth_audit import (
     create_growth_audit_run_endpoint,
     get_growth_audit_run_endpoint,
     list_growth_audit_events_endpoint,
+    list_growth_audit_findings_endpoint,
     list_growth_audit_pages_endpoint,
     list_growth_audit_runs_endpoint,
+    list_growth_audit_tasks_endpoint,
 )
-from app.models.growth_audit import GrowthAuditEvent, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditEvent, GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun, GrowthAuditTask
 from app.schemas.growth_audit import GrowthAuditRunCreateRequest
 from app.services.growth_audit.exceptions import GrowthAuditRunNotFoundError
 
@@ -96,6 +98,8 @@ def test_growth_audit_routes_registered() -> None:
     assert "/projects/{project_id}/growth-audit/runs/{run_id}" in paths
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/pages" in paths
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/events" in paths
+    assert "/projects/{project_id}/growth-audit/runs/{run_id}/findings" in paths
+    assert "/projects/{project_id}/growth-audit/runs/{run_id}/tasks" in paths
 
 
 def test_create_growth_audit_run_returns_201_payload() -> None:
@@ -239,5 +243,81 @@ def test_get_growth_audit_run_wrong_project_returns_404() -> None:
                 await get_growth_audit_run_endpoint(project_id, run_id, session)
 
         assert exc_info.value.status_code == 404
+
+    asyncio.run(run())
+
+
+def test_list_findings_and_tasks_endpoints() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_id = uuid4()
+        session = AsyncMock()
+        now = datetime.now(UTC)
+        finding = GrowthAuditFinding(
+            id=uuid4(),
+            run_id=run_id,
+            page_id=uuid4(),
+            project_id=project_id,
+            category="seo",
+            severity="high",
+            priority="high",
+            title="Title mancante",
+            status="open",
+            created_at=now,
+            updated_at=now,
+        )
+        task = GrowthAuditTask(
+            id=uuid4(),
+            run_id=run_id,
+            page_id=uuid4(),
+            project_id=project_id,
+            title="Aggiungere title",
+            owner_type="seo",
+            priority="high",
+            estimated_effort="low",
+            status="open",
+            created_at=now,
+            updated_at=now,
+        )
+
+        with (
+            patch(
+                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.growth_audit.list_growth_audit_findings",
+                new_callable=AsyncMock,
+                return_value=[finding],
+            ),
+            patch(
+                "app.api.routes.growth_audit.list_growth_audit_tasks",
+                new_callable=AsyncMock,
+                return_value=[task],
+            ),
+        ):
+            findings_response = await list_growth_audit_findings_endpoint(
+                project_id,
+                run_id,
+                None,
+                None,
+                None,
+                None,
+                session,
+            )
+            tasks_response = await list_growth_audit_tasks_endpoint(
+                project_id,
+                run_id,
+                None,
+                None,
+                None,
+                None,
+                session,
+            )
+
+        assert len(findings_response.findings) == 1
+        assert findings_response.findings[0].title == "Title mancante"
+        assert len(tasks_response.tasks) == 1
+        assert tasks_response.tasks[0].owner_type == "seo"
 
     asyncio.run(run())

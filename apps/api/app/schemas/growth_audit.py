@@ -24,6 +24,7 @@ GrowthAuditPhase = Literal[
     "discovery",
     "classification",
     "analysis",
+    "technical_scan",
     "ready_for_analysis",
     "finalization",
     "completed",
@@ -50,6 +51,7 @@ GrowthAuditPageStatus = Literal[
     "pending",
     "discovered",
     "classified",
+    "analyzing",
     "analyzed",
     "failed",
     "skipped",
@@ -202,3 +204,71 @@ class GrowthAuditStartResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     run: GrowthAuditRunRead
+
+
+class GrowthAuditFindingRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    run_id: UUID = Field(serialization_alias="runId")
+    page_id: UUID | None = Field(default=None, serialization_alias="pageId")
+    project_id: UUID = Field(serialization_alias="projectId")
+    source_result_id: UUID | None = Field(
+        default=None,
+        serialization_alias="sourceResultId",
+    )
+    category: str
+    severity: str
+    priority: str
+    title: str
+    description: str | None = None
+    evidence: str | None = None
+    recommendation: str | None = None
+    how_to_validate: str | None = Field(
+        default=None,
+        serialization_alias="howToValidate",
+    )
+    impact: str | None = None
+    effort: str | None = None
+    status: str
+    finding_metadata: dict[str, Any] | None = Field(
+        default=None,
+        serialization_alias="metadata",
+    )
+    created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+
+
+class GrowthAuditTaskRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    run_id: UUID = Field(serialization_alias="runId")
+    page_id: UUID | None = Field(default=None, serialization_alias="pageId")
+    finding_id: UUID | None = Field(default=None, serialization_alias="findingId")
+    project_id: UUID = Field(serialization_alias="projectId")
+    title: str
+    description: str | None = None
+    owner_type: str = Field(serialization_alias="ownerType")
+    priority: str
+    estimated_effort: str = Field(serialization_alias="estimatedEffort")
+    status: str
+    task_metadata: dict[str, Any] | None = Field(
+        default=None,
+        serialization_alias="metadata",
+    )
+    completed_at: datetime | None = Field(default=None, serialization_alias="completedAt")
+    created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+
+
+class GrowthAuditFindingsListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    findings: list[GrowthAuditFindingRead]
+
+
+class GrowthAuditTasksListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    tasks: list[GrowthAuditTaskRead]

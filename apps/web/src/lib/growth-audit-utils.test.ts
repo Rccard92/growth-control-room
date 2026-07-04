@@ -3,14 +3,18 @@ import type { GrowthAuditPage } from "@gcr/shared";
 import {
   aggregatePageInventory,
   filterInventoryPages,
+  filterInventoryPagesByScore,
   getDefaultRootUrl,
   getGrowthAuditInventoryFilterLabel,
   getGrowthAuditPageSourceLabel,
   getGrowthAuditPageTypeLabel,
   getGrowthAuditPhaseLabel,
+  getGrowthAuditScoreBadgeClass,
+  getGrowthAuditScoreBand,
   getGrowthAuditSourceBadgeClass,
   getGrowthAuditStatusLabel,
   getInventoryMessage,
+  getTopPriorityFindings,
 } from "./growth-audit-utils";
 
 const samplePages: GrowthAuditPage[] = [
@@ -96,10 +100,62 @@ describe("growth-audit-utils", () => {
   it("builds inventory messages", () => {
     expect(getInventoryMessage(3)).toContain("Inventario creato");
     expect(getInventoryMessage(1)).toContain("solo la pagina seed");
+    expect(
+      getInventoryMessage(3, {
+        message: "Technical page scan completed. AI/GEO/CRO analysis is not enabled yet.",
+      }),
+    ).toContain("Scansione tecnica completata");
   });
 
   it("builds default root URL from shop domain", () => {
     expect(getDefaultRootUrl("shop.example.com")).toBe("https://shop.example.com");
     expect(getDefaultRootUrl("https://shop.example.com")).toBe("https://shop.example.com");
+  });
+
+  it("maps score bands and badge classes", () => {
+    expect(getGrowthAuditScoreBand(85)).toBe("good");
+    expect(getGrowthAuditScoreBand(70)).toBe("warning");
+    expect(getGrowthAuditScoreBand(45)).toBe("critical");
+    expect(getGrowthAuditScoreBadgeClass(85)).toContain("--good");
+    expect(getGrowthAuditScoreBadgeClass(null)).toContain("--none");
+  });
+
+  it("filters inventory pages by score band", () => {
+    const pages: GrowthAuditPage[] = [
+      { ...samplePages[0], id: "a", score: 90 },
+      { ...samplePages[1], id: "b", score: 65 },
+      { ...samplePages[2], id: "c", score: 40 },
+    ];
+    expect(filterInventoryPagesByScore(pages, "good")).toHaveLength(1);
+    expect(filterInventoryPagesByScore(pages, "critical")).toHaveLength(1);
+  });
+
+  it("orders priority findings by severity", () => {
+    const findings = getTopPriorityFindings(
+      [
+        {
+          id: "f1",
+          runId: "run",
+          projectId: "proj",
+          category: "seo",
+          severity: "medium",
+          priority: "medium",
+          title: "Medium",
+          status: "open",
+        },
+        {
+          id: "f2",
+          runId: "run",
+          projectId: "proj",
+          category: "seo",
+          severity: "critical",
+          priority: "high",
+          title: "Critical",
+          status: "open",
+        },
+      ],
+      2,
+    );
+    expect(findings[0].severity).toBe("critical");
   });
 });

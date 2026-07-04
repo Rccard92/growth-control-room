@@ -8,6 +8,8 @@ from app.db.session import get_db
 from app.schemas.growth_audit import (
     GrowthAuditEventRead,
     GrowthAuditEventsListResponse,
+    GrowthAuditFindingRead,
+    GrowthAuditFindingsListResponse,
     GrowthAuditPageRead,
     GrowthAuditPagesListResponse,
     GrowthAuditRunCreateRequest,
@@ -15,6 +17,8 @@ from app.schemas.growth_audit import (
     GrowthAuditRunRead,
     GrowthAuditRunsListResponse,
     GrowthAuditStartResponse,
+    GrowthAuditTaskRead,
+    GrowthAuditTasksListResponse,
 )
 from app.services.growth_audit.exceptions import (
     GrowthAuditError,
@@ -24,8 +28,10 @@ from app.services.growth_audit.exceptions import (
 from app.services.growth_audit.run_service import (
     get_growth_audit_run_detail,
     list_growth_audit_events,
+    list_growth_audit_findings,
     list_growth_audit_pages,
     list_growth_audit_runs,
+    list_growth_audit_tasks,
     start_growth_audit_run,
 )
 from app.services.projects import get_project_in_default_workspace
@@ -185,4 +191,74 @@ async def list_growth_audit_events_endpoint(
         ) from exc
     return GrowthAuditEventsListResponse(
         events=[GrowthAuditEventRead.model_validate(event) for event in events]
+    )
+
+
+@router.get(
+    "/{project_id}/growth-audit/runs/{run_id}/findings",
+    response_model=GrowthAuditFindingsListResponse,
+)
+async def list_growth_audit_findings_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID | None = Query(default=None, alias="pageId"),
+    severity: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditFindingsListResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        findings = await list_growth_audit_findings(
+            session,
+            project_id,
+            run_id,
+            page_id=page_id,
+            severity=severity,
+            category=category,
+            status=status,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+    return GrowthAuditFindingsListResponse(
+        findings=[GrowthAuditFindingRead.model_validate(f) for f in findings]
+    )
+
+
+@router.get(
+    "/{project_id}/growth-audit/runs/{run_id}/tasks",
+    response_model=GrowthAuditTasksListResponse,
+)
+async def list_growth_audit_tasks_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID | None = Query(default=None, alias="pageId"),
+    priority: str | None = Query(default=None),
+    owner_type: str | None = Query(default=None, alias="ownerType"),
+    status: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditTasksListResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        tasks = await list_growth_audit_tasks(
+            session,
+            project_id,
+            run_id,
+            page_id=page_id,
+            priority=priority,
+            owner_type=owner_type,
+            status=status,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+    return GrowthAuditTasksListResponse(
+        tasks=[GrowthAuditTaskRead.model_validate(t) for t in tasks]
     )

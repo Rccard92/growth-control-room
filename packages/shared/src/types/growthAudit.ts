@@ -16,6 +16,7 @@ export type GrowthAuditPhase =
   | "discovery"
   | "classification"
   | "analysis"
+  | "technical_scan"
   | "ready_for_analysis"
   | "finalization"
   | "completed"
@@ -40,6 +41,7 @@ export type GrowthAuditPageStatus =
   | "pending"
   | "discovered"
   | "classified"
+  | "analyzing"
   | "analyzed"
   | "failed"
   | "skipped";
@@ -62,11 +64,35 @@ export type GrowthAuditInventoryFilter =
   | "static_page"
   | "unknown";
 
+export type GrowthAuditScoreFilter = "all" | "critical" | "warning" | "good";
+
+export type GrowthAuditPageStatusFilter = "all" | "analyzed" | "failed";
+
+export type GrowthAuditFindingSeverity =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "info";
+
+export type GrowthAuditFindingCategory =
+  | "technical"
+  | "seo"
+  | "schema"
+  | "images";
+
+export type GrowthAuditTaskOwnerType = "seo" | "content" | "dev" | "design" | "ads";
+
 export interface GrowthAuditRunSummary {
   message?: string;
   pagesDiscovered?: number;
   pagesClassified?: number;
   pagesAnalyzed?: number;
+  pagesFailed?: number;
+  averageTechnicalScore?: number | null;
+  criticalFindings?: number;
+  highFindings?: number;
+  tasksOpen?: number;
   includeAiAnalysis?: boolean;
   auditMode?: string;
   sources?: {
@@ -194,4 +220,66 @@ export interface GrowthAuditEventsListResponse {
 
 export interface GrowthAuditStartResponse {
   run: GrowthAuditRun;
+}
+
+export interface GrowthAuditFinding {
+  id: string;
+  runId: string;
+  pageId?: string | null;
+  projectId: string;
+  sourceResultId?: string | null;
+  category: GrowthAuditFindingCategory | string;
+  severity: GrowthAuditFindingSeverity | string;
+  priority: string;
+  title: string;
+  description?: string | null;
+  evidence?: string | null;
+  recommendation?: string | null;
+  howToValidate?: string | null;
+  impact?: string | null;
+  effort?: string | null;
+  status: string;
+  metadata?: Record<string, unknown> | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface GrowthAuditTask {
+  id: string;
+  runId: string;
+  pageId?: string | null;
+  findingId?: string | null;
+  projectId: string;
+  title: string;
+  description?: string | null;
+  ownerType: GrowthAuditTaskOwnerType | string;
+  priority: string;
+  estimatedEffort: string;
+  status: string;
+  metadata?: Record<string, unknown> | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface GrowthAuditFindingsListResponse {
+  findings: GrowthAuditFinding[];
+}
+
+export interface GrowthAuditTasksListResponse {
+  tasks: GrowthAuditTask[];
+}
+
+export interface GrowthAuditFindingsFilters {
+  pageId?: string;
+  severity?: string;
+  category?: string;
+  status?: string;
+}
+
+export interface GrowthAuditTasksFilters {
+  pageId?: string;
+  priority?: string;
+  ownerType?: string;
+  status?: string;
 }

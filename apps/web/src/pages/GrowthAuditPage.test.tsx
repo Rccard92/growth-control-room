@@ -13,6 +13,8 @@ const {
   useStartSeoSkillRunMock,
   useGrowthAuditRunsMock,
   useGrowthAuditRunMock,
+  useGrowthAuditFindingsMock,
+  useGrowthAuditTasksMock,
   useStartGrowthAuditRunMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
@@ -24,6 +26,8 @@ const {
   useStartSeoSkillRunMock: vi.fn(),
   useGrowthAuditRunsMock: vi.fn(),
   useGrowthAuditRunMock: vi.fn(),
+  useGrowthAuditFindingsMock: vi.fn(),
+  useGrowthAuditTasksMock: vi.fn(),
   useStartGrowthAuditRunMock: vi.fn(),
 }));
 
@@ -53,10 +57,12 @@ vi.mock("../hooks/useSeoSkills", () => ({
 vi.mock("../hooks/useGrowthAudit", () => ({
   useGrowthAuditRuns: useGrowthAuditRunsMock,
   useGrowthAuditRun: useGrowthAuditRunMock,
+  useGrowthAuditFindings: useGrowthAuditFindingsMock,
+  useGrowthAuditTasks: useGrowthAuditTasksMock,
   useStartGrowthAuditRun: useStartGrowthAuditRunMock,
 }));
 
-function setupMocks(options?: { withActiveRun?: boolean }) {
+function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boolean }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
     data: { id: "proj-1", name: "Solmielato" },
@@ -105,20 +111,32 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
           projectId: "proj-1",
           rootUrl: "https://solmielato.it",
           normalizedDomain: "solmielato.it",
-          status: "completed",
+          status: options?.withTechnicalScan ? "completed" : "completed",
           phase: "finalization",
           auditMode: "full_site_mvp",
           provider: "openai",
           progressPercent: 100,
           pagesDiscovered: 3,
           pagesClassified: 3,
-          pagesAnalyzed: 0,
+          pagesAnalyzed: options?.withTechnicalScan ? 3 : 0,
           pagesFailed: 0,
-          summary: {
-            message: "Page inventory completed. AI page analysis is not enabled yet.",
-            pageTypes: { homepage: 1, product: 1, collection: 1 },
-            sources: { seed: 1, sitemap: 1, shopify: 1 },
-          },
+          siteScore: options?.withTechnicalScan ? 78 : null,
+          summary: options?.withTechnicalScan
+            ? {
+                message: "Technical page scan completed. AI/GEO/CRO analysis is not enabled yet.",
+                pageTypes: { homepage: 1, product: 1, collection: 1 },
+                sources: { seed: 1, sitemap: 1, shopify: 1 },
+                pagesAnalyzed: 3,
+                averageTechnicalScore: 78,
+                criticalFindings: 1,
+                highFindings: 2,
+                tasksOpen: 2,
+              }
+            : {
+                message: "Page inventory completed. AI page analysis is not enabled yet.",
+                pageTypes: { homepage: 1, product: 1, collection: 1 },
+                sources: { seed: 1, sitemap: 1, shopify: 1 },
+              },
         },
         pages: [
           {
@@ -129,9 +147,11 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
             normalizedUrl: "https://solmielato.it",
             pageType: "homepage",
             source: "seed",
-            status: "classified",
+            status: options?.withTechnicalScan ? "analyzed" : "classified",
             priority: "high",
             title: "Home",
+            httpStatus: options?.withTechnicalScan ? 200 : null,
+            score: options?.withTechnicalScan ? 82 : null,
           },
           {
             id: "page-2",
@@ -141,9 +161,11 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
             normalizedUrl: "https://solmielato.it/products/miele",
             pageType: "product",
             source: "shopify_product",
-            status: "classified",
+            status: options?.withTechnicalScan ? "analyzed" : "classified",
             priority: "normal",
             title: "Miele",
+            httpStatus: options?.withTechnicalScan ? 200 : null,
+            score: options?.withTechnicalScan ? 55 : null,
           },
           {
             id: "page-3",
@@ -153,9 +175,11 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
             normalizedUrl: "https://solmielato.it/collections/best",
             pageType: "collection",
             source: "sitemap",
-            status: "classified",
+            status: options?.withTechnicalScan ? "analyzed" : "classified",
             priority: "normal",
             title: "Best",
+            httpStatus: options?.withTechnicalScan ? 200 : null,
+            score: options?.withTechnicalScan ? 71 : null,
           },
         ],
         events: [
@@ -180,6 +204,43 @@ function setupMocks(options?: { withActiveRun?: boolean }) {
   useGrowthAuditRunMock.mockReturnValue({
     data: activeRun,
     isLoading: false,
+  });
+  useGrowthAuditFindingsMock.mockReturnValue({
+    data: options?.withTechnicalScan
+      ? [
+          {
+            id: "finding-1",
+            runId: "run-1",
+            projectId: "proj-1",
+            pageId: "page-2",
+            category: "seo",
+            severity: "critical",
+            priority: "high",
+            title: "Title mancante",
+            recommendation: "Aggiungi un title descrittivo.",
+            howToValidate: "Verifica il tag title.",
+            status: "open",
+          },
+        ]
+      : [],
+  });
+  useGrowthAuditTasksMock.mockReturnValue({
+    data: options?.withTechnicalScan
+      ? [
+          {
+            id: "task-1",
+            runId: "run-1",
+            projectId: "proj-1",
+            pageId: "page-2",
+            title: "Aggiungere title pagina",
+            description: "Scrivi un title unico.",
+            ownerType: "seo",
+            priority: "high",
+            estimatedEffort: "low",
+            status: "open",
+          },
+        ]
+      : [],
   });
   useStartGrowthAuditRunMock.mockReturnValue({
     mutateAsync: vi.fn().mockResolvedValue({ run: { id: "run-new" } }),
@@ -214,16 +275,45 @@ describe("GrowthAuditPage", () => {
   });
 
   it("shows inventory table, badges and filters when run exists", () => {
-    setupMocks({ withActiveRun: true });
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
     const html = renderPage();
     expect(html).toContain("Inventario pagine");
     expect(html).toContain("Homepage");
     expect(html).toContain("Shopify prodotto");
     expect(html).toContain("Sitemap");
-    expect(html).toContain("Analisi in arrivo");
     expect(html).toContain("Prodotti");
     expect(html).toContain("Categorie");
     expect(html).toContain("Eventi recenti");
+    expect(html).toContain("HTTP");
+    expect(html).toContain("Problemi");
+    expect(html).toContain("82");
+    expect(html).toContain("200");
+  });
+
+  it("shows Site Score and pagesAnalyzed from technical scan", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    expect(html).toContain("Site Score");
+    expect(html).toContain("78");
+    expect(html).toContain("Pagine analizzate");
+    expect(html).toContain("3");
+  });
+
+  it("renders priority findings and open tasks", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    expect(html).toContain("Problemi prioritari");
+    expect(html).toContain("Title mancante");
+    expect(html).toContain("Task aperti");
+    expect(html).toContain("Aggiungere title pagina");
+    expect(html).toContain("deterministica");
+  });
+
+  it("renders score filters", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    expect(html).toContain("Critiche &lt;60");
+    expect(html).toContain("Buone 80+");
   });
 
   it("sends maxPages in start payload", async () => {

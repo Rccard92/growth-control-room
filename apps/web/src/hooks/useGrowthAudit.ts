@@ -1,9 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GrowthAuditRunCreateRequest, GrowthAuditRunStatus } from "@gcr/shared";
+import type {
+  GrowthAuditFindingsFilters,
+  GrowthAuditRunCreateRequest,
+  GrowthAuditRunStatus,
+  GrowthAuditTasksFilters,
+} from "@gcr/shared";
 import {
   fetchGrowthAuditEvents,
+  fetchGrowthAuditFindings,
   fetchGrowthAuditPages,
   fetchGrowthAuditRun,
+  fetchGrowthAuditTasks,
   listGrowthAuditRuns,
   startGrowthAuditRun,
 } from "../lib/growth-audit-api";
@@ -63,6 +70,54 @@ export function useGrowthAuditEvents(projectId?: string, runId?: string, enabled
     queryFn: () => fetchGrowthAuditEvents(projectId!, runId!),
     enabled: Boolean(projectId) && Boolean(runId) && enabled,
     select: (data) => data.events,
+  });
+}
+
+const FINDINGS_TASKS_STATUSES: GrowthAuditRunStatus[] = [
+  "analyzing",
+  "completed",
+  "partial_failed",
+];
+
+function canFetchFindingsTasks(status?: GrowthAuditRunStatus): boolean {
+  return Boolean(status && FINDINGS_TASKS_STATUSES.includes(status));
+}
+
+export function useGrowthAuditFindings(
+  projectId?: string,
+  runId?: string,
+  filters?: GrowthAuditFindingsFilters,
+  runStatus?: GrowthAuditRunStatus,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.growthAudit.findings(projectId ?? "", runId ?? "", filters),
+    queryFn: () => fetchGrowthAuditFindings(projectId!, runId!, filters),
+    enabled:
+      Boolean(projectId) &&
+      Boolean(runId) &&
+      enabled &&
+      canFetchFindingsTasks(runStatus),
+    select: (data) => data.findings,
+  });
+}
+
+export function useGrowthAuditTasks(
+  projectId?: string,
+  runId?: string,
+  filters?: GrowthAuditTasksFilters,
+  runStatus?: GrowthAuditRunStatus,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.growthAudit.tasks(projectId ?? "", runId ?? "", filters),
+    queryFn: () => fetchGrowthAuditTasks(projectId!, runId!, filters),
+    enabled:
+      Boolean(projectId) &&
+      Boolean(runId) &&
+      enabled &&
+      canFetchFindingsTasks(runStatus),
+    select: (data) => data.tasks,
   });
 }
 

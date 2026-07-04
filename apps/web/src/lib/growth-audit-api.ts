@@ -1,10 +1,14 @@
 import type {
   GrowthAuditEventsListResponse,
+  GrowthAuditFindingsFilters,
+  GrowthAuditFindingsListResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
   GrowthAuditRunsListResponse,
   GrowthAuditStartResponse,
+  GrowthAuditTasksFilters,
+  GrowthAuditTasksListResponse,
 } from "@gcr/shared";
 import { apiFetch, jsonBody } from "./api";
 
@@ -59,5 +63,37 @@ export function fetchGrowthAuditEvents(
 ): Promise<GrowthAuditEventsListResponse> {
   return apiFetch<GrowthAuditEventsListResponse>(
     `${growthAuditBasePath(projectId)}/runs/${runId}/events`,
+  );
+}
+
+function buildFilterQuery(filters?: GrowthAuditFindingsFilters | GrowthAuditTasksFilters): string {
+  if (!filters) return "";
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function fetchGrowthAuditFindings(
+  projectId: string,
+  runId: string,
+  filters?: GrowthAuditFindingsFilters,
+): Promise<GrowthAuditFindingsListResponse> {
+  const query = buildFilterQuery(filters);
+  return apiFetch<GrowthAuditFindingsListResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/findings${query}`,
+  );
+}
+
+export function fetchGrowthAuditTasks(
+  projectId: string,
+  runId: string,
+  filters?: GrowthAuditTasksFilters,
+): Promise<GrowthAuditTasksListResponse> {
+  const query = buildFilterQuery(filters);
+  return apiFetch<GrowthAuditTasksListResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/tasks${query}`,
   );
 }

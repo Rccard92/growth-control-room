@@ -16,6 +16,7 @@ from app.models.growth_audit import (
     GrowthAuditEvent,
     GrowthAuditFinding,
     GrowthAuditPage,
+    GrowthAuditPageResult,
     GrowthAuditRun,
     GrowthAuditTask,
 )
@@ -29,8 +30,10 @@ from app.services.growth_audit.page_classifier import (
     get_default_skill_bundle_for_page_type,
 )
 from app.services.growth_audit.page_inventory import merge_discovered_urls
+from app.services.growth_audit.page_technical_scanner import scan_page_technical
 from app.services.growth_audit.shopify_url_discovery import discover_shopify_urls
 from app.services.growth_audit.sitemap_discovery import discover_sitemap_urls
+from app.services.growth_audit.technical_scoring import score_technical_scan
 from app.services.growth_audit.url_utils import (
     extract_domain,
     get_url_path,
@@ -42,7 +45,13 @@ logger = logging.getLogger(__name__)
 
 MAX_LIST_LIMIT = 100
 MAX_DISCOVERY_PAGES = 300
+MAX_TECHNICAL_SCAN_PAGES = 300
+TECHNICAL_SCAN_CONCURRENCY = 4
+TECHNICAL_SCAN_TIMEOUT_SECONDS = 12.0
 SUPPORTED_PROVIDERS = {"openai", "claude"}
+
+_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+_PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 def _utcnow() -> datetime:
@@ -194,6 +203,347 @@ async def _upsert_inventory_pages(
         classified_count += 1
 
     return classified_count
+
+
+def _pages_to_scan(run: GrowthAuditRun, max_pages: int) -> list[GrowthAuditPage]:
+    scan_limit = min(max_pages, run.total_pages or 0, MAX_TECHNICAL_SCAN_PAGES)
+    eligible = [
+        page
+        for page in run.pages
+        if page.status in ("classified", "discovered", "pending")
+    ]
+    return eligible[:scan_limit]
+
+
+async def _fetch_page_scan(
+    page: GrowthAuditPage,
+    *,
+    root_domain: str,
+    semaphore: asyncio.Semaphore,
+) -> tuple[GrowthAuditPage, dict | None, str | None]:
+    async with semaphore:
+        try:
+            scan = await scan_page_technical(
+                page.url,
+                page_type=page.page_type,
+                root_domain=root_domain,
+                timeout_seconds=TECHNICAL_SCAN_TIMEOUT_SECONDS,
+            )
+            score_technical_scan(scan, page.page_type)
+            return page, scan, None
+        except Exception as exc:
+            logger.warning("Technical scan failed for page %s: %s", page.url, exc)
+            return page, None, str(exc)
+
+
+async def _persist_technical_scan_result(
+    session: AsyncSession,
+    *,
+    run: GrowthAuditRun,
+    page: GrowthAuditPage,
+    scan: dict | None,
+    error_message: str | None,
+    now: datetime,
+) -> tuple[bool, int, list[dict], list[dict]]:
+    page_started = now
+    result_status = "completed"
+    page_status = "analyzed"
+    score = 0
+    findings: list[dict] = []
+    tasks: list[dict] = []
+    summary = "Technical scan completed."
+
+    if scan is None or error_message:
+        result_status = "failed"
+        page_status = "failed"
+        page.error_message = error_message or scan.get("fetchError") if scan else "Scan failed"
+        summary = page.error_message or "Technical scan failed."
+        await create_growth_audit_event(
+            session,
+            run_id=run.id,
+            project_id=run.project_id,
+            event_type="page_scan_failed",
+            phase="technical_scan",
+            message=f"Scansione fallita: {page.url}",
+            progress_percent=run.progress_percent,
+            payload={"pageId": str(page.id), "url": page.url, "error": page.error_message},
+        )
+        run.pages_failed += 1
+    else:
+        score = scan.get("score", 0)
+        findings = scan.get("findings") or []
+        tasks = scan.get("tasks") or []
+        page.http_status = scan.get("httpStatus")
+        page.title = scan.get("title") or page.title
+        page.meta_description = scan.get("metaDescription")
+        page.canonical_url = scan.get("canonicalUrl")
+        page.h1 = scan.get("h1")
+        page.score = score
+        page.seo_score = score
+        page.analyzed_at = now
+        page.error_message = scan.get("fetchError")
+        page.page_metadata = {
+            **(page.page_metadata or {}),
+            "technical": {
+                "schemaTypes": (scan.get("schema") or {}).get("types", []),
+                "imagesTotal": (scan.get("images") or {}).get("total", 0),
+                "imagesMissingAlt": (scan.get("images") or {}).get("missingAlt", 0),
+                "linksInternal": (scan.get("links") or {}).get("internal", 0),
+                "linksExternal": (scan.get("links") or {}).get("external", 0),
+                "robots": scan.get("robots") or {},
+            },
+        }
+        if scan.get("fetchError"):
+            result_status = "failed"
+            page_status = "failed"
+            run.pages_failed += 1
+        else:
+            run.pages_analyzed += 1
+        summary = f"Technical score {score}. {len(findings)} findings."
+
+        await create_growth_audit_event(
+            session,
+            run_id=run.id,
+            project_id=run.project_id,
+            event_type="page_scanned",
+            phase="technical_scan",
+            message=f"Pagina scansionata: {page.url}",
+            progress_percent=run.progress_percent,
+            payload={
+                "pageId": str(page.id),
+                "url": page.url,
+                "score": score,
+                "httpStatus": scan.get("httpStatus"),
+            },
+        )
+
+    page.status = page_status
+    page_result = GrowthAuditPageResult(
+        run_id=run.id,
+        page_id=page.id,
+        project_id=run.project_id,
+        result_type="technical",
+        status=result_status,
+        score=score if scan else None,
+        summary=summary,
+        findings=findings if scan else None,
+        tasks=tasks if scan else None,
+        raw_output=scan,
+        started_at=page_started,
+        completed_at=now,
+        error_message=error_message if not scan else scan.get("fetchError"),
+    )
+    session.add(page_result)
+    await session.flush()
+
+    if scan and findings:
+        for finding_data in findings:
+            finding = GrowthAuditFinding(
+                run_id=run.id,
+                page_id=page.id,
+                project_id=run.project_id,
+                source_result_id=page_result.id,
+                category=finding_data.get("category", "technical"),
+                severity=finding_data.get("severity", "medium"),
+                priority=finding_data.get("priority", "medium"),
+                title=finding_data.get("title", "Finding"),
+                description=finding_data.get("description"),
+                evidence=finding_data.get("evidence"),
+                recommendation=finding_data.get("recommendation"),
+                how_to_validate=finding_data.get("howToValidate"),
+                impact=finding_data.get("impact"),
+                effort=finding_data.get("effort"),
+                status="open",
+            )
+            session.add(finding)
+
+    if scan and tasks:
+        for task_data in tasks:
+            task = GrowthAuditTask(
+                run_id=run.id,
+                page_id=page.id,
+                project_id=run.project_id,
+                title=task_data.get("title", "Task"),
+                description=task_data.get("description"),
+                owner_type=task_data.get("ownerType", "seo"),
+                priority=task_data.get("priority", "medium"),
+                estimated_effort=task_data.get("estimatedEffort", "medium"),
+                status="open",
+            )
+            session.add(task)
+
+    success = page_status == "analyzed"
+    return success, score, findings, tasks
+
+
+async def _run_technical_scan_phase(
+    session: AsyncSession,
+    *,
+    run: GrowthAuditRun,
+    max_pages: int,
+    source_counts: dict[str, int],
+    page_type_counts: dict[str, int],
+    classified_count: int,
+    inventory_count: int,
+    now: datetime,
+) -> None:
+    pages = _pages_to_scan(run, max_pages)
+    total_to_scan = len(pages)
+
+    run.pages_analyzed = run.pages_analyzed or 0
+    run.pages_failed = run.pages_failed or 0
+
+    run.status = "analyzing"
+    run.phase = "technical_scan"
+    run.progress_percent = 65
+    await create_growth_audit_event(
+        session,
+        run_id=run.id,
+        project_id=run.project_id,
+        event_type="technical_scan_started",
+        phase="technical_scan",
+        message=f"Scansione tecnica avviata su {total_to_scan} pagine.",
+        progress_percent=65,
+        payload={"pagesToScan": total_to_scan},
+    )
+    await session.commit()
+
+    if total_to_scan == 0:
+        run.pages_analyzed = 0
+        run.pages_failed = 0
+        run.site_score = None
+        run.seo_score = None
+        run.status = "completed"
+        run.phase = "finalization"
+        run.progress_percent = 100
+        run.completed_at = _utcnow()
+        run.summary = {
+            "message": "Technical page scan completed. No pages to analyze.",
+            "pagesDiscovered": inventory_count,
+            "pagesClassified": classified_count,
+            "pagesAnalyzed": 0,
+            "pagesFailed": 0,
+            "includeAiAnalysis": bool((run.config or {}).get("includeAiAnalysis")),
+            "auditMode": run.audit_mode,
+            "sources": source_counts,
+            "pageTypes": page_type_counts,
+            "nextStep": "Enable page-level AI, GEO and CRO analysis by page type.",
+        }
+        await create_growth_audit_event(
+            session,
+            run_id=run.id,
+            project_id=run.project_id,
+            event_type="run_completed",
+            phase="finalization",
+            message="Growth Audit completato.",
+            progress_percent=100,
+            payload=run.summary,
+        )
+        await session.commit()
+        return
+
+    semaphore = asyncio.Semaphore(TECHNICAL_SCAN_CONCURRENCY)
+    scan_results = await asyncio.gather(
+        *[
+            _fetch_page_scan(page, root_domain=run.normalized_domain, semaphore=semaphore)
+            for page in pages
+        ]
+    )
+
+    scores: list[int] = []
+    all_findings: list[dict] = []
+    done = 0
+
+    for page, scan, error_message in scan_results:
+        run.current_url = page.url
+        page.status = "analyzing"
+        done += 1
+        run.progress_percent = 65 + int(30 * done / total_to_scan)
+        if run.progress_percent > 95:
+            run.progress_percent = 95
+
+        success, score, findings, _ = await _persist_technical_scan_result(
+            session,
+            run=run,
+            page=page,
+            scan=scan,
+            error_message=error_message,
+            now=now,
+        )
+        if success and score is not None:
+            scores.append(score)
+        all_findings.extend(findings)
+        await session.commit()
+
+    run.current_url = None
+    include_ai = bool((run.config or {}).get("includeAiAnalysis"))
+
+    critical_count = sum(1 for f in all_findings if f.get("severity") == "critical")
+    high_count = sum(1 for f in all_findings if f.get("severity") == "high")
+    tasks_open = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditTask)
+            .where(
+                GrowthAuditTask.run_id == run.id,
+                GrowthAuditTask.project_id == run.project_id,
+                GrowthAuditTask.status == "open",
+            )
+        )
+    ).scalar_one()
+
+    average_score = round(sum(scores) / len(scores)) if scores else None
+    run.site_score = average_score
+    run.seo_score = average_score
+    run.geo_score = None
+    run.cro_score = None
+    run.performance_score = None
+
+    warning_message = None
+    if inventory_count <= 1:
+        warning_message = (
+            "Solo la pagina seed è stata trovata. Verifica sitemap o sincronizzazione Shopify."
+        )
+
+    if run.pages_analyzed == 0 and run.pages_failed > 0:
+        final_status = "failed"
+    elif run.pages_failed > 0:
+        final_status = "partial_failed"
+    else:
+        final_status = "completed"
+
+    run.status = final_status
+    run.phase = "finalization"
+    run.progress_percent = 100
+    run.completed_at = _utcnow()
+    run.summary = {
+        "message": "Technical page scan completed. AI/GEO/CRO analysis is not enabled yet.",
+        "pagesDiscovered": inventory_count,
+        "pagesClassified": classified_count,
+        "pagesAnalyzed": run.pages_analyzed,
+        "pagesFailed": run.pages_failed,
+        "averageTechnicalScore": average_score,
+        "criticalFindings": critical_count,
+        "highFindings": high_count,
+        "tasksOpen": tasks_open,
+        "includeAiAnalysis": include_ai,
+        "auditMode": run.audit_mode,
+        "sources": source_counts,
+        "pageTypes": page_type_counts,
+        "nextStep": "Enable page-level AI, GEO and CRO analysis by page type.",
+        "warning": warning_message,
+    }
+    await create_growth_audit_event(
+        session,
+        run_id=run.id,
+        project_id=run.project_id,
+        event_type="run_completed",
+        phase="finalization",
+        message="Growth Audit completato: scansione tecnica pagine.",
+        progress_percent=100,
+        payload=run.summary,
+    )
+    await session.commit()
 
 
 async def create_growth_audit_event(
@@ -440,53 +790,16 @@ async def process_growth_audit_run(run_id: UUID) -> None:
         )
         await session.commit()
 
-        include_ai = bool((run.config or {}).get("includeAiAnalysis"))
-        await create_growth_audit_event(
+        await _run_technical_scan_phase(
             session,
-            run_id=run.id,
-            project_id=run.project_id,
-            event_type="analysis_skipped",
-            phase="analysis",
-            message="Analisi AI non abilitata in questo step.",
-            progress_percent=60,
-            payload={"includeAiAnalysis": include_ai},
+            run=run,
+            max_pages=max_pages,
+            source_counts=source_counts,
+            page_type_counts=page_type_counts,
+            classified_count=classified_count,
+            inventory_count=len(inventory_items),
+            now=now,
         )
-        await session.commit()
-
-        warning_message = None
-        if len(inventory_items) <= 1:
-            warning_message = (
-                "Solo la pagina seed è stata trovata. Verifica sitemap o sincronizzazione Shopify."
-            )
-
-        run.status = "completed"
-        run.phase = "finalization"
-        run.progress_percent = 100
-        run.completed_at = _utcnow()
-        run.current_url = None
-        run.summary = {
-            "message": "Page inventory completed. AI page analysis is not enabled yet.",
-            "pagesDiscovered": len(inventory_items),
-            "pagesClassified": classified_count,
-            "pagesAnalyzed": 0,
-            "includeAiAnalysis": include_ai,
-            "auditMode": run.audit_mode,
-            "sources": source_counts,
-            "pageTypes": page_type_counts,
-            "nextStep": "Enable page-level technical and AI analysis.",
-            "warning": warning_message,
-        }
-        await create_growth_audit_event(
-            session,
-            run_id=run.id,
-            project_id=run.project_id,
-            event_type="run_completed",
-            phase="finalization",
-            message="Growth Audit completato: inventario pagine pronto.",
-            progress_percent=100,
-            payload=run.summary,
-        )
-        await session.commit()
 
 
 async def get_growth_audit_run(
@@ -577,3 +890,79 @@ async def list_growth_audit_events(
     if run is None:
         raise GrowthAuditRunNotFoundError(f"Growth Audit run {run_id} not found")
     return sorted(run.events, key=lambda event: event.created_at or _utcnow())
+
+
+async def list_growth_audit_findings(
+    session: AsyncSession,
+    project_id: UUID,
+    run_id: UUID,
+    *,
+    page_id: UUID | None = None,
+    severity: str | None = None,
+    category: str | None = None,
+    status: str | None = None,
+) -> list[GrowthAuditFinding]:
+    run = await get_growth_audit_run(session, project_id, run_id)
+    if run is None:
+        raise GrowthAuditRunNotFoundError(f"Growth Audit run {run_id} not found")
+
+    query = select(GrowthAuditFinding).where(
+        GrowthAuditFinding.run_id == run_id,
+        GrowthAuditFinding.project_id == project_id,
+    )
+    if page_id is not None:
+        query = query.where(GrowthAuditFinding.page_id == page_id)
+    if severity:
+        query = query.where(GrowthAuditFinding.severity == severity)
+    if category:
+        query = query.where(GrowthAuditFinding.category == category)
+    if status:
+        query = query.where(GrowthAuditFinding.status == status)
+
+    result = await session.execute(query)
+    findings = list(result.scalars().all())
+    findings.sort(
+        key=lambda f: (
+            _SEVERITY_ORDER.get(f.severity, 99),
+            f.created_at or _utcnow(),
+        )
+    )
+    return findings
+
+
+async def list_growth_audit_tasks(
+    session: AsyncSession,
+    project_id: UUID,
+    run_id: UUID,
+    *,
+    page_id: UUID | None = None,
+    priority: str | None = None,
+    owner_type: str | None = None,
+    status: str | None = None,
+) -> list[GrowthAuditTask]:
+    run = await get_growth_audit_run(session, project_id, run_id)
+    if run is None:
+        raise GrowthAuditRunNotFoundError(f"Growth Audit run {run_id} not found")
+
+    query = select(GrowthAuditTask).where(
+        GrowthAuditTask.run_id == run_id,
+        GrowthAuditTask.project_id == project_id,
+    )
+    if page_id is not None:
+        query = query.where(GrowthAuditTask.page_id == page_id)
+    if priority:
+        query = query.where(GrowthAuditTask.priority == priority)
+    if owner_type:
+        query = query.where(GrowthAuditTask.owner_type == owner_type)
+    if status:
+        query = query.where(GrowthAuditTask.status == status)
+
+    result = await session.execute(query)
+    tasks = list(result.scalars().all())
+    tasks.sort(
+        key=lambda t: (
+            _PRIORITY_ORDER.get(t.priority, 99),
+            t.created_at or _utcnow(),
+        )
+    )
+    return tasks

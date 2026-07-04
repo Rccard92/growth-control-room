@@ -1,4 +1,9 @@
-import type { AiUsageFilters, DateRangeParams } from "@gcr/shared";
+import type {
+  AiUsageFilters,
+  DateRangeParams,
+  GrowthAuditFindingsFilters,
+  GrowthAuditTasksFilters,
+} from "@gcr/shared";
 
 export const queryKeys = {
   projects: {
@@ -119,5 +124,9 @@ export const queryKeys = {
       ["growth-audit", "pages", projectId, runId] as const,
     events: (projectId: string, runId: string) =>
       ["growth-audit", "events", projectId, runId] as const,
+    findings: (projectId: string, runId: string, filters?: GrowthAuditFindingsFilters) =>
+      ["growth-audit", "findings", projectId, runId, filters ?? {}] as const,
+    tasks: (projectId: string, runId: string, filters?: GrowthAuditTasksFilters) =>
+      ["growth-audit", "tasks", projectId, runId, filters ?? {}] as const,
   },
 };

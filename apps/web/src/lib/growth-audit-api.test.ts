@@ -55,4 +55,26 @@ describe("growth-audit-api", () => {
       "/api/projects/proj-1/growth-audit/runs/run-42/events",
     );
   });
+
+  it("calls findings endpoint with filters", async () => {
+    const { fetchGrowthAuditFindings } = await import("./growth-audit-api");
+    await fetchGrowthAuditFindings("proj-1", "run-42", {
+      severity: "high",
+      pageId: "page-1",
+    });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/findings?severity=high&pageId=page-1",
+    );
+  });
+
+  it("calls tasks endpoint with filters", async () => {
+    const { fetchGrowthAuditTasks } = await import("./growth-audit-api");
+    await fetchGrowthAuditTasks("proj-1", "run-42", {
+      status: "open",
+      ownerType: "seo",
+    });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/tasks?status=open&ownerType=seo",
+    );
+  });
 });
