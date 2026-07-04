@@ -404,3 +404,149 @@ export function getInventoryKpiItems(
     { label: "Sconosciute", value: String(pageTypes.unknown ?? aggregated.unknown) },
   ];
 }
+
+export interface GrowthAuditPageTechnicalMetadata {
+  schemaTypes: string[];
+  imagesTotal: number | null;
+  imagesMissingAlt: number | null;
+  linksInternal: number | null;
+  linksExternal: number | null;
+  robots: { noindex?: boolean; nofollow?: boolean; raw?: string } | null;
+}
+
+const SEVERITY_LABELS: Record<string, string> = {
+  critical: "Critico",
+  high: "Alta",
+  medium: "Media",
+  low: "Bassa",
+  info: "Info",
+};
+
+const TASK_PRIORITY_LABELS: Record<string, string> = {
+  high: "Alta",
+  medium: "Media",
+  low: "Bassa",
+};
+
+const OWNER_TYPE_LABELS: Record<string, string> = {
+  seo: "SEO",
+  content: "Contenuto",
+  dev: "Sviluppo",
+  design: "Design",
+  ads: "Ads",
+};
+
+function readTechnicalBlock(page: GrowthAuditPage): Record<string, unknown> | null {
+  const metadata = page.metadata as Record<string, unknown> | null | undefined;
+  if (metadata?.technical && typeof metadata.technical === "object") {
+    return metadata.technical as Record<string, unknown>;
+  }
+  const pageMetadata = (page as GrowthAuditPage & { pageMetadata?: Record<string, unknown> })
+    .pageMetadata;
+  if (pageMetadata?.technical && typeof pageMetadata.technical === "object") {
+    return pageMetadata.technical as Record<string, unknown>;
+  }
+  return null;
+}
+
+export function getFindingsForPage(
+  findings: GrowthAuditFinding[],
+  pageId: string | null,
+): GrowthAuditFinding[] {
+  if (!pageId) return [];
+  return findings.filter((finding) => finding.pageId === pageId);
+}
+
+export function getTasksForPage(
+  tasks: GrowthAuditTask[],
+  pageId: string | null,
+): GrowthAuditTask[] {
+  if (!pageId) return [];
+  return tasks.filter((task) => task.pageId === pageId);
+}
+
+export function sortGrowthAuditFindings(findings: GrowthAuditFinding[]): GrowthAuditFinding[] {
+  return [...findings].sort((a, b) => {
+    const severityDiff =
+      (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99);
+    if (severityDiff !== 0) return severityDiff;
+    return (a.title || "").localeCompare(b.title || "");
+  });
+}
+
+export function sortGrowthAuditTasks(tasks: GrowthAuditTask[]): GrowthAuditTask[] {
+  return [...tasks].sort((a, b) => {
+    const priorityDiff =
+      (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99);
+    if (priorityDiff !== 0) return priorityDiff;
+    return (a.title || "").localeCompare(b.title || "");
+  });
+}
+
+export function getGrowthAuditPageScoreLabel(score?: number | null): string {
+  if (score == null) return "Non disponibile";
+  if (score >= 80) return "Buona";
+  if (score >= 60) return "Da migliorare";
+  return "Critica";
+}
+
+export function getGrowthAuditFindingSeverityLabel(severity?: string | null): string {
+  if (!severity) return "—";
+  return SEVERITY_LABELS[severity] ?? severity;
+}
+
+export function getGrowthAuditTaskPriorityLabel(priority?: string | null): string {
+  if (!priority) return "—";
+  return TASK_PRIORITY_LABELS[priority] ?? priority;
+}
+
+export function getGrowthAuditOwnerTypeLabel(ownerType?: string | null): string {
+  if (!ownerType) return "—";
+  return OWNER_TYPE_LABELS[ownerType] ?? ownerType;
+}
+
+export function getGrowthAuditPageTechnicalMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageTechnicalMetadata {
+  const technical = readTechnicalBlock(page);
+  const schemaTypes = Array.isArray(technical?.schemaTypes)
+    ? (technical.schemaTypes as unknown[]).filter((item): item is string => typeof item === "string")
+    : [];
+
+  const readNumber = (key: string): number | null => {
+    const value = technical?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  const robotsRaw = technical?.robots;
+  const robots =
+    robotsRaw && typeof robotsRaw === "object"
+      ? (robotsRaw as { noindex?: boolean; nofollow?: boolean; raw?: string })
+      : null;
+
+  return {
+    schemaTypes,
+    imagesTotal: readNumber("imagesTotal"),
+    imagesMissingAlt: readNumber("imagesMissingAlt"),
+    linksInternal: readNumber("linksInternal"),
+    linksExternal: readNumber("linksExternal"),
+    robots,
+  };
+}
+
+export function formatPageFindingsCount(count: number): string {
+  if (count <= 0) return "Nessun problema";
+  if (count === 1) return "1 problema";
+  return `${count} problemi`;
+}
+
+export function getGrowthAuditPageInventoryStatusLabel(status?: string | null): string {
+  if (!status) return "Non ancora scansionata";
+  if (status === "analyzed") return "Analizzata";
+  if (status === "failed") return "Fallita";
+  if (status === "classified") return "Classificata";
+  if (status === "pending" || status === "discovered" || status === "analyzing") {
+    return "Non ancora scansionata";
+  }
+  return getGrowthAuditPageStatusLabel(status);
+}

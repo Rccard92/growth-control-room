@@ -241,6 +241,8 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Problemi");
     expect(html).toContain("82");
     expect(html).toContain("200");
+    expect(html).toContain("Dettaglio");
+    expect(html).toContain("Buona");
   });
 
   it("shows Site Score and pagesAnalyzed from technical scan", () => {

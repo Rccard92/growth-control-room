@@ -4,9 +4,13 @@ import {
   aggregatePageInventory,
   filterInventoryPages,
   filterInventoryPagesByScore,
+  formatPageFindingsCount,
   getDefaultRootUrl,
+  getFindingsForPage,
   getGrowthAuditInventoryFilterLabel,
+  getGrowthAuditPageScoreLabel,
   getGrowthAuditPageSourceLabel,
+  getGrowthAuditPageTechnicalMetadata,
   getGrowthAuditPageTypeLabel,
   getGrowthAuditPhaseLabel,
   getGrowthAuditScoreBadgeClass,
@@ -14,7 +18,9 @@ import {
   getGrowthAuditSourceBadgeClass,
   getGrowthAuditStatusLabel,
   getInventoryMessage,
+  getTasksForPage,
   getTopPriorityFindings,
+  sortGrowthAuditFindings,
 } from "./growth-audit-utils";
 
 const samplePages: GrowthAuditPage[] = [
@@ -157,5 +163,106 @@ describe("growth-audit-utils", () => {
       2,
     );
     expect(findings[0].severity).toBe("critical");
+  });
+
+  it("filters findings and tasks by page id", () => {
+    const findings = [
+      {
+        id: "f1",
+        runId: "run",
+        projectId: "proj",
+        pageId: "page-1",
+        category: "seo",
+        severity: "high",
+        priority: "high",
+        title: "A",
+        status: "open",
+      },
+      {
+        id: "f2",
+        runId: "run",
+        projectId: "proj",
+        pageId: "page-2",
+        category: "seo",
+        severity: "low",
+        priority: "low",
+        title: "B",
+        status: "open",
+      },
+    ];
+    const tasks = [
+      {
+        id: "t1",
+        runId: "run",
+        projectId: "proj",
+        pageId: "page-1",
+        title: "Task A",
+        ownerType: "seo",
+        priority: "high",
+        estimatedEffort: "low",
+        status: "open",
+      },
+      {
+        id: "t2",
+        runId: "run",
+        projectId: "proj",
+        pageId: "page-2",
+        title: "Task B",
+        ownerType: "dev",
+        priority: "medium",
+        estimatedEffort: "medium",
+        status: "open",
+      },
+    ];
+
+    expect(getFindingsForPage(findings, "page-1")).toHaveLength(1);
+    expect(getTasksForPage(tasks, "page-1")).toHaveLength(1);
+    expect(getFindingsForPage(findings, null)).toHaveLength(0);
+  });
+
+  it("sorts findings by severity", () => {
+    const sorted = sortGrowthAuditFindings([
+      {
+        id: "f1",
+        runId: "run",
+        projectId: "proj",
+        category: "seo",
+        severity: "info",
+        priority: "low",
+        title: "Info",
+        status: "open",
+      },
+      {
+        id: "f2",
+        runId: "run",
+        projectId: "proj",
+        category: "seo",
+        severity: "critical",
+        priority: "high",
+        title: "Critical",
+        status: "open",
+      },
+    ]);
+    expect(sorted[0].severity).toBe("critical");
+  });
+
+  it("reads technical metadata safely when metadata is null", () => {
+    const meta = getGrowthAuditPageTechnicalMetadata({
+      ...samplePages[0],
+      metadata: null,
+    });
+    expect(meta.schemaTypes).toEqual([]);
+    expect(meta.imagesTotal).toBeNull();
+    expect(meta.robots).toBeNull();
+  });
+
+  it("maps score labels and findings count", () => {
+    expect(getGrowthAuditPageScoreLabel(82)).toBe("Buona");
+    expect(getGrowthAuditPageScoreLabel(67)).toBe("Da migliorare");
+    expect(getGrowthAuditPageScoreLabel(43)).toBe("Critica");
+    expect(getGrowthAuditPageScoreLabel(null)).toBe("Non disponibile");
+    expect(formatPageFindingsCount(0)).toBe("Nessun problema");
+    expect(formatPageFindingsCount(1)).toBe("1 problema");
+    expect(formatPageFindingsCount(2)).toBe("2 problemi");
   });
 });

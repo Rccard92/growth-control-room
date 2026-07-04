@@ -7,6 +7,7 @@ import type {
   GrowthAuditScoreFilter,
 } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
+import { GrowthAuditPageDrawer } from "../components/growth-audit/GrowthAuditPageDrawer";
 import {
   useGrowthAuditFindings,
   useGrowthAuditRun,
@@ -27,10 +28,13 @@ import {
   filterInventoryPagesByScore,
   filterInventoryPagesByStatus,
   formatGrowthAuditScore,
+  formatPageFindingsCount,
   getDefaultRootUrl,
+  getFindingsForPage,
   getGrowthAuditInventoryFilterLabel,
+  getGrowthAuditPageInventoryStatusLabel,
+  getGrowthAuditPageScoreLabel,
   getGrowthAuditPageSourceLabel,
-  getGrowthAuditPageStatusLabel,
   getGrowthAuditPageTypeLabel,
   getGrowthAuditPhaseLabel,
   getGrowthAuditScoreBadgeClass,
@@ -39,9 +43,12 @@ import {
   getGrowthAuditStatusLabel,
   getInventoryKpiItems,
   getInventoryMessage,
+  getTasksForPage,
   getTechnicalKpiItems,
   getTopOpenTasks,
   getTopPriorityFindings,
+  sortGrowthAuditFindings,
+  sortGrowthAuditTasks,
 } from "../lib/growth-audit-utils";
 import { APP_ROUTES } from "../routes/config";
 
@@ -83,6 +90,11 @@ export function GrowthAuditPage() {
   const [scoreFilter, setScoreFilter] = useState<GrowthAuditScoreFilter>("all");
   const [statusFilter, setStatusFilter] = useState<GrowthAuditPageStatusFilter>("all");
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedPageId(null);
+  }, [activeRunId]);
 
   useEffect(() => {
     if (activeRunId) return;
@@ -143,6 +155,26 @@ export function GrowthAuditPage() {
     }
     return map;
   }, [pages]);
+  const selectedPage = useMemo(
+    () => pages.find((page) => page.id === selectedPageId) ?? null,
+    [pages, selectedPageId],
+  );
+  const selectedPageFindings = useMemo(
+    () => sortGrowthAuditFindings(getFindingsForPage(findings, selectedPageId)),
+    [findings, selectedPageId],
+  );
+  const selectedPageTasks = useMemo(
+    () => sortGrowthAuditTasks(getTasksForPage(tasks, selectedPageId)),
+    [tasks, selectedPageId],
+  );
+
+  useEffect(() => {
+    if (!selectedPageId) return;
+    if (!pages.some((page) => page.id === selectedPageId)) {
+      setSelectedPageId(null);
+    }
+  }, [pages, selectedPageId]);
+
   const showInventoryKpis =
     activeRun?.status === "completed" &&
     pages.length > 0 &&
@@ -469,14 +501,33 @@ export function GrowthAuditPage() {
                         <th>Title</th>
                         <th>Problemi</th>
                         <th>Stato</th>
+                        <th>Azioni</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredPages.map((page) => (
-                        <tr key={page.id}>
+                        <tr
+                          key={page.id}
+                          className="growth-audit-pages-table__row--clickable"
+                          onClick={() => setSelectedPageId(page.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setSelectedPageId(page.id);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Apri dettaglio pagina ${page.url}`}
+                        >
                           <td className="growth-audit-pages-table__url">
                             <div>{page.title || page.url}</div>
                             <div className="growth-audit-pages-table__url-sub">{page.url}</div>
+                            {page.status === "failed" && page.errorMessage && (
+                              <div className="growth-audit-pages-table__error">
+                                {page.errorMessage}
+                              </div>
+                            )}
                           </td>
                           <td>{getGrowthAuditPageTypeLabel(page.pageType)}</td>
                           <td>
@@ -487,14 +538,29 @@ export function GrowthAuditPage() {
                           <td>{page.httpStatus ?? "—"}</td>
                           <td>
                             <span className={getGrowthAuditScoreBadgeClass(page.score)}>
-                              {formatGrowthAuditScore(page.score)}
+                              {formatGrowthAuditScore(page.score)}{" "}
+                              {getGrowthAuditPageScoreLabel(page.score)}
                             </span>
                           </td>
                           <td className="growth-audit-pages-table__title">
                             {page.title ?? "—"}
                           </td>
-                          <td>{findingsByPageId[page.id] ?? "—"}</td>
-                          <td>{getGrowthAuditPageStatusLabel(page.status)}</td>
+                          <td>
+                            {formatPageFindingsCount(findingsByPageId[page.id] ?? 0)}
+                          </td>
+                          <td>{getGrowthAuditPageInventoryStatusLabel(page.status)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="growth-audit-pages-table__action gcr-btn gcr-btn--secondary gcr-btn--sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedPageId(page.id);
+                              }}
+                            >
+                              Dettaglio
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -565,6 +631,14 @@ export function GrowthAuditPage() {
           </div>
         )}
       </section>
+
+      <GrowthAuditPageDrawer
+        open={Boolean(selectedPage)}
+        page={selectedPage}
+        findings={selectedPageFindings}
+        tasks={selectedPageTasks}
+        onClose={() => setSelectedPageId(null)}
+      />
 
       <section className="growth-audit-ai-next gcr-card">
         <div className="growth-audit-ai-next__header">
