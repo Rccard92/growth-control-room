@@ -348,13 +348,14 @@ describe("GrowthAuditPage", () => {
     expect(html).not.toContain("SEO Audit Control Room");
   });
 
-  it("renders AI/GEO/CRO coming card", () => {
+  it("renders AI/GEO/CRO availability card", () => {
     setupMocks();
     const html = renderPage();
-    expect(html).toContain("Analisi AI/GEO/CRO in arrivo");
+    expect(html).toContain("Analisi AI/GEO/CRO");
+    expect(html).toContain("tab AI/GEO/CRO nel drawer");
     expect(html).toContain("Prodotto: SEO ecommerce, schema Product, immagini, CRO e trust.");
     expect(html).toContain("Blog: contenuto, intent, E-E-A-T, GEO e linking interno.");
     expect(html).toContain("Collection: intent commerciale, schema, testo categoria e UX catalogo.");
-    expect(html).toContain("Step successivo");
+    expect(html).toContain("Disponibile");
   });
 });

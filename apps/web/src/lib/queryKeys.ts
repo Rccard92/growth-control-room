@@ -128,5 +128,7 @@ export const queryKeys = {
       ["growth-audit", "findings", projectId, runId, filters ?? {}] as const,
     tasks: (projectId: string, runId: string, filters?: GrowthAuditTasksFilters) =>
       ["growth-audit", "tasks", projectId, runId, filters ?? {}] as const,
+    pageResults: (projectId: string, runId: string, pageId: string, resultType?: string) =>
+      ["growth-audit", "page-results", projectId, runId, pageId, resultType ?? ""] as const,
   },
 };

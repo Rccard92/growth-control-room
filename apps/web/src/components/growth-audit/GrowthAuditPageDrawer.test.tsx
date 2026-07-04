@@ -14,11 +14,24 @@ const { useProductSeoDetailMock, useCollectionSeoDetailMock, useProductsSeoMock,
     useCollectionsSeoMock: vi.fn(),
   }));
 
+const {
+  useGrowthAuditPageResultsMock,
+  useAnalyzeGrowthAuditPageWithAiMock,
+} = vi.hoisted(() => ({
+  useGrowthAuditPageResultsMock: vi.fn(),
+  useAnalyzeGrowthAuditPageWithAiMock: vi.fn(),
+}));
+
 vi.mock("../../hooks/useContentSeo", () => ({
   useProductSeoDetail: useProductSeoDetailMock,
   useCollectionSeoDetail: useCollectionSeoDetailMock,
   useProductsSeo: useProductsSeoMock,
   useCollectionsSeo: useCollectionsSeoMock,
+}));
+
+vi.mock("../../hooks/useGrowthAudit", () => ({
+  useGrowthAuditPageResults: useGrowthAuditPageResultsMock,
+  useAnalyzeGrowthAuditPageWithAi: useAnalyzeGrowthAuditPageWithAiMock,
 }));
 
 function setupSeoDetailMocks() {
@@ -32,6 +45,14 @@ function setupSeoDetailMocks() {
   useCollectionSeoDetailMock.mockReturnValue(idleQuery);
   useProductsSeoMock.mockReturnValue(idleQuery);
   useCollectionsSeoMock.mockReturnValue(idleQuery);
+  useGrowthAuditPageResultsMock.mockReturnValue({
+    data: [],
+    isLoading: false,
+  });
+  useAnalyzeGrowthAuditPageWithAiMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
 }
 
 const samplePage: GrowthAuditPage = {
@@ -142,6 +163,7 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain("Problemi");
     expect(html).toContain("Task");
     expect(html).toContain("Dati tecnici");
+    expect(html).toContain("AI/GEO/CRO");
   });
 
   it("renders overview riepilogo and enabled rescan button when run is completed", () => {
@@ -231,7 +253,7 @@ describe("GrowthAuditPageDrawer", () => {
     );
 
     expect(html).toContain("Nessuna entità Shopify collegata");
-    expect(countDrawerTabs(html)).toBe(5);
+    expect(countDrawerTabs(html)).toBe(6);
   });
 
   it("renders linked Shopify entity card and Modifica Shopify tab for editable product", () => {
@@ -260,7 +282,7 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain("Modifica Shopify");
     expect(html).toContain("Usa la tab Modifica Shopify");
     expect(html).not.toContain("Nel prossimo step potrai modificare title");
-    expect(countDrawerTabs(html)).toBe(6);
+    expect(countDrawerTabs(html)).toBe(7);
   });
 
   it("does not show Modifica Shopify tab without sourceEntityId", () => {
@@ -280,10 +302,10 @@ describe("GrowthAuditPageDrawer", () => {
       />,
     );
 
-    expect(countDrawerTabs(html)).toBe(5);
+    expect(countDrawerTabs(html)).toBe(6);
   });
 
-  it("renders in-arrivo microcopy for linked Shopify page entity on overview", () => {
+  it("does not show Modifica Shopify tab without sourceEntityId", () => {
     setupSeoDetailMocks();
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
@@ -302,6 +324,22 @@ describe("GrowthAuditPageDrawer", () => {
 
     expect(html).toContain("Pagina Shopify");
     expect(html).toContain("Modifica Shopify per pagine e articoli in arrivo.");
+    expect(countDrawerTabs(html)).toBe(6);
+  });
+
+  it("hides AI tab when page is not analyzed", () => {
+    setupSeoDetailMocks();
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={{ ...samplePage, status: "failed" }}
+        findings={[]}
+        tasks={[]}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).not.toContain("AI/GEO/CRO");
     expect(countDrawerTabs(html)).toBe(5);
   });
 

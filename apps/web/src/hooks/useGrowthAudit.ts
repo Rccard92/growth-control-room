@@ -1,14 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   GrowthAuditFindingsFilters,
+  GrowthAuditPageAiAnalysisRequest,
   GrowthAuditPageRescanRequest,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunStatus,
   GrowthAuditTasksFilters,
 } from "@gcr/shared";
 import {
+  analyzeGrowthAuditPageWithAi,
   fetchGrowthAuditEvents,
   fetchGrowthAuditFindings,
+  fetchGrowthAuditPageResults,
   fetchGrowthAuditPages,
   fetchGrowthAuditRun,
   fetchGrowthAuditTasks,
@@ -190,6 +193,72 @@ export function useRescanGrowthAuditPage(projectId?: string) {
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.growthAudit.events(projectId, runId),
+      });
+    },
+  });
+}
+
+export function useGrowthAuditPageResults(
+  projectId?: string,
+  runId?: string,
+  pageId?: string,
+  filters?: { resultType?: string },
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.growthAudit.pageResults(
+      projectId ?? "",
+      runId ?? "",
+      pageId ?? "",
+      filters?.resultType,
+    ),
+    queryFn: () => fetchGrowthAuditPageResults(projectId!, runId!, pageId!, filters),
+    enabled: Boolean(projectId) && Boolean(runId) && Boolean(pageId) && enabled,
+    select: (data) => data.results,
+  });
+}
+
+export function useAnalyzeGrowthAuditPageWithAi(projectId?: string, runId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      pageId: string;
+      payload?: GrowthAuditPageAiAnalysisRequest;
+    }) => {
+      if (!projectId || !runId) {
+        throw new Error("projectId and runId are required");
+      }
+      return analyzeGrowthAuditPageWithAi(projectId, runId, input.pageId, input.payload);
+    },
+    onSuccess: (data) => {
+      if (!projectId) return;
+
+      const resolvedRunId = data.run.id;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.runs(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.run(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pages(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.findings(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.tasks(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.events(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pageResults(
+          projectId,
+          resolvedRunId,
+          data.page.id,
+        ),
       });
     },
   });

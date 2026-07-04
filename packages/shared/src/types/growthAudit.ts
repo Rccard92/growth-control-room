@@ -80,7 +80,11 @@ export type GrowthAuditFindingCategory =
   | "technical"
   | "seo"
   | "schema"
-  | "images";
+  | "images"
+  | "content"
+  | "geo"
+  | "cro"
+  | "ads";
 
 export type GrowthAuditTaskOwnerType = "seo" | "content" | "dev" | "design" | "ads";
 
@@ -109,6 +113,22 @@ export interface GrowthAuditRunSummary {
   nextStep?: string;
   warning?: string | null;
   lastPageRescanAt?: string | null;
+  aiPagesAnalyzed?: number;
+  geoFindings?: number;
+  croFindings?: number;
+  adsFindings?: number;
+  lastAiAnalysisAt?: string | null;
+  lastAiAnalysisUrl?: string | null;
+}
+
+export interface GrowthAuditPageAiMetadata {
+  latestResultId?: string;
+  latestScore?: number;
+  seoScore?: number;
+  geoScore?: number;
+  croScore?: number;
+  adsReadinessScore?: number;
+  analyzedAt?: string;
 }
 
 export interface GrowthAuditRunCreateRequest {
@@ -313,4 +333,51 @@ export interface GrowthAuditPageRescanResponse {
   findingsCount: number;
   tasksCount: number;
   message: string;
+}
+
+export type GrowthAuditAiAnalysisDepth = "standard" | "deep";
+
+export interface GrowthAuditPageResult {
+  id: string;
+  runId: string;
+  pageId: string;
+  projectId: string;
+  resultType: string;
+  skillKey?: string | null;
+  status: string;
+  score?: number | null;
+  summary?: string | null;
+  findings?: Array<Record<string, unknown>> | null;
+  recommendations?: Array<Record<string, unknown>> | null;
+  tasks?: Array<Record<string, unknown>> | null;
+  artifacts?: Record<string, unknown> | null;
+  rawOutput?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface GrowthAuditPageAiAnalysisRequest {
+  provider?: GrowthAuditProvider;
+  depth?: GrowthAuditAiAnalysisDepth;
+  includeSeo?: boolean;
+  includeGeo?: boolean;
+  includeCro?: boolean;
+  includeAdsReadiness?: boolean;
+  note?: string | null;
+}
+
+export interface GrowthAuditPageAiAnalysisResponse {
+  run: GrowthAuditRun;
+  page: GrowthAuditPage;
+  result: GrowthAuditPageResult;
+  findingsCount: number;
+  tasksCount: number;
+  message: string;
+}
+
+export interface GrowthAuditPageResultsListResponse {
+  results: GrowthAuditPageResult[];
 }

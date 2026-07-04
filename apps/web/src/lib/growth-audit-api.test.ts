@@ -95,4 +95,40 @@ describe("growth-audit-api", () => {
       }),
     );
   });
+
+  it("calls ai-analysis page endpoint with POST body", async () => {
+    const { analyzeGrowthAuditPageWithAi } = await import("./growth-audit-api");
+    await analyzeGrowthAuditPageWithAi("proj-1", "run-42", "page-7", {
+      provider: "claude",
+      includeSeo: true,
+      includeGeo: false,
+      includeCro: true,
+      includeAdsReadiness: true,
+      note: "Pagina prioritaria",
+    });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/pages/page-7/ai-analysis",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          provider: "claude",
+          includeSeo: true,
+          includeGeo: false,
+          includeCro: true,
+          includeAdsReadiness: true,
+          note: "Pagina prioritaria",
+        }),
+      }),
+    );
+  });
+
+  it("calls page results endpoint with resultType filter", async () => {
+    const { fetchGrowthAuditPageResults } = await import("./growth-audit-api");
+    await fetchGrowthAuditPageResults("proj-1", "run-42", "page-7", {
+      resultType: "ai_deep_analysis",
+    });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/pages/page-7/results?resultType=ai_deep_analysis",
+    );
+  });
 });

@@ -2,8 +2,11 @@ import type {
   GrowthAuditEventsListResponse,
   GrowthAuditFindingsFilters,
   GrowthAuditFindingsListResponse,
+  GrowthAuditPageAiAnalysisRequest,
+  GrowthAuditPageAiAnalysisResponse,
   GrowthAuditPageRescanRequest,
   GrowthAuditPageRescanResponse,
+  GrowthAuditPageResultsListResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
@@ -113,4 +116,45 @@ export function rescanGrowthAuditPage(
       ...jsonBody(payload ?? { clearPreviousOpenItems: true }),
     },
   );
+}
+
+export function analyzeGrowthAuditPageWithAi(
+  projectId: string,
+  runId: string,
+  pageId: string,
+  payload?: GrowthAuditPageAiAnalysisRequest,
+): Promise<GrowthAuditPageAiAnalysisResponse> {
+  return apiFetch<GrowthAuditPageAiAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/pages/${pageId}/ai-analysis`,
+    {
+      method: "POST",
+      ...jsonBody(
+        payload ?? {
+          provider: "openai",
+          depth: "standard",
+          includeSeo: true,
+          includeGeo: true,
+          includeCro: true,
+          includeAdsReadiness: true,
+        },
+      ),
+    },
+  );
+}
+
+export function fetchGrowthAuditPageResults(
+  projectId: string,
+  runId: string,
+  pageId: string,
+  filters?: { resultType?: string },
+): Promise<GrowthAuditPageResultsListResponse> {
+  const params = new URLSearchParams();
+  if (filters?.resultType) {
+    params.set("resultType", filters.resultType);
+  }
+  const query = params.toString();
+  const path = `${growthAuditBasePath(projectId)}/runs/${runId}/pages/${pageId}/results${
+    query ? `?${query}` : ""
+  }`;
+  return apiFetch<GrowthAuditPageResultsListResponse>(path);
 }

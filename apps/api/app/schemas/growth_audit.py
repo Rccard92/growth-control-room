@@ -316,3 +316,59 @@ class GrowthAuditPageRescanResponse(BaseModel):
     findings_count: int = Field(serialization_alias="findingsCount")
     tasks_count: int = Field(serialization_alias="tasksCount")
     message: str
+
+
+GrowthAuditAiAnalysisDepth = Literal["standard", "deep"]
+
+
+class GrowthAuditPageResultRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    run_id: UUID = Field(serialization_alias="runId")
+    page_id: UUID = Field(serialization_alias="pageId")
+    project_id: UUID = Field(serialization_alias="projectId")
+    result_type: str = Field(serialization_alias="resultType")
+    skill_key: str | None = Field(default=None, serialization_alias="skillKey")
+    status: str
+    score: int | None = None
+    summary: str | None = None
+    findings: list[Any] | None = None
+    recommendations: list[Any] | None = None
+    tasks: list[Any] | None = None
+    artifacts: dict[str, Any] | None = None
+    raw_output: dict[str, Any] | None = Field(default=None, serialization_alias="rawOutput")
+    error_message: str | None = Field(default=None, serialization_alias="errorMessage")
+    started_at: datetime | None = Field(default=None, serialization_alias="startedAt")
+    completed_at: datetime | None = Field(default=None, serialization_alias="completedAt")
+    created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+
+
+class GrowthAuditPageAiAnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    provider: GrowthAuditProvider = "openai"
+    depth: GrowthAuditAiAnalysisDepth = "standard"
+    include_seo: bool = Field(default=True, alias="includeSeo")
+    include_geo: bool = Field(default=True, alias="includeGeo")
+    include_cro: bool = Field(default=True, alias="includeCro")
+    include_ads_readiness: bool = Field(default=True, alias="includeAdsReadiness")
+    note: str | None = None
+
+
+class GrowthAuditPageAiAnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    run: GrowthAuditRunRead
+    page: GrowthAuditPageRead
+    result: GrowthAuditPageResultRead
+    findings_count: int = Field(serialization_alias="findingsCount")
+    tasks_count: int = Field(serialization_alias="tasksCount")
+    message: str
+
+
+class GrowthAuditPageResultsListResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    results: list[GrowthAuditPageResultRead]

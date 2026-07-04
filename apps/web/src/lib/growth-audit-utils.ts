@@ -335,6 +335,11 @@ export function getGrowthAuditSeverityBadgeClass(severity?: string | null): stri
   return `growth-audit-severity-badge growth-audit-severity-badge--${normalized}`;
 }
 
+export function getGrowthAuditAiKpiLabel(count?: number | null): string {
+  if (count == null || count === 0) return "—";
+  return String(count);
+}
+
 export function getTechnicalKpiItems(
   run?: {
     siteScore?: number | null;
@@ -361,6 +366,10 @@ export function getTechnicalKpiItems(
     {
       label: "Pagine analizzate",
       value: String(run?.pagesAnalyzed ?? summary?.pagesAnalyzed ?? "—"),
+    },
+    {
+      label: "Pagine AI analizzate",
+      value: getGrowthAuditAiKpiLabel(summary?.aiPagesAnalyzed),
     },
     {
       label: "Problemi critici/alti",

@@ -16,12 +16,13 @@ import {
   isGrowthAuditRunActive,
   mapGrowthAuditPageToSeoEntity,
 } from "../../lib/growth-audit-utils";
+import { GrowthAuditPageAiAnalysisPanel } from "./GrowthAuditPageAiAnalysisPanel";
 import { GrowthAuditPageFindingsPanel } from "./GrowthAuditPageFindingsPanel";
 import { GrowthAuditPageImprovementPanel } from "./GrowthAuditPageImprovementPanel";
 import { GrowthAuditPageTasksPanel } from "./GrowthAuditPageTasksPanel";
 import { GrowthAuditPageTechnicalSummary } from "./GrowthAuditPageTechnicalSummary";
 
-type DrawerTabId = "overview" | "improvements" | "problems" | "tasks" | "technical" | "shopify";
+type DrawerTabId = "overview" | "improvements" | "problems" | "tasks" | "technical" | "ai" | "shopify";
 
 interface GrowthAuditPageDrawerProps {
   open: boolean;
@@ -130,11 +131,14 @@ export function GrowthAuditPageDrawer({
       { id: "tasks", label: "Task" },
       { id: "technical", label: "Dati tecnici" },
     ];
+    if (page?.status === "analyzed") {
+      base.push({ id: "ai", label: "AI/GEO/CRO" });
+    }
     if (shopifyEditTabVisible) {
       base.push({ id: "shopify", label: "Modifica Shopify" });
     }
     return base;
-  }, [shopifyEditTabVisible]);
+  }, [shopifyEditTabVisible, page?.status]);
 
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
@@ -516,6 +520,17 @@ export function GrowthAuditPageDrawer({
           {activeTab === "technical" && (
             <div className="growth-audit-page-drawer__tab-panel" role="tabpanel">
               <GrowthAuditPageTechnicalSummary page={currentPage} />
+            </div>
+          )}
+
+          {activeTab === "ai" && projectId && runId && currentPage.status === "analyzed" && (
+            <div className="growth-audit-page-drawer__tab-panel" role="tabpanel">
+              <GrowthAuditPageAiAnalysisPanel
+                projectId={projectId}
+                runId={runId}
+                page={currentPage}
+                runStatus={runStatus}
+              />
             </div>
           )}
 

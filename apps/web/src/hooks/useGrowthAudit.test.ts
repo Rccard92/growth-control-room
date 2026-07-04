@@ -4,20 +4,11 @@ import { queryKeys } from "../lib/queryKeys";
 
 const invalidateQueriesMock = vi.fn();
 const rescanGrowthAuditPageMock = vi.fn();
+const analyzeGrowthAuditPageWithAiMock = vi.fn();
 
 let capturedMutation: {
-  mutationFn: (input: {
-    runId: string;
-    pageId: string;
-    payload?: { clearPreviousOpenItems?: boolean };
-  }) => Promise<unknown>;
-  onSuccess?: (data: {
-    run: GrowthAuditRun;
-    page: GrowthAuditPage;
-    findingsCount: number;
-    tasksCount: number;
-    message: string;
-  }) => void;
+  mutationFn: (input: unknown) => Promise<unknown>;
+  onSuccess?: (data: unknown) => void;
 } | null = null;
 
 vi.mock("@tanstack/react-query", () => ({
@@ -36,6 +27,8 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("../lib/growth-audit-api", () => ({
   rescanGrowthAuditPage: rescanGrowthAuditPageMock,
+  analyzeGrowthAuditPageWithAi: analyzeGrowthAuditPageWithAiMock,
+  fetchGrowthAuditPageResults: vi.fn(),
   startGrowthAuditRun: vi.fn(),
   listGrowthAuditRuns: vi.fn(),
   fetchGrowthAuditRun: vi.fn(),
@@ -110,6 +103,61 @@ describe("useRescanGrowthAuditPage", () => {
       "run-42",
       "page-1",
       { clearPreviousOpenItems: false },
+    );
+  });
+});
+
+describe("useAnalyzeGrowthAuditPageWithAi", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedMutation = null;
+  });
+
+  it("invalidates growth audit queries including page results on success", async () => {
+    const { useAnalyzeGrowthAuditPageWithAi } = await import("./useGrowthAudit");
+    useAnalyzeGrowthAuditPageWithAi("proj-1", "run-42");
+
+    expect(capturedMutation).not.toBeNull();
+
+    const response = {
+      run: { id: "run-42" } as GrowthAuditRun,
+      page: { id: "page-7" } as GrowthAuditPage,
+      result: { id: "result-1" },
+      findingsCount: 3,
+      tasksCount: 2,
+      message: "Analisi completata.",
+    };
+
+    capturedMutation!.onSuccess?.(response);
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.pageResults("proj-1", "run-42", "page-7"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(7);
+  });
+
+  it("calls ai analysis API with project, run and page ids", async () => {
+    const { useAnalyzeGrowthAuditPageWithAi } = await import("./useGrowthAudit");
+    analyzeGrowthAuditPageWithAiMock.mockResolvedValue({
+      run: { id: "run-42" },
+      page: { id: "page-7" },
+      result: { id: "result-1" },
+      findingsCount: 1,
+      tasksCount: 1,
+      message: "ok",
+    });
+
+    const hook = useAnalyzeGrowthAuditPageWithAi("proj-1", "run-42");
+    await hook.mutateAsync({
+      pageId: "page-7",
+      payload: { provider: "openai", includeGeo: false },
+    });
+
+    expect(analyzeGrowthAuditPageWithAiMock).toHaveBeenCalledWith(
+      "proj-1",
+      "run-42",
+      "page-7",
+      { provider: "openai", includeGeo: false },
     );
   });
 });

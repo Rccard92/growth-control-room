@@ -10,9 +10,13 @@ from app.schemas.growth_audit import (
     GrowthAuditEventsListResponse,
     GrowthAuditFindingRead,
     GrowthAuditFindingsListResponse,
+    GrowthAuditPageAiAnalysisRequest,
+    GrowthAuditPageAiAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
+    GrowthAuditPageResultRead,
+    GrowthAuditPageResultsListResponse,
     GrowthAuditPagesListResponse,
     GrowthAuditRunCreateRequest,
     GrowthAuditRunDetailResponse,
@@ -26,6 +30,10 @@ from app.services.growth_audit.exceptions import (
     GrowthAuditError,
     GrowthAuditRunNotFoundError,
     GrowthAuditValidationError,
+)
+from app.services.growth_audit.page_ai_analysis import (
+    analyze_growth_audit_page_with_ai,
+    list_growth_audit_page_results,
 )
 from app.services.growth_audit.run_service import (
     get_growth_audit_run_detail,
@@ -307,4 +315,84 @@ async def rescan_growth_audit_page_endpoint(
         findings_count=findings_count,
         tasks_count=tasks_count,
         message=message,
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/ai-analysis",
+    response_model=GrowthAuditPageAiAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_page_ai_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID,
+    request: GrowthAuditPageAiAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditPageAiAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        run, page, result, findings_count, tasks_count = await analyze_growth_audit_page_with_ai(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            page_id=page_id,
+            provider=request.provider,
+            depth=request.depth,
+            include_seo=request.include_seo,
+            include_geo=request.include_geo,
+            include_cro=request.include_cro,
+            include_ads_readiness=request.include_ads_readiness,
+            note=request.note,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    message = (
+        f"Analisi AI completata. Score AI: {result.score}."
+        if result.status == "completed"
+        else f"Analisi AI fallita: {result.error_message or 'errore sconosciuto'}"
+    )
+    return GrowthAuditPageAiAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(run),
+        page=GrowthAuditPageRead.model_validate(page),
+        result=GrowthAuditPageResultRead.model_validate(result),
+        findings_count=findings_count,
+        tasks_count=tasks_count,
+        message=message,
+    )
+
+
+@router.get(
+    "/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/results",
+    response_model=GrowthAuditPageResultsListResponse,
+)
+async def list_growth_audit_page_results_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID,
+    result_type: str | None = Query(default=None, alias="resultType"),
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditPageResultsListResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        results = await list_growth_audit_page_results(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            page_id=page_id,
+            result_type=result_type,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+    return GrowthAuditPageResultsListResponse(
+        results=[GrowthAuditPageResultRead.model_validate(r) for r in results]
     )

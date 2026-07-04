@@ -1122,6 +1122,20 @@ def _build_registry() -> dict[str, AiOperationDefinition]:
             enabled=False,
             warning_notes=_SEO_SKILL_EXTERNAL_WARNING,
         ),
+        # Growth Audit
+        _op(
+            "growth_audit_page_ai_analysis",
+            "Analisi AI/GEO/CRO pagina Growth Audit",
+            "growth_audit",
+            "page_ai_analysis",
+            "growth_audit_page_ai",
+            "standard",
+            "OPENAI_MODEL_STANDARD",
+            6500,
+            0.25,
+            entity_type="growth_audit_page",
+            recommended_use="Analisi singola pagina prioritaria: SEO/GEO/CRO/Ads readiness.",
+        ),
         # Email/Ads futuri
         _op("email_campaign_strategy", "Strategia email", "email", "campaign_strategy", "generic", "premium", "OPENAI_MODEL_PREMIUM", 4000, 0.5, status="planned", enabled=False, recommended_use="Premium per strategia campagna complessa."),
         _op("email_copy_generation", "Copy email", "email", "generate_copy", "generic", "standard", "OPENAI_MODEL_STANDARD", 2500, 0.55, status="planned", enabled=False, recommended_use="Standard per email marketing."),

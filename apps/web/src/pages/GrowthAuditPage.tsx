@@ -63,8 +63,8 @@ const GROWTH_AUDIT_FLOW_STEPS = [
 ] as const;
 
 const GROWTH_AUDIT_ROADMAP = [
-  "Analisi AI/GEO/CRO differenziata per tipologia di pagina",
-  "Rescan singola pagina",
+  "Analisi AI/GEO/CRO per pagine prioritarie",
+  "Batch AI controllato su pagine ad alto impatto",
   "Integrazioni: PageSpeed, Search Console, GA4, Google Ads, Firecrawl/DataForSEO",
 ] as const;
 
@@ -636,8 +636,8 @@ export function GrowthAuditPage() {
 
             {showTechnicalSections && (
               <p className="growth-audit-technical-note">
-                Questa scansione è tecnica e deterministica. Nel prossimo step aggiungeremo
-                analisi AI/GEO/CRO differenziata per tipo pagina.
+                La scansione tecnica è deterministica. Per SEO/GEO/CRO avanzato apri una pagina
+                analizzata e usa la tab AI/GEO/CRO nel drawer.
               </p>
             )}
           </div>
@@ -665,12 +665,12 @@ export function GrowthAuditPage() {
 
       <section className="growth-audit-ai-next gcr-card">
         <div className="growth-audit-ai-next__header">
-          <h2 className="growth-audit-ai-next__title">Analisi AI/GEO/CRO in arrivo</h2>
-          <span className="growth-audit-ai-next__badge">Step successivo</span>
+          <h2 className="growth-audit-ai-next__title">Analisi AI/GEO/CRO</h2>
+          <span className="growth-audit-ai-next__badge">Disponibile</span>
         </div>
         <p className="growth-audit-ai-next__description">
-          Le skill SEO importate verranno applicate automaticamente in base al tipo di pagina.
-          Una pagina prodotto riceverà controlli diversi da un articolo blog o da una collection.
+          Apri una pagina già scansionata e usa la tab AI/GEO/CRO nel drawer per analizzare
+          manualmente le pagine prioritarie. Il prompt varia in base al tipo di pagina.
         </p>
         <ul className="growth-audit-ai-next__list">
           {GROWTH_AUDIT_AI_NEXT_BULLETS.map((item) => (
