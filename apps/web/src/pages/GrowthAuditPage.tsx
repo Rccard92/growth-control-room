@@ -7,6 +7,7 @@ import type {
   GrowthAuditScoreFilter,
 } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
+import { GrowthAuditPriorityDashboard } from "../components/growth-audit/GrowthAuditPriorityDashboard";
 import {
   useGrowthAuditFindings,
   useGrowthAuditRun,
@@ -163,6 +164,13 @@ export function GrowthAuditPage() {
     activeRun?.status === "completed" ||
     activeRun?.status === "partial_failed" ||
     activeRun?.status === "analyzing";
+
+  const showPriorityDashboard = Boolean(
+    activeRun &&
+      pages.length > 0 &&
+      resolvedRunId &&
+      ["completed", "partial_failed", "failed", "analyzing"].includes(activeRun.status),
+  );
 
   const handleStartAudit = async () => {
     const trimmed = rootUrl.trim();
@@ -407,12 +415,28 @@ export function GrowthAuditPage() {
               </div>
             )}
 
+            {showPriorityDashboard && resolvedRunId && (
+              <GrowthAuditPriorityDashboard
+                projectId={projectId}
+                runId={resolvedRunId}
+                pages={pages}
+                findings={findings}
+                tasks={tasks}
+                summary={summary}
+                siteScore={activeRun?.siteScore}
+              />
+            )}
+
             {pages.length > 0 && (
-              <div className="growth-audit-inventory">
+              <div className="growth-audit-inventory growth-audit-inventory--secondary">
                 <div className="growth-audit-inventory__header">
                   <div>
                     <h4 className="growth-audit-inventory__title">Inventario pagine</h4>
                     <p className="growth-audit-inventory__subtitle">
+                      Tutte le pagine scoperte e scansionate. Usa i filtri se vuoi lavorare
+                      manualmente su un gruppo specifico.
+                    </p>
+                    <p className="growth-audit-inventory__meta">
                       {inventoryCounts.total} pagine totali · {filteredPages.length} visibili con
                       filtro corrente
                     </p>
@@ -544,8 +568,13 @@ export function GrowthAuditPage() {
             )}
 
             {showTechnicalSections && priorityFindings.length > 0 && (
-              <section className="growth-audit-findings gcr-card">
-                <h4 className="growth-audit-findings__title">Problemi prioritari</h4>
+              <details className="growth-audit-findings growth-audit-findings--compact gcr-card">
+                <summary className="growth-audit-findings__title">
+                  Problemi prioritari ({priorityFindings.length})
+                </summary>
+                <p className="growth-audit-findings__note">
+                  Vedi anche i cluster ricorrenti nella dashboard sopra.
+                </p>
                 <ul className="growth-audit-findings__list">
                   {priorityFindings.map((finding) => (
                     <li key={finding.id} className="growth-audit-findings__item">
@@ -573,12 +602,14 @@ export function GrowthAuditPage() {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </details>
             )}
 
             {showTechnicalSections && openTasks.length > 0 && (
-              <section className="growth-audit-tasks gcr-card">
-                <h4 className="growth-audit-tasks__title">Task aperti</h4>
+              <details className="growth-audit-tasks growth-audit-tasks--compact gcr-card">
+                <summary className="growth-audit-tasks__title">
+                  Task aperti ({openTasks.length})
+                </summary>
                 <ul className="growth-audit-tasks__list">
                   {openTasks.map((task) => (
                     <li key={task.id} className="growth-audit-tasks__item">
@@ -593,7 +624,7 @@ export function GrowthAuditPage() {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </details>
             )}
 
             {showTechnicalSections && (

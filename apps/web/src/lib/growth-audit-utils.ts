@@ -3,6 +3,7 @@ import type {
   GrowthAuditInventoryCounts,
   GrowthAuditInventoryFilter,
   GrowthAuditPage,
+  GrowthAuditPageAiMetadata,
   GrowthAuditPageResult,
   GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
@@ -1696,4 +1697,526 @@ export function getGrowthAuditWhereToFix(
     return "Modifica Shopify → campi SEO / contenuto";
   }
   return "Contenuto pagina / implementazione on-page";
+}
+
+export function getGrowthAuditPageAiMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageAiMetadata | null {
+  const ai = page.metadata?.ai;
+  if (!ai || typeof ai !== "object") return null;
+  return ai as GrowthAuditPageAiMetadata;
+}
+
+export function hasGrowthAuditPageAiAnalysis(page: GrowthAuditPage): boolean {
+  const aiMeta = getGrowthAuditPageAiMetadata(page);
+  return Boolean(aiMeta?.analyzedAt || aiMeta?.latestResultId || aiMeta?.latestScore != null);
+}
+
+export type GrowthAuditPagePriorityLevel = "critical" | "high" | "medium" | "low";
+
+export type GrowthAuditPagePriorityItem = {
+  pageId: string;
+  url: string;
+  title: string;
+  pageType: string;
+  pageTypeLabel: string;
+  sourceLabel: string;
+  score: number | null;
+  aiScore: number | null;
+  geoScore: number | null;
+  croScore: number | null;
+  adsReadinessScore: number | null;
+  openFindings: number;
+  highPriorityFindings: number;
+  openTasks: number;
+  isShopifyLinked: boolean;
+  sourceEntityType?: string | null;
+  priorityScore: number;
+  priorityLevel: GrowthAuditPagePriorityLevel;
+  reasons: string[];
+  recommendedNextAction: string;
+};
+
+const PRIORITY_LEVEL_LABELS: Record<GrowthAuditPagePriorityLevel, string> = {
+  critical: "Critico",
+  high: "Alto",
+  medium: "Medio",
+  low: "Basso",
+};
+
+const SYSTEM_PAGE_TYPES = new Set([
+  "policy",
+  "cart",
+  "checkout",
+  "search",
+  "account",
+  "policy_page",
+  "system_page",
+]);
+
+const STRATEGIC_AI_PAGE_TYPES = new Set([
+  "product",
+  "collection",
+  "landing_page",
+  "homepage",
+]);
+
+function _getBusinessPageTypeBoost(pageType: string): number {
+  const normalized = pageType.toLowerCase();
+  if (normalized === "product") return 18;
+  if (normalized === "collection") return 14;
+  if (normalized === "landing_page") return 16;
+  if (normalized === "homepage") return 12;
+  if (normalized === "blog_article" || normalized === "blog" || normalized === "article") return 8;
+  if (normalized === "static_page" || normalized === "page") return 4;
+  if (SYSTEM_PAGE_TYPES.has(normalized)) return -20;
+  return 0;
+}
+
+function _getTechnicalScoreBoost(score: number | null | undefined): number {
+  if (score == null) return 12;
+  if (score < 60) return 35;
+  if (score < 80) return 20;
+  if (score < 90) return 8;
+  return 0;
+}
+
+function _getTaskPriorityBoost(priority: string): number {
+  const normalized = priority.toLowerCase();
+  if (normalized === "high") return 10;
+  if (normalized === "medium") return 5;
+  if (normalized === "low") return 2;
+  return 0;
+}
+
+function _getFindingSeverityBoost(severity: string): number {
+  const normalized = severity.toLowerCase();
+  if (normalized === "critical") return 25;
+  if (normalized === "high") return 15;
+  if (normalized === "medium") return 6;
+  if (normalized === "low") return 2;
+  return 0;
+}
+
+function _resolvePriorityLevel(score: number): GrowthAuditPagePriorityLevel {
+  if (score >= 70) return "critical";
+  if (score >= 45) return "high";
+  if (score >= 20) return "medium";
+  return "low";
+}
+
+function _pageHasSeoContentIssues(
+  pageFindings: GrowthAuditFinding[],
+  page: GrowthAuditPage,
+): boolean {
+  const haystack = pageFindings
+    .map((f) => `${f.title} ${f.category} ${f.description ?? ""}`)
+    .join(" ")
+    .toLowerCase();
+  if (
+    haystack.includes("title") ||
+    haystack.includes("meta") ||
+    haystack.includes("immagin") ||
+    haystack.includes("alt") ||
+    haystack.includes("h1")
+  ) {
+    return true;
+  }
+  const titleLen = page.title?.length ?? 0;
+  const metaLen = page.metaDescription?.length ?? 0;
+  return titleLen < 30 || titleLen > 65 || metaLen < 80 || metaLen > 165;
+}
+
+function _buildPagePriorityReasons(input: {
+  page: GrowthAuditPage;
+  pageFindings: GrowthAuditFinding[];
+  openTasks: number;
+  highPriorityFindings: number;
+  hasAiAnalysis: boolean;
+  aiMeta: GrowthAuditPageAiMetadata | null;
+}): string[] {
+  const { page, openTasks, highPriorityFindings, hasAiAnalysis, aiMeta } = input;
+  const reasons: string[] = [];
+
+  if (page.score != null && page.score < 60) {
+    reasons.push("Score tecnico basso");
+  }
+  if (highPriorityFindings > 0) {
+    reasons.push("Problemi ad alta priorità");
+  }
+  if (
+    isGrowthAuditPageShopifyLinked(page) &&
+    (page.pageType === "product" || page.pageType === "collection")
+  ) {
+    reasons.push("Pagina prodotto collegata a Shopify");
+  }
+  if (
+    !hasAiAnalysis &&
+    STRATEGIC_AI_PAGE_TYPES.has((page.pageType ?? "").toLowerCase())
+  ) {
+    reasons.push("Non ancora analizzata con AI/GEO/CRO");
+  }
+  const croScore = aiMeta?.croScore ?? page.croScore;
+  if (croScore != null && croScore < 70) {
+    reasons.push("CRO sotto soglia");
+  }
+  const geoScore = aiMeta?.geoScore ?? page.geoScore;
+  if (geoScore != null && geoScore < 70) {
+    reasons.push("GEO sotto soglia");
+  }
+  if (openTasks > 0) {
+    reasons.push("Task aperti");
+  }
+  if (page.pageType === "collection" && page.score != null && page.score < 80) {
+    reasons.push("Collection commerciale da ottimizzare");
+  }
+
+  const unique = [...new Set(reasons)];
+  return unique.slice(0, 4);
+}
+
+function _buildRecommendedNextAction(input: {
+  page: GrowthAuditPage;
+  pageFindings: GrowthAuditFinding[];
+  hasAiAnalysis: boolean;
+}): string {
+  const { page, pageFindings, hasAiAnalysis } = input;
+  const shopifyLinked = isGrowthAuditPageShopifyLinked(page);
+  const isCommerce =
+    page.pageType === "product" || page.pageType === "collection";
+
+  if (shopifyLinked && isCommerce && _pageHasSeoContentIssues(pageFindings, page)) {
+    return "Apri la scheda e correggi da Modifica Shopify";
+  }
+  if (
+    !hasAiAnalysis &&
+    STRATEGIC_AI_PAGE_TYPES.has((page.pageType ?? "").toLowerCase())
+  ) {
+    return "Apri la scheda e lancia AI/GEO/CRO";
+  }
+  if (page.score != null && page.score < 60) {
+    return "Apri la scheda e risolvi le priorità tecniche";
+  }
+  return "Apri la scheda e rivedi le azioni consigliate";
+}
+
+function _computePagePriorityScore(input: {
+  page: GrowthAuditPage;
+  pageFindings: GrowthAuditFinding[];
+  pageTasks: GrowthAuditTask[];
+  hasAiAnalysis: boolean;
+  aiMeta: GrowthAuditPageAiMetadata | null;
+}): number {
+  const { page, pageFindings, pageTasks, hasAiAnalysis, aiMeta } = input;
+  let score = _getTechnicalScoreBoost(page.score);
+  score += _getBusinessPageTypeBoost(page.pageType ?? "");
+
+  for (const finding of pageFindings) {
+    if (finding.status !== "open") continue;
+    score += _getFindingSeverityBoost(finding.severity);
+  }
+
+  for (const task of pageTasks) {
+    if (task.status !== "open") continue;
+    score += _getTaskPriorityBoost(task.priority);
+  }
+
+  if (
+    isGrowthAuditPageShopifyLinked(page) &&
+    (page.pageType === "product" || page.pageType === "collection")
+  ) {
+    score += 5;
+  }
+
+  const pageType = (page.pageType ?? "").toLowerCase();
+  if (
+    !hasAiAnalysis &&
+    (pageType === "product" || pageType === "collection" || pageType === "landing_page")
+  ) {
+    score += 8;
+  }
+
+  const geoScore = aiMeta?.geoScore ?? page.geoScore;
+  if (geoScore != null && geoScore < 70) score += 10;
+
+  const croScore = aiMeta?.croScore ?? page.croScore;
+  if (croScore != null && croScore < 70) score += 10;
+
+  const adsScore = aiMeta?.adsReadinessScore;
+  if (adsScore != null && adsScore < 70) score += 8;
+
+  return Math.max(0, score);
+}
+
+export function buildGrowthAuditPagePriorityItems(input: {
+  pages: GrowthAuditPage[];
+  findings: GrowthAuditFinding[];
+  tasks: GrowthAuditTask[];
+  pageResultsByPageId?: Record<string, GrowthAuditPageResult[]>;
+}): GrowthAuditPagePriorityItem[] {
+  const { pages, findings, tasks } = input;
+  const openFindings = findings.filter((f) => f.status === "open");
+  const openTasks = tasks.filter((t) => t.status === "open");
+
+  const items = pages.map((page) => {
+    const pageFindings = getFindingsForPage(openFindings, page.id);
+    const pageTasks = getTasksForPage(openTasks, page.id);
+    const aiMeta = getGrowthAuditPageAiMetadata(page);
+    const hasAiAnalysis = hasGrowthAuditPageAiAnalysis(page);
+
+    const highPriorityFindings = pageFindings.filter(
+      (f) => f.severity === "critical" || f.severity === "high",
+    ).length;
+
+    const priorityScore = _computePagePriorityScore({
+      page,
+      pageFindings,
+      pageTasks,
+      hasAiAnalysis,
+      aiMeta,
+    });
+
+    const reasons = _buildPagePriorityReasons({
+      page,
+      pageFindings,
+      openTasks: pageTasks.length,
+      highPriorityFindings,
+      hasAiAnalysis,
+      aiMeta,
+    });
+
+    return {
+      pageId: page.id,
+      url: page.url,
+      title: page.title || page.url,
+      pageType: page.pageType,
+      pageTypeLabel: getGrowthAuditPageTypeLabel(page.pageType),
+      sourceLabel: getGrowthAuditPageSourceLabel(page.source),
+      score: page.score ?? null,
+      aiScore: aiMeta?.latestScore ?? null,
+      geoScore: aiMeta?.geoScore ?? page.geoScore ?? null,
+      croScore: aiMeta?.croScore ?? page.croScore ?? null,
+      adsReadinessScore: aiMeta?.adsReadinessScore ?? null,
+      openFindings: pageFindings.length,
+      highPriorityFindings,
+      openTasks: pageTasks.length,
+      isShopifyLinked: isGrowthAuditPageShopifyLinked(page),
+      sourceEntityType: page.sourceEntityType,
+      priorityScore,
+      priorityLevel: _resolvePriorityLevel(priorityScore),
+      reasons,
+      recommendedNextAction: _buildRecommendedNextAction({
+        page,
+        pageFindings,
+        hasAiAnalysis,
+      }),
+    };
+  });
+
+  return items.sort((a, b) => {
+    if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore;
+    if (b.highPriorityFindings !== a.highPriorityFindings) {
+      return b.highPriorityFindings - a.highPriorityFindings;
+    }
+    const scoreA = a.score ?? 999;
+    const scoreB = b.score ?? 999;
+    return scoreA - scoreB;
+  });
+}
+
+export function getGrowthAuditPriorityLevelLabel(
+  level: GrowthAuditPagePriorityLevel | string,
+): string {
+  return PRIORITY_LEVEL_LABELS[level as GrowthAuditPagePriorityLevel] ?? level;
+}
+
+export function getGrowthAuditPriorityLevelBadgeClass(
+  level: GrowthAuditPagePriorityLevel | string,
+): string {
+  const normalized = (level || "low").toLowerCase();
+  const valid = ["critical", "high", "medium", "low"].includes(normalized)
+    ? normalized
+    : "low";
+  return `growth-audit-top-page-card growth-audit-top-page-card--${valid}`;
+}
+
+export function normalizeGrowthAuditClusterKey(input: {
+  category?: string | null;
+  title?: string | null;
+}): string {
+  return [_normalizePriorityText(input.category), _normalizePriorityText(input.title)].join("|");
+}
+
+export type GrowthAuditSiteIssueCluster = {
+  key: string;
+  category: string;
+  title: string;
+  count: number;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  affectedPageIds: string[];
+  recommendation: string;
+};
+
+function _maxSeverity(severities: string[]): GrowthAuditSiteIssueCluster["severity"] {
+  let best = 99;
+  let result: GrowthAuditSiteIssueCluster["severity"] = "medium";
+  for (const severity of severities) {
+    const order = SEVERITY_ORDER[severity] ?? 99;
+    if (order < best) {
+      best = order;
+      result = (severity as GrowthAuditSiteIssueCluster["severity"]) || "medium";
+    }
+  }
+  return result;
+}
+
+function _mostFrequentRecommendation(recommendations: string[]): string {
+  const counts = new Map<string, number>();
+  for (const rec of recommendations) {
+    const trimmed = rec.trim();
+    if (!trimmed) continue;
+    counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+  }
+  let best = "";
+  let bestCount = 0;
+  for (const [rec, count] of counts) {
+    if (count > bestCount) {
+      best = rec;
+      bestCount = count;
+    }
+  }
+  return best || recommendations.find((r) => r.trim()) || "Rivedi e correggi su ogni pagina interessata.";
+}
+
+export function buildGrowthAuditSiteIssueClusters(
+  findings: GrowthAuditFinding[],
+  tasks: GrowthAuditTask[],
+): GrowthAuditSiteIssueCluster[] {
+  const openFindings = findings.filter((f) => f.status === "open");
+  const openTasks = tasks.filter((t) => t.status === "open");
+
+  const findingGroups = new Map<
+    string,
+    {
+      category: string;
+      title: string;
+      severities: string[];
+      pageIds: Set<string>;
+      recommendations: string[];
+    }
+  >();
+
+  for (const finding of openFindings) {
+    const key = normalizeGrowthAuditClusterKey({
+      category: finding.category,
+      title: finding.title,
+    });
+    const existing = findingGroups.get(key);
+    if (existing) {
+      existing.severities.push(finding.severity);
+      if (finding.pageId) existing.pageIds.add(finding.pageId);
+      if (finding.recommendation) existing.recommendations.push(finding.recommendation);
+    } else {
+      findingGroups.set(key, {
+        category: finding.category,
+        title: finding.title,
+        severities: [finding.severity],
+        pageIds: new Set(finding.pageId ? [finding.pageId] : []),
+        recommendations: finding.recommendation ? [finding.recommendation] : [],
+      });
+    }
+  }
+
+  const clusters: GrowthAuditSiteIssueCluster[] = [...findingGroups.entries()].map(
+    ([key, group]) => ({
+      key,
+      category: group.category,
+      title: group.title,
+      count: group.severities.length,
+      severity: _maxSeverity(group.severities),
+      affectedPageIds: [...group.pageIds],
+      recommendation: _mostFrequentRecommendation(group.recommendations),
+    }),
+  );
+
+  const findingTitleKeys = new Set(
+    openFindings.map((f) => _normalizePriorityText(f.title)),
+  );
+
+  for (const task of openTasks) {
+    const normalizedTitle = _normalizePriorityText(task.title);
+    if (findingTitleKeys.has(normalizedTitle)) continue;
+
+    const key = normalizeGrowthAuditClusterKey({ category: "task", title: task.title });
+    const existing = clusters.find((c) => c.key === key);
+    if (existing) {
+      existing.count += 1;
+      if (task.pageId && !existing.affectedPageIds.includes(task.pageId)) {
+        existing.affectedPageIds.push(task.pageId);
+      }
+      continue;
+    }
+    clusters.push({
+      key,
+      category: "task",
+      title: task.title,
+      count: 1,
+      severity: _maxSeverity([task.priority === "high" ? "high" : "medium"]),
+      affectedPageIds: task.pageId ? [task.pageId] : [],
+      recommendation: task.description?.trim() || task.title,
+    });
+  }
+
+  return clusters.sort((a, b) => {
+    const severityDiff = (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99);
+    if (severityDiff !== 0) return severityDiff;
+    return b.count - a.count;
+  });
+}
+
+export type GrowthAuditAiCoverageStats = {
+  totalPages: number;
+  technicallyAnalyzedPages: number;
+  aiAnalyzedPages: number;
+  productsWithoutAi: number;
+  collectionsWithoutAi: number;
+  strategicWithoutAi: number;
+  coveragePercent: number;
+};
+
+export function buildGrowthAuditAiCoverageStats(
+  pages: GrowthAuditPage[],
+  summary?: GrowthAuditRunSummary | null,
+): GrowthAuditAiCoverageStats {
+  const technicallyAnalyzedPages = pages.filter(
+    (p) => p.status === "analyzed" || p.score != null,
+  ).length;
+
+  const aiAnalyzedPages = pages.filter((p) => hasGrowthAuditPageAiAnalysis(p)).length;
+
+  const products = pages.filter((p) => p.pageType === "product");
+  const collections = pages.filter((p) => p.pageType === "collection");
+  const strategic = pages.filter((p) =>
+    STRATEGIC_AI_PAGE_TYPES.has((p.pageType ?? "").toLowerCase()),
+  );
+
+  const productsWithoutAi = products.filter((p) => !hasGrowthAuditPageAiAnalysis(p)).length;
+  const collectionsWithoutAi = collections.filter(
+    (p) => !hasGrowthAuditPageAiAnalysis(p),
+  ).length;
+  const strategicWithoutAi = strategic.filter((p) => !hasGrowthAuditPageAiAnalysis(p)).length;
+
+  const coverageBase = strategic.length > 0 ? strategic.length : pages.length;
+  const coveragePercent =
+    coverageBase > 0 ? Math.round((aiAnalyzedPages / coverageBase) * 100) : 0;
+
+  return {
+    totalPages: pages.length,
+    technicallyAnalyzedPages,
+    aiAnalyzedPages: summary?.aiPagesAnalyzed ?? aiAnalyzedPages,
+    productsWithoutAi,
+    collectionsWithoutAi,
+    strategicWithoutAi,
+    coveragePercent,
+  };
 }

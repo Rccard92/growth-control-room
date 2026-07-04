@@ -33,6 +33,10 @@ import {
   mapGrowthAuditPageToSeoEntity,
   sortGrowthAuditFindings,
   normalizeGrowthAuditPriorityDedupeKey,
+  buildGrowthAuditPagePriorityItems,
+  buildGrowthAuditSiteIssueClusters,
+  buildGrowthAuditAiCoverageStats,
+  getGrowthAuditPriorityLevelLabel,
 } from "./growth-audit-utils";
 
 const samplePages: GrowthAuditPage[] = [
@@ -583,6 +587,187 @@ describe("growth-audit-utils", () => {
     it("getGrowthAuditPriorityActionLabel returns Italian labels", () => {
       expect(getGrowthAuditPriorityActionLabel("critical")).toBe("Critico");
       expect(getGrowthAuditEffortLabel("low")).toBe("Basso");
+    });
+  });
+
+  describe("buildGrowthAuditPagePriorityItems", () => {
+    const productPage: GrowthAuditPage = {
+      id: "page-prod",
+      runId: "run-1",
+      projectId: "proj-1",
+      url: "https://example.com/products/a",
+      normalizedUrl: "https://example.com/products/a",
+      pageType: "product",
+      source: "shopify_product",
+      status: "analyzed",
+      priority: "normal",
+      score: 55,
+      sourceEntityType: "shopify_product",
+      sourceEntityId: "prod-1",
+    };
+
+    const staticPage: GrowthAuditPage = {
+      id: "page-static",
+      runId: "run-1",
+      projectId: "proj-1",
+      url: "https://example.com/pages/about",
+      normalizedUrl: "https://example.com/pages/about",
+      pageType: "static_page",
+      source: "sitemap",
+      status: "analyzed",
+      priority: "normal",
+      score: 88,
+    };
+
+    it("orders by priorityScore desc", () => {
+      const items = buildGrowthAuditPagePriorityItems({
+        pages: [staticPage, productPage],
+        findings: [
+          {
+            id: "f1",
+            runId: "run-1",
+            projectId: "proj-1",
+            pageId: "page-prod",
+            category: "seo",
+            severity: "high",
+            priority: "high",
+            title: "Title debole",
+            status: "open",
+          },
+          {
+            id: "f2",
+            runId: "run-1",
+            projectId: "proj-1",
+            pageId: "page-static",
+            category: "seo",
+            severity: "low",
+            priority: "low",
+            title: "Dettaglio minore",
+            status: "open",
+          },
+        ],
+        tasks: [],
+      });
+      expect(items[0].pageId).toBe("page-prod");
+      expect(items[0].priorityScore).toBeGreaterThan(items[1].priorityScore);
+    });
+
+    it("product with high finding ranks above static page with low", () => {
+      const items = buildGrowthAuditPagePriorityItems({
+        pages: [staticPage, productPage],
+        findings: [
+          {
+            id: "f1",
+            runId: "run-1",
+            projectId: "proj-1",
+            pageId: "page-prod",
+            category: "seo",
+            severity: "high",
+            priority: "high",
+            title: "Title debole",
+            status: "open",
+          },
+        ],
+        tasks: [],
+      });
+      expect(items[0].pageType).toBe("product");
+    });
+
+    it("adds AI analysis reason for strategic pages without AI", () => {
+      const items = buildGrowthAuditPagePriorityItems({
+        pages: [productPage],
+        findings: [],
+        tasks: [],
+      });
+      expect(items[0].reasons).toContain("Non ancora analizzata con AI/GEO/CRO");
+    });
+
+    it("adds Shopify linked reason for product", () => {
+      const items = buildGrowthAuditPagePriorityItems({
+        pages: [productPage],
+        findings: [],
+        tasks: [],
+      });
+      expect(items[0].reasons).toContain("Pagina prodotto collegata a Shopify");
+      expect(items[0].isShopifyLinked).toBe(true);
+    });
+
+    it("getGrowthAuditPriorityLevelLabel returns Italian labels", () => {
+      expect(getGrowthAuditPriorityLevelLabel("critical")).toBe("Critico");
+      expect(getGrowthAuditPriorityLevelLabel("high")).toBe("Alto");
+    });
+  });
+
+  describe("buildGrowthAuditSiteIssueClusters", () => {
+    it("groups similar open findings", () => {
+      const clusters = buildGrowthAuditSiteIssueClusters(
+        [
+          {
+            id: "f1",
+            runId: "run-1",
+            projectId: "proj-1",
+            pageId: "p1",
+            category: "images",
+            severity: "high",
+            priority: "high",
+            title: "Immagini senza alt",
+            recommendation: "Aggiungi alt descrittivi.",
+            status: "open",
+          },
+          {
+            id: "f2",
+            runId: "run-1",
+            projectId: "proj-1",
+            pageId: "p2",
+            category: "images",
+            severity: "medium",
+            priority: "medium",
+            title: "Immagini senza alt",
+            recommendation: "Aggiungi alt descrittivi.",
+            status: "open",
+          },
+        ],
+        [],
+      );
+      expect(clusters).toHaveLength(1);
+      expect(clusters[0].count).toBe(2);
+      expect(clusters[0].title).toBe("Immagini senza alt");
+      expect(clusters[0].affectedPageIds).toEqual(["p1", "p2"]);
+    });
+  });
+
+  describe("buildGrowthAuditAiCoverageStats", () => {
+    it("counts strategic pages without AI", () => {
+      const stats = buildGrowthAuditAiCoverageStats([
+        {
+          id: "p1",
+          runId: "run-1",
+          projectId: "proj-1",
+          url: "https://example.com/products/a",
+          normalizedUrl: "https://example.com/products/a",
+          pageType: "product",
+          source: "shopify_product",
+          status: "analyzed",
+          priority: "normal",
+        },
+        {
+          id: "p2",
+          runId: "run-1",
+          projectId: "proj-1",
+          url: "https://example.com",
+          normalizedUrl: "https://example.com",
+          pageType: "homepage",
+          source: "seed",
+          status: "analyzed",
+          priority: "high",
+          metadata: {
+            ai: { analyzedAt: "2026-06-13T10:00:00Z", latestScore: 82 },
+          },
+        },
+      ]);
+      expect(stats.productsWithoutAi).toBe(1);
+      expect(stats.strategicWithoutAi).toBe(1);
+      expect(stats.aiAnalyzedPages).toBe(1);
     });
   });
 });

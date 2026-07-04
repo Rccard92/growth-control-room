@@ -275,6 +275,9 @@ describe("GrowthAuditPage", () => {
   it("shows inventory table, badges and filters when run exists", () => {
     setupMocks({ withActiveRun: true, withTechnicalScan: true });
     const html = renderPage();
+    expect(html).toContain("Priorità Growth Audit");
+    expect(html).toContain("Gestisci pagina");
+    expect(html).toContain("Tutte le pagine scoperte e scansionate");
     expect(html).toContain("Inventario pagine");
     expect(html).toContain("Homepage");
     expect(html).toContain("Shopify prodotto");
@@ -310,6 +313,7 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Title mancante");
     expect(html).toContain("Task aperti");
     expect(html).toContain("Aggiungere title pagina");
+    expect(html).toContain("cluster ricorrenti");
     expect(html).toContain("deterministica");
   });
 
