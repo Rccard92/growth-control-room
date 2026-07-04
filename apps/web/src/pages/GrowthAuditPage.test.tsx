@@ -7,10 +7,6 @@ const {
   useParamsMock,
   useProjectMock,
   useShopifyStatusMock,
-  useSeoSkillCatalogMock,
-  useSeoSkillRunsMock,
-  useSeoSkillRunMock,
-  useStartSeoSkillRunMock,
   useGrowthAuditRunsMock,
   useGrowthAuditRunMock,
   useGrowthAuditFindingsMock,
@@ -20,10 +16,6 @@ const {
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
   useShopifyStatusMock: vi.fn(),
-  useSeoSkillCatalogMock: vi.fn(),
-  useSeoSkillRunsMock: vi.fn(),
-  useSeoSkillRunMock: vi.fn(),
-  useStartSeoSkillRunMock: vi.fn(),
   useGrowthAuditRunsMock: vi.fn(),
   useGrowthAuditRunMock: vi.fn(),
   useGrowthAuditFindingsMock: vi.fn(),
@@ -47,13 +39,6 @@ vi.mock("../hooks/useShopify", () => ({
   useShopifyStatus: useShopifyStatusMock,
 }));
 
-vi.mock("../hooks/useSeoSkills", () => ({
-  useSeoSkillCatalog: useSeoSkillCatalogMock,
-  useSeoSkillRuns: useSeoSkillRunsMock,
-  useSeoSkillRun: useSeoSkillRunMock,
-  useStartSeoSkillRun: useStartSeoSkillRunMock,
-}));
-
 vi.mock("../hooks/useGrowthAudit", () => ({
   useGrowthAuditRuns: useGrowthAuditRunsMock,
   useGrowthAuditRun: useGrowthAuditRunMock,
@@ -70,38 +55,6 @@ function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boo
   });
   useShopifyStatusMock.mockReturnValue({
     data: { connected: true, shopDomain: "solmielato.myshopify.com" },
-  });
-  useSeoSkillCatalogMock.mockReturnValue({
-    data: {
-      skills: [
-        {
-          key: "seo_page",
-          label: "Page SEO",
-          description: "Page SEO",
-          category: "audit",
-          source: "claude-seo",
-          upstreamCommand: "/seo page",
-          status: "available",
-          defaultProvider: "openai",
-          requires: ["url"],
-          optionalIntegrations: [],
-          requiredIntegrations: [],
-          outputSchema: "seo_page_v1",
-          runtime: "prompt_only",
-          riskLevel: "low",
-          enabled: true,
-        },
-      ],
-      counts: { total: 1, available: 1, needsConfig: 0, externalRequired: 0, planned: 0 },
-    },
-    isLoading: false,
-    isError: false,
-  });
-  useSeoSkillRunsMock.mockReturnValue({ data: [] });
-  useSeoSkillRunMock.mockReturnValue({ data: undefined, isLoading: false });
-  useStartSeoSkillRunMock.mockReturnValue({
-    mutateAsync: vi.fn(),
-    isPending: false,
   });
 
   const activeRun = options?.withActiveRun
@@ -339,10 +292,20 @@ describe("GrowthAuditPage", () => {
     );
   });
 
-  it("renders guided URL audit section", () => {
+  it("does not render legacy guided URL audit section", () => {
     setupMocks();
     const html = renderPage();
-    expect(html).toContain("Audit guidato su URL");
-    expect(html).toContain("SEO Audit Control Room");
+    expect(html).not.toContain("Audit guidato su URL");
+    expect(html).not.toContain("SEO Audit Control Room");
+  });
+
+  it("renders AI/GEO/CRO coming card", () => {
+    setupMocks();
+    const html = renderPage();
+    expect(html).toContain("Analisi AI/GEO/CRO in arrivo");
+    expect(html).toContain("Prodotto: SEO ecommerce, schema Product, immagini, CRO e trust.");
+    expect(html).toContain("Blog: contenuto, intent, E-E-A-T, GEO e linking interno.");
+    expect(html).toContain("Collection: intent commerciale, schema, testo categoria e UX catalogo.");
+    expect(html).toContain("Step successivo");
   });
 });

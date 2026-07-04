@@ -7,7 +7,6 @@ import type {
   GrowthAuditScoreFilter,
 } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
-import { SeoSkillLibrary } from "../components/seo-skills";
 import {
   useGrowthAuditFindings,
   useGrowthAuditRun,
@@ -57,6 +56,12 @@ const GROWTH_AUDIT_ROADMAP = [
   "Analisi AI/GEO/CRO differenziata per tipologia di pagina",
   "Rescan singola pagina",
   "Integrazioni: PageSpeed, Search Console, GA4, Google Ads, Firecrawl/DataForSEO",
+] as const;
+
+const GROWTH_AUDIT_AI_NEXT_BULLETS = [
+  "Prodotto: SEO ecommerce, schema Product, immagini, CRO e trust.",
+  "Blog: contenuto, intent, E-E-A-T, GEO e linking interno.",
+  "Collection: intent commerciale, schema, testo categoria e UX catalogo.",
 ] as const;
 
 export function GrowthAuditPage() {
@@ -561,15 +566,20 @@ export function GrowthAuditPage() {
         )}
       </section>
 
-      <section className="growth-audit-manual-section">
-        <header className="growth-audit-manual-section__header">
-          <h2 className="growth-audit-manual-section__title">Audit guidato su URL</h2>
-          <p className="growth-audit-manual-section__description">
-            Modalità complementare per analizzare subito una pagina specifica mentre l&apos;inventario
-            full site viene costruito.
-          </p>
-        </header>
-        <SeoSkillLibrary projectId={projectId} />
+      <section className="growth-audit-ai-next gcr-card">
+        <div className="growth-audit-ai-next__header">
+          <h2 className="growth-audit-ai-next__title">Analisi AI/GEO/CRO in arrivo</h2>
+          <span className="growth-audit-ai-next__badge">Step successivo</span>
+        </div>
+        <p className="growth-audit-ai-next__description">
+          Le skill SEO importate verranno applicate automaticamente in base al tipo di pagina.
+          Una pagina prodotto riceverà controlli diversi da un articolo blog o da una collection.
+        </p>
+        <ul className="growth-audit-ai-next__list">
+          {GROWTH_AUDIT_AI_NEXT_BULLETS.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       </section>
 
       <section className="growth-audit-roadmap gcr-card">
