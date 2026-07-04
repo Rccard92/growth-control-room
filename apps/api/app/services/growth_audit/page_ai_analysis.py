@@ -311,6 +311,22 @@ async def _update_run_summary_after_ai_analysis(
     }
 
 
+def _readable_ai_failure_message(exc: Exception, *, provider: str) -> str:
+    msg = str(exc)
+    lowered = msg.lower()
+    if "not configured" in lowered or "non configurato" in lowered:
+        return (
+            f"Provider {provider} non configurato. "
+            "Verifica le credenziali AI del progetto."
+        )
+    if "invalid schema for response_format" in lowered:
+        return (
+            "Analisi AI non riuscita: configurazione output non valida. "
+            "Riprova dopo l'aggiornamento del sistema."
+        )
+    return f"Analisi AI non riuscita: {msg}"
+
+
 async def _persist_failed_ai_result(
     session: AsyncSession,
     *,
@@ -471,14 +487,7 @@ async def analyze_growth_audit_page_with_ai(
             json_schema_name="growth_audit_page_ai_output" if json_schema else None,
         )
     except Exception as exc:
-        error_message = str(exc)
-        if "not configured" in error_message.lower() or "non configurato" in error_message.lower():
-            readable = (
-                f"Provider {normalized_provider} non configurato. "
-                "Verifica le credenziali AI del progetto."
-            )
-        else:
-            readable = f"Analisi AI non riuscita: {error_message}"
+        readable = _readable_ai_failure_message(exc, provider=normalized_provider)
         await _persist_failed_ai_result(
             session,
             run=run,

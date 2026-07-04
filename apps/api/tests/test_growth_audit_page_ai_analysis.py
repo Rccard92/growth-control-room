@@ -342,6 +342,94 @@ def test_provider_error_creates_failed_result() -> None:
     asyncio.run(run())
 
 
+def test_invalid_schema_error_returns_readable_message() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_id = uuid4()
+        page_id = uuid4()
+        audit_run = _build_completed_run(project_id, run_id)
+        page = _build_analyzed_page(project_id=project_id, run_id=run_id, page_id=page_id)
+        technical = _build_technical_result(
+            project_id=project_id,
+            run_id=run_id,
+            page_id=page_id,
+        )
+
+        session = AsyncMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        events: list[str] = []
+        added_results: list[GrowthAuditPageResult] = []
+
+        def track_add(obj):
+            if isinstance(obj, GrowthAuditPageResult):
+                added_results.append(obj)
+
+        session.add.side_effect = track_add
+
+        async def track_event(session_arg, **kwargs):
+            events.append(kwargs["event_type"])
+            return GrowthAuditEvent(
+                id=uuid4(),
+                run_id=run_id,
+                project_id=project_id,
+                event_type=kwargs["event_type"],
+                message=kwargs["message"],
+            )
+
+        openai_error = (
+            "Invalid schema for response_format 'growth_audit_page_ai_output': "
+            "In context=('properties', 'artifacts'), 'required' is required..."
+        )
+
+        with (
+            patch(
+                "app.services.growth_audit.page_ai_analysis.get_growth_audit_run",
+                new=AsyncMock(return_value=audit_run),
+            ),
+            patch(
+                "app.services.growth_audit.page_ai_analysis._get_growth_audit_page",
+                new=AsyncMock(return_value=page),
+            ),
+            patch(
+                "app.services.growth_audit.page_ai_analysis._load_latest_technical_result",
+                new=AsyncMock(return_value=technical),
+            ),
+            patch(
+                "app.services.growth_audit.page_ai_analysis._build_page_analysis_context",
+                new=AsyncMock(return_value={"url": page.url}),
+            ),
+            patch(
+                "app.services.growth_audit.page_ai_analysis.generate_structured_json_with_provider",
+                new=AsyncMock(side_effect=ValueError(openai_error)),
+            ),
+            patch(
+                "app.services.growth_audit.page_ai_analysis.create_growth_audit_event",
+                new=AsyncMock(side_effect=track_event),
+            ),
+        ):
+            with pytest.raises(GrowthAuditValidationError) as exc_info:
+                await analyze_growth_audit_page_with_ai(
+                    session,
+                    project_id=project_id,
+                    run_id=run_id,
+                    page_id=page_id,
+                )
+
+        assert exc_info.value.args[0] == (
+            "Analisi AI non riuscita: configurazione output non valida. "
+            "Riprova dopo l'aggiornamento del sistema."
+        )
+        assert "Invalid schema for response_format" not in exc_info.value.args[0]
+        assert "page_ai_analysis_started" in events
+        assert "page_ai_analysis_failed" in events
+        assert any(r.status == "failed" for r in added_results)
+
+    asyncio.run(run())
+
+
 def test_ai_analysis_route_returns_200() -> None:
     from app.api.routes.growth_audit import analyze_growth_audit_page_ai_endpoint
 

@@ -79,9 +79,8 @@ def get_growth_audit_page_ai_output_json_schema() -> dict[str, Any]:
             "priority": _enum_schema(ALLOWED_PRIORITIES),
         },
     )
-    artifacts_schema = {
-        "type": "object",
-        "properties": {
+    artifacts_schema = _strict_object_schema(
+        properties={
             "shopifyEditHints": {
                 "type": "array",
                 "maxItems": 6,
@@ -103,8 +102,7 @@ def get_growth_audit_page_ai_output_json_schema() -> dict[str, Any]:
                 "items": _string_schema(400),
             },
         },
-        "additionalProperties": False,
-    }
+    )
     return _strict_object_schema(
         properties={
             "score": _score_schema(),
@@ -138,6 +136,7 @@ GROWTH_AUDIT_PAGE_AI_SCHEMA_INSTRUCTION = """
 Rispondi con un singolo oggetto JSON valido. Nessun markdown fuori dal JSON.
 Limiti: max 8 findings, max 8 tasks, max 6 recommendations, summary max 900 caratteri.
 CRO e neuromarketing: analisi euristica basata su segnali pagina, NON dati comportamentali reali.
+Nel campo artifacts includi sempre tutte le chiavi richieste: shopifyEditHints, croChecklist, geoChecklist, adsReadinessNotes. Se non hai elementi, usa array vuoti.
 """.strip()
 
 
