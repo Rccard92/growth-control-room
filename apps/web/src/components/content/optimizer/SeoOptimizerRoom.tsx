@@ -14,12 +14,9 @@ import {
 } from "../../../hooks/useContentSeo";
 import { useShopifyScopes } from "../../../hooks/useShopify";
 
-import { SeoSkillLibrary } from "../../seo-skills";
-
 const TABS: { id: SeoOptimizerTab; label: string }[] = [
   { id: "products", label: "Prodotti" },
   { id: "collections", label: "Categorie" },
-  { id: "skills", label: "Audit SEO" },
 ];
 
 interface SeoOptimizerRoomProps {
@@ -178,8 +175,6 @@ export function SeoOptimizerRoom({
           )}
         </div>
       )}
-
-      {tab === "skills" && <SeoSkillLibrary projectId={projectId} />}
 
       <SeoEntityEditDrawer
         open={Boolean(editEntity)}

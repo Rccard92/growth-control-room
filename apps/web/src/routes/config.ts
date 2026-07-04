@@ -1,5 +1,6 @@
 export const PROJECT_NAV = [
   { to: "", label: "Control Room", icon: "◉", end: true as const },
+  { to: "audit", label: "Growth Audit", icon: "↗" },
   { to: "brand-intelligence", label: "Brand Intelligence", icon: "◎" },
   { to: "integrations", label: "Integration Center", icon: "⬡" },
   { to: "shopify", label: "Shopify", icon: "🛍" },
@@ -15,6 +16,7 @@ export const APP_ROUTES = {
   projects: "/projects",
   newProject: "/projects/new",
   project: (id: string) => `/projects/${id}`,
+  projectGrowthAudit: (id: string) => `/projects/${id}/audit`,
   projectBrandIntelligence: (id: string) => `/projects/${id}/brand-intelligence`,
   projectIntegrations: (id: string) => `/projects/${id}/integrations`,
   projectShopify: (id: string) => `/projects/${id}/shopify`,

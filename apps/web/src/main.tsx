@@ -9,6 +9,7 @@ import "./index.css";
 import "./styles/foundation.css";
 import "./styles/shopify-dashboard.css";
 import "./styles/content-seo.css";
+import "./styles/growth-audit.css";
 import "./styles/brand-intelligence.css";
 import "./styles/date-range-selector.css";
 import "./styles/ai-usage.css";

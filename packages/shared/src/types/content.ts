@@ -105,7 +105,7 @@ export interface ContentSeoAnalyzeResponse {
 
 export type SeoOptimizerSeverity = "critical" | "warning" | "opportunity" | "good";
 export type SeoProposalStatus = "draft" | "approved" | "applied" | "rejected";
-export type SeoOptimizerTab = "products" | "collections" | "skills" | "editorial";
+export type SeoOptimizerTab = "products" | "collections" | "editorial";
 
 export interface SeoOptimizerSyncResponse {
   productsSynced: number;

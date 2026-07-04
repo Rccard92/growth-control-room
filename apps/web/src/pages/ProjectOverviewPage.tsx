@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Link, useParams } from "react-router-dom";
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { CommandCard } from "../components/CommandCard";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
@@ -12,11 +11,6 @@ import {
 } from "../hooks/useProjects";
 import { useShopifyStatus } from "../hooks/useShopify";
 import { APP_ROUTES } from "../routes/config";
-
-const HEALTH_DATA = [
-  { name: "score", value: 72 },
-  { name: "gap", value: 28 },
-];
 
 export function ProjectOverviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,29 +40,22 @@ export function ProjectOverviewPage() {
         <div className="gcr-card gcr-card--glow">
           <p className="gcr-card__label">Health Score</p>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div style={{ width: 80, height: 80 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={HEALTH_DATA}
-                    dataKey="value"
-                    innerRadius={28}
-                    outerRadius={38}
-                    startAngle={90}
-                    endAngle={-270}
-                    stroke="none"
-                  >
-                    <Cell fill="var(--gcr-accent-violet)" />
-                    <Cell fill="var(--gcr-border)" />
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
             <div>
-              <p className="gcr-card__value">72</p>
-              <p className="gcr-card__meta">Placeholder — AI analyst in arrivo</p>
+              <p className="gcr-card__value">—</p>
+              <p className="gcr-card__meta">
+                Avvia il primo Growth Audit per calcolare lo score.
+              </p>
             </div>
           </div>
+          {id && (
+            <Link
+              to={APP_ROUTES.projectGrowthAudit(id)}
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              style={{ marginTop: "0.75rem" }}
+            >
+              Apri Growth Audit
+            </Link>
+          )}
         </div>
 
         <div className="gcr-card">
@@ -118,6 +105,7 @@ export function ProjectOverviewPage() {
         Shortcuts
       </h2>
       <div className="gcr-grid gcr-grid--4">
+        <CommandCard icon="↗" label="Growth Audit" description="Analizza sito, pagine, SEO, GEO e priorità CRO" to={APP_ROUTES.projectGrowthAudit(id!)} />
         <CommandCard icon="◎" label="Brand Intelligence" description="Profilo brand e contesto AI" to={APP_ROUTES.projectBrandIntelligence(id!)} />
         <CommandCard icon="⬡" label="Integration Center" description="Connettori e grafo dati" to={APP_ROUTES.projectIntegrations(id!)} />
         <CommandCard icon="🛍" label="Shopify" description="Store, ordini, KPI" to={APP_ROUTES.projectShopify(id!)} />

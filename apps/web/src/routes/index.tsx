@@ -5,6 +5,7 @@ import { AiUsagePage } from "../pages/AiUsagePage";
 import { BrandIntelligencePage } from "../pages/BrandIntelligencePage";
 import { ChangelogPage } from "../pages/ChangelogPage";
 import { ContentPage } from "../pages/ContentPage";
+import { GrowthAuditPage } from "../pages/GrowthAuditPage";
 import { IntegrationsPage } from "../pages/IntegrationsPage";
 import { LoginPage } from "../pages/LoginPage";
 import { PrivacyPolicyPage } from "../pages/PrivacyPolicyPage";
@@ -28,6 +29,7 @@ export function AppRoutes() {
 
       <Route path="projects/:id" element={<AppShell showSidebar />}>
         <Route index element={<ProjectOverviewPage />} />
+        <Route path="audit" element={<GrowthAuditPage />} />
         <Route path="brand-intelligence" element={<BrandIntelligencePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="shopify" element={<ShopifyPage />} />
