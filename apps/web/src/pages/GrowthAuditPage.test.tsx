@@ -12,6 +12,7 @@ const {
   useGrowthAuditFindingsMock,
   useGrowthAuditTasksMock,
   useStartGrowthAuditRunMock,
+  useRescanGrowthAuditPageMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
@@ -21,6 +22,7 @@ const {
   useGrowthAuditFindingsMock: vi.fn(),
   useGrowthAuditTasksMock: vi.fn(),
   useStartGrowthAuditRunMock: vi.fn(),
+  useRescanGrowthAuditPageMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -45,6 +47,7 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useGrowthAuditFindings: useGrowthAuditFindingsMock,
   useGrowthAuditTasks: useGrowthAuditTasksMock,
   useStartGrowthAuditRun: useStartGrowthAuditRunMock,
+  useRescanGrowthAuditPage: useRescanGrowthAuditPageMock,
 }));
 
 function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boolean }) {
@@ -197,6 +200,17 @@ function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boo
   });
   useStartGrowthAuditRunMock.mockReturnValue({
     mutateAsync: vi.fn().mockResolvedValue({ run: { id: "run-new" } }),
+    isPending: false,
+    isError: false,
+  });
+  useRescanGrowthAuditPageMock.mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({
+      run: { id: "run-1" },
+      page: { id: "page-1" },
+      findingsCount: 0,
+      tasksCount: 0,
+      message: "Pagina riscansionata.",
+    }),
     isPending: false,
     isError: false,
   });

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   GrowthAuditFindingsFilters,
+  GrowthAuditPageRescanRequest,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunStatus,
   GrowthAuditTasksFilters,
@@ -12,6 +13,7 @@ import {
   fetchGrowthAuditRun,
   fetchGrowthAuditTasks,
   listGrowthAuditRuns,
+  rescanGrowthAuditPage,
   startGrowthAuditRun,
 } from "../lib/growth-audit-api";
 import { queryKeys } from "../lib/queryKeys";
@@ -143,6 +145,51 @@ export function useStartGrowthAuditRun(projectId?: string) {
         events: [],
         findingsCount: 0,
         tasksCount: 0,
+      });
+    },
+  });
+}
+
+export function useRescanGrowthAuditPage(projectId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      runId: string;
+      pageId: string;
+      payload?: GrowthAuditPageRescanRequest;
+    }) => {
+      if (!projectId) {
+        throw new Error("projectId is required");
+      }
+      return rescanGrowthAuditPage(
+        projectId,
+        input.runId,
+        input.pageId,
+        input.payload,
+      );
+    },
+    onSuccess: (data) => {
+      if (!projectId) return;
+
+      const runId = data.run.id;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.runs(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.run(projectId, runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pages(projectId, runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.findings(projectId, runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.tasks(projectId, runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.events(projectId, runId),
       });
     },
   });

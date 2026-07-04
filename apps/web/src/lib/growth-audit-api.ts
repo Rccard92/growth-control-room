@@ -2,6 +2,8 @@ import type {
   GrowthAuditEventsListResponse,
   GrowthAuditFindingsFilters,
   GrowthAuditFindingsListResponse,
+  GrowthAuditPageRescanRequest,
+  GrowthAuditPageRescanResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
@@ -95,5 +97,20 @@ export function fetchGrowthAuditTasks(
   const query = buildFilterQuery(filters);
   return apiFetch<GrowthAuditTasksListResponse>(
     `${growthAuditBasePath(projectId)}/runs/${runId}/tasks${query}`,
+  );
+}
+
+export function rescanGrowthAuditPage(
+  projectId: string,
+  runId: string,
+  pageId: string,
+  payload?: GrowthAuditPageRescanRequest,
+): Promise<GrowthAuditPageRescanResponse> {
+  return apiFetch<GrowthAuditPageRescanResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/pages/${pageId}/rescan`,
+    {
+      method: "POST",
+      ...jsonBody(payload ?? { clearPreviousOpenItems: true }),
+    },
   );
 }

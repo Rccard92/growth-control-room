@@ -272,3 +272,23 @@ class GrowthAuditTasksListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     tasks: list[GrowthAuditTaskRead]
+
+
+class GrowthAuditPageRescanRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    clear_previous_open_items: bool = Field(
+        default=True,
+        alias="clearPreviousOpenItems",
+    )
+    note: str | None = None
+
+
+class GrowthAuditPageRescanResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    run: GrowthAuditRunRead
+    page: GrowthAuditPageRead
+    findings_count: int = Field(serialization_alias="findingsCount")
+    tasks_count: int = Field(serialization_alias="tasksCount")
+    message: str

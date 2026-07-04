@@ -13,6 +13,7 @@ import {
   useGrowthAuditRun,
   useGrowthAuditRuns,
   useGrowthAuditTasks,
+  useRescanGrowthAuditPage,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
 import { useProject } from "../hooks/useProjects";
@@ -78,6 +79,7 @@ export function GrowthAuditPage() {
   const { data: shopifyStatus } = useShopifyStatus(id);
   const { data: runs } = useGrowthAuditRuns(projectId);
   const startRun = useStartGrowthAuditRun(projectId);
+  const rescanPage = useRescanGrowthAuditPage(projectId);
 
   const defaultRootUrl = useMemo(
     () => getDefaultRootUrl(shopifyStatus?.shopDomain),
@@ -637,6 +639,17 @@ export function GrowthAuditPage() {
         page={selectedPage}
         findings={selectedPageFindings}
         tasks={selectedPageTasks}
+        projectId={projectId}
+        runId={activeRunId}
+        runStatus={activeRun?.status}
+        isRescanning={rescanPage.isPending}
+        onRescan={async ({ runId, pageId, clearPreviousOpenItems }) => {
+          await rescanPage.mutateAsync({
+            runId,
+            pageId,
+            payload: { clearPreviousOpenItems },
+          });
+        }}
         onClose={() => setSelectedPageId(null)}
       />
 

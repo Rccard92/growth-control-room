@@ -304,6 +304,8 @@ export type {
   GrowthAuditInventoryFilter,
   GrowthAuditMode,
   GrowthAuditPage,
+  GrowthAuditPageRescanRequest,
+  GrowthAuditPageRescanResponse,
   GrowthAuditPageSource,
   GrowthAuditPageStatus,
   GrowthAuditPageStatusFilter,

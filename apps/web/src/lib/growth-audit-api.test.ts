@@ -77,4 +77,22 @@ describe("growth-audit-api", () => {
       "/api/projects/proj-1/growth-audit/runs/run-42/tasks?status=open&ownerType=seo",
     );
   });
+
+  it("calls rescan page endpoint with POST body", async () => {
+    const { rescanGrowthAuditPage } = await import("./growth-audit-api");
+    await rescanGrowthAuditPage("proj-1", "run-42", "page-7", {
+      clearPreviousOpenItems: true,
+      note: "Dopo fix meta",
+    });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/pages/page-7/rescan",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          clearPreviousOpenItems: true,
+          note: "Dopo fix meta",
+        }),
+      }),
+    );
+  });
 });

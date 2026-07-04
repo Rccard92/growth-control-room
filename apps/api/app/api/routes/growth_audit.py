@@ -11,6 +11,8 @@ from app.schemas.growth_audit import (
     GrowthAuditFindingRead,
     GrowthAuditFindingsListResponse,
     GrowthAuditPageRead,
+    GrowthAuditPageRescanRequest,
+    GrowthAuditPageRescanResponse,
     GrowthAuditPagesListResponse,
     GrowthAuditRunCreateRequest,
     GrowthAuditRunDetailResponse,
@@ -32,6 +34,7 @@ from app.services.growth_audit.run_service import (
     list_growth_audit_pages,
     list_growth_audit_runs,
     list_growth_audit_tasks,
+    rescan_growth_audit_page,
     start_growth_audit_run,
 )
 from app.services.projects import get_project_in_default_workspace
@@ -261,4 +264,47 @@ async def list_growth_audit_tasks_endpoint(
         ) from exc
     return GrowthAuditTasksListResponse(
         tasks=[GrowthAuditTaskRead.model_validate(t) for t in tasks]
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/rescan",
+    response_model=GrowthAuditPageRescanResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def rescan_growth_audit_page_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID,
+    request: GrowthAuditPageRescanRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditPageRescanResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        run, page, findings_count, tasks_count = await rescan_growth_audit_page(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            page_id=page_id,
+            clear_previous_open_items=request.clear_previous_open_items,
+            note=request.note,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    message = (
+        f"Pagina riscansionata. Score aggiornato: {page.score}."
+        if page.status == "analyzed"
+        else f"Riscansione fallita: {page.error_message or 'errore sconosciuto'}"
+    )
+    return GrowthAuditPageRescanResponse(
+        run=GrowthAuditRunRead.model_validate(run),
+        page=GrowthAuditPageRead.model_validate(page),
+        findings_count=findings_count,
+        tasks_count=tasks_count,
+        message=message,
     )

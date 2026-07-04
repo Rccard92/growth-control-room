@@ -17,6 +17,7 @@ export type GrowthAuditPhase =
   | "classification"
   | "analysis"
   | "technical_scan"
+  | "page_rescan"
   | "ready_for_analysis"
   | "finalization"
   | "completed"
@@ -83,6 +84,10 @@ export type GrowthAuditFindingCategory =
 
 export type GrowthAuditTaskOwnerType = "seo" | "content" | "dev" | "design" | "ads";
 
+export type GrowthAuditFindingStatus = "open" | "completed" | "dismissed" | "superseded";
+
+export type GrowthAuditTaskStatus = "open" | "completed" | "dismissed" | "superseded";
+
 export interface GrowthAuditRunSummary {
   message?: string;
   pagesDiscovered?: number;
@@ -103,6 +108,7 @@ export interface GrowthAuditRunSummary {
   pageTypes?: Record<string, number>;
   nextStep?: string;
   warning?: string | null;
+  lastPageRescanAt?: string | null;
 }
 
 export interface GrowthAuditRunCreateRequest {
@@ -282,4 +288,17 @@ export interface GrowthAuditTasksFilters {
   priority?: string;
   ownerType?: string;
   status?: string;
+}
+
+export interface GrowthAuditPageRescanRequest {
+  clearPreviousOpenItems?: boolean;
+  note?: string | null;
+}
+
+export interface GrowthAuditPageRescanResponse {
+  run: GrowthAuditRun;
+  page: GrowthAuditPage;
+  findingsCount: number;
+  tasksCount: number;
+  message: string;
 }

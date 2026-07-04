@@ -7,7 +7,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -52,6 +52,15 @@ SUPPORTED_PROVIDERS = {"openai", "claude"}
 
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+_ACTIVE_RUN_STATUSES = {
+    "pending",
+    "queued",
+    "discovering",
+    "classifying",
+    "analyzing",
+    "ready_for_analysis",
+}
+_RESCAN_ALLOWED_RUN_STATUSES = {"completed", "partial_failed", "failed"}
 
 
 def _utcnow() -> datetime:
@@ -263,6 +272,9 @@ async def _persist_technical_scan_result(
     scan: dict | None,
     error_message: str | None,
     now: datetime,
+    count_as_new_analysis: bool = True,
+    create_page_event: bool = True,
+    event_phase: str = "technical_scan",
 ) -> tuple[bool, int, list[dict], list[dict]]:
     page_started = now
     result_status = "completed"
@@ -277,17 +289,19 @@ async def _persist_technical_scan_result(
         page_status = "failed"
         page.error_message = error_message or scan.get("fetchError") if scan else "Scan failed"
         summary = page.error_message or "Technical scan failed."
-        await create_growth_audit_event(
-            session,
-            run_id=run.id,
-            project_id=run.project_id,
-            event_type="page_scan_failed",
-            phase="technical_scan",
-            message=f"Scansione fallita: {page.url}",
-            progress_percent=run.progress_percent,
-            payload={"pageId": str(page.id), "url": page.url, "error": page.error_message},
-        )
-        run.pages_failed += 1
+        if create_page_event:
+            await create_growth_audit_event(
+                session,
+                run_id=run.id,
+                project_id=run.project_id,
+                event_type="page_scan_failed",
+                phase=event_phase,
+                message=f"Scansione fallita: {page.url}",
+                progress_percent=run.progress_percent,
+                payload={"pageId": str(page.id), "url": page.url, "error": page.error_message},
+            )
+        if count_as_new_analysis:
+            run.pages_failed += 1
     else:
         score = scan.get("score", 0)
         findings = scan.get("findings") or []
@@ -315,26 +329,28 @@ async def _persist_technical_scan_result(
         if scan.get("fetchError"):
             result_status = "failed"
             page_status = "failed"
-            run.pages_failed += 1
-        else:
+            if count_as_new_analysis:
+                run.pages_failed += 1
+        elif count_as_new_analysis:
             run.pages_analyzed += 1
         summary = f"Technical score {score}. {len(findings)} findings."
 
-        await create_growth_audit_event(
-            session,
-            run_id=run.id,
-            project_id=run.project_id,
-            event_type="page_scanned",
-            phase="technical_scan",
-            message=f"Pagina scansionata: {page.url}",
-            progress_percent=run.progress_percent,
-            payload={
-                "pageId": str(page.id),
-                "url": page.url,
-                "score": score,
-                "httpStatus": scan.get("httpStatus"),
-            },
-        )
+        if create_page_event:
+            await create_growth_audit_event(
+                session,
+                run_id=run.id,
+                project_id=run.project_id,
+                event_type="page_scanned",
+                phase=event_phase,
+                message=f"Pagina scansionata: {page.url}",
+                progress_percent=run.progress_percent,
+                payload={
+                    "pageId": str(page.id),
+                    "url": page.url,
+                    "score": score,
+                    "httpStatus": scan.get("httpStatus"),
+                },
+            )
 
     page.status = page_status
     page_result = GrowthAuditPageResult(
@@ -1003,3 +1019,353 @@ async def list_growth_audit_tasks(
         )
     )
     return tasks
+
+
+async def _get_growth_audit_page(
+    session: AsyncSession,
+    *,
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID,
+) -> GrowthAuditPage | None:
+    result = await session.execute(
+        select(GrowthAuditPage).where(
+            GrowthAuditPage.id == page_id,
+            GrowthAuditPage.run_id == run_id,
+            GrowthAuditPage.project_id == project_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _supersede_page_open_items(
+    session: AsyncSession,
+    *,
+    run_id: UUID,
+    page_id: UUID,
+    project_id: UUID,
+) -> tuple[int, int]:
+    findings_result = await session.execute(
+        update(GrowthAuditFinding)
+        .where(
+            GrowthAuditFinding.run_id == run_id,
+            GrowthAuditFinding.page_id == page_id,
+            GrowthAuditFinding.project_id == project_id,
+            GrowthAuditFinding.status == "open",
+        )
+        .values(status="superseded")
+    )
+    tasks_result = await session.execute(
+        update(GrowthAuditTask)
+        .where(
+            GrowthAuditTask.run_id == run_id,
+            GrowthAuditTask.page_id == page_id,
+            GrowthAuditTask.project_id == project_id,
+            GrowthAuditTask.status == "open",
+        )
+        .values(status="superseded")
+    )
+    return findings_result.rowcount or 0, tasks_result.rowcount or 0
+
+
+async def _count_open_findings_and_tasks(
+    session: AsyncSession,
+    *,
+    run_id: UUID,
+    project_id: UUID,
+) -> tuple[int, int]:
+    findings_count = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditFinding)
+            .where(
+                GrowthAuditFinding.run_id == run_id,
+                GrowthAuditFinding.project_id == project_id,
+                GrowthAuditFinding.status == "open",
+            )
+        )
+    ).scalar_one()
+    tasks_count = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditTask)
+            .where(
+                GrowthAuditTask.run_id == run_id,
+                GrowthAuditTask.project_id == project_id,
+                GrowthAuditTask.status == "open",
+            )
+        )
+    ).scalar_one()
+    return findings_count, tasks_count
+
+
+async def recompute_growth_audit_run_summary(
+    session: AsyncSession,
+    run: GrowthAuditRun,
+    *,
+    last_page_rescan_at: datetime | None = None,
+) -> None:
+    pages_analyzed = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditPage)
+            .where(
+                GrowthAuditPage.run_id == run.id,
+                GrowthAuditPage.project_id == run.project_id,
+                GrowthAuditPage.status == "analyzed",
+            )
+        )
+    ).scalar_one()
+    pages_failed = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditPage)
+            .where(
+                GrowthAuditPage.run_id == run.id,
+                GrowthAuditPage.project_id == run.project_id,
+                GrowthAuditPage.status == "failed",
+            )
+        )
+    ).scalar_one()
+
+    scores = (
+        await session.execute(
+            select(GrowthAuditPage.score).where(
+                GrowthAuditPage.run_id == run.id,
+                GrowthAuditPage.project_id == run.project_id,
+                GrowthAuditPage.status == "analyzed",
+                GrowthAuditPage.score.is_not(None),
+            )
+        )
+    ).scalars().all()
+    average_score = round(sum(scores) / len(scores)) if scores else None
+
+    critical_count = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditFinding)
+            .where(
+                GrowthAuditFinding.run_id == run.id,
+                GrowthAuditFinding.project_id == run.project_id,
+                GrowthAuditFinding.status == "open",
+                GrowthAuditFinding.severity == "critical",
+            )
+        )
+    ).scalar_one()
+    high_count = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditFinding)
+            .where(
+                GrowthAuditFinding.run_id == run.id,
+                GrowthAuditFinding.project_id == run.project_id,
+                GrowthAuditFinding.status == "open",
+                GrowthAuditFinding.severity == "high",
+            )
+        )
+    ).scalar_one()
+    tasks_open = (
+        await session.execute(
+            select(func.count())
+            .select_from(GrowthAuditTask)
+            .where(
+                GrowthAuditTask.run_id == run.id,
+                GrowthAuditTask.project_id == run.project_id,
+                GrowthAuditTask.status == "open",
+            )
+        )
+    ).scalar_one()
+
+    run.pages_analyzed = pages_analyzed
+    run.pages_failed = pages_failed
+    run.site_score = average_score
+    run.seo_score = average_score
+
+    if pages_analyzed == 0 and pages_failed > 0:
+        run.status = "failed"
+    elif pages_failed > 0:
+        run.status = "partial_failed"
+    else:
+        run.status = "completed"
+
+    existing_summary = dict(run.summary or {})
+    include_ai = (run.config or {}).get("includeAiAnalysis", False)
+    run.summary = {
+        **existing_summary,
+        "message": existing_summary.get(
+            "message",
+            "Technical page scan completed. AI/GEO/CRO analysis is not enabled yet.",
+        ),
+        "pagesDiscovered": existing_summary.get("pagesDiscovered", run.pages_discovered),
+        "pagesClassified": existing_summary.get("pagesClassified", run.pages_classified),
+        "pagesAnalyzed": pages_analyzed,
+        "pagesFailed": pages_failed,
+        "averageTechnicalScore": average_score,
+        "criticalFindings": critical_count,
+        "highFindings": high_count,
+        "tasksOpen": tasks_open,
+        "includeAiAnalysis": existing_summary.get("includeAiAnalysis", include_ai),
+        "auditMode": existing_summary.get("auditMode", run.audit_mode),
+        "sources": existing_summary.get("sources", {}),
+        "pageTypes": existing_summary.get("pageTypes", {}),
+        "nextStep": existing_summary.get(
+            "nextStep",
+            "Enable page-level AI, GEO and CRO analysis by page type.",
+        ),
+        "warning": existing_summary.get("warning"),
+        "lastPageRescanAt": (
+            last_page_rescan_at.isoformat()
+            if last_page_rescan_at
+            else existing_summary.get("lastPageRescanAt")
+        ),
+    }
+
+
+async def rescan_growth_audit_page(
+    session: AsyncSession,
+    *,
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID,
+    clear_previous_open_items: bool = True,
+    note: str | None = None,
+) -> tuple[GrowthAuditRun, GrowthAuditPage, int, int]:
+    run = await get_growth_audit_run(session, project_id, run_id)
+    if run is None:
+        raise GrowthAuditRunNotFoundError(f"Growth Audit run {run_id} not found")
+
+    if run.status in _ACTIVE_RUN_STATUSES:
+        raise GrowthAuditValidationError(
+            "Cannot rescan page while audit run is still active."
+        )
+    if run.status not in _RESCAN_ALLOWED_RUN_STATUSES:
+        raise GrowthAuditValidationError(
+            f"Cannot rescan page for run status: {run.status}"
+        )
+
+    page = await _get_growth_audit_page(
+        session,
+        project_id=project_id,
+        run_id=run_id,
+        page_id=page_id,
+    )
+    if page is None:
+        raise GrowthAuditRunNotFoundError(f"Growth Audit page {page_id} not found")
+
+    if not (page.url and page.url.strip()):
+        raise GrowthAuditValidationError("Page URL is required for rescan.")
+
+    now = _utcnow()
+
+    await create_growth_audit_event(
+        session,
+        run_id=run.id,
+        project_id=project_id,
+        event_type="page_rescan_started",
+        phase="page_rescan",
+        message=f"Riscansione pagina avviata: {page.url}",
+        progress_percent=run.progress_percent,
+        payload={
+            "pageId": str(page.id),
+            "url": page.url,
+            "note": note,
+        },
+    )
+
+    if clear_previous_open_items:
+        findings_superseded, tasks_superseded = await _supersede_page_open_items(
+            session,
+            run_id=run.id,
+            page_id=page.id,
+            project_id=project_id,
+        )
+        if findings_superseded > 0 or tasks_superseded > 0:
+            await create_growth_audit_event(
+                session,
+                run_id=run.id,
+                project_id=project_id,
+                event_type="page_previous_items_superseded",
+                phase="page_rescan",
+                message=(
+                    f"Archiviati {findings_superseded} problemi e "
+                    f"{tasks_superseded} task aperti precedenti."
+                ),
+                progress_percent=run.progress_percent,
+                payload={
+                    "pageId": str(page.id),
+                    "findingsSuperseded": findings_superseded,
+                    "tasksSuperseded": tasks_superseded,
+                },
+            )
+
+    page.status = "analyzing"
+    page.error_message = None
+    await session.flush()
+
+    scan: dict | None = None
+    error_message: str | None = None
+    try:
+        scan = await scan_page_technical(
+            page.url,
+            page_type=page.page_type,
+            root_domain=run.normalized_domain,
+            timeout_seconds=TECHNICAL_SCAN_TIMEOUT_SECONDS,
+        )
+        score_technical_scan(scan, page.page_type)
+    except Exception as exc:
+        logger.warning("Page rescan failed for %s: %s", page.url, exc)
+        error_message = str(exc)
+
+    success, score, findings_data, tasks_data = await _persist_technical_scan_result(
+        session,
+        run=run,
+        page=page,
+        scan=scan,
+        error_message=error_message,
+        now=now,
+        count_as_new_analysis=False,
+        create_page_event=False,
+        event_phase="page_rescan",
+    )
+
+    await recompute_growth_audit_run_summary(
+        session,
+        run,
+        last_page_rescan_at=now,
+    )
+
+    findings_count, tasks_count = await _count_open_findings_and_tasks(
+        session,
+        run_id=run.id,
+        project_id=project_id,
+    )
+
+    event_type = "page_rescan_completed" if success else "page_rescan_failed"
+    event_message = (
+        f"Riscansione completata: {page.url}"
+        if success
+        else f"Riscansione fallita: {page.url}"
+    )
+    await create_growth_audit_event(
+        session,
+        run_id=run.id,
+        project_id=project_id,
+        event_type=event_type,
+        phase="page_rescan",
+        message=event_message,
+        progress_percent=run.progress_percent or 100,
+        payload={
+            "pageId": str(page.id),
+            "url": page.url,
+            "score": page.score,
+            "status": page.status,
+            "findingsCreated": len(findings_data),
+            "tasksCreated": len(tasks_data),
+        },
+    )
+
+    await session.commit()
+    await session.refresh(run)
+    await session.refresh(page)
+
+    return run, page, findings_count, tasks_count

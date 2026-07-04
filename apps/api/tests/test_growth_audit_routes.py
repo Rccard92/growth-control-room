@@ -100,6 +100,9 @@ def test_growth_audit_routes_registered() -> None:
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/events" in paths
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/findings" in paths
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/tasks" in paths
+    assert (
+        "/projects/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/rescan" in paths
+    )
 
 
 def test_create_growth_audit_run_returns_201_payload() -> None:

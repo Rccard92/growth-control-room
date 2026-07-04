@@ -47,6 +47,13 @@ const sampleFinding: GrowthAuditFinding = {
   status: "open",
 };
 
+const rescanProps = {
+  projectId: "proj-1",
+  runId: "run-1",
+  runStatus: "completed",
+  onRescan: vi.fn().mockResolvedValue(undefined),
+};
+
 describe("handleDrawerEscapeKey", () => {
   it("calls onClose when Escape is pressed", () => {
     const onClose = vi.fn();
@@ -96,13 +103,14 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain('aria-label="Chiudi"');
   });
 
-  it("renders technical fields and disabled rescan button", () => {
+  it("renders technical fields and enabled rescan button when run is completed", () => {
     const html = renderToStaticMarkup(
       <GrowthAuditPageDrawer
         open
         page={samplePage}
         findings={[]}
         tasks={[]}
+        {...rescanProps}
         onClose={() => undefined}
       />,
     );
@@ -110,7 +118,60 @@ describe("GrowthAuditPageDrawer", () => {
     expect(html).toContain("Miele di Limone");
     expect(html).toContain("Miele biologico siciliano dal gusto delicato.");
     expect(html).toContain("Product, WebPage");
-    expect(html).toContain("Riscansiona pagina — in arrivo");
+    expect(html).toContain("Riscansiona pagina");
+    expect(html).not.toContain("in arrivo");
+    expect(html).not.toContain("disabled");
+    expect(html).toContain(
+      "Usalo dopo aver corretto title, meta, immagini, schema o altri elementi tecnici.",
+    );
+  });
+
+  it("shows Riprova scansione label for failed pages", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={{ ...samplePage, status: "failed", errorMessage: "Timeout" }}
+        findings={[]}
+        tasks={[]}
+        {...rescanProps}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Riprova scansione");
+    expect(html).toContain("Timeout");
+  });
+
+  it("disables rescan while run is active", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={samplePage}
+        findings={[]}
+        tasks={[]}
+        {...rescanProps}
+        runStatus="analyzing"
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("disabled");
+  });
+
+  it("shows loading label when isRescanning", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageDrawer
+        open
+        page={samplePage}
+        findings={[]}
+        tasks={[]}
+        {...rescanProps}
+        isRescanning
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Riscansione in corso…");
     expect(html).toContain("disabled");
   });
 
