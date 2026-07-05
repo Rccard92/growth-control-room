@@ -441,6 +441,18 @@ class GrowthAuditGa4EcommerceAnalysisResponse(BaseModel):
     message: str
 
 
+class GrowthAuditMerchantCenterAnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class GrowthAuditMerchantCenterAnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    run: GrowthAuditRunRead
+    summary: dict[str, Any]
+    message: str
+
+
 class GrowthAuditPageResultsListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

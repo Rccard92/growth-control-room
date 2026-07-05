@@ -20,6 +20,7 @@ GOOGLE_OAUTH_SCOPES = [
     "https://www.googleapis.com/auth/webmasters.readonly",
     "https://www.googleapis.com/auth/analytics.readonly",
     "https://www.googleapis.com/auth/adwords",
+    "https://www.googleapis.com/auth/content",
 ]
 
 OAUTH_STATE_TTL_MINUTES = 10

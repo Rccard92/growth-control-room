@@ -128,6 +128,7 @@ export interface GrowthAuditRunSummary {
   analytics?: GrowthAuditRunAnalyticsSummary;
   shopifyCommerce?: GrowthAuditRunShopifyCommerceSummary;
   ga4Ecommerce?: GrowthAuditRunGa4EcommerceSummary;
+  merchantCenter?: GrowthAuditRunMerchantCenterSummary;
 }
 
 export interface GrowthAuditRunAnalyticsSummary {
@@ -213,6 +214,59 @@ export interface GrowthAuditRunShopifyCommerceSummary {
     sales?: number;
     quantitySold?: number;
     ordersCount?: number;
+  }>;
+  lastSyncedAt?: string | null;
+}
+
+export interface GrowthAuditMerchantCenterIssue {
+  code?: string | null;
+  severity?: string | null;
+  destination?: string | null;
+  description?: string | null;
+  detail?: string | null;
+  documentation?: string | null;
+}
+
+export interface GrowthAuditMerchantCenterDestinationStatus {
+  destination?: string | null;
+  status?: string | null;
+}
+
+export interface GrowthAuditPageMerchantCenterMetadata {
+  merchantProductId?: string | null;
+  offerId?: string | null;
+  title?: string | null;
+  link?: string | null;
+  status?: "approved" | "disapproved" | "limited" | "unknown" | string;
+  availability?: string | null;
+  price?: number | null;
+  currency?: string | null;
+  brand?: string | null;
+  gtin?: string | null;
+  mpn?: string | null;
+  imageLink?: string | null;
+  destinationStatuses?: GrowthAuditMerchantCenterDestinationStatus[];
+  issues?: GrowthAuditMerchantCenterIssue[];
+  issuesCount?: number;
+  criticalIssuesCount?: number;
+  matchedBy?: string | null;
+  matchStatus?: "no_reliable_match" | string | null;
+  matchDebug?: Record<string, unknown> | null;
+  syncedAt?: string;
+}
+
+export interface GrowthAuditRunMerchantCenterSummary {
+  productsMatched?: number;
+  productsUnmatched?: number;
+  approvedProducts?: number;
+  disapprovedProducts?: number;
+  limitedProducts?: number;
+  productsWithIssues?: number;
+  criticalIssues?: number;
+  topIssues?: Array<{
+    code?: string;
+    count?: number;
+    severity?: string | null;
   }>;
   lastSyncedAt?: string | null;
 }
@@ -662,6 +716,16 @@ export interface GrowthAuditGa4EcommerceAnalysisRequest {
 export interface GrowthAuditGa4EcommerceAnalysisResponse {
   run: GrowthAuditRun;
   summary: GrowthAuditRunGa4EcommerceSummary;
+  message: string;
+}
+
+export interface GrowthAuditMerchantCenterAnalysisRequest {
+  // Nessun parametro: sync completa feed Merchant Center.
+}
+
+export interface GrowthAuditMerchantCenterAnalysisResponse {
+  run: GrowthAuditRun;
+  summary: GrowthAuditRunMerchantCenterSummary;
   message: string;
 }
 

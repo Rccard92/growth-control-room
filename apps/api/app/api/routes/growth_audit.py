@@ -22,6 +22,8 @@ from app.schemas.growth_audit import (
     GrowthAuditShopifyCommerceAnalysisResponse,
     GrowthAuditGa4EcommerceAnalysisRequest,
     GrowthAuditGa4EcommerceAnalysisResponse,
+    GrowthAuditMerchantCenterAnalysisRequest,
+    GrowthAuditMerchantCenterAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
@@ -43,6 +45,7 @@ from app.services.google.exceptions import (
     GoogleIntegrationNotConnectedError,
     GoogleIntegrationPermissionError,
     GoogleSearchConsolePropertyError,
+    MerchantAccountError,
 )
 from app.services.growth_audit.exceptions import (
     GrowthAuditError,
@@ -67,6 +70,9 @@ from app.services.growth_audit.shopify_commerce_analysis import (
 )
 from app.services.growth_audit.analytics_ecommerce_analysis import (
     analyze_growth_audit_analytics_ecommerce,
+)
+from app.services.growth_audit.merchant_center_analysis import (
+    analyze_growth_audit_merchant_center,
 )
 from app.services.shopify.exceptions import (
     ShopifyCommerceApiError,
@@ -127,6 +133,11 @@ def _map_growth_audit_error(
             detail=str(exc),
         )
     if isinstance(exc, GoogleAnalyticsPropertyError):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    if isinstance(exc, MerchantAccountError):
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
@@ -626,6 +637,39 @@ async def analyze_growth_audit_analytics_ecommerce_endpoint(
         run=GrowthAuditRunRead.model_validate(result["run"]),
         summary=summary,
         message=result.get("message") or "Funnel ecommerce GA4 aggiornato",
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/merchant-center-analysis",
+    response_model=GrowthAuditMerchantCenterAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_merchant_center_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    request: GrowthAuditMerchantCenterAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditMerchantCenterAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        result = await analyze_growth_audit_merchant_center(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    summary = result["summary"]
+    return GrowthAuditMerchantCenterAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(result["run"]),
+        summary=summary,
+        message=result.get("message") or "Dati Merchant Center aggiornati.",
     )
 
 

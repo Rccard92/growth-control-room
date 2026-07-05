@@ -8,6 +8,8 @@ import type {
   GrowthAuditPageSearchConsoleMetadata,
   GrowthAuditPageAnalyticsMetadata,
   GrowthAuditPageShopifyCommerceMetadata,
+  GrowthAuditPageMerchantCenterMetadata,
+  GrowthAuditMerchantCenterIssue,
   GrowthAuditPageGa4EcommerceMetadata,
   GrowthAuditRunShopifyCommerceSummary,
   GrowthAuditPageResult,
@@ -1858,6 +1860,56 @@ export function hasGrowthAuditPageShopifyCommerceData(page: GrowthAuditPage): bo
   return Boolean(meta?.syncedAt);
 }
 
+export function getGrowthAuditPageMerchantCenterMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageMerchantCenterMetadata | null {
+  const merchant = page.metadata?.merchantCenter;
+  if (!merchant || typeof merchant !== "object") return null;
+  return merchant as GrowthAuditPageMerchantCenterMetadata;
+}
+
+export function hasGrowthAuditPageMerchantCenterData(page: GrowthAuditPage): boolean {
+  const meta = getGrowthAuditPageMerchantCenterMetadata(page);
+  return Boolean(meta?.syncedAt);
+}
+
+export function hasGrowthAuditPageMerchantCenterReliableMatch(page: GrowthAuditPage): boolean {
+  const meta = getGrowthAuditPageMerchantCenterMetadata(page);
+  if (!meta?.syncedAt) return false;
+  if (meta.matchStatus === "no_reliable_match") return false;
+  return Boolean(meta.matchedBy && meta.matchedBy !== "none");
+}
+
+export function getGrowthAuditMerchantCenterStatusLabel(
+  status?: string | null,
+): string {
+  switch ((status ?? "unknown").toLowerCase()) {
+    case "approved":
+      return "Approvato";
+    case "disapproved":
+      return "Disapprovato";
+    case "limited":
+      return "Limitato";
+    default:
+      return "Sconosciuto";
+  }
+}
+
+export function getGrowthAuditMerchantCenterStatusBadgeClass(
+  status?: string | null,
+): string {
+  switch ((status ?? "unknown").toLowerCase()) {
+    case "approved":
+      return "growth-audit-merchant-center__status--approved";
+    case "disapproved":
+      return "growth-audit-merchant-center__status--disapproved";
+    case "limited":
+      return "growth-audit-merchant-center__status--limited";
+    default:
+      return "growth-audit-merchant-center__status--unknown";
+  }
+}
+
 export function getGrowthAuditPageGa4EcommerceMetadata(
   page: GrowthAuditPage,
 ): GrowthAuditPageGa4EcommerceMetadata | null {
@@ -2663,6 +2715,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   hasSearchConsoleData?: boolean;
   hasAnalyticsData?: boolean;
   hasShopifyCommerceData?: boolean;
+  hasMerchantCenterData?: boolean;
   hasGa4EcommerceData?: boolean;
   shopifyEditable: boolean;
   openFindingsCount: number;
@@ -2675,6 +2728,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
     hasSearchConsoleData = false,
     hasAnalyticsData = false,
     hasShopifyCommerceData = false,
+    hasMerchantCenterData = false,
     hasGa4EcommerceData = false,
     shopifyEditable,
     openFindingsCount,
@@ -2747,6 +2801,12 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       ? "available"
       : "todo";
 
+  const merchantCenterStatus: GrowthAuditWorkflowStepStatus = hasMerchantCenterData
+    ? "done"
+    : isProductPage
+      ? "available"
+      : "todo";
+
   const workflowSteps: GrowthAuditWorkflowStep[] = [
     {
       key: "priority",
@@ -2763,6 +2823,12 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       label: "Shopify Commerce",
       status: commerceStatus,
       anchorId: "shopify-commerce",
+    });
+    workflowSteps.push({
+      key: "merchant-center",
+      label: "Merchant Center",
+      status: merchantCenterStatus,
+      anchorId: "merchant-center",
     });
   }
 
@@ -3014,6 +3080,7 @@ type ProductIntelligenceScoreContext = {
   gscMeta: GrowthAuditPageSearchConsoleMetadata | null;
   analyticsMeta: GrowthAuditPageAnalyticsMetadata | null;
   commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
+  merchantMeta: GrowthAuditPageMerchantCenterMetadata | null;
   ga4EcommerceMeta: GrowthAuditPageGa4EcommerceMetadata | null;
   performanceSnapshot: PerformanceArtifactsSnapshot;
   croScore: number | null;
@@ -3056,6 +3123,7 @@ function _computeProductPriorityScore(input: {
   const gscMeta = getGrowthAuditPageSearchConsoleMetadata(page);
   const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
   const commerceMeta = getGrowthAuditPageShopifyCommerceMetadata(page);
+  const merchantMeta = getGrowthAuditPageMerchantCenterMetadata(page);
   const ga4EcommerceMeta = getGrowthAuditPageGa4EcommerceMetadata(page);
   const aiMeta = getGrowthAuditPageAiMetadata(page);
   const performanceSnapshot = _getProductIntelligencePerformanceSnapshot(page, performanceResults);
@@ -3239,6 +3307,26 @@ function _computeProductPriorityScore(input: {
     }
   }
 
+  if (merchantMeta && hasGrowthAuditPageMerchantCenterReliableMatch(page)) {
+    const status = (merchantMeta.status ?? "unknown").toLowerCase();
+    const hasDemand =
+      (commerceMeta?.sales ?? 0) > 0 ||
+      (gscMeta?.impressions ?? 0) > 200 ||
+      (analyticsMeta?.sessions ?? 0) > 50 ||
+      (ga4EcommerceMeta?.itemViews ?? ga4EcommerceMeta?.itemViewEvents ?? 0) > 30;
+
+    if (status === "disapproved" && hasDemand) {
+      score += 22;
+      addTheme("general", 22);
+    } else if (status === "limited" && hasDemand) {
+      score += 12;
+      addTheme("general", 12);
+    } else if ((merchantMeta.criticalIssuesCount ?? 0) > 0 && hasDemand) {
+      score += 10;
+      addTheme("general", 10);
+    }
+  }
+
   if (ga4EcommerceMeta) {
     const itemViews = ga4EcommerceMeta.itemViews ?? ga4EcommerceMeta.itemViewEvents ?? 0;
     const itemsAddedToCart = ga4EcommerceMeta.itemsAddedToCart ?? 0;
@@ -3291,6 +3379,7 @@ function _computeProductPriorityScore(input: {
     gscMeta,
     analyticsMeta,
     commerceMeta,
+    merchantMeta,
     ga4EcommerceMeta,
     performanceSnapshot,
     croScore,
@@ -3510,7 +3599,7 @@ function _buildProductIntelligenceEvidence(input: {
 }): GrowthAuditProductIntelligenceSignal[] {
   const { context, priorityActionsCount } = input;
   const signals: GrowthAuditProductIntelligenceSignal[] = [];
-  const { gscMeta, analyticsMeta, commerceMeta, ga4EcommerceMeta, performanceSnapshot, croScore, openFindings } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, merchantMeta, ga4EcommerceMeta, performanceSnapshot, croScore, openFindings } = context;
 
   if (ga4EcommerceMeta) {
     const itemViews = ga4EcommerceMeta.itemViews ?? ga4EcommerceMeta.itemViewEvents ?? 0;
@@ -3810,6 +3899,46 @@ function _buildProductIntelligenceEvidence(input: {
     });
   }
 
+  if (
+    merchantMeta?.syncedAt &&
+    merchantMeta.matchedBy &&
+    merchantMeta.matchedBy !== "none" &&
+    merchantMeta.matchStatus !== "no_reliable_match"
+  ) {
+    const status = (merchantMeta.status ?? "unknown").toLowerCase();
+    signals.push({
+      key: "merchant-status",
+      label: "Status Merchant",
+      value: getGrowthAuditMerchantCenterStatusLabel(status),
+      tone:
+        status === "disapproved"
+          ? "danger"
+          : status === "limited"
+            ? "warning"
+            : status === "approved"
+              ? "good"
+              : "neutral",
+      explanation: "Stato prodotto nel feed Merchant Center.",
+    });
+    if ((merchantMeta.issuesCount ?? 0) > 0) {
+      signals.push({
+        key: "merchant-issues",
+        label: "Issue feed",
+        value: String(merchantMeta.issuesCount ?? 0),
+        tone: (merchantMeta.criticalIssuesCount ?? 0) > 0 ? "danger" : "warning",
+        explanation: "Issue diagnostiche segnalate da Merchant Center.",
+      });
+    }
+  } else if (merchantMeta?.matchStatus === "no_reliable_match") {
+    signals.push({
+      key: "merchant-unmatched",
+      label: "Match Merchant",
+      value: "Nessun match affidabile",
+      tone: "neutral",
+      explanation: "Il prodotto feed non è stato abbinato in modo deterministico.",
+    });
+  }
+
   if (priorityActionsCount > 0) {
     signals.push({
       key: "priority-actions",
@@ -3828,7 +3957,7 @@ function _buildProductIntelligenceRecommendedActions(input: {
   missingData: string[];
 }): GrowthAuditProductIntelligenceAction[] {
   const { context, missingData } = input;
-  const { gscMeta, analyticsMeta, commerceMeta, ga4EcommerceMeta, performanceSnapshot, croScore, aiLatestScore, openFindings } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, merchantMeta, ga4EcommerceMeta, performanceSnapshot, croScore, aiLatestScore, openFindings } = context;
   const actions: GrowthAuditProductIntelligenceAction[] = [];
 
   const impressions = gscMeta?.impressions ?? 0;
@@ -3848,6 +3977,42 @@ function _buildProductIntelligenceRecommendedActions(input: {
   const funnelCart = ga4EcommerceMeta?.itemsAddedToCart ?? 0;
   const funnelPurchases = ga4EcommerceMeta?.itemsPurchased ?? 0;
   const funnelRevenue = ga4EcommerceMeta?.itemRevenue ?? 0;
+  const hasDemand =
+    sales > 0 || impressions > 200 || sessions > 50 || funnelViews > 30;
+
+  if (
+    merchantMeta?.syncedAt &&
+    merchantMeta.matchedBy &&
+    merchantMeta.matchedBy !== "none" &&
+    merchantMeta.matchStatus !== "no_reliable_match"
+  ) {
+    const status = (merchantMeta.status ?? "unknown").toLowerCase();
+    if (status === "disapproved" && hasDemand) {
+      actions.push({
+        title: "Risolvi problemi Merchant Center",
+        reason: "Il prodotto è disapprovato nel feed ma ha segnali di domanda o vendite.",
+        expectedImpact: "Ripristino visibilità Shopping e free listings.",
+        whereToFix: "Merchant Center / feed prodotto / attributi obbligatori",
+        howToValidate: "Riesegui sync Merchant Center e verifica status approvato.",
+      });
+    } else if ((merchantMeta.issuesCount ?? 0) > 0) {
+      const issueCodes = (merchantMeta.issues ?? [])
+        .map((issue: GrowthAuditMerchantCenterIssue) => issue.code)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(", ");
+      actions.push({
+        title: "Aggiorna feed prodotto",
+        reason:
+          issueCodes.length > 0
+            ? `Merchant Center segnala issue feed (${issueCodes}).`
+            : "Merchant Center segnala issue su immagini, prezzo o disponibilità.",
+        expectedImpact: "Meno warning e migliore distribuzione del prodotto.",
+        whereToFix: "Merchant Center / Shopify feed / attributi prodotto",
+        howToValidate: "Controlla issue azzerate dopo aggiornamento feed.",
+      });
+    }
+  }
 
   if (ga4EcommerceMeta && funnelViews > 50 && funnelCart === 0) {
     actions.push({
@@ -4254,8 +4419,18 @@ function _computeEconomicDataConfidence(page: GrowthAuditPage): number {
   if (hasGrowthAuditPageAnalyticsData(page)) confidence += 20;
   if (hasGrowthAuditPageGa4EcommerceData(page)) confidence += 20;
   if (hasGrowthAuditPageShopifyCommerceData(page)) confidence += 20;
+  if (hasGrowthAuditPageMerchantCenterReliableMatch(page)) confidence += 10;
   if (hasGrowthAuditPagePerformanceAnalysis(page)) confidence += 10;
   if (hasGrowthAuditPageAiAnalysis(page)) confidence += 10;
+
+  const merchantMeta = getGrowthAuditPageMerchantCenterMetadata(page);
+  if (
+    merchantMeta?.syncedAt &&
+    (merchantMeta.matchStatus === "no_reliable_match" || merchantMeta.matchedBy === "none")
+  ) {
+    confidence = Math.max(0, confidence - 10);
+  }
+
   return confidence;
 }
 
@@ -4458,7 +4633,17 @@ function _computeEconomicTechnicalAndCroRisk(input: {
     _isPoorCls(performanceSnapshot.cls) ||
     _isPoorInp(performanceSnapshot.inp);
 
-  if (!hasSignal) return null;
+  const merchantMeta = getGrowthAuditPageMerchantCenterMetadata(page);
+  const hasMerchantFeedRisk =
+    merchantMeta?.syncedAt &&
+    merchantMeta.matchedBy &&
+    merchantMeta.matchedBy !== "none" &&
+    merchantMeta.matchStatus !== "no_reliable_match" &&
+    ((merchantMeta.status ?? "").toLowerCase() === "disapproved" ||
+      (merchantMeta.status ?? "").toLowerCase() === "limited" ||
+      (merchantMeta.criticalIssuesCount ?? 0) > 0);
+
+  if (!hasSignal && !(hasMerchantFeedRisk && hasTrafficOrSales)) return null;
 
   let score = 0;
   if (perfScore != null) {
@@ -4474,6 +4659,18 @@ function _computeEconomicTechnicalAndCroRisk(input: {
   if (hasHigh) score += 15;
   if (hasHighTask) score += 10;
   if (hasTrafficOrSales && (hasCritical || hasHigh)) score += 15;
+
+  if (
+    merchantMeta?.syncedAt &&
+    merchantMeta.matchedBy &&
+    merchantMeta.matchedBy !== "none" &&
+    merchantMeta.matchStatus !== "no_reliable_match"
+  ) {
+    const status = (merchantMeta.status ?? "unknown").toLowerCase();
+    if (status === "disapproved" && hasTrafficOrSales) score += 30;
+    else if (status === "limited" && hasTrafficOrSales) score += 18;
+    else if ((merchantMeta.criticalIssuesCount ?? 0) > 0 && hasTrafficOrSales) score += 12;
+  }
 
   return score > 0 ? _clampScore(score) : null;
 }
@@ -4758,6 +4955,44 @@ function _buildEconomicPriorityReasons(input: {
       detail: "Finding ad alta priorità su prodotto con vendite attive.",
       impact: "risk",
     });
+  }
+
+  const merchantMeta = getGrowthAuditPageMerchantCenterMetadata(page);
+  const hasDemand =
+    (commerceMeta?.sales ?? 0) > 0 ||
+    (gscMeta?.impressions ?? 0) > 200 ||
+    (analyticsMeta?.sessions ?? 0) > 50 ||
+    (ga4Meta?.itemViews ?? ga4Meta?.itemViewEvents ?? 0) > 30;
+
+  if (
+    merchantMeta?.syncedAt &&
+    merchantMeta.matchedBy &&
+    merchantMeta.matchedBy !== "none" &&
+    merchantMeta.matchStatus !== "no_reliable_match"
+  ) {
+    const status = (merchantMeta.status ?? "unknown").toLowerCase();
+    if (status === "disapproved" && hasDemand) {
+      reasons.push({
+        key: "merchant_disapproved",
+        label: "Prodotto disapprovato",
+        detail: "Prodotto disapprovato: visibilità Shopping/free listings limitata.",
+        impact: "risk",
+      });
+    } else if ((merchantMeta.criticalIssuesCount ?? 0) > 0 && hasDemand) {
+      reasons.push({
+        key: "merchant_issues",
+        label: "Issue feed Merchant",
+        detail: "Merchant Center segnala problemi feed su un prodotto con domanda/vendite.",
+        impact: "risk",
+      });
+    } else if (status === "approved") {
+      reasons.push({
+        key: "merchant_approved",
+        label: "Feed approvato",
+        detail: "Prodotto approvato nel feed Merchant Center.",
+        impact: "positive",
+      });
+    }
   }
 
   if (dataConfidence < 40) {

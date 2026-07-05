@@ -6,6 +6,9 @@ import type {
   GoogleSearchConsoleSitesResponse,
   SelectGoogleAnalyticsPropertyRequest,
   SelectGoogleAnalyticsPropertyResponse,
+  GoogleMerchantAccountsResponse,
+  SelectGoogleMerchantAccountRequest,
+  SelectGoogleMerchantAccountResponse,
   SelectSearchConsoleSiteRequest,
   SelectSearchConsoleSiteResponse,
 } from "@gcr/shared";
@@ -68,6 +71,32 @@ export function startGoogleOAuth(
   return apiFetch<GoogleOAuthStartResponse>(`/api/projects/${projectId}/google/oauth/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload ?? { services: ["search_console", "analytics", "google_ads"] }),
+    body: JSON.stringify(
+      payload ?? {
+        services: ["search_console", "analytics", "google_ads", "merchant_center"],
+      },
+    ),
   });
+}
+
+export function fetchMerchantAccounts(
+  projectId: string,
+): Promise<GoogleMerchantAccountsResponse> {
+  return apiFetch<GoogleMerchantAccountsResponse>(
+    `/api/projects/${projectId}/google/merchant/accounts`,
+  );
+}
+
+export function selectMerchantAccount(
+  projectId: string,
+  payload: SelectGoogleMerchantAccountRequest,
+): Promise<SelectGoogleMerchantAccountResponse> {
+  return apiFetch<SelectGoogleMerchantAccountResponse>(
+    `/api/projects/${projectId}/google/merchant/select-account`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
 }

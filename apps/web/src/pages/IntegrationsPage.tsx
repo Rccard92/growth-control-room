@@ -5,6 +5,7 @@ import { INTEGRATIONS } from "@gcr/shared";
 import { IntegrationCard } from "../components/IntegrationCard";
 import { GoogleSearchConsolePropertyModal } from "../components/integrations/GoogleSearchConsolePropertyModal";
 import { GoogleAnalyticsPropertyModal } from "../components/integrations/GoogleAnalyticsPropertyModal";
+import { GoogleMerchantCenterAccountModal } from "../components/integrations/GoogleMerchantCenterAccountModal";
 import { IntegrationGraph } from "../components/IntegrationGraph";
 import { PageHeader } from "../components/PageHeader";
 import {
@@ -24,6 +25,7 @@ export function IntegrationsPage() {
   const startGoogleOAuth = useStartGoogleOAuth(id);
   const [isSearchConsoleModalOpen, setIsSearchConsoleModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [isMerchantModalOpen, setIsMerchantModalOpen] = useState(false);
   const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(
     null,
   );
@@ -53,7 +55,7 @@ export function IntegrationsPage() {
 
   const handleConnectGoogle = async () => {
     const response = await startGoogleOAuth.mutateAsync({
-      services: ["search_console", "analytics", "google_ads"],
+      services: ["search_console", "analytics", "google_ads", "merchant_center"],
     });
     window.location.href = response.authorizationUrl;
   };
@@ -87,7 +89,8 @@ export function IntegrationsPage() {
       {error && <div className="gcr-alert gcr-alert--error">{error.message}</div>}
 
       <p className="integrations-page__hint">
-        Le fonti Google usano API key per PageSpeed/CrUX e OAuth per Search Console, GA4 e Ads.
+        Le fonti Google usano API key per PageSpeed/CrUX e OAuth per Search Console, GA4, Ads e
+        Merchant Center.
       </p>
 
       {isGridLoading && <div className="gcr-skeleton" style={{ height: 120 }} />}
@@ -109,6 +112,9 @@ export function IntegrationsPage() {
                 googleAnalyticsPropertyId: project?.googleAnalyticsPropertyId,
                 googleAnalyticsPropertyName: project?.googleAnalyticsPropertyName,
                 onSelectGoogleAnalyticsProperty: () => setIsAnalyticsModalOpen(true),
+                googleMerchantAccountId: project?.googleMerchantAccountId,
+                googleMerchantAccountName: project?.googleMerchantAccountName,
+                onSelectMerchantAccount: () => setIsMerchantModalOpen(true),
               })}
             />
           ))}
@@ -131,6 +137,15 @@ export function IntegrationsPage() {
           selectedPropertyName={project?.googleAnalyticsPropertyName}
           open={isAnalyticsModalOpen}
           onClose={() => setIsAnalyticsModalOpen(false)}
+        />
+      )}
+
+      {id && (
+        <GoogleMerchantCenterAccountModal
+          projectId={id}
+          selectedAccountId={project?.googleMerchantAccountId}
+          open={isMerchantModalOpen}
+          onClose={() => setIsMerchantModalOpen(false)}
         />
       )}
 

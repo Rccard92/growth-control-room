@@ -19,6 +19,7 @@ const {
   useAnalyzeGrowthAuditAnalyticsMock,
   useAnalyzeGrowthAuditShopifyCommerceMock,
   useAnalyzeGrowthAuditGa4EcommerceMock,
+  useAnalyzeGrowthAuditMerchantCenterMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
@@ -35,6 +36,7 @@ const {
   useAnalyzeGrowthAuditAnalyticsMock: vi.fn(),
   useAnalyzeGrowthAuditShopifyCommerceMock: vi.fn(),
   useAnalyzeGrowthAuditGa4EcommerceMock: vi.fn(),
+  useAnalyzeGrowthAuditMerchantCenterMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -65,6 +67,7 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useAnalyzeGrowthAuditAnalytics: useAnalyzeGrowthAuditAnalyticsMock,
   useAnalyzeGrowthAuditShopifyCommerce: useAnalyzeGrowthAuditShopifyCommerceMock,
   useAnalyzeGrowthAuditGa4Ecommerce: useAnalyzeGrowthAuditGa4EcommerceMock,
+  useAnalyzeGrowthAuditMerchantCenter: useAnalyzeGrowthAuditMerchantCenterMock,
 }));
 
 vi.mock("../hooks/useGoogleIntegrations", () => ({
@@ -307,6 +310,10 @@ function setupMocks(options?: {
         configured: true,
       },
       googleAds: { status: "setup_incomplete", configured: true },
+      merchantCenter: {
+        status: options?.analyticsConnected ? "connected" : "needs_setup",
+        configured: true,
+      },
     },
     isLoading: false,
   });
@@ -327,6 +334,11 @@ function setupMocks(options?: {
     isPending: false,
     isError: Boolean(options?.ga4EcommerceError),
     error: options?.ga4EcommerceError,
+  });
+  useAnalyzeGrowthAuditMerchantCenterMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
   });
 }
 

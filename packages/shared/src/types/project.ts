@@ -9,6 +9,8 @@ export interface Project {
   searchConsoleSiteUrl?: string | null;
   googleAnalyticsPropertyId?: string | null;
   googleAnalyticsPropertyName?: string | null;
+  googleMerchantAccountId?: string | null;
+  googleMerchantAccountName?: string | null;
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
@@ -27,4 +29,6 @@ export interface UpdateProjectInput {
   searchConsoleSiteUrl?: string | null;
   googleAnalyticsPropertyId?: string | null;
   googleAnalyticsPropertyName?: string | null;
+  googleMerchantAccountId?: string | null;
+  googleMerchantAccountName?: string | null;
 }

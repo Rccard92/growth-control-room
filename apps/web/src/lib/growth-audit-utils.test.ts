@@ -1712,6 +1712,61 @@ describe("growth-audit-utils", () => {
       expect(item!.level).not.toBe("maximum");
     });
 
+    it("boosts technical risk for disapproved merchant product with demand", () => {
+      const item = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            shopifyCommerce: { sales: 200, syncedAt: "2026-01-01T00:00:00Z" },
+            merchantCenter: {
+              matchedBy: "link",
+              status: "disapproved",
+              issuesCount: 1,
+              criticalIssuesCount: 1,
+              syncedAt: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+      });
+      expect(item).not.toBeNull();
+      expect(item!.breakdown.technicalAndCroRisk).toBeGreaterThan(20);
+      expect(item!.reasons.some((r) => r.key === "merchant_disapproved")).toBe(true);
+    });
+
+    it("lowers data confidence when merchant has no reliable match", () => {
+      const withMatch = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            merchantCenter: {
+              matchedBy: "link",
+              status: "approved",
+              syncedAt: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+      });
+      const withoutMatch = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            merchantCenter: {
+              matchedBy: "none",
+              matchStatus: "no_reliable_match",
+              syncedAt: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+      });
+      expect(withMatch!.breakdown.dataConfidence).toBeGreaterThan(withoutMatch!.breakdown.dataConfidence);
+    });
+
     it("ranking sorts by score descending", () => {
       const pages: GrowthAuditPage[] = [
         {

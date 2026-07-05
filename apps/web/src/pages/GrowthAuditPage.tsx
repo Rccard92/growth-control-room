@@ -18,6 +18,7 @@ import {
   useAnalyzeGrowthAuditSearchConsole,
   useAnalyzeGrowthAuditShopifyCommerce,
   useAnalyzeGrowthAuditGa4Ecommerce,
+  useAnalyzeGrowthAuditMerchantCenter,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
 import { useGoogleIntegrationStatus } from "../hooks/useGoogleIntegrations";
@@ -157,8 +158,14 @@ export function GrowthAuditPage() {
   const analyzeAnalytics = useAnalyzeGrowthAuditAnalytics(projectId, resolvedRunId);
   const analyzeShopifyCommerce = useAnalyzeGrowthAuditShopifyCommerce(projectId, resolvedRunId);
   const analyzeGa4Ecommerce = useAnalyzeGrowthAuditGa4Ecommerce(projectId, resolvedRunId);
+  const analyzeMerchantCenter = useAnalyzeGrowthAuditMerchantCenter(projectId, resolvedRunId);
   const shopifyConnected = shopifyStatus?.connected ?? false;
   const ga4Connected = googleStatus?.analytics.status === "connected";
+  const merchantConfigured = Boolean(project?.googleMerchantAccountId);
+  const merchantOAuthConnected =
+    googleStatus?.merchantCenter.status === "connected" ||
+    (googleStatus?.oauth.status === "connected" &&
+      googleStatus?.merchantCenter.status === "needs_setup");
 
   const { data: runDetail } = useGrowthAuditRun(projectId, resolvedRunId, Boolean(resolvedRunId));
   const runStatus = runDetail?.run.status;
@@ -852,6 +859,91 @@ export function GrowthAuditPage() {
                     <strong>
                       {summary.shopifyCommerce.lastSyncedAt
                         ? formatGrowthAuditRunDate(summary.shopifyCommerce.lastSyncedAt)
+                        : "—"}
+                    </strong>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {isDashboardMode && resolvedRunId && (
+        <section className="growth-audit-merchant-center-panel gcr-card">
+          <header className="growth-audit-merchant-center-panel__header">
+            <h2 className="growth-audit-merchant-center-panel__title">Merchant Center feed</h2>
+          </header>
+
+          {!merchantConfigured ? (
+            <p className="growth-audit-merchant-center-panel__callout">
+              Seleziona un account Merchant Center per diagnosticare status feed e issue prodotto.
+              Vai al{" "}
+              <Link to={APP_ROUTES.projectIntegrations(projectId)}>Integration Center</Link>.
+            </p>
+          ) : !merchantOAuthConnected ? (
+            <p className="growth-audit-merchant-center-panel__callout">
+              Collega Google con lo scope Merchant Center per sincronizzare il feed. Vai al{" "}
+              <Link to={APP_ROUTES.projectIntegrations(projectId)}>Integration Center</Link>.
+            </p>
+          ) : (
+            <>
+              <div className="growth-audit-merchant-center-panel__actions">
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--primary"
+                  disabled={analyzeMerchantCenter.isPending || activeRun?.status === "analyzing"}
+                  onClick={() => void analyzeMerchantCenter.mutateAsync({})}
+                >
+                  {analyzeMerchantCenter.isPending
+                    ? "Aggiornamento in corso…"
+                    : "Aggiorna Merchant Center"}
+                </button>
+              </div>
+
+              {analyzeMerchantCenter.isError && (
+                <p className="growth-audit-merchant-center-panel__error" role="alert">
+                  {analyzeMerchantCenter.error instanceof Error
+                    ? analyzeMerchantCenter.error.message
+                    : "Impossibile aggiornare i dati Merchant Center."}
+                </p>
+              )}
+
+              {summary?.merchantCenter && (
+                <div className="growth-audit-merchant-center-panel__kpis">
+                  <div>
+                    <span>Prodotti abbinati</span>
+                    <strong>{summary.merchantCenter.productsMatched ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Non abbinati</span>
+                    <strong>{summary.merchantCenter.productsUnmatched ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Approvati</span>
+                    <strong>{summary.merchantCenter.approvedProducts ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Disapprovati</span>
+                    <strong>{summary.merchantCenter.disapprovedProducts ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Limitati</span>
+                    <strong>{summary.merchantCenter.limitedProducts ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Con issue</span>
+                    <strong>{summary.merchantCenter.productsWithIssues ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Issue critiche</span>
+                    <strong>{summary.merchantCenter.criticalIssues ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Ultimo sync</span>
+                    <strong>
+                      {summary.merchantCenter.lastSyncedAt
+                        ? formatGrowthAuditRunDate(summary.merchantCenter.lastSyncedAt)
                         : "—"}
                     </strong>
                   </div>

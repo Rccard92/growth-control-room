@@ -6120,6 +6120,194 @@
   font-size: 0.9rem;
 }
 
+.growth-audit-merchant-center-panel {
+  margin-bottom: 1rem;
+}
+
+.growth-audit-merchant-center-panel__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.growth-audit-merchant-center-panel__callout,
+.growth-audit-merchant-center-panel__error {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-merchant-center-panel__error {
+  color: #fca5a5;
+}
+
+.growth-audit-merchant-center-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.growth-audit-merchant-center-panel__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.growth-audit-merchant-center-panel__kpis div {
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.growth-audit-merchant-center-panel__kpis span {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.growth-audit-merchant-center-panel__kpis strong {
+  font-size: 1.05rem;
+}
+
+.growth-audit-merchant-center__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.growth-audit-merchant-center__metric {
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.growth-audit-merchant-center__metric-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gcr-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.growth-audit-merchant-center__metric-value,
+.growth-audit-merchant-center__status-badge {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.growth-audit-merchant-center__status--approved {
+  color: #86efac;
+}
+
+.growth-audit-merchant-center__status--limited {
+  color: #fcd34d;
+}
+
+.growth-audit-merchant-center__status--disapproved {
+  color: #fca5a5;
+}
+
+.growth-audit-merchant-center__status--unknown {
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-merchant-center__issues {
+  margin-top: 1rem;
+}
+
+.growth-audit-merchant-center__issues-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.growth-audit-merchant-center__issues-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.growth-audit-merchant-center__issues-list li {
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.growth-audit-merchant-center__issue-code {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gcr-accent-cyan);
+}
+
+.growth-audit-merchant-center__issue-severity {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: var(--gcr-text-muted);
+  text-transform: uppercase;
+}
+
+.growth-audit-merchant-center__issues-list p {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-merchant-center__technical {
+  margin-top: 1rem;
+}
+
+.growth-audit-merchant-center__technical summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-merchant-center__technical-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.65rem;
+  margin: 0.75rem 0 0;
+}
+
+.growth-audit-merchant-center__technical-grid dt {
+  font-size: 0.72rem;
+  color: var(--gcr-text-muted);
+  text-transform: uppercase;
+}
+
+.growth-audit-merchant-center__technical-grid dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+}
+
+.growth-audit-merchant-center__debug {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.55);
+  font-size: 0.75rem;
+  overflow-x: auto;
+}
+
+.growth-audit-merchant-center__empty {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--gcr-text-muted);
+  font-size: 0.9rem;
+}
+
 .growth-audit-ga4-funnel-panel {
   margin-bottom: 1rem;
 }

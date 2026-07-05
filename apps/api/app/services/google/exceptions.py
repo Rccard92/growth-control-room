@@ -61,3 +61,11 @@ class GoogleAnalyticsPropertyError(Exception):
     def __init__(self, message: str, *, property_id: str | None = None) -> None:
         super().__init__(message)
         self.property_id = property_id
+
+
+class MerchantAccountError(Exception):
+    """Raised when a Merchant Center account is missing or invalid."""
+
+    def __init__(self, message: str, *, account_id: str | None = None) -> None:
+        super().__init__(message)
+        self.account_id = account_id

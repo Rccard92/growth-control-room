@@ -24,6 +24,7 @@ export interface GrowthAuditPageWorkspaceSidebarProps {
   hasSearchConsoleData?: boolean;
   hasAnalyticsData?: boolean;
   hasShopifyCommerceData?: boolean;
+  hasMerchantCenterData?: boolean;
   hasGa4EcommerceData?: boolean;
   shopifySectionAvailable: boolean;
   aiSectionAvailable: boolean;
@@ -60,6 +61,7 @@ export function GrowthAuditPageWorkspaceSidebar({
   hasSearchConsoleData = false,
   hasAnalyticsData = false,
   hasShopifyCommerceData = false,
+  hasMerchantCenterData = false,
   hasGa4EcommerceData = false,
   shopifySectionAvailable,
   aiSectionAvailable,
@@ -81,6 +83,7 @@ export function GrowthAuditPageWorkspaceSidebar({
     hasSearchConsoleData,
     hasAnalyticsData,
     hasShopifyCommerceData,
+    hasMerchantCenterData,
     hasGa4EcommerceData,
     shopifyEditable: shopifySectionAvailable && Boolean(mappedEntity),
     openFindingsCount,
@@ -192,6 +195,15 @@ export function GrowthAuditPageWorkspaceSidebar({
               onClick={() => onScrollToSection("shopify-commerce")}
             >
               Shopify Commerce
+            </button>
+          )}
+          {isProductPage && (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              onClick={() => onScrollToSection("merchant-center")}
+            >
+              Merchant Center
             </button>
           )}
           {aiSectionAvailable && (

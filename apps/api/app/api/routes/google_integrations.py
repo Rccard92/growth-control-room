@@ -14,6 +14,10 @@ from app.schemas.google_integration import (
     GoogleOAuthStartResponse,
     GoogleSearchConsoleSite,
     GoogleSearchConsoleSitesResponse,
+    GoogleMerchantAccount,
+    GoogleMerchantAccountsResponse,
+    SelectGoogleMerchantAccountRequest,
+    SelectGoogleMerchantAccountResponse,
     SelectGoogleAnalyticsPropertyRequest,
     SelectGoogleAnalyticsPropertyResponse,
     SelectSearchConsoleSiteRequest,
@@ -27,6 +31,7 @@ from app.services.google.exceptions import (
     GoogleIntegrationNotConnectedError,
     GoogleIntegrationPermissionError,
     GoogleSearchConsolePropertyError,
+    MerchantAccountError,
 )
 from app.services.google.google_integrations import (
     get_google_integration_status,
@@ -41,6 +46,7 @@ from app.services.google.google_oauth import (
 )
 from app.services.google.google_tokens import get_valid_google_access_token
 from app.services.google.analytics_client import fetch_ga4_account_summaries
+from app.services.google.merchant_client import fetch_merchant_accounts
 from app.services.google.search_console_client import fetch_search_console_sites
 from app.services.projects import get_project_in_default_workspace
 
@@ -74,6 +80,8 @@ def _map_google_integration_error(exc: Exception) -> HTTPException:
     if isinstance(exc, GoogleSearchConsolePropertyError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, GoogleAnalyticsPropertyError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, MerchantAccountError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, GoogleApiRequestError):
         return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
@@ -246,6 +254,89 @@ async def select_google_analytics_property(
         property_name=property_name,
         display_name=project.google_analytics_property_name or display_name,
         message="Proprietà GA4 salvata.",
+    )
+
+
+@router.get(
+    "/{project_id}/google/merchant/accounts",
+    response_model=GoogleMerchantAccountsResponse,
+    response_model_by_alias=True,
+)
+async def list_merchant_accounts(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> GoogleMerchantAccountsResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        access_token = await get_valid_google_access_token(
+            session,
+            project_id,
+            provider="merchant_center",
+        )
+        accounts = await fetch_merchant_accounts(access_token)
+    except Exception as exc:
+        raise _map_google_integration_error(exc) from exc
+
+    return GoogleMerchantAccountsResponse(
+        accounts=[
+            GoogleMerchantAccount(
+                account_id=account["accountId"],
+                name=account["name"],
+                display_name=account["displayName"],
+                type=account.get("type"),
+                relationship=account.get("relationship"),
+            )
+            for account in accounts
+        ]
+    )
+
+
+@router.post(
+    "/{project_id}/google/merchant/select-account",
+    response_model=SelectGoogleMerchantAccountResponse,
+    response_model_by_alias=True,
+)
+async def select_merchant_account(
+    project_id: UUID,
+    body: SelectGoogleMerchantAccountRequest,
+    session: AsyncSession = Depends(get_db),
+) -> SelectGoogleMerchantAccountResponse:
+    project = await get_project_in_default_workspace(project_id, session)
+    account_id = body.account_id.strip()
+    account_name = body.account_name.strip()
+    if not account_id or not account_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="accountId e accountName sono obbligatori.",
+        )
+
+    try:
+        access_token = await get_valid_google_access_token(
+            session,
+            project_id,
+            provider="merchant_center",
+        )
+        available_accounts = await fetch_merchant_accounts(access_token)
+        available_ids = {account["accountId"] for account in available_accounts}
+        if available_ids and account_id not in available_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="L'account Merchant selezionato non è disponibile per questo account Google.",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _map_google_integration_error(exc) from exc
+
+    project.google_merchant_account_id = account_id
+    project.google_merchant_account_name = account_name
+    session.add(project)
+    await session.commit()
+    await session.refresh(project)
+
+    return SelectGoogleMerchantAccountResponse(
+        account_id=project.google_merchant_account_id or account_id,
+        message="Account Merchant Center salvato.",
     )
 
 

@@ -12,6 +12,7 @@ const connectedGoogleStatus: GoogleIntegrationStatusResponse = {
   searchConsole: { status: "connected", configured: true },
   analytics: { status: "connected", configured: true },
   googleAds: { status: "setup_incomplete", configured: true },
+  merchantCenter: { status: "needs_setup", configured: true },
 };
 
 describe("IntegrationGraph status helpers", () => {

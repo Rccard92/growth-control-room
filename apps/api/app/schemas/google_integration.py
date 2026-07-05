@@ -18,6 +18,7 @@ class GoogleIntegrationStatusResponse(BaseModel):
     search_console: GoogleServiceStatus = Field(serialization_alias="searchConsole")
     analytics: GoogleServiceStatus
     google_ads: GoogleServiceStatus = Field(serialization_alias="googleAds")
+    merchant_center: GoogleServiceStatus = Field(serialization_alias="merchantCenter")
 
 
 class GoogleOAuthStartRequest(BaseModel):
@@ -90,4 +91,34 @@ class SelectGoogleAnalyticsPropertyResponse(BaseModel):
     property_id: str = Field(serialization_alias="propertyId")
     property_name: str = Field(serialization_alias="propertyName")
     display_name: str = Field(serialization_alias="displayName")
+    message: str
+
+
+class GoogleMerchantAccount(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    account_id: str = Field(serialization_alias="accountId")
+    name: str
+    display_name: str = Field(serialization_alias="displayName")
+    type: str | None = None
+    relationship: str | None = None
+
+
+class GoogleMerchantAccountsResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    accounts: list[GoogleMerchantAccount]
+
+
+class SelectGoogleMerchantAccountRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    account_id: str = Field(validation_alias="accountId")
+    account_name: str = Field(validation_alias="accountName")
+
+
+class SelectGoogleMerchantAccountResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    account_id: str = Field(serialization_alias="accountId")
     message: str

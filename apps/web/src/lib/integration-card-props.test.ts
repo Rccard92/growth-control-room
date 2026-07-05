@@ -9,6 +9,7 @@ const googleStatus = {
   searchConsole: { status: "needs_setup" as const, configured: true },
   analytics: { status: "needs_setup" as const, configured: true },
   googleAds: { status: "setup_incomplete" as const, configured: true },
+  merchantCenter: { status: "needs_setup" as const, configured: true },
 };
 
 describe("getIntegrationCardProps", () => {
@@ -138,5 +139,47 @@ describe("getIntegrationCardProps", () => {
 
     expect(props.secondaryActionLabel).toBe("Modifica proprietà");
     expect(props.detailText).toBe("Proprietà: Solmielato GA4");
+  });
+
+  it("maps merchant_center without account to Seleziona account", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "merchant_center")!;
+    const onSelect = vi.fn();
+    const props = getIntegrationCardProps({
+      meta,
+      googleStatus: {
+        ...googleStatus,
+        oauth: { status: "connected", configured: true },
+        merchantCenter: { status: "needs_setup", configured: true },
+      },
+      oauthConnectDisabled: false,
+      handleConnectGoogle: vi.fn(),
+      projectId: "proj-1",
+      onSelectMerchantAccount: onSelect,
+    });
+
+    expect(props.badgeLabel).toBe("Account da selezionare");
+    expect(props.secondaryActionLabel).toBe("Seleziona account");
+    expect(props.onSecondaryAction).toBe(onSelect);
+  });
+
+  it("maps merchant_center with account to Configurata", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "merchant_center")!;
+    const props = getIntegrationCardProps({
+      meta,
+      googleStatus: {
+        ...googleStatus,
+        oauth: { status: "connected", configured: true },
+        merchantCenter: { status: "connected", configured: true },
+      },
+      oauthConnectDisabled: false,
+      handleConnectGoogle: vi.fn(),
+      projectId: "proj-1",
+      googleMerchantAccountId: "123456",
+      googleMerchantAccountName: "Example Merchant",
+      onSelectMerchantAccount: vi.fn(),
+    });
+
+    expect(props.badgeLabel).toBe("Configurata");
+    expect(props.detailText).toBe("Account: Example Merchant");
   });
 });

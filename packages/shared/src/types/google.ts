@@ -18,6 +18,7 @@ export interface GoogleIntegrationStatusResponse {
   searchConsole: GoogleServiceStatus;
   analytics: GoogleServiceStatus;
   googleAds: GoogleServiceStatus;
+  merchantCenter: GoogleServiceStatus;
 }
 
 export interface GoogleOAuthStartRequest {
@@ -67,5 +68,27 @@ export interface SelectGoogleAnalyticsPropertyResponse {
   propertyId: string;
   propertyName: string;
   displayName: string;
+  message: string;
+}
+
+export interface GoogleMerchantAccount {
+  accountId: string;
+  name: string;
+  displayName: string;
+  type?: string | null;
+  relationship?: string | null;
+}
+
+export interface GoogleMerchantAccountsResponse {
+  accounts: GoogleMerchantAccount[];
+}
+
+export interface SelectGoogleMerchantAccountRequest {
+  accountId: string;
+  accountName: string;
+}
+
+export interface SelectGoogleMerchantAccountResponse {
+  accountId: string;
   message: string;
 }

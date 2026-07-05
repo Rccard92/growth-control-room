@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
+from app.models.project import Project
 from app.schemas.google_integration import GoogleIntegrationStatusResponse, GoogleServiceStatus
 from app.services.encryption import decrypt_secret, encrypt_secret
 from app.services.google.google_config import (
@@ -20,7 +21,7 @@ from app.services.google.google_config import (
     is_pagespeed_configured,
 )
 
-GOOGLE_OAUTH_PROVIDERS = ("google_search_console", "ga4", "google_ads")
+GOOGLE_OAUTH_PROVIDERS = ("google_search_console", "ga4", "google_ads", "merchant_center")
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,27 @@ async def get_google_integration_status(
     search_console = integrations.get("google_search_console")
     analytics = integrations.get("ga4")
     google_ads = integrations.get("google_ads")
+    merchant_center = integrations.get("merchant_center")
+
+    project_result = await session.execute(
+        select(Project.google_merchant_account_id).where(Project.id == project_id)
+    )
+    merchant_account_id = project_result.scalar_one_or_none()
+
+    merchant_status = _oauth_service_status(merchant_center)
+    if merchant_status.status == "connected":
+        if merchant_account_id:
+            merchant_status = GoogleServiceStatus(
+                status="connected",
+                configured=True,
+                message="Account Merchant Center configurato.",
+            )
+        else:
+            merchant_status = GoogleServiceStatus(
+                status="needs_setup",
+                configured=True,
+                message="Seleziona un account Merchant Center.",
+            )
 
     return GoogleIntegrationStatusResponse(
         pagespeed=_api_key_service_status(is_pagespeed_configured()),
@@ -114,6 +136,7 @@ async def get_google_integration_status(
         search_console=_oauth_service_status(search_console),
         analytics=_oauth_service_status(analytics),
         google_ads=_oauth_service_status(google_ads, require_developer_token=True),
+        merchant_center=merchant_status,
     )
 
 

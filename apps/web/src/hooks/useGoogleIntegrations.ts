@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GoogleOAuthStartRequest, SelectGoogleAnalyticsPropertyRequest, SelectSearchConsoleSiteRequest } from "@gcr/shared";
+import type { GoogleOAuthStartRequest, SelectGoogleAnalyticsPropertyRequest, SelectGoogleMerchantAccountRequest, SelectSearchConsoleSiteRequest } from "@gcr/shared";
 import {
   fetchGoogleAnalyticsProperties,
   fetchGoogleIntegrationStatus,
+  fetchMerchantAccounts,
   fetchSearchConsoleSites,
   selectGoogleAnalyticsProperty,
+  selectMerchantAccount,
   selectSearchConsoleSite,
   startGoogleOAuth,
 } from "../lib/google-integrations-api";
@@ -75,6 +77,31 @@ export function useStartGoogleOAuth(projectId: string | undefined) {
         throw new Error("Project id is required");
       }
       return startGoogleOAuth(projectId, payload);
+    },
+  });
+}
+
+export function useMerchantAccounts(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.google.merchantAccounts(projectId ?? ""),
+    queryFn: () => fetchMerchantAccounts(projectId!),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useSelectMerchantAccount(projectId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SelectGoogleMerchantAccountRequest) => {
+      if (!projectId) {
+        throw new Error("Project id is required");
+      }
+      return selectMerchantAccount(projectId, payload);
+    },
+    onSuccess: () => {
+      if (!projectId) return;
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.google.status(projectId) });
     },
   });
 }

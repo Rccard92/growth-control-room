@@ -20,6 +20,9 @@ interface GetIntegrationCardPropsInput {
   googleAnalyticsPropertyId?: string | null;
   googleAnalyticsPropertyName?: string | null;
   onSelectGoogleAnalyticsProperty?: () => void;
+  googleMerchantAccountId?: string | null;
+  googleMerchantAccountName?: string | null;
+  onSelectMerchantAccount?: () => void;
 }
 
 function mapGoogleStatus(status: GoogleServiceStatus["status"]): IntegrationUiStatus {
@@ -115,6 +118,9 @@ export function getIntegrationCardProps({
   googleAnalyticsPropertyId,
   googleAnalyticsPropertyName,
   onSelectGoogleAnalyticsProperty,
+  googleMerchantAccountId,
+  googleMerchantAccountName,
+  onSelectMerchantAccount,
 }: GetIntegrationCardPropsInput): IntegrationCardProps {
   if (meta.provider === "shopify") {
     const connected = apiStatus === "connected";
@@ -193,6 +199,61 @@ export function getIntegrationCardProps({
           setupIncompleteNote: "Aggiungi GOOGLE_ADS_DEVELOPER_TOKEN su Railway",
         },
       );
+    case "merchant_center": {
+      const service = googleStatus.merchantCenter;
+      const oauthConnected = googleStatus.oauth.status === "connected";
+
+      if (service.status === "missing_credentials") {
+        return {
+          meta,
+          status: "missing_credentials",
+          actionLabel: "OAuth mancante",
+          disabled: true,
+        };
+      }
+
+      if (service.status === "needs_setup" && !oauthConnected) {
+        return oauthCardProps(
+          meta,
+          service,
+          oauthConnectDisabled,
+          handleConnectGoogle,
+        );
+      }
+
+      if (service.status === "needs_setup" || (service.status === "connected" && !googleMerchantAccountId)) {
+        return {
+          meta,
+          status: "needs_setup",
+          badgeLabel: "Account da selezionare",
+          actionLabel: oauthConnected ? "Collegata" : "Collega Google",
+          disabled: oauthConnected,
+          onAction: oauthConnected ? undefined : handleConnectGoogle,
+          secondaryActionLabel: "Seleziona account",
+          onSecondaryAction: onSelectMerchantAccount,
+          note: oauthConnected
+            ? "Seleziona l'account Merchant Center per abilitare la diagnostica feed."
+            : "Collega Google per accedere a Merchant Center.",
+        };
+      }
+
+      if (service.status === "connected" && googleMerchantAccountId) {
+        return {
+          meta,
+          status: "connected",
+          badgeLabel: "Configurata",
+          actionLabel: "Configurata",
+          disabled: true,
+          secondaryActionLabel: "Modifica account",
+          onSecondaryAction: onSelectMerchantAccount,
+          detailText: googleMerchantAccountName
+            ? `Account: ${googleMerchantAccountName}`
+            : `Account ID: ${googleMerchantAccountId}`,
+        };
+      }
+
+      return oauthCardProps(meta, service, oauthConnectDisabled, handleConnectGoogle);
+    }
     default:
       return {
         meta,

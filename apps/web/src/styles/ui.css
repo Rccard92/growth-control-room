@@ -726,6 +726,81 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.merchant-account-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.merchant-account-modal__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gcr-text-muted);
+}
+
+.merchant-account-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.merchant-account-modal__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--gcr-border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--gcr-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.merchant-account-modal__option:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.merchant-account-modal__option--selected {
+  border-color: rgba(34, 211, 238, 0.55);
+  background: rgba(34, 211, 238, 0.08);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.15);
+}
+
+.merchant-account-modal__option-check {
+  width: 1.25rem;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gcr-accent-cyan);
+  line-height: 1.4;
+}
+
+.merchant-account-modal__option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.merchant-account-modal__option-main {
+  font-size: 0.9rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.merchant-account-modal__option-sub {
+  font-size: 0.78rem;
+  color: var(--gcr-text-muted);
+}
+
 .integration-card__brand-icon {
   width: 2.4rem;
   height: 2.4rem;

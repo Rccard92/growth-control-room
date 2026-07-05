@@ -69,6 +69,21 @@ vi.mock("../components/integrations/GoogleAnalyticsPropertyModal", () => ({
     ) : null,
 }));
 
+vi.mock("../components/integrations/GoogleMerchantCenterAccountModal", () => ({
+  GoogleMerchantCenterAccountModal: ({
+    open,
+    selectedAccountId,
+  }: {
+    open: boolean;
+    selectedAccountId?: string | null;
+  }) =>
+    open ? (
+      <div data-testid="merchant-account-modal" data-selected={selectedAccountId ?? ""}>
+        modal-open
+      </div>
+    ) : null,
+}));
+
 vi.mock("../hooks/useProjects", () => ({
   useProject: useProjectMock,
   useProjectIntegrations: useProjectIntegrationsMock,
@@ -106,6 +121,7 @@ const googleStatus = {
     configured: true,
     message: "Developer Token Google Ads mancante.",
   },
+  merchantCenter: { status: "needs_setup", configured: true },
 };
 
 function countOccurrences(value: string, needle: string): number {

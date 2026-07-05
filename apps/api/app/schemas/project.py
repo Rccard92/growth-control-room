@@ -81,6 +81,14 @@ class ProjectUpdate(BaseModel):
         default=None,
         validation_alias="googleAnalyticsPropertyName",
     )
+    google_merchant_account_id: str | None = Field(
+        default=None,
+        validation_alias="googleMerchantAccountId",
+    )
+    google_merchant_account_name: str | None = Field(
+        default=None,
+        validation_alias="googleMerchantAccountName",
+    )
 
     @field_validator("public_site_url", mode="before")
     @classmethod
@@ -121,6 +129,26 @@ class ProjectUpdate(BaseModel):
         trimmed = value.strip()
         return trimmed or None
 
+    @field_validator("google_merchant_account_id", mode="before")
+    @classmethod
+    def validate_google_merchant_account_id_update(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("L'ID account Merchant deve essere una stringa")
+        trimmed = value.strip()
+        return trimmed or None
+
+    @field_validator("google_merchant_account_name", mode="before")
+    @classmethod
+    def validate_google_merchant_account_name_update(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Il nome account Merchant deve essere una stringa")
+        trimmed = value.strip()
+        return trimmed or None
+
 
 class ProjectRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -141,6 +169,14 @@ class ProjectRead(BaseModel):
     google_analytics_property_name: str | None = Field(
         default=None,
         serialization_alias="googleAnalyticsPropertyName",
+    )
+    google_merchant_account_id: str | None = Field(
+        default=None,
+        serialization_alias="googleMerchantAccountId",
+    )
+    google_merchant_account_name: str | None = Field(
+        default=None,
+        serialization_alias="googleMerchantAccountName",
     )
     status: str
     created_at: datetime = Field(serialization_alias="createdAt")

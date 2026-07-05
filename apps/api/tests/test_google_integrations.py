@@ -18,14 +18,17 @@ from app.api.routes.google_integrations import (
     get_google_status,
     google_oauth_callback,
     list_google_analytics_properties,
+    list_merchant_accounts,
     list_search_console_sites,
     select_google_analytics_property,
+    select_merchant_account,
     select_search_console_site,
     start_google_oauth,
 )
 from app.schemas.google_integration import (
     GoogleOAuthStartRequest,
     SelectGoogleAnalyticsPropertyRequest,
+    SelectGoogleMerchantAccountRequest,
     SelectSearchConsoleSiteRequest,
 )
 from app.services.encryption import decrypt_secret, encrypt_secret
@@ -832,5 +835,99 @@ def test_select_google_analytics_property_returns_422_for_unknown_property() -> 
             )
 
         assert exc.value.status_code == 422
+
+    asyncio.run(run())
+
+
+def test_list_merchant_accounts_returns_accounts() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_merchant_accounts",
+                new_callable=AsyncMock,
+                return_value=[
+                    {
+                        "accountId": "123456",
+                        "name": "accounts/123456",
+                        "displayName": "Example Merchant",
+                        "type": "STANDARD",
+                        "relationship": "primary",
+                    }
+                ],
+            ),
+        ):
+            response = await list_merchant_accounts(project_id, session)
+
+        assert len(response.accounts) == 1
+        assert response.accounts[0].account_id == "123456"
+        assert response.accounts[0].display_name == "Example Merchant"
+
+    asyncio.run(run())
+
+
+def test_select_merchant_account_saves_account() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+        project = Project(
+            id=project_id,
+            workspace_id=uuid4(),
+            name="Example",
+            slug="example",
+            status="active",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+                return_value=project,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_merchant_accounts",
+                new_callable=AsyncMock,
+                return_value=[
+                    {
+                        "accountId": "123456",
+                        "name": "accounts/123456",
+                        "displayName": "Example Merchant",
+                    }
+                ],
+            ),
+        ):
+            response = await select_merchant_account(
+                project_id,
+                SelectGoogleMerchantAccountRequest(
+                    account_id="123456",
+                    account_name="Example Merchant",
+                ),
+                session,
+            )
+
+        assert response.account_id == "123456"
+        assert project.google_merchant_account_id == "123456"
+        assert project.google_merchant_account_name == "Example Merchant"
+        session.commit.assert_awaited_once()
 
     asyncio.run(run())

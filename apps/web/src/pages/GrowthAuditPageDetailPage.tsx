@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { GrowthAuditPageResult } from "@gcr/shared";
 import { GrowthAuditPageWorkspaceShopifyCommerceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceShopifyCommerceSection";
+import { GrowthAuditPageWorkspaceMerchantCenterSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceMerchantCenterSection";
 import { GrowthAuditProductIntelligenceSummary } from "../components/growth-audit/page-detail/GrowthAuditProductIntelligenceSummary";
 import { GrowthAuditPriorityActionsPanel } from "../components/growth-audit/GrowthAuditPriorityActionsPanel";
 import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailShopifySection";
@@ -29,6 +30,7 @@ import {
   hasGrowthAuditPageAnalyticsData,
   hasGrowthAuditPageSearchConsoleData,
   hasGrowthAuditPageShopifyCommerceData,
+  hasGrowthAuditPageMerchantCenterData,
   hasGrowthAuditPageGa4EcommerceData,
   isGrowthAuditRunActive,
   mapGrowthAuditPageToSeoEntity,
@@ -122,6 +124,10 @@ export function GrowthAuditPageDetailPage() {
   );
   const hasShopifyCommerceData = useMemo(
     () => (page ? hasGrowthAuditPageShopifyCommerceData(page) : false),
+    [page],
+  );
+  const hasMerchantCenterData = useMemo(
+    () => (page ? hasGrowthAuditPageMerchantCenterData(page) : false),
     [page],
   );
   const hasGa4EcommerceData = useMemo(
@@ -239,6 +245,8 @@ export function GrowthAuditPageDetailPage() {
 
           <GrowthAuditPageWorkspaceShopifyCommerceSection page={page} />
 
+          <GrowthAuditPageWorkspaceMerchantCenterSection page={page} />
+
           <GrowthAuditPageWorkspacePerformanceSection
             projectId={projectId}
             runId={runId}
@@ -273,6 +281,7 @@ export function GrowthAuditPageDetailPage() {
           hasSearchConsoleData={hasSearchConsoleData}
           hasAnalyticsData={hasAnalyticsData}
           hasShopifyCommerceData={hasShopifyCommerceData}
+          hasMerchantCenterData={hasMerchantCenterData}
           hasGa4EcommerceData={hasGa4EcommerceData}
           shopifySectionAvailable={Boolean(mappedEntity)}
           aiSectionAvailable={Boolean(aiAvailable)}

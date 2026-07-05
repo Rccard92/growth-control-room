@@ -17,6 +17,8 @@ import type {
   GrowthAuditShopifyCommerceAnalysisResponse,
   GrowthAuditGa4EcommerceAnalysisRequest,
   GrowthAuditGa4EcommerceAnalysisResponse,
+  GrowthAuditMerchantCenterAnalysisRequest,
+  GrowthAuditMerchantCenterAnalysisResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
@@ -219,6 +221,20 @@ export function analyzeGrowthAuditGa4Ecommerce(
     {
       method: "POST",
       ...jsonBody(payload ?? { days: 30 }),
+    },
+  );
+}
+
+export function analyzeGrowthAuditMerchantCenter(
+  projectId: string,
+  runId: string,
+  payload?: GrowthAuditMerchantCenterAnalysisRequest,
+): Promise<GrowthAuditMerchantCenterAnalysisResponse> {
+  return apiFetch<GrowthAuditMerchantCenterAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/merchant-center-analysis`,
+    {
+      method: "POST",
+      ...jsonBody(payload ?? {}),
     },
   );
 }
