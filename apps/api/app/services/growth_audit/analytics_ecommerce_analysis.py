@@ -53,7 +53,14 @@ VARIANT_MATCH_FIELDS = """
         variants(first: 100) {
           nodes {
             id
+            title
             sku
+            price
+            inventoryQuantity
+            selectedOptions {
+              name
+              value
+            }
           }
         }
       }
@@ -139,19 +146,38 @@ async def _fetch_shopify_variant_match_data(
             product_gid = node["id"]
             variant_legacy_ids: list[str] = []
             skus: list[str] = []
+            variant_entries: list[dict[str, Any]] = []
             variants = (node.get("variants") or {}).get("nodes") or []
             for variant in variants:
                 if not isinstance(variant, dict):
                     continue
                 legacy_id = _extract_legacy_id(variant.get("id"))
+                variant_gid = variant.get("id")
+                sku = variant.get("sku")
+                price_raw = variant.get("price")
+                price = _safe_float(price_raw) if price_raw is not None else None
+                stock_raw = variant.get("inventoryQuantity")
+                stock = int(stock_raw) if stock_raw is not None else None
+                selected_options = variant.get("selectedOptions")
                 if legacy_id:
                     variant_legacy_ids.append(legacy_id)
-                sku = variant.get("sku")
                 if sku:
                     skus.append(str(sku))
+                variant_entries.append(
+                    {
+                        "variantGid": variant_gid,
+                        "variantLegacyId": legacy_id,
+                        "title": variant.get("title"),
+                        "sku": str(sku) if sku else None,
+                        "price": price,
+                        "stock": stock,
+                        "selectedOptions": selected_options if isinstance(selected_options, list) else None,
+                    }
+                )
             variant_data_by_gid[product_gid] = {
                 "variantLegacyIds": variant_legacy_ids,
                 "skus": skus,
+                "variants": variant_entries,
             }
 
     return variant_data_by_gid
@@ -205,6 +231,149 @@ def _has_funnel_signal(aggregate: dict[str, Any] | None) -> bool:
     ) or _safe_float(aggregate.get("itemRevenue")) > 0
 
 
+def _has_variant_funnel_signal(variant_row: dict[str, Any]) -> bool:
+    return any(
+        int(variant_row.get(key) or 0) > 0
+        for key in (
+            "itemViews",
+            "itemViewEvents",
+            "itemsAddedToCart",
+            "itemsCheckedOut",
+            "itemsPurchased",
+        )
+    ) or _safe_float(variant_row.get("itemRevenue")) > 0
+
+
+def _serialize_variant_bucket_row(
+    *,
+    variant_key: str,
+    metrics: dict[str, Any] | None,
+    catalog_variant: dict[str, Any] | None,
+) -> dict[str, Any]:
+    metrics = metrics or {}
+    catalog_variant = catalog_variant or {}
+    item_views = int(metrics.get("itemViews") or 0)
+    item_view_events = int(metrics.get("itemViewEvents") or 0)
+    views_base = item_views if item_views > 0 else item_view_events
+    items_added_to_cart = int(metrics.get("itemsAddedToCart") or 0)
+    items_checked_out = int(metrics.get("itemsCheckedOut") or 0)
+    items_purchased = int(metrics.get("itemsPurchased") or 0)
+    item_revenue = round(_safe_float(metrics.get("itemRevenue")), 2)
+    variant_matched_by = metrics.get("matchedBy") or "none"
+    has_signal = _has_variant_funnel_signal(metrics)
+    item_ids_raw = metrics.get("itemIds") or []
+    if isinstance(item_ids_raw, set):
+        item_ids = sorted(item_ids_raw)
+    else:
+        item_ids = sorted(item_ids_raw)
+    item_names_raw = metrics.get("itemNames") or []
+    if isinstance(item_names_raw, set):
+        item_names = sorted(item_names_raw)
+    else:
+        item_names = sorted(item_names_raw)
+
+    if variant_key == "unknown":
+        variant_title = "Variante non identificata"
+        variant_legacy_id = "unknown"
+    else:
+        variant_legacy_id = variant_key
+        variant_title = catalog_variant.get("title") or metrics.get("variantTitle")
+
+    return {
+        "variantLegacyId": variant_legacy_id,
+        "variantGid": catalog_variant.get("variantGid") or metrics.get("variantGid"),
+        "variantTitle": variant_title,
+        "sku": catalog_variant.get("sku") or metrics.get("sku"),
+        "price": catalog_variant.get("price") if catalog_variant.get("price") is not None else metrics.get("price"),
+        "stock": catalog_variant.get("stock") if catalog_variant.get("stock") is not None else metrics.get("stock"),
+        "itemIds": item_ids,
+        "itemNames": item_names,
+        "itemViews": item_views,
+        "itemViewEvents": item_view_events,
+        "itemsAddedToCart": items_added_to_cart,
+        "itemsCheckedOut": items_checked_out,
+        "itemsPurchased": items_purchased,
+        "itemRevenue": item_revenue,
+        "viewToCartRate": _safe_rate(items_added_to_cart, views_base),
+        "cartToCheckoutRate": _safe_rate(items_checked_out, items_added_to_cart),
+        "checkoutToPurchaseRate": _safe_rate(items_purchased, items_checked_out),
+        "viewToPurchaseRate": _safe_rate(items_purchased, views_base),
+        "cartToPurchaseRate": _safe_rate(items_purchased, items_added_to_cart),
+        "matchedBy": variant_matched_by if has_signal else "none",
+    }
+
+
+def _build_variant_breakdown(
+    aggregate: dict[str, Any] | None,
+    variant_catalog: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    catalog = variant_catalog or []
+    if not catalog and not (aggregate or {}).get("variants"):
+        return None
+
+    aggregate_variants: dict[str, dict[str, Any]] = (aggregate or {}).get("variants") or {}
+    catalog_by_id = {
+        str(variant.get("variantLegacyId")): variant
+        for variant in catalog
+        if variant.get("variantLegacyId")
+    }
+
+    breakdown_rows: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+
+    for catalog_variant in catalog:
+        variant_key = str(catalog_variant.get("variantLegacyId") or "")
+        if not variant_key:
+            continue
+        seen_keys.add(variant_key)
+        metrics = aggregate_variants.get(variant_key)
+        breakdown_rows.append(
+            _serialize_variant_bucket_row(
+                variant_key=variant_key,
+                metrics=metrics,
+                catalog_variant=catalog_variant,
+            )
+        )
+
+    for variant_key, metrics in aggregate_variants.items():
+        if variant_key in seen_keys:
+            continue
+        breakdown_rows.append(
+            _serialize_variant_bucket_row(
+                variant_key=variant_key,
+                metrics=metrics,
+                catalog_variant=catalog_by_id.get(variant_key),
+            )
+        )
+
+    if not breakdown_rows:
+        return None
+
+    catalog_count = len([row for row in breakdown_rows if row.get("variantLegacyId") != "unknown"])
+    variants_with_funnel_data = sum(
+        1 for row in breakdown_rows if row.get("matchedBy") not in {None, "none"}
+    )
+    best_by_revenue = max(
+        breakdown_rows,
+        key=lambda row: _safe_float(row.get("itemRevenue")),
+        default=None,
+    )
+    best_by_purchase = max(
+        breakdown_rows,
+        key=lambda row: int(row.get("itemsPurchased") or 0),
+        default=None,
+    )
+
+    return {
+        "variantBreakdown": breakdown_rows,
+        "variantsCount": catalog_count,
+        "variantsWithFunnelData": variants_with_funnel_data,
+        "bestVariantByRevenue": best_by_revenue.get("variantLegacyId") if best_by_revenue else None,
+        "bestVariantByPurchase": best_by_purchase.get("variantLegacyId") if best_by_purchase else None,
+        "variantMatchingMode": "strict",
+    }
+
+
 def _build_page_ga4_ecommerce_metadata(
     *,
     period_days: int,
@@ -212,6 +381,7 @@ def _build_page_ga4_ecommerce_metadata(
     synced_at: str,
     currency: str | None = None,
     match_debug: dict[str, Any] | None = None,
+    variant_catalog: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     agg = aggregate or {}
     item_views = int(agg.get("itemViews") or 0)
@@ -251,6 +421,11 @@ def _build_page_ga4_ecommerce_metadata(
     }
     if match_debug:
         metadata["matchDebug"] = match_debug
+
+    variant_summary = _build_variant_breakdown(aggregate, variant_catalog)
+    if variant_summary:
+        metadata.update(variant_summary)
+
     return metadata
 
 
@@ -275,6 +450,9 @@ def _compute_run_ga4_ecommerce_summary(
     view_to_cart_rates: list[float] = []
     cart_to_purchase_rates: list[float] = []
     top_candidates: list[tuple[float, dict[str, Any]]] = []
+    top_variant_candidates: list[tuple[float, dict[str, Any]]] = []
+    variants_with_funnel_data = 0
+    variants_without_funnel_data = 0
 
     for page in product_pages:
         funnel = (page.page_metadata or {}).get("ga4Ecommerce") or {}
@@ -334,7 +512,45 @@ def _compute_run_ga4_ecommerce_summary(
                 )
             )
 
+        variant_breakdown = funnel.get("variantBreakdown") or []
+        if isinstance(variant_breakdown, list):
+            for variant_row in variant_breakdown:
+                if not isinstance(variant_row, dict):
+                    continue
+                variant_matched_by = variant_row.get("matchedBy") or "none"
+                variant_views = int(variant_row.get("itemViews") or variant_row.get("itemViewEvents") or 0)
+                variant_revenue = _safe_float(variant_row.get("itemRevenue"))
+                variant_has_data = variant_matched_by != "none" and (
+                    variant_views > 0
+                    or int(variant_row.get("itemsAddedToCart") or 0) > 0
+                    or int(variant_row.get("itemsPurchased") or 0) > 0
+                    or variant_revenue > 0
+                )
+                if variant_has_data:
+                    variants_with_funnel_data += 1
+                else:
+                    variants_without_funnel_data += 1
+
+                if variant_has_data:
+                    top_variant_candidates.append(
+                        (
+                            variant_revenue if variant_revenue > 0 else float(variant_views),
+                            {
+                                "pageId": str(page.id),
+                                "productTitle": page.source_entity_title or page.title,
+                                "variantLegacyId": variant_row.get("variantLegacyId"),
+                                "variantTitle": variant_row.get("variantTitle"),
+                                "sku": variant_row.get("sku"),
+                                "itemViews": variant_views,
+                                "itemsAddedToCart": int(variant_row.get("itemsAddedToCart") or 0),
+                                "itemsPurchased": int(variant_row.get("itemsPurchased") or 0),
+                                "itemRevenue": round(variant_revenue, 2),
+                            },
+                        )
+                    )
+
     top_candidates.sort(key=lambda item: item[0], reverse=True)
+    top_variant_candidates.sort(key=lambda item: item[0], reverse=True)
     average_view_to_cart = (
         round(sum(view_to_cart_rates) / len(view_to_cart_rates), 4)
         if view_to_cart_rates
@@ -384,6 +600,9 @@ def _compute_run_ga4_ecommerce_summary(
         "highViewLowCartProducts": high_view_low_cart_products,
         "highCartLowPurchaseProducts": high_cart_low_purchase_products,
         "topFunnelProducts": [item[1] for item in top_candidates[:10]],
+        "variantsWithFunnelData": variants_with_funnel_data,
+        "variantsWithoutFunnelData": variants_without_funnel_data,
+        "topVariants": [item[1] for item in top_variant_candidates[:10]],
         "currency": currency,
         "lastSyncedAt": synced_at,
     }
@@ -627,12 +846,22 @@ async def analyze_growth_audit_analytics_ecommerce(
     for page in product_pages:
         aggregate = page_aggregates.get(page.id)
         if aggregate:
+            serialized_variants: dict[str, dict[str, Any]] = {}
+            for variant_key, variant_bucket in (aggregate.get("variants") or {}).items():
+                serialized_variants[variant_key] = {
+                    **variant_bucket,
+                    "itemIds": sorted(variant_bucket.get("itemIds") or []),
+                    "itemNames": sorted(variant_bucket.get("itemNames") or []),
+                }
             aggregate = {
                 **aggregate,
                 "matchedItemIds": sorted(aggregate.get("matchedItemIds") or []),
                 "matchedItemNames": sorted(aggregate.get("matchedItemNames") or []),
+                "variants": serialized_variants,
             }
         profile = profile_by_page_id.get(page.id)
+        product_gid = (page.source_entity_gid or "").strip()
+        variant_catalog = (variant_data_by_gid.get(product_gid) or {}).get("variants") or []
         match_debug = (
             build_page_match_debug(
                 profile,
@@ -648,6 +877,7 @@ async def analyze_growth_audit_analytics_ecommerce(
             aggregate=aggregate,
             synced_at=synced_at,
             match_debug=match_debug,
+            variant_catalog=variant_catalog,
         )
         page.page_metadata = {
             **(page.page_metadata or {}),

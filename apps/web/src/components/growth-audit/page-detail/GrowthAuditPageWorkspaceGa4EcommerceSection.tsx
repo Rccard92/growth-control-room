@@ -1,4 +1,8 @@
-import type { GrowthAuditGa4MatchDebug, GrowthAuditPage } from "@gcr/shared";
+import type {
+  GrowthAuditGa4MatchDebug,
+  GrowthAuditPage,
+  GrowthAuditPageGa4EcommerceVariantMetadata,
+} from "@gcr/shared";
 import {
   getGrowthAuditPageGa4EcommerceMetadata,
   isGrowthAuditProductPage,
@@ -42,6 +46,8 @@ function formatMatchTypeLabel(matchedBy?: string | null): string {
       return "sku";
     case "item_name":
       return "item_name";
+    case "product_only":
+      return "product_only";
     default:
       return matchedBy ?? "none";
   }
@@ -208,6 +214,174 @@ function renderMatchDebugBlock(
   );
 }
 
+function sortVariantBreakdown(
+  variants: GrowthAuditPageGa4EcommerceVariantMetadata[],
+): GrowthAuditPageGa4EcommerceVariantMetadata[] {
+  return [...variants].sort((left, right) => {
+    const revenueDiff = (right.itemRevenue ?? 0) - (left.itemRevenue ?? 0);
+    if (revenueDiff !== 0) return revenueDiff;
+    const purchaseDiff = (right.itemsPurchased ?? 0) - (left.itemsPurchased ?? 0);
+    if (purchaseDiff !== 0) return purchaseDiff;
+    const viewsLeft = left.itemViews ?? left.itemViewEvents ?? 0;
+    const viewsRight = right.itemViews ?? right.itemViewEvents ?? 0;
+    return viewsRight - viewsLeft;
+  });
+}
+
+function buildVariantDiagnosisCallouts(
+  variants: GrowthAuditPageGa4EcommerceVariantMetadata[],
+  bestVariantByRevenue?: string | null,
+): string[] {
+  const callouts: string[] = [];
+  const matchedVariants = variants.filter((variant) => variant.matchedBy && variant.matchedBy !== "none");
+
+  for (const variant of matchedVariants) {
+    const views = variant.itemViews ?? variant.itemViewEvents ?? 0;
+    const cart = variant.itemsAddedToCart ?? 0;
+    const purchases = variant.itemsPurchased ?? 0;
+    const title = variant.variantTitle || variant.variantLegacyId || "Variante";
+
+    if (views > 50 && cart === 0) {
+      callouts.push(
+        `${title}: questa variante viene vista ma convince poco ad entrare nel carrello.`,
+      );
+    } else if (cart > 5 && purchases === 0) {
+      callouts.push(
+        `${title}: questa variante entra nel carrello ma perde prima dell'acquisto.`,
+      );
+    } else if (
+      bestVariantByRevenue &&
+      variant.variantLegacyId === bestVariantByRevenue &&
+      (variant.itemRevenue ?? 0) > 0
+    ) {
+      callouts.push(
+        `${title}: questa variante sta già monetizzando — priorità alta su immagini, stock e copy.`,
+      );
+    } else if ((variant.stock ?? 1) <= 0 && (views > 0 || cart > 0)) {
+      callouts.push(
+        `${title}: questa variante ha domanda ma lo stock può limitare vendite.`,
+      );
+    }
+
+    if (callouts.length >= 3) break;
+  }
+
+  return callouts.slice(0, 3);
+}
+
+function renderVariantPerformanceSection(
+  funnelMeta: NonNullable<ReturnType<typeof getGrowthAuditPageGa4EcommerceMetadata>>,
+) {
+  const variantBreakdown = funnelMeta.variantBreakdown;
+  if (!variantBreakdown || variantBreakdown.length === 0) {
+    return (
+      <div className="growth-audit-ga4-funnel__variants-empty">
+        <h3 className="growth-audit-ga4-funnel__variants-title">Performance varianti</h3>
+        <p className="growth-audit-ga4-funnel__variants-subtitle">
+          Il prodotto ha funnel aggregato, ma non è ancora disponibile una divisione affidabile per
+          variante.
+        </p>
+      </div>
+    );
+  }
+
+  const sortedVariants = sortVariantBreakdown(variantBreakdown);
+  const callouts = buildVariantDiagnosisCallouts(sortedVariants, funnelMeta.bestVariantByRevenue);
+
+  return (
+    <div className="growth-audit-ga4-funnel__variants">
+      <header className="growth-audit-ga4-funnel__variants-header">
+        <h3 className="growth-audit-ga4-funnel__variants-title">Performance varianti</h3>
+        <p className="growth-audit-ga4-funnel__variants-subtitle">
+          Le metriche sono divise per variante solo quando GA4 restituisce un itemId/SKU abbinabile in
+          modo deterministico.
+        </p>
+      </header>
+
+      <div className="growth-audit-ga4-funnel__variants-table-wrap">
+        <table className="growth-audit-ga4-funnel__variants-table">
+          <thead>
+            <tr>
+              <th>Variante</th>
+              <th>SKU</th>
+              <th>Stock</th>
+              <th>Prezzo</th>
+              <th>View item</th>
+              <th>Add to cart</th>
+              <th>Purchase</th>
+              <th>Revenue</th>
+              <th>View → cart</th>
+              <th>Cart → purchase</th>
+              <th>Match</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedVariants.map((variant) => {
+              const isMatched = variant.matchedBy && variant.matchedBy !== "none";
+              const isBestRevenue =
+                funnelMeta.bestVariantByRevenue &&
+                variant.variantLegacyId === funnelMeta.bestVariantByRevenue;
+              const views = variant.itemViews ?? variant.itemViewEvents ?? 0;
+              const cart = variant.itemsAddedToCart ?? 0;
+              const isHighViewLowCart = isMatched && views > 50 && cart === 0;
+              const isHighCartLowPurchase =
+                isMatched && cart > 5 && (variant.itemsPurchased ?? 0) === 0;
+              const isOutOfStockDemand =
+                isMatched && (variant.stock ?? 1) <= 0 && (views > 0 || cart > 0);
+              const rowClass = [
+                isBestRevenue ? "growth-audit-ga4-funnel__variants-row--best-revenue" : "",
+                isHighViewLowCart ? "growth-audit-ga4-funnel__variants-row--high-view-low-cart" : "",
+                isHighCartLowPurchase
+                  ? "growth-audit-ga4-funnel__variants-row--high-cart-low-purchase"
+                  : "",
+                isOutOfStockDemand ? "growth-audit-ga4-funnel__variants-row--out-of-stock" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <tr
+                  key={variant.variantLegacyId || variant.variantTitle || variant.sku}
+                  className={rowClass || undefined}
+                >
+                  <td>
+                    <strong>{variant.variantTitle || "—"}</strong>
+                    {!isMatched && (
+                      <p className="growth-audit-ga4-funnel__variants-note">
+                        Nessun dato item-level abbinato a questa variante nel periodo.
+                      </p>
+                    )}
+                  </td>
+                  <td>{variant.sku || "—"}</td>
+                  <td>{formatNumber(variant.stock)}</td>
+                  <td>{formatMoney(variant.price, funnelMeta.currency)}</td>
+                  <td>{formatNumber(views)}</td>
+                  <td>{formatNumber(variant.itemsAddedToCart)}</td>
+                  <td>{formatNumber(variant.itemsPurchased)}</td>
+                  <td>{formatMoney(variant.itemRevenue, funnelMeta.currency)}</td>
+                  <td>{formatRate(variant.viewToCartRate)}</td>
+                  <td>{formatRate(variant.cartToPurchaseRate)}</td>
+                  <td>{formatMatchTypeLabel(variant.matchedBy)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {callouts.length > 0 && (
+        <div className="growth-audit-ga4-funnel__variants-callouts">
+          {callouts.map((callout) => (
+            <p key={callout} className="growth-audit-ga4-funnel__variants-callout">
+              {callout}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function GrowthAuditPageWorkspaceGa4EcommerceSection({
   page,
 }: GrowthAuditPageWorkspaceGa4EcommerceSectionProps) {
@@ -324,6 +498,8 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
               presenti.
             </p>
           )}
+
+          {renderVariantPerformanceSection(funnelMeta)}
         </>
       ) : (
         <p className="growth-audit-ga4-funnel__empty">

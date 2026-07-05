@@ -53,6 +53,99 @@ def _parse_shopify_composite_item_id(item_id: str) -> dict[str, str] | None:
     }
 
 
+def get_variant_legacy_id_from_ga4_item_id(
+    item_id: str,
+    known_variant_legacy_ids: set[str] | frozenset[str],
+) -> str | None:
+    normalized = (item_id or "").strip()
+    if not normalized or normalized == "(not set)":
+        return None
+
+    parsed = _parse_shopify_composite_item_id(normalized)
+    if parsed and parsed.get("variantLegacyId"):
+        return parsed["variantLegacyId"]
+
+    if normalized in known_variant_legacy_ids:
+        return normalized
+
+    return None
+
+
+def _resolve_variant_assignment(
+    profile: ProductMatchProfile,
+    item_id: str,
+    matched_by: str,
+) -> tuple[str, str]:
+    normalized_item_id = item_id.strip()
+    item_id_lower = normalized_item_id.lower()
+
+    if matched_by == "shopify_composite_item_id":
+        parsed = _parse_shopify_composite_item_id(normalized_item_id)
+        if parsed and parsed.get("variantLegacyId"):
+            return parsed["variantLegacyId"], "shopify_composite_item_id"
+        return "unknown", "product_only"
+
+    if matched_by == "variant_id":
+        if normalized_item_id in profile.variant_legacy_ids:
+            return normalized_item_id, "variant_id"
+        return "unknown", "product_only"
+
+    if matched_by == "sku":
+        variant_id = profile.sku_to_variant_legacy_id.get(item_id_lower)
+        if variant_id:
+            return variant_id, "sku"
+        return "unknown", "product_only"
+
+    if matched_by in {"item_id", "item_name"}:
+        return "unknown", "product_only"
+
+    return "unknown", "product_only"
+
+
+def _new_variant_bucket(
+    variant_key: str,
+    variant_matched_by: str,
+    profile: ProductMatchProfile,
+) -> dict[str, Any]:
+    if variant_key == "unknown":
+        return {
+            "variantLegacyId": "unknown",
+            "variantGid": None,
+            "variantTitle": "Variante non identificata",
+            "sku": None,
+            "price": None,
+            "stock": None,
+            "itemViews": 0,
+            "itemViewEvents": 0,
+            "itemsAddedToCart": 0,
+            "itemsCheckedOut": 0,
+            "itemsPurchased": 0,
+            "itemRevenue": 0.0,
+            "matchedBy": variant_matched_by,
+            "itemIds": set(),
+            "itemNames": set(),
+        }
+
+    catalog = profile.variants_by_legacy_id.get(variant_key) or {}
+    return {
+        "variantLegacyId": variant_key,
+        "variantGid": catalog.get("variantGid"),
+        "variantTitle": catalog.get("title"),
+        "sku": catalog.get("sku"),
+        "price": catalog.get("price"),
+        "stock": catalog.get("stock"),
+        "itemViews": 0,
+        "itemViewEvents": 0,
+        "itemsAddedToCart": 0,
+        "itemsCheckedOut": 0,
+        "itemsPurchased": 0,
+        "itemRevenue": 0.0,
+        "matchedBy": variant_matched_by,
+        "itemIds": set(),
+        "itemNames": set(),
+    }
+
+
 def _profile_matches_composite_item_id(
     profile: ProductMatchProfile,
     parsed: dict[str, str],
@@ -73,6 +166,8 @@ class ProductMatchProfile:
     product_legacy_id: str | None = None
     variant_legacy_ids: set[str] = field(default_factory=set)
     skus: set[str] = field(default_factory=set)
+    variants_by_legacy_id: dict[str, dict[str, Any]] = field(default_factory=dict)
+    sku_to_variant_legacy_id: dict[str, str] = field(default_factory=dict)
     title_normalized: str = ""
     handle_normalized: str = ""
 
@@ -270,12 +365,36 @@ def build_product_match_profiles(
         )
 
         variant_info = variant_data_by_gid.get(product_gid) or {}
+        sku_counts: dict[str, int] = {}
+        for variant in variant_info.get("variants") or []:
+            if not isinstance(variant, dict):
+                continue
+            legacy_id = variant.get("variantLegacyId")
+            if not legacy_id:
+                continue
+            legacy_id = str(legacy_id)
+            profile.variant_legacy_ids.add(legacy_id)
+            profile.variants_by_legacy_id[legacy_id] = variant
+            sku = variant.get("sku")
+            if sku:
+                normalized_sku = str(sku).strip().lower()
+                profile.skus.add(normalized_sku)
+                sku_counts[normalized_sku] = sku_counts.get(normalized_sku, 0) + 1
+
         for variant_id in variant_info.get("variantLegacyIds") or []:
             if variant_id:
                 profile.variant_legacy_ids.add(str(variant_id))
         for sku in variant_info.get("skus") or []:
             if sku:
                 profile.skus.add(str(sku).strip().lower())
+
+        for normalized_sku, count in sku_counts.items():
+            if count == 1:
+                for legacy_id, variant in profile.variants_by_legacy_id.items():
+                    variant_sku = variant.get("sku")
+                    if variant_sku and str(variant_sku).strip().lower() == normalized_sku:
+                        profile.sku_to_variant_legacy_id[normalized_sku] = legacy_id
+                        break
 
         profiles.append(profile)
 
@@ -428,6 +547,7 @@ def match_ga4_rows_to_pages(
                     "matchedItemIds": set(),
                     "matchedItemNames": set(),
                     "matchedVariants": set(),
+                    "variants": {},
                 },
             )
             bucket["itemViews"] += item_views
@@ -442,5 +562,26 @@ def match_ga4_rows_to_pages(
                 bucket["matchedItemNames"].add(item_name)
             if item_variant and item_variant != "(not set)":
                 bucket["matchedVariants"].add(item_variant)
+
+            variant_key, variant_matched_by = _resolve_variant_assignment(
+                profile,
+                item_id,
+                matched_by,
+            )
+            variant_buckets: dict[str, dict[str, Any]] = bucket["variants"]
+            variant_bucket = variant_buckets.setdefault(
+                variant_key,
+                _new_variant_bucket(variant_key, variant_matched_by, profile),
+            )
+            variant_bucket["itemViews"] += item_views
+            variant_bucket["itemViewEvents"] += item_view_events
+            variant_bucket["itemsAddedToCart"] += items_added_to_cart
+            variant_bucket["itemsCheckedOut"] += items_checked_out
+            variant_bucket["itemsPurchased"] += items_purchased
+            variant_bucket["itemRevenue"] += item_revenue
+            if item_id and item_id != "(not set)":
+                variant_bucket["itemIds"].add(item_id)
+            if item_name and item_name != "(not set)":
+                variant_bucket["itemNames"].add(item_name)
 
     return page_aggregates, unmatched_items, ambiguous_items

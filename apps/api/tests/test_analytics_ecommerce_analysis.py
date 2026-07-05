@@ -19,6 +19,7 @@ from app.schemas.growth_audit import GrowthAuditGa4EcommerceAnalysisRequest
 from app.services.growth_audit.analytics_ecommerce_analysis import (
     _build_page_ga4_ecommerce_metadata,
     _build_ga4_ecommerce_findings,
+    _build_variant_breakdown,
     _compute_run_ga4_ecommerce_summary,
     analyze_growth_audit_analytics_ecommerce,
 )
@@ -26,6 +27,7 @@ from app.services.growth_audit.exceptions import GrowthAuditValidationError
 from app.services.growth_audit.ga4_item_product_matching import (
     _parse_shopify_composite_item_id,
     build_product_match_profiles,
+    get_variant_legacy_id_from_ga4_item_id,
     match_ga4_rows_to_pages,
 )
 from app.services.google.exceptions import GoogleApiRequestError
@@ -1073,3 +1075,453 @@ def test_ga4_ecommerce_route_returns_422_without_property() -> None:
         assert exc.value.status_code == 422
 
     asyncio.run(run())
+
+
+def _build_polline_variant_data() -> dict:
+    product_gid = "gid://shopify/Product/14916300964188"
+    return {
+        product_gid: {
+            "variantLegacyIds": [
+                "54906504773980",
+                "54906504806748",
+                "54906504839516",
+            ],
+            "skus": ["007", "008", "009"],
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/54906504773980",
+                    "variantLegacyId": "54906504773980",
+                    "title": "120g",
+                    "sku": "007",
+                    "price": 12.90,
+                    "stock": 10,
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/54906504806748",
+                    "variantLegacyId": "54906504806748",
+                    "title": "250g",
+                    "sku": "008",
+                    "price": 22.50,
+                    "stock": 5,
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/54906504839516",
+                    "variantLegacyId": "54906504839516",
+                    "title": "500g",
+                    "sku": "009",
+                    "price": 35.00,
+                    "stock": 0,
+                },
+            ],
+        }
+    }
+
+
+def _build_metadata_from_match(
+    page: GrowthAuditPage,
+    rows: list[dict],
+    variant_data_by_gid: dict,
+) -> dict:
+    profiles = build_product_match_profiles([page], variant_data_by_gid=variant_data_by_gid)
+    aggregates, _, _ = match_ga4_rows_to_pages(profiles, rows)
+    aggregate = aggregates.get(page.id)
+    if aggregate:
+        serialized_variants: dict = {}
+        for variant_key, variant_bucket in (aggregate.get("variants") or {}).items():
+            serialized_variants[variant_key] = {
+                **variant_bucket,
+                "itemIds": sorted(variant_bucket.get("itemIds") or []),
+                "itemNames": sorted(variant_bucket.get("itemNames") or []),
+            }
+        aggregate = {
+            **aggregate,
+            "matchedItemIds": sorted(aggregate.get("matchedItemIds") or []),
+            "matchedItemNames": sorted(aggregate.get("matchedItemNames") or []),
+            "variants": serialized_variants,
+        }
+    catalog = (variant_data_by_gid.get(page.source_entity_gid) or {}).get("variants") or []
+    return _build_page_ga4_ecommerce_metadata(
+        period_days=30,
+        aggregate=aggregate,
+        synced_at="2026-06-13T10:00:00Z",
+        variant_catalog=catalog,
+    )
+
+
+def test_get_variant_legacy_id_from_composite_and_direct() -> None:
+    known = {"54906504773980", "999"}
+    assert (
+        get_variant_legacy_id_from_ga4_item_id(
+            "shopify_IT_14916300964188_54906504773980",
+            known,
+        )
+        == "54906504773980"
+    )
+    assert get_variant_legacy_id_from_ga4_item_id("54906504773980", known) == "54906504773980"
+    assert get_variant_legacy_id_from_ga4_item_id("abc", known) is None
+
+
+def test_composite_assigns_row_to_correct_variant() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    variant_data = _build_polline_variant_data()
+    profiles = build_product_match_profiles([page], variant_data_by_gid=variant_data)
+    aggregates, _, _ = match_ga4_rows_to_pages(
+        profiles,
+        [
+            {
+                "itemId": "shopify_IT_14916300964188_54906504773980",
+                "itemName": "Polline 120g",
+                "itemVariant": "",
+                "itemsViewed": 100,
+                "itemsAddedToCart": 10,
+                "itemsPurchased": 2,
+                "itemRevenue": 40.0,
+            }
+        ],
+    )
+    variant_bucket = aggregates[page.id]["variants"]["54906504773980"]
+    assert variant_bucket["itemViews"] == 100
+    assert variant_bucket["matchedBy"] == "shopify_composite_item_id"
+
+
+def test_three_composite_rows_create_three_variant_breakdown() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    variant_data = _build_polline_variant_data()
+    rows = [
+        {
+            "itemId": "shopify_IT_14916300964188_54906504773980",
+            "itemName": "Polline 120g",
+            "itemsViewed": 100,
+            "itemsAddedToCart": 10,
+            "itemsPurchased": 2,
+            "itemRevenue": 40.0,
+        },
+        {
+            "itemId": "shopify_IT_14916300964188_54906504806748",
+            "itemName": "Polline 250g",
+            "itemsViewed": 60,
+            "itemsAddedToCart": 6,
+            "itemsPurchased": 1,
+            "itemRevenue": 22.5,
+        },
+        {
+            "itemId": "shopify_IT_14916300964188_54906504839516",
+            "itemName": "Polline 500g",
+            "itemsViewed": 30,
+            "itemsAddedToCart": 3,
+            "itemsPurchased": 1,
+            "itemRevenue": 35.0,
+        },
+    ]
+    metadata = _build_metadata_from_match(page, rows, variant_data)
+    matched_rows = [
+        row for row in metadata["variantBreakdown"] if row["matchedBy"] != "none"
+    ]
+    assert len(matched_rows) == 3
+
+
+def test_product_aggregate_equals_sum_of_variants() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    variant_data = _build_polline_variant_data()
+    rows = [
+        {
+            "itemId": "shopify_IT_14916300964188_54906504773980",
+            "itemName": "Polline 120g",
+            "itemsViewed": 100,
+            "itemsAddedToCart": 10,
+            "itemsPurchased": 2,
+            "itemRevenue": 40.0,
+        },
+        {
+            "itemId": "shopify_IT_14916300964188_54906504806748",
+            "itemName": "Polline 250g",
+            "itemsViewed": 60,
+            "itemsAddedToCart": 6,
+            "itemsPurchased": 1,
+            "itemRevenue": 22.5,
+        },
+    ]
+    metadata = _build_metadata_from_match(page, rows, variant_data)
+    matched_rows = [
+        row for row in metadata["variantBreakdown"] if row["matchedBy"] != "none"
+    ]
+    assert metadata["itemViews"] == sum(row["itemViews"] for row in matched_rows)
+    assert metadata["itemsAddedToCart"] == sum(row["itemsAddedToCart"] for row in matched_rows)
+    assert metadata["itemsPurchased"] == sum(row["itemsPurchased"] for row in matched_rows)
+    assert metadata["itemRevenue"] == round(
+        sum(row["itemRevenue"] for row in matched_rows), 2
+    )
+
+
+def test_product_only_match_goes_to_unknown_variant_bucket() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    variant_data = _build_polline_variant_data()
+    metadata = _build_metadata_from_match(
+        page,
+        [
+            {
+                "itemId": "14916300964188",
+                "itemName": "Polline biologico",
+                "itemsViewed": 80,
+                "itemsAddedToCart": 8,
+                "itemsPurchased": 1,
+                "itemRevenue": 15.0,
+            }
+        ],
+        variant_data,
+    )
+    unknown = next(
+        row for row in metadata["variantBreakdown"] if row["variantLegacyId"] == "unknown"
+    )
+    assert unknown["itemViews"] == 80
+    assert unknown["matchedBy"] == "product_only"
+    matched_catalog_rows = [
+        row
+        for row in metadata["variantBreakdown"]
+        if row["variantLegacyId"] not in {"unknown"} and row["matchedBy"] != "none"
+    ]
+    assert matched_catalog_rows == []
+
+
+def test_sku_unique_assigns_to_variant() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    variant_data = _build_polline_variant_data()
+    profiles = build_product_match_profiles([page], variant_data_by_gid=variant_data)
+    aggregates, _, _ = match_ga4_rows_to_pages(
+        profiles,
+        [
+            {
+                "itemId": "007",
+                "itemName": "Polline",
+                "itemsViewed": 25,
+                "itemsAddedToCart": 2,
+                "itemsPurchased": 1,
+                "itemRevenue": 12.9,
+            }
+        ],
+    )
+    variant_bucket = aggregates[page.id]["variants"]["54906504773980"]
+    assert variant_bucket["matchedBy"] == "sku"
+    assert variant_bucket["itemViews"] == 25
+
+
+def test_sku_ambiguous_assigns_to_unknown_variant() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    variant_data = _build_polline_variant_data()
+    variant_data[page.source_entity_gid]["variants"].append(
+        {
+            "variantGid": "gid://shopify/ProductVariant/999",
+            "variantLegacyId": "999",
+            "title": "Duplicato",
+            "sku": "007",
+            "price": 10.0,
+            "stock": 1,
+        }
+    )
+    profiles = build_product_match_profiles([page], variant_data_by_gid=variant_data)
+    aggregates, _, _ = match_ga4_rows_to_pages(
+        profiles,
+        [
+            {
+                "itemId": "007",
+                "itemName": "Polline",
+                "itemsViewed": 25,
+                "itemsAddedToCart": 2,
+                "itemsPurchased": 1,
+                "itemRevenue": 12.9,
+            }
+        ],
+    )
+    assert aggregates[page.id]["variants"]["unknown"]["itemViews"] == 25
+
+
+def test_variant_breakdown_rates_zero_safe() -> None:
+    breakdown = _build_variant_breakdown(
+        {
+            "variants": {
+                "54906504773980": {
+                    "variantLegacyId": "54906504773980",
+                    "itemViews": 0,
+                    "itemsAddedToCart": 0,
+                    "itemsCheckedOut": 0,
+                    "itemsPurchased": 0,
+                    "itemRevenue": 0.0,
+                    "matchedBy": "shopify_composite_item_id",
+                    "itemIds": [],
+                    "itemNames": [],
+                }
+            }
+        },
+        _build_polline_variant_data()["gid://shopify/Product/14916300964188"]["variants"],
+    )
+    row = breakdown["variantBreakdown"][0]
+    assert row["viewToCartRate"] == 0
+    assert row["cartToPurchaseRate"] == 0
+
+
+def test_best_variant_by_revenue_and_purchase() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    metadata = _build_metadata_from_match(
+        page,
+        [
+            {
+                "itemId": "shopify_IT_14916300964188_54906504773980",
+                "itemName": "Polline 120g",
+                "itemsViewed": 100,
+                "itemsAddedToCart": 10,
+                "itemsPurchased": 2,
+                "itemRevenue": 40.0,
+            },
+            {
+                "itemId": "shopify_IT_14916300964188_54906504839516",
+                "itemName": "Polline 500g",
+                "itemsViewed": 30,
+                "itemsAddedToCart": 3,
+                "itemsPurchased": 5,
+                "itemRevenue": 35.0,
+            },
+        ],
+        _build_polline_variant_data(),
+    )
+    assert metadata["bestVariantByRevenue"] == "54906504773980"
+    assert metadata["bestVariantByPurchase"] == "54906504839516"
+
+
+def test_variant_breakdown_ignores_candidate_items() -> None:
+    from app.services.growth_audit.ga4_item_product_matching import (
+        build_page_match_debug,
+        find_potential_unmatched_candidates_for_profile,
+    )
+
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+        title="Polline biologico",
+    )
+    variant_data = _build_polline_variant_data()
+    rows = [
+        {
+            "itemId": "999",
+            "itemName": "Polline biologico extra",
+            "itemsViewed": 120,
+            "itemsAddedToCart": 8,
+            "itemsPurchased": 2,
+            "itemRevenue": 40.0,
+        }
+    ]
+    profiles = build_product_match_profiles([page], variant_data_by_gid=variant_data)
+    metadata = _build_metadata_from_match(page, rows, variant_data)
+    candidates = find_potential_unmatched_candidates_for_profile(profiles[0], rows)
+    debug = build_page_match_debug(profiles[0], aggregate=None, rows=rows)
+
+    assert len(candidates) > 0
+    assert metadata.get("variantBreakdown") is not None
+    assert all(row["itemViews"] == 0 for row in metadata["variantBreakdown"])
+    assert debug["candidateItems"][0]["itemsViewed"] == 120
+
+
+def test_run_summary_includes_top_variants() -> None:
+    page = _build_product_page(project_id=uuid4(), run_id=uuid4())
+    page.source_entity_gid = "gid://shopify/Product/14916300964188"
+    page.page_metadata = {
+        "ga4Ecommerce": _build_metadata_from_match(
+            page,
+            [
+                {
+                    "itemId": "shopify_IT_14916300964188_54906504773980",
+                    "itemName": "Polline 120g",
+                    "itemsViewed": 100,
+                    "itemsAddedToCart": 10,
+                    "itemsPurchased": 2,
+                    "itemRevenue": 40.0,
+                }
+            ],
+            _build_polline_variant_data(),
+        )
+    }
+    summary = _compute_run_ga4_ecommerce_summary(
+        [page],
+        period_days=30,
+        synced_at="2026-06-13T10:00:00Z",
+        unmatched_items=0,
+    )
+    assert summary["variantsWithFunnelData"] == 1
+    assert len(summary["topVariants"]) == 1
+    assert summary["topVariants"][0]["variantTitle"] == "120g"
+
+
+def test_polline_three_variant_real_case_totals() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+        title="Polline biologico",
+    )
+    metadata = _build_metadata_from_match(
+        page,
+        [
+            {
+                "itemId": "shopify_IT_14916300964188_54906504773980",
+                "itemName": "Polline 120g",
+                "itemsViewed": 6000,
+                "itemsAddedToCart": 600,
+                "itemsPurchased": 150,
+                "itemRevenue": 1200.0,
+            },
+            {
+                "itemId": "shopify_IT_14916300964188_54906504806748",
+                "itemName": "Polline 250g",
+                "itemsViewed": 3000,
+                "itemsAddedToCart": 300,
+                "itemsPurchased": 100,
+                "itemRevenue": 900.0,
+            },
+            {
+                "itemId": "shopify_IT_14916300964188_54906504839516",
+                "itemName": "Polline 500g",
+                "itemsViewed": 1089,
+                "itemsAddedToCart": 161,
+                "itemsPurchased": 57,
+                "itemRevenue": 325.30,
+            },
+        ],
+        _build_polline_variant_data(),
+    )
+    matched_rows = [
+        row for row in metadata["variantBreakdown"] if row["matchedBy"] == "shopify_composite_item_id"
+    ]
+    assert len(matched_rows) == 3
+    assert metadata["itemViews"] == 10089
+    assert metadata["itemsAddedToCart"] == 1061
+    assert metadata["itemsPurchased"] == 307
+    assert metadata["itemRevenue"] == 2425.30
+    assert metadata["matchedBy"] == "shopify_composite_item_id"

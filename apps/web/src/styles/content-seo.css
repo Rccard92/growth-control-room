@@ -6056,6 +6056,86 @@
   font-weight: 600;
 }
 
+.growth-audit-ga4-funnel__variants,
+.growth-audit-ga4-funnel__variants-empty {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.growth-audit-ga4-funnel__variants-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.growth-audit-ga4-funnel__variants-subtitle {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-ga4-funnel__variants-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.growth-audit-ga4-funnel__variants-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.growth-audit-ga4-funnel__variants-table th,
+.growth-audit-ga4-funnel__variants-table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  text-align: left;
+  vertical-align: top;
+}
+
+.growth-audit-ga4-funnel__variants-table th {
+  color: var(--gcr-text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.growth-audit-ga4-funnel__variants-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-ga4-funnel__variants-row--best-revenue td:first-child strong {
+  color: var(--gcr-accent, #6366f1);
+}
+
+.growth-audit-ga4-funnel__variants-row--high-view-low-cart td {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.growth-audit-ga4-funnel__variants-row--high-cart-low-purchase td {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.growth-audit-ga4-funnel__variants-row--out-of-stock td {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.growth-audit-ga4-funnel__variants-callouts {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.growth-audit-ga4-funnel__variants-callout {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.08);
+  border-left: 3px solid var(--gcr-accent, #6366f1);
+  font-size: 0.86rem;
+}
+
 .growth-audit-priority-actions__expand {
   margin-top: 1rem;
 }

@@ -340,6 +340,7 @@ export type {
   GrowthAuditPageShopifyCommerceMetadata,
   GrowthAuditRunShopifyCommerceSummary,
   GrowthAuditPageGa4EcommerceMetadata,
+  GrowthAuditPageGa4EcommerceVariantMetadata,
   GrowthAuditGa4MatchCandidateItem,
   GrowthAuditGa4MatchDebug,
   GrowthAuditGa4MatchShopifyKeys,

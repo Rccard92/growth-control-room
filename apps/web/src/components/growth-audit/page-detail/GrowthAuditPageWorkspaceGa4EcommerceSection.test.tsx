@@ -238,4 +238,104 @@ describe("GrowthAuditPageWorkspaceGa4EcommerceSection", () => {
     expect(html).toContain("Purchase");
     expect(html).not.toContain("Dati GA4 non abbinati a questo prodotto");
   });
+
+  it("renders variant performance table sorted by revenue", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageWorkspaceGa4EcommerceSection
+        page={{
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 190,
+              itemsAddedToCart: 16,
+              itemsPurchased: 3,
+              itemRevenue: 97.5,
+              matchedBy: "shopify_composite_item_id",
+              variantBreakdown: [
+                {
+                  variantLegacyId: "54906504806748",
+                  variantTitle: "250g",
+                  sku: "008",
+                  stock: 5,
+                  price: 22.5,
+                  itemViews: 60,
+                  itemsAddedToCart: 6,
+                  itemsPurchased: 1,
+                  itemRevenue: 22.5,
+                  viewToCartRate: 0.1,
+                  cartToPurchaseRate: 0.1667,
+                  matchedBy: "shopify_composite_item_id",
+                },
+                {
+                  variantLegacyId: "54906504773980",
+                  variantTitle: "120g",
+                  sku: "007",
+                  stock: 10,
+                  price: 12.9,
+                  itemViews: 100,
+                  itemsAddedToCart: 10,
+                  itemsPurchased: 2,
+                  itemRevenue: 40,
+                  viewToCartRate: 0.1,
+                  cartToPurchaseRate: 0.2,
+                  matchedBy: "shopify_composite_item_id",
+                },
+                {
+                  variantLegacyId: "54906504839516",
+                  variantTitle: "500g",
+                  sku: "009",
+                  stock: 0,
+                  price: 35,
+                  itemViews: 30,
+                  itemsAddedToCart: 0,
+                  itemsPurchased: 0,
+                  itemRevenue: 75,
+                  viewToCartRate: 0,
+                  cartToPurchaseRate: 0,
+                  matchedBy: "shopify_composite_item_id",
+                },
+              ],
+              bestVariantByRevenue: "54906504839516",
+              syncedAt: "2026-06-13T10:00:00.000Z",
+            },
+          },
+        }}
+      />,
+    );
+    expect(html).toContain("Performance varianti");
+    expect(html).toContain("120g");
+    expect(html).toContain("250g");
+    expect(html).toContain("500g");
+    expect(html).toContain("SKU");
+    expect(html).toContain("Stock");
+    expect(html).toContain("View → cart");
+    const revenue500Index = html.indexOf("500g");
+    const revenue120Index = html.indexOf("120g");
+    expect(revenue500Index).toBeGreaterThan(-1);
+    expect(revenue120Index).toBeGreaterThan(revenue500Index);
+  });
+
+  it("renders variant breakdown empty state when absent", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageWorkspaceGa4EcommerceSection
+        page={{
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 50,
+              itemsAddedToCart: 5,
+              itemsPurchased: 1,
+              itemRevenue: 20,
+              matchedBy: "item_id",
+              syncedAt: "2026-06-13T10:00:00.000Z",
+            },
+          },
+        }}
+      />,
+    );
+    expect(html).toContain("Performance varianti");
+    expect(html).toContain("non è ancora disponibile una divisione affidabile per variante");
+  });
 });

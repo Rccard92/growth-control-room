@@ -245,6 +245,29 @@ export interface GrowthAuditGa4MatchDebug {
   candidateItems: GrowthAuditGa4MatchCandidateItem[];
 }
 
+export interface GrowthAuditPageGa4EcommerceVariantMetadata {
+  variantLegacyId?: string | null;
+  variantGid?: string | null;
+  variantTitle?: string | null;
+  sku?: string | null;
+  price?: number | null;
+  stock?: number | null;
+  itemIds?: string[];
+  itemNames?: string[];
+  itemViews?: number;
+  itemViewEvents?: number;
+  itemsAddedToCart?: number;
+  itemsCheckedOut?: number;
+  itemsPurchased?: number;
+  itemRevenue?: number;
+  viewToCartRate?: number;
+  cartToCheckoutRate?: number;
+  checkoutToPurchaseRate?: number;
+  viewToPurchaseRate?: number;
+  cartToPurchaseRate?: number;
+  matchedBy?: string;
+}
+
 export interface GrowthAuditPageGa4EcommerceMetadata {
   periodDays?: number;
   itemViews?: number;
@@ -268,6 +291,12 @@ export interface GrowthAuditPageGa4EcommerceMetadata {
   matchDebug?: GrowthAuditGa4MatchDebug;
   source?: string;
   syncedAt?: string;
+  variantBreakdown?: GrowthAuditPageGa4EcommerceVariantMetadata[];
+  variantsCount?: number;
+  variantsWithFunnelData?: number;
+  bestVariantByRevenue?: string | null;
+  bestVariantByPurchase?: string | null;
+  variantMatchingMode?: string;
 }
 
 export interface GrowthAuditRunGa4EcommerceSummary {
@@ -293,6 +322,19 @@ export interface GrowthAuditRunGa4EcommerceSummary {
   topFunnelProducts?: Array<{
     pageId: string;
     title?: string | null;
+    itemViews?: number;
+    itemsAddedToCart?: number;
+    itemsPurchased?: number;
+    itemRevenue?: number;
+  }>;
+  variantsWithFunnelData?: number;
+  variantsWithoutFunnelData?: number;
+  topVariants?: Array<{
+    pageId: string;
+    productTitle?: string | null;
+    variantLegacyId?: string | null;
+    variantTitle?: string | null;
+    sku?: string | null;
     itemViews?: number;
     itemsAddedToCart?: number;
     itemsPurchased?: number;

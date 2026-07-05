@@ -1457,6 +1457,62 @@ describe("growth-audit-utils", () => {
       expect(action?.howToValidate).toContain("Shopify → GA4");
     });
 
+    it("uses matched variant breakdown for GA4 evidence and actions", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 100,
+              itemsAddedToCart: 10,
+              itemsPurchased: 2,
+              itemRevenue: 100,
+              matchedBy: "shopify_composite_item_id",
+              bestVariantByRevenue: "v1",
+              bestVariantByPurchase: "v1",
+              variantBreakdown: [
+                {
+                  variantLegacyId: "v1",
+                  variantTitle: "120g",
+                  itemViews: 100,
+                  itemsAddedToCart: 10,
+                  itemsPurchased: 2,
+                  itemRevenue: 100,
+                  matchedBy: "shopify_composite_item_id",
+                },
+                {
+                  variantLegacyId: "v2",
+                  variantTitle: "250g",
+                  itemViews: 0,
+                  itemsAddedToCart: 0,
+                  itemsPurchased: 0,
+                  itemRevenue: 0,
+                  matchedBy: "none",
+                },
+              ],
+              syncedAt: "2026-06-13T10:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+
+      expect(
+        summary.evidence.some((signal) => signal.key === "ga4-variants-with-funnel"),
+      ).toBe(true);
+      expect(
+        summary.evidence.some((signal) => signal.key === "ga4-best-variant-revenue"),
+      ).toBe(true);
+      expect(
+        summary.recommendedActions.some((action) =>
+          action.title.includes("Ottimizza la variante più redditizia"),
+        ),
+      ).toBe(true);
+    });
+
     it("includes GA4 Ecommerce Funnel in missingData when absent", () => {
       const summary = buildGrowthAuditProductIntelligenceSummary({
         page: baseProductPage,

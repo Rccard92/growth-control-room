@@ -3594,6 +3594,46 @@ function _buildProductIntelligenceEvidence(input: {
         explanation: "Tasso conversione da carrello ad acquisto.",
       });
     }
+
+    const matchedVariants = (ga4EcommerceMeta.variantBreakdown ?? []).filter(
+      (variant) => variant.matchedBy && variant.matchedBy !== "none",
+    );
+    if (matchedVariants.length > 0) {
+      signals.push({
+        key: "ga4-variants-with-funnel",
+        label: "Varianti con funnel",
+        value: _formatItalianNumber(matchedVariants.length),
+        tone: "good",
+        explanation: "Varianti con metriche GA4 abbinate in modo deterministico.",
+      });
+
+      const bestRevenueVariant = matchedVariants.find(
+        (variant) => variant.variantLegacyId === ga4EcommerceMeta.bestVariantByRevenue,
+      );
+      if (bestRevenueVariant) {
+        const currency = ga4EcommerceMeta.currency ? ` ${ga4EcommerceMeta.currency}` : "";
+        signals.push({
+          key: "ga4-best-variant-revenue",
+          label: "Migliore variante per revenue",
+          value: `${bestRevenueVariant.variantTitle || bestRevenueVariant.variantLegacyId || "—"} · ${(bestRevenueVariant.itemRevenue ?? 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency}`,
+          tone: "good",
+          explanation: "Variante con item revenue più alta nel periodo.",
+        });
+      }
+
+      const bestPurchaseVariant = matchedVariants.find(
+        (variant) => variant.variantLegacyId === ga4EcommerceMeta.bestVariantByPurchase,
+      );
+      if (bestPurchaseVariant) {
+        signals.push({
+          key: "ga4-best-variant-purchase",
+          label: "Migliore variante per purchase",
+          value: `${bestPurchaseVariant.variantTitle || bestPurchaseVariant.variantLegacyId || "—"} · ${_formatItalianNumber(bestPurchaseVariant.itemsPurchased ?? 0)}`,
+          tone: "good",
+          explanation: "Variante con più acquisti item-level nel periodo.",
+        });
+      }
+    }
   }
 
   if (commerceMeta?.sales != null && commerceMeta.sales > 0) {
@@ -3851,6 +3891,61 @@ function _buildProductIntelligenceRecommendedActions(input: {
       howToValidate:
         "Controlla item_id, SKU e configurazione ecommerce Shopify → GA4.",
     });
+  }
+
+  const matchedVariants = (ga4EcommerceMeta?.variantBreakdown ?? []).filter(
+    (variant) => variant.matchedBy && variant.matchedBy !== "none",
+  );
+  if (matchedVariants.length > 0) {
+    const totalVariantRevenue = matchedVariants.reduce(
+      (sum, variant) => sum + (variant.itemRevenue ?? 0),
+      0,
+    );
+    const bestRevenueVariant = matchedVariants.find(
+      (variant) => variant.variantLegacyId === ga4EcommerceMeta?.bestVariantByRevenue,
+    );
+    if (
+      bestRevenueVariant &&
+      totalVariantRevenue > 0 &&
+      (bestRevenueVariant.itemRevenue ?? 0) / totalVariantRevenue > 0.6
+    ) {
+      actions.push({
+        title: "Ottimizza la variante più redditizia",
+        reason: `${bestRevenueVariant.variantTitle || bestRevenueVariant.variantLegacyId} genera gran parte della item revenue.`,
+        expectedImpact: "Maggiore revenue concentrando ottimizzazioni sulla variante vincente.",
+        whereToFix: "Immagini, stock, copy e CTA della variante principale",
+        howToValidate: "Confronta item revenue per variante nei prossimi 30 giorni.",
+      });
+    }
+
+    const highDemandLowConversion = matchedVariants.find((variant) => {
+      const views = variant.itemViews ?? variant.itemViewEvents ?? 0;
+      return views > 50 && (variant.itemsPurchased ?? 0) === 0;
+    });
+    if (highDemandLowConversion) {
+      actions.push({
+        title: "Analizza variante con domanda non convertita",
+        reason: `${highDemandLowConversion.variantTitle || highDemandLowConversion.variantLegacyId} ha view item alte ma pochi acquisti.`,
+        expectedImpact: "Più purchase dalla variante con domanda già visibile.",
+        whereToFix: "Prezzo, immagini, stock e copy della variante specifica",
+        howToValidate: "Monitora View → Purchase rate per quella variante.",
+      });
+    }
+
+    const outOfStockDemand = matchedVariants.find((variant) => {
+      const views = variant.itemViews ?? variant.itemViewEvents ?? 0;
+      const cart = variant.itemsAddedToCart ?? 0;
+      return (variant.stock ?? 1) <= 0 && (views > 0 || cart > 0);
+    });
+    if (outOfStockDemand) {
+      actions.push({
+        title: "Risolvi stock della variante con domanda",
+        reason: `${outOfStockDemand.variantTitle || outOfStockDemand.variantLegacyId} genera view/cart ma risulta senza stock.`,
+        expectedImpact: "Recupero vendite perse su una variante già richiesta.",
+        whereToFix: "Shopify inventory della variante",
+        howToValidate: "Verifica purchase e item revenue dopo il ripristino stock.",
+      });
+    }
   }
 
   if (sales > 0 && hasCriticalFindings) {
