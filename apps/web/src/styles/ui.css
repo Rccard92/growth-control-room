@@ -558,6 +558,28 @@
   line-height: 1.45;
 }
 
+.integration-card__brand-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.integration-card__brand-icon img {
+  width: 1.65rem;
+  height: 1.65rem;
+  object-fit: contain;
+  display: block;
+}
+
+.integration-card__emoji-icon {
+  font-size: 1.5rem;
+}
+
 .integrations-page__hint {
   margin: 0 0 1rem;
   font-size: 0.85rem;

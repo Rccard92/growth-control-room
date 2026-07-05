@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { IntegrationMeta, IntegrationUiStatus } from "@gcr/shared";
+import { INTEGRATION_BRAND_ICONS } from "./integrationBrandIcons";
 import { StatusBadge } from "./StatusBadge";
 
 export interface IntegrationCardProps {
@@ -30,6 +31,8 @@ export function IntegrationCard({
   note,
   badgeLabel,
 }: IntegrationCardProps) {
+  const brandIcon = INTEGRATION_BRAND_ICONS[meta.provider];
+
   const action =
     actionLabel == null ? null : disabled ? (
       <button type="button" className="gcr-btn gcr-btn--secondary" disabled>
@@ -55,7 +58,13 @@ export function IntegrationCard({
           marginBottom: "0.75rem",
         }}
       >
-        <span style={{ fontSize: "1.5rem" }}>{meta.icon}</span>
+        {brandIcon ? (
+          <span className="integration-card__brand-icon">
+            <img src={brandIcon} alt="" aria-hidden="true" />
+          </span>
+        ) : (
+          <span className="integration-card__emoji-icon">{meta.icon}</span>
+        )}
         <StatusBadge variant={toBadgeVariant(status)} label={badgeLabel} />
       </div>
       <h3 className="gcr-card__title">{meta.label}</h3>

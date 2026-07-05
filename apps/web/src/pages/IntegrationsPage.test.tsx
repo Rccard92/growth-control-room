@@ -146,4 +146,13 @@ describe("IntegrationsPage unified grid", () => {
     const html = renderPage();
     expect(html).toContain("Connetti");
   });
+
+  it("renders brand SVG icons in the unified grid", () => {
+    setupMocks();
+    const html = renderPage();
+
+    expect(html).toContain("integration-card__brand-icon");
+    expect(html).toContain("<img");
+    expect(html).toContain("Klaviyo");
+  });
 });
