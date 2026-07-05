@@ -4123,3 +4123,916 @@ export function buildGrowthAuditProductIntelligenceSummary(input: {
     recommendedActions,
   };
 }
+
+// ─── Economic Priority Score ───────────────────────────────────────────────
+
+export type GrowthAuditEconomicPriorityLevel =
+  | "maximum"
+  | "high"
+  | "medium"
+  | "low"
+  | "monitor";
+
+export interface GrowthAuditEconomicPriorityBreakdown {
+  businessImpact: number;
+  organicOpportunity: number;
+  trafficAndConversion: number;
+  ecommerceFunnel: number;
+  technicalAndCroRisk: number;
+  stockAndAvailability: number;
+  dataConfidence: number;
+}
+
+export interface GrowthAuditEconomicPriorityReason {
+  key: string;
+  label: string;
+  detail: string;
+  impact: "positive" | "negative" | "opportunity" | "risk" | "neutral";
+}
+
+export interface GrowthAuditEconomicPriorityItem {
+  pageId: string;
+  url: string;
+  title: string;
+  handle?: string | null;
+  score: number;
+  level: GrowthAuditEconomicPriorityLevel;
+  label: string;
+  shortReason: string;
+  reasons: GrowthAuditEconomicPriorityReason[];
+  breakdown: GrowthAuditEconomicPriorityBreakdown;
+  metrics: {
+    sales?: number;
+    quantitySold?: number;
+    ordersCount?: number;
+    stock?: number | null;
+    gscImpressions?: number;
+    gscClicks?: number;
+    gscCtr?: number;
+    gscPosition?: number;
+    ga4Sessions?: number;
+    ga4Conversions?: number;
+    ga4Revenue?: number;
+    itemViews?: number;
+    addToCart?: number;
+    purchases?: number;
+    itemRevenue?: number;
+    performanceScore?: number;
+    croScore?: number;
+    seoScore?: number;
+    bestVariantTitle?: string | null;
+    bestVariantRevenue?: number | null;
+  };
+}
+
+export type GrowthAuditEconomicPriorityFilter =
+  | "all"
+  | "high_priority"
+  | "with_sales"
+  | "high_impressions"
+  | "with_funnel"
+  | "stock_issues"
+  | "incomplete_data";
+
+type EconomicPriorityPeerContext = {
+  salesValues: number[];
+  runSummary?: GrowthAuditRunShopifyCommerceSummary | null;
+};
+
+type EconomicAreaKey =
+  | "businessImpact"
+  | "organicOpportunity"
+  | "trafficAndConversion"
+  | "ecommerceFunnel"
+  | "technicalAndCroRisk"
+  | "stockAndAvailability";
+
+const ECONOMIC_AREA_WEIGHTS: Record<EconomicAreaKey, number> = {
+  businessImpact: 0.25,
+  organicOpportunity: 0.2,
+  trafficAndConversion: 0.15,
+  ecommerceFunnel: 0.2,
+  technicalAndCroRisk: 0.15,
+  stockAndAvailability: 0.05,
+};
+
+const ECONOMIC_PRIORITY_LEVEL_LABELS: Record<GrowthAuditEconomicPriorityLevel, string> = {
+  maximum: "Priorità massima",
+  high: "Priorità alta",
+  medium: "Priorità media",
+  low: "Priorità bassa",
+  monitor: "Monitoraggio",
+};
+
+export function getGrowthAuditEconomicPriorityLevelLabel(
+  level: GrowthAuditEconomicPriorityLevel,
+): string {
+  return ECONOMIC_PRIORITY_LEVEL_LABELS[level];
+}
+
+export function getGrowthAuditEconomicPriorityLevelBadgeClass(
+  level: GrowthAuditEconomicPriorityLevel,
+): string {
+  return `growth-audit-economic-priority__badge growth-audit-economic-priority__badge--${level}`;
+}
+
+function _extractProductHandle(page: GrowthAuditPage): string | null {
+  const ga4Meta = getGrowthAuditPageGa4EcommerceMetadata(page);
+  const handleFromDebug = ga4Meta?.matchDebug?.shopifyKeys?.handleNormalized;
+  if (handleFromDebug) return handleFromDebug;
+  const match = page.url?.match(/\/products\/([^/?#]+)/i);
+  return match?.[1] ?? null;
+}
+
+function _clampScore(value: number): number {
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function _computeEconomicDataConfidence(page: GrowthAuditPage): number {
+  let confidence = 0;
+  if (hasGrowthAuditPageSearchConsoleData(page)) confidence += 20;
+  if (hasGrowthAuditPageAnalyticsData(page)) confidence += 20;
+  if (hasGrowthAuditPageGa4EcommerceData(page)) confidence += 20;
+  if (hasGrowthAuditPageShopifyCommerceData(page)) confidence += 20;
+  if (hasGrowthAuditPagePerformanceAnalysis(page)) confidence += 10;
+  if (hasGrowthAuditPageAiAnalysis(page)) confidence += 10;
+  return confidence;
+}
+
+function _getSalesPercentile(sales: number, salesValues: number[]): number {
+  if (salesValues.length === 0 || sales <= 0) return 0;
+  const sorted = [...salesValues].filter((v) => v > 0).sort((a, b) => a - b);
+  if (sorted.length === 0) return 0;
+  const below = sorted.filter((v) => v < sales).length;
+  return (below / sorted.length) * 100;
+}
+
+function _hasGa4EcommerceReliableMatch(
+  ga4Meta: GrowthAuditPageGa4EcommerceMetadata | null,
+): boolean {
+  if (!ga4Meta) return false;
+  if (ga4Meta.matchDebug?.matchStatus === "no_reliable_match") return false;
+  return ga4Meta.matchedBy != null && ga4Meta.matchedBy !== "none";
+}
+
+function _hasDemandSignal(input: {
+  sales?: number;
+  impressions?: number;
+  sessions?: number;
+  itemViews?: number;
+}): boolean {
+  return (
+    (input.sales ?? 0) > 0 ||
+    (input.impressions ?? 0) > 200 ||
+    (input.sessions ?? 0) > 50 ||
+    (input.itemViews ?? 0) > 30
+  );
+}
+
+function _computeEconomicBusinessImpact(input: {
+  commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
+  ga4Meta: GrowthAuditPageGa4EcommerceMetadata | null;
+  page: GrowthAuditPage;
+  peerContext?: EconomicPriorityPeerContext;
+}): number | null {
+  const { commerceMeta, ga4Meta, page, peerContext } = input;
+  const sales = commerceMeta?.sales;
+  const quantitySold = commerceMeta?.quantitySold;
+  const ordersCount = commerceMeta?.ordersCount;
+  const purchases = ga4Meta?.itemsPurchased;
+  const itemRevenue = ga4Meta?.itemRevenue;
+
+  const hasCommerce =
+    (sales != null && sales > 0) ||
+    (quantitySold != null && quantitySold > 0) ||
+    (ordersCount != null && ordersCount > 0);
+  const hasGa4Revenue =
+    (purchases != null && purchases > 0) || (itemRevenue != null && itemRevenue > 0);
+
+  if (!hasCommerce && !hasGa4Revenue) return null;
+
+  let score = 0;
+  if (sales != null && sales > 0) score += 25;
+  if (sales != null && sales >= 100) score += 10;
+  if (quantitySold != null && quantitySold > 0) score += 10;
+  if (ordersCount != null && ordersCount > 0) score += 10;
+  if (purchases != null && purchases > 0) score += 15;
+  if (itemRevenue != null && itemRevenue > 0) score += 15;
+
+  if (
+    commerceMeta &&
+    _isTopCommerceProduct(page, commerceMeta, peerContext?.runSummary ?? null)
+  ) {
+    score += 20;
+  }
+
+  if (sales != null && sales > 0 && peerContext?.salesValues.length) {
+    const percentile = _getSalesPercentile(sales, peerContext.salesValues);
+    if (percentile >= 80) score += 15;
+    else if (percentile >= 50) score += 8;
+  }
+
+  const bestVariantId = ga4Meta?.bestVariantByRevenue;
+  if (bestVariantId && ga4Meta?.variantBreakdown) {
+    const bestVariant = ga4Meta.variantBreakdown.find(
+      (v) => v.variantLegacyId === bestVariantId,
+    );
+    if ((bestVariant?.itemRevenue ?? 0) > 0) score += 10;
+  }
+
+  return _clampScore(score);
+}
+
+function _computeEconomicOrganicOpportunity(
+  gscMeta: GrowthAuditPageSearchConsoleMetadata | null,
+): number | null {
+  if (!gscMeta || gscMeta.impressions == null) return null;
+  const impressions = gscMeta.impressions;
+  if (impressions <= 0) return null;
+
+  let score = 0;
+  if (impressions > 1000) score += 30;
+  else if (impressions >= 200) score += 15;
+
+  const ctr = gscMeta.ctr;
+  if (ctr != null && impressions > 200) {
+    if (ctr < 0.01) score += 35;
+    else if (ctr < 0.02) score += 20;
+  }
+
+  const position = gscMeta.position;
+  if (position != null && position >= 4 && position <= 15) score += 25;
+
+  if ((gscMeta.topQueries?.length ?? 0) > 0) score += 10;
+
+  return score > 0 ? _clampScore(score) : null;
+}
+
+function _computeEconomicTrafficAndConversion(
+  analyticsMeta: GrowthAuditPageAnalyticsMetadata | null,
+): number | null {
+  if (!analyticsMeta || analyticsMeta.sessions == null) return null;
+  const sessions = analyticsMeta.sessions;
+  if (sessions <= 0) return null;
+
+  let score = 0;
+  if (sessions > 300) score += 25;
+  else if (sessions >= 50) score += 15;
+
+  const conversions = analyticsMeta.conversions;
+  if (conversions != null && conversions === 0 && sessions > 50) score += 30;
+
+  const revenue = analyticsMeta.revenue;
+  if (revenue != null) {
+    if (revenue === 0 && sessions > 50) score += 20;
+    else if (revenue > 0) score += 10;
+  } else if (sessions > 50) {
+    score += 15;
+  }
+
+  const engagementRate = analyticsMeta.engagementRate;
+  if (engagementRate != null && engagementRate < 0.45 && sessions > 50) score += 20;
+
+  return score > 0 ? _clampScore(score) : null;
+}
+
+function _computeEconomicEcommerceFunnel(
+  ga4Meta: GrowthAuditPageGa4EcommerceMetadata | null,
+): number | null {
+  if (!ga4Meta || !_hasGa4EcommerceReliableMatch(ga4Meta)) return null;
+
+  const itemViews = ga4Meta.itemViews ?? ga4Meta.itemViewEvents;
+  if (itemViews == null) return null;
+
+  let score = 0;
+  if (itemViews > 100) score += 20;
+  else if (itemViews >= 30) score += 10;
+
+  const addToCart = ga4Meta.itemsAddedToCart ?? 0;
+  const purchases = ga4Meta.itemsPurchased ?? 0;
+  const checkout = ga4Meta.itemsCheckedOut ?? 0;
+
+  if (itemViews > 50 && addToCart === 0) score += 35;
+  if (addToCart > 0 && purchases === 0) score += 30;
+  if (checkout > 0 && purchases === 0) score += 25;
+
+  const viewToCartRate = ga4Meta.viewToCartRate;
+  if (viewToCartRate != null && viewToCartRate < 0.05 && itemViews > 50) score += 25;
+
+  const cartToPurchaseRate = ga4Meta.cartToPurchaseRate;
+  if (cartToPurchaseRate != null && cartToPurchaseRate < 0.2 && addToCart > 5) score += 20;
+
+  if (purchases > 0) score += 15;
+  if ((ga4Meta.itemRevenue ?? 0) > 0) score += 15;
+
+  return score > 0 ? _clampScore(score) : null;
+}
+
+function _computeEconomicTechnicalAndCroRisk(input: {
+  page: GrowthAuditPage;
+  findings: GrowthAuditFinding[];
+  tasks: GrowthAuditTask[];
+  hasTrafficOrSales: boolean;
+}): number | null {
+  const { page, findings, tasks, hasTrafficOrSales } = input;
+  const aiMeta = getGrowthAuditPageAiMetadata(page);
+  const performanceSnapshot = _getProductIntelligencePerformanceSnapshot(page);
+  const perfScore = performanceSnapshot.performanceScore;
+  const croScore = aiMeta?.croScore ?? page.croScore ?? null;
+  const seoScore = page.score ?? null;
+
+  const openFindings = findings.filter((f) => f.status === "open");
+  const openTasks = tasks.filter((t) => t.status === "open");
+  const hasCritical = openFindings.some((f) => f.severity === "critical");
+  const hasHigh = openFindings.some((f) => f.severity === "high");
+  const hasHighTask = openTasks.some((t) => t.priority === "high");
+
+  const hasSignal =
+    perfScore != null ||
+    croScore != null ||
+    seoScore != null ||
+    hasCritical ||
+    hasHigh ||
+    hasHighTask ||
+    _isPoorLcp(performanceSnapshot.lcp) ||
+    _isPoorCls(performanceSnapshot.cls) ||
+    _isPoorInp(performanceSnapshot.inp);
+
+  if (!hasSignal) return null;
+
+  let score = 0;
+  if (perfScore != null) {
+    if (perfScore < 50) score += 25;
+    else if (perfScore < 80) score += 15;
+  }
+  if (_isPoorLcp(performanceSnapshot.lcp)) score += 10;
+  if (_isPoorCls(performanceSnapshot.cls)) score += 10;
+  if (_isPoorInp(performanceSnapshot.inp)) score += 10;
+  if (croScore != null && croScore < 70) score += 20;
+  if (seoScore != null && seoScore < 70) score += 15;
+  if (hasCritical) score += 25;
+  if (hasHigh) score += 15;
+  if (hasHighTask) score += 10;
+  if (hasTrafficOrSales && (hasCritical || hasHigh)) score += 15;
+
+  return score > 0 ? _clampScore(score) : null;
+}
+
+function _computeEconomicStockAndAvailability(input: {
+  commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
+  ga4Meta: GrowthAuditPageGa4EcommerceMetadata | null;
+  demand: { sales?: number; impressions?: number; sessions?: number; itemViews?: number };
+}): number | null {
+  const { commerceMeta, ga4Meta, demand } = input;
+  const hasDemand = _hasDemandSignal(demand);
+  const stock = commerceMeta?.stock;
+  const availableForSale = commerceMeta?.availableForSale;
+
+  let score = 0;
+  let hasData = false;
+
+  if (stock != null) {
+    hasData = true;
+    if (hasDemand && stock <= 0) score += 60;
+    else if ((demand.sales ?? 0) > 0 && stock > 0 && stock <= 10) score += 40;
+  }
+
+  if (availableForSale != null) {
+    hasData = true;
+    if (hasDemand && availableForSale === false) score += 50;
+  }
+
+  const bestVariantId = ga4Meta?.bestVariantByRevenue;
+  if (bestVariantId && ga4Meta?.variantBreakdown) {
+    const bestVariant = ga4Meta.variantBreakdown.find(
+      (v) => v.variantLegacyId === bestVariantId,
+    );
+    if (bestVariant?.stock != null) {
+      hasData = true;
+      const variantViews = bestVariant.itemViews ?? bestVariant.itemViewEvents ?? 0;
+      const variantCart = bestVariant.itemsAddedToCart ?? 0;
+      if (bestVariant.stock <= 0 && (variantViews > 0 || variantCart > 0)) score += 45;
+      else if (bestVariant.stock > 0 && bestVariant.stock <= 10 && (bestVariant.itemRevenue ?? 0) > 0) {
+        score += 30;
+      }
+    }
+  }
+
+  if (!hasData) return null;
+  return score > 0 ? _clampScore(score) : null;
+}
+
+function _scoreToEconomicPriorityLevel(score: number): GrowthAuditEconomicPriorityLevel {
+  if (score >= 85) return "maximum";
+  if (score >= 70) return "high";
+  if (score >= 50) return "medium";
+  if (score >= 25) return "low";
+  return "monitor";
+}
+
+function _capEconomicLevelForLowConfidence(
+  level: GrowthAuditEconomicPriorityLevel,
+  dataConfidence: number,
+): GrowthAuditEconomicPriorityLevel {
+  if (dataConfidence >= 40) return level;
+  const order: GrowthAuditEconomicPriorityLevel[] = [
+    "monitor",
+    "low",
+    "medium",
+    "high",
+    "maximum",
+  ];
+  const maxIndex = order.indexOf("medium");
+  const currentIndex = order.indexOf(level);
+  return currentIndex > maxIndex ? "medium" : level;
+}
+
+function _buildEconomicPriorityShortReason(input: {
+  breakdown: GrowthAuditEconomicPriorityBreakdown;
+  areaScores: Partial<Record<EconomicAreaKey, number>>;
+  commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
+  gscMeta: GrowthAuditPageSearchConsoleMetadata | null;
+  ga4Meta: GrowthAuditPageGa4EcommerceMetadata | null;
+  analyticsMeta: GrowthAuditPageAnalyticsMetadata | null;
+  hasCriticalOrHigh: boolean;
+}): string {
+  const {
+    breakdown,
+    commerceMeta,
+    gscMeta,
+    ga4Meta,
+    analyticsMeta,
+    hasCriticalOrHigh,
+  } = input;
+
+  if (breakdown.dataConfidence < 40) {
+    return "Dati insufficienti per una priorità economica affidabile.";
+  }
+
+  const sales = commerceMeta?.sales ?? 0;
+  const impressions = gscMeta?.impressions ?? 0;
+  const ctr = gscMeta?.ctr ?? 0;
+  const sessions = analyticsMeta?.sessions ?? 0;
+  const itemViews = ga4Meta?.itemViews ?? ga4Meta?.itemViewEvents ?? 0;
+  const purchases = ga4Meta?.itemsPurchased ?? 0;
+
+  if (sales > 0 && hasCriticalOrHigh) {
+    return "Prodotto già validato economicamente con criticità da correggere.";
+  }
+
+  if (impressions > 500 && ctr < 0.02) {
+    return "Molte impression organiche ma CTR basso.";
+  }
+
+  if (
+    (itemViews > 50 || sessions > 50) &&
+    sales === 0 &&
+    (purchases === 0 || purchases == null)
+  ) {
+    return "Domanda presente ma conversione migliorabile.";
+  }
+
+  if (ga4Meta?.bestVariantByRevenue && ga4Meta.variantBreakdown) {
+    const best = ga4Meta.variantBreakdown.find(
+      (v) => v.variantLegacyId === ga4Meta.bestVariantByRevenue,
+    );
+    if ((best?.itemRevenue ?? 0) > 0) {
+      return "Una variante sta monetizzando più delle altre.";
+    }
+  }
+
+  const stock = commerceMeta?.stock;
+  if (
+    stock != null &&
+    stock <= 0 &&
+    _hasDemandSignal({ sales, impressions, sessions, itemViews })
+  ) {
+    return "Domanda presente ma stock/disponibilità da controllare.";
+  }
+
+  const dominant = Object.entries(input.areaScores).sort((a, b) => b[1] - a[1])[0]?.[0];
+  switch (dominant) {
+    case "businessImpact":
+      return "Prodotto già monetizza: priorità su ottimizzazione e crescita.";
+    case "organicOpportunity":
+      return "Opportunità SEO organica da sfruttare.";
+    case "ecommerceFunnel":
+      return "Funnel ecommerce con margini di miglioramento.";
+    case "technicalAndCroRisk":
+      return "Criticità tecniche o CRO da affrontare.";
+    case "stockAndAvailability":
+      return "Stock o disponibilità da verificare.";
+    default:
+      return "Monitorare e completare i dati per affinare la priorità.";
+  }
+}
+
+function _buildEconomicPriorityReasons(input: {
+  commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
+  gscMeta: GrowthAuditPageSearchConsoleMetadata | null;
+  ga4Meta: GrowthAuditPageGa4EcommerceMetadata | null;
+  analyticsMeta: GrowthAuditPageAnalyticsMetadata | null;
+  performanceScore: number | null;
+  croScore: number | null;
+  findings: GrowthAuditFinding[];
+  dataConfidence: number;
+  page: GrowthAuditPage;
+}): GrowthAuditEconomicPriorityReason[] {
+  const {
+    commerceMeta,
+    gscMeta,
+    ga4Meta,
+    analyticsMeta,
+    performanceScore,
+    croScore,
+    findings,
+    dataConfidence,
+    page,
+  } = input;
+  const reasons: GrowthAuditEconomicPriorityReason[] = [];
+
+  if (commerceMeta?.sales != null && commerceMeta.sales > 0) {
+    reasons.push({
+      key: "shopify_sales",
+      label: "Vendite Shopify",
+      detail: "Shopify mostra vendite nel periodo: prodotto già validato.",
+      impact: "positive",
+    });
+  }
+
+  const impressions = gscMeta?.impressions;
+  const ctr = gscMeta?.ctr;
+  if (impressions != null && impressions > 500 && ctr != null && ctr < 0.02) {
+    reasons.push({
+      key: "gsc_ctr",
+      label: "CTR organico basso",
+      detail: "Search Console mostra molte impression con CTR basso.",
+      impact: "opportunity",
+    });
+  }
+
+  if (ga4Meta && _hasGa4EcommerceReliableMatch(ga4Meta)) {
+    const views = ga4Meta.itemViews ?? ga4Meta.itemViewEvents ?? 0;
+    const cart = ga4Meta.itemsAddedToCart ?? 0;
+    if (views > 50 && cart === 0) {
+      reasons.push({
+        key: "funnel_view_cart",
+        label: "Funnel view → cart",
+        detail: "GA4 Ecommerce mostra view item ma pochi add to cart.",
+        impact: "opportunity",
+      });
+    }
+    if (cart > 0 && (ga4Meta.itemsPurchased ?? 0) === 0) {
+      reasons.push({
+        key: "funnel_cart_purchase",
+        label: "Funnel cart → purchase",
+        detail: "GA4 Ecommerce mostra add to cart ma pochi acquisti.",
+        impact: "opportunity",
+      });
+    }
+  } else if (!hasGrowthAuditPageGa4EcommerceData(page)) {
+    reasons.push({
+      key: "missing_ga4_ecommerce",
+      label: "GA4 Ecommerce assente",
+      detail: "Dati GA4 Ecommerce mancanti: priorità meno affidabile.",
+      impact: "neutral",
+    });
+  }
+
+  if (ga4Meta?.bestVariantByRevenue && ga4Meta.variantBreakdown) {
+    const best = ga4Meta.variantBreakdown.find(
+      (v) => v.variantLegacyId === ga4Meta.bestVariantByRevenue,
+    );
+    if (best?.variantTitle && (best.itemRevenue ?? 0) > 0) {
+      reasons.push({
+        key: "best_variant",
+        label: "Variante top revenue",
+        detail: `La variante ${best.variantTitle} genera la revenue più alta.`,
+        impact: "positive",
+      });
+    }
+  }
+
+  if (performanceScore != null && performanceScore < 70) {
+    reasons.push({
+      key: "performance",
+      label: "Performance bassa",
+      detail: "Performance bassa può limitare conversione mobile.",
+      impact: "risk",
+    });
+  }
+
+  const bestVariantId = ga4Meta?.bestVariantByRevenue;
+  if (bestVariantId && ga4Meta?.variantBreakdown) {
+    const best = ga4Meta.variantBreakdown.find((v) => v.variantLegacyId === bestVariantId);
+    if (best?.stock != null && best.stock <= 10) {
+      const views = best.itemViews ?? best.itemViewEvents ?? 0;
+      if (views > 0 || (best.itemsAddedToCart ?? 0) > 0) {
+        reasons.push({
+          key: "variant_stock",
+          label: "Stock variante",
+          detail: "Stock basso su variante con domanda.",
+          impact: "risk",
+        });
+      }
+    }
+  }
+
+  const sessions = analyticsMeta?.sessions ?? 0;
+  if (croScore != null && croScore < 70 && sessions > 50) {
+    reasons.push({
+      key: "cro_score",
+      label: "CRO score basso",
+      detail: "CRO score basso su prodotto con traffico.",
+      impact: "opportunity",
+    });
+  }
+
+  const hasHighFinding = findings.some(
+    (f) => f.status === "open" && (f.severity === "high" || f.severity === "critical"),
+  );
+  if (hasHighFinding && (commerceMeta?.sales ?? 0) > 0) {
+    reasons.push({
+      key: "finding_commerce",
+      label: "Criticità su prodotto che vende",
+      detail: "Finding ad alta priorità su prodotto con vendite attive.",
+      impact: "risk",
+    });
+  }
+
+  if (dataConfidence < 40) {
+    reasons.push({
+      key: "low_confidence",
+      label: "Dati incompleti",
+      detail: "Copertura dati insufficiente per una priorità economica affidabile.",
+      impact: "neutral",
+    });
+  }
+
+  return reasons.slice(0, 5);
+}
+
+function _buildEconomicPriorityMetrics(input: {
+  page: GrowthAuditPage;
+  commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
+  gscMeta: GrowthAuditPageSearchConsoleMetadata | null;
+  analyticsMeta: GrowthAuditPageAnalyticsMetadata | null;
+  ga4Meta: GrowthAuditPageGa4EcommerceMetadata | null;
+  performanceScore: number | null;
+  croScore: number | null;
+}): GrowthAuditEconomicPriorityItem["metrics"] {
+  const { commerceMeta, gscMeta, analyticsMeta, ga4Meta, performanceScore, croScore, page } =
+    input;
+  const metrics: GrowthAuditEconomicPriorityItem["metrics"] = {};
+
+  if (commerceMeta?.sales != null) metrics.sales = commerceMeta.sales;
+  if (commerceMeta?.quantitySold != null) metrics.quantitySold = commerceMeta.quantitySold;
+  if (commerceMeta?.ordersCount != null) metrics.ordersCount = commerceMeta.ordersCount;
+  if (commerceMeta?.stock != null) metrics.stock = commerceMeta.stock;
+
+  if (gscMeta?.impressions != null) metrics.gscImpressions = gscMeta.impressions;
+  if (gscMeta?.clicks != null) metrics.gscClicks = gscMeta.clicks;
+  if (gscMeta?.ctr != null) metrics.gscCtr = gscMeta.ctr;
+  if (gscMeta?.position != null) metrics.gscPosition = gscMeta.position;
+
+  if (analyticsMeta?.sessions != null) metrics.ga4Sessions = analyticsMeta.sessions;
+  if (analyticsMeta?.conversions != null) metrics.ga4Conversions = analyticsMeta.conversions;
+  if (analyticsMeta?.revenue != null) metrics.ga4Revenue = analyticsMeta.revenue;
+
+  if (ga4Meta) {
+    const views = ga4Meta.itemViews ?? ga4Meta.itemViewEvents;
+    if (views != null) metrics.itemViews = views;
+    if (ga4Meta.itemsAddedToCart != null) metrics.addToCart = ga4Meta.itemsAddedToCart;
+    if (ga4Meta.itemsPurchased != null) metrics.purchases = ga4Meta.itemsPurchased;
+    if (ga4Meta.itemRevenue != null) metrics.itemRevenue = ga4Meta.itemRevenue;
+
+    if (ga4Meta.bestVariantByRevenue && ga4Meta.variantBreakdown) {
+      const best = ga4Meta.variantBreakdown.find(
+        (v) => v.variantLegacyId === ga4Meta.bestVariantByRevenue,
+      );
+      if (best) {
+        metrics.bestVariantTitle = best.variantTitle ?? null;
+        if (best.itemRevenue != null) metrics.bestVariantRevenue = best.itemRevenue;
+      }
+    }
+  }
+
+  if (performanceScore != null) metrics.performanceScore = performanceScore;
+  if (croScore != null) metrics.croScore = croScore;
+  if (page.score != null) metrics.seoScore = page.score;
+
+  return metrics;
+}
+
+export function buildGrowthAuditEconomicPriorityItem(input: {
+  page: GrowthAuditPage;
+  findings: GrowthAuditFinding[];
+  tasks: GrowthAuditTask[];
+  peerContext?: EconomicPriorityPeerContext;
+}): GrowthAuditEconomicPriorityItem | null {
+  const { page, findings, tasks, peerContext } = input;
+
+  if (!isGrowthAuditProductPage(page)) return null;
+
+  const pageFindings = getFindingsForPage(findings, page.id);
+  const pageTasks = getTasksForPage(tasks, page.id);
+
+  const gscMeta = getGrowthAuditPageSearchConsoleMetadata(page);
+  const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
+  const commerceMeta = getGrowthAuditPageShopifyCommerceMetadata(page);
+  const ga4Meta = getGrowthAuditPageGa4EcommerceMetadata(page);
+  const aiMeta = getGrowthAuditPageAiMetadata(page);
+  const performanceSnapshot = _getProductIntelligencePerformanceSnapshot(page);
+  const perfScore = performanceSnapshot.performanceScore;
+  const croScore = aiMeta?.croScore ?? page.croScore ?? null;
+
+  const dataConfidence = _computeEconomicDataConfidence(page);
+
+  const demand = {
+    sales: commerceMeta?.sales,
+    impressions: gscMeta?.impressions,
+    sessions: analyticsMeta?.sessions,
+    itemViews: ga4Meta?.itemViews ?? ga4Meta?.itemViewEvents,
+  };
+  const hasTrafficOrSales =
+    (commerceMeta?.sales ?? 0) > 0 ||
+    (gscMeta?.impressions ?? 0) > 200 ||
+    (analyticsMeta?.sessions ?? 0) > 50;
+
+  const areaScores: Partial<Record<EconomicAreaKey, number>> = {};
+  const businessImpact = _computeEconomicBusinessImpact({
+    commerceMeta,
+    ga4Meta,
+    page,
+    peerContext,
+  });
+  if (businessImpact != null) areaScores.businessImpact = businessImpact;
+
+  const organicOpportunity = _computeEconomicOrganicOpportunity(gscMeta);
+  if (organicOpportunity != null) areaScores.organicOpportunity = organicOpportunity;
+
+  const trafficAndConversion = _computeEconomicTrafficAndConversion(analyticsMeta);
+  if (trafficAndConversion != null) areaScores.trafficAndConversion = trafficAndConversion;
+
+  const ecommerceFunnel = _computeEconomicEcommerceFunnel(ga4Meta);
+  if (ecommerceFunnel != null) areaScores.ecommerceFunnel = ecommerceFunnel;
+
+  const technicalAndCroRisk = _computeEconomicTechnicalAndCroRisk({
+    page,
+    findings: pageFindings,
+    tasks: pageTasks,
+    hasTrafficOrSales,
+  });
+  if (technicalAndCroRisk != null) areaScores.technicalAndCroRisk = technicalAndCroRisk;
+
+  const stockAndAvailability = _computeEconomicStockAndAvailability({
+    commerceMeta,
+    ga4Meta,
+    demand,
+  });
+  if (stockAndAvailability != null) areaScores.stockAndAvailability = stockAndAvailability;
+
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const [key, weight] of Object.entries(ECONOMIC_AREA_WEIGHTS) as [
+    EconomicAreaKey,
+    number,
+  ][]) {
+    const areaScore = areaScores[key];
+    if (areaScore != null) {
+      weightedSum += areaScore * weight;
+      weightTotal += weight;
+    }
+  }
+
+  const rawScore = weightTotal > 0 ? weightedSum / weightTotal : 0;
+  const score = _clampScore(rawScore);
+
+  let level = _scoreToEconomicPriorityLevel(score);
+  level = _capEconomicLevelForLowConfidence(level, dataConfidence);
+
+  const breakdown: GrowthAuditEconomicPriorityBreakdown = {
+    businessImpact: areaScores.businessImpact ?? 0,
+    organicOpportunity: areaScores.organicOpportunity ?? 0,
+    trafficAndConversion: areaScores.trafficAndConversion ?? 0,
+    ecommerceFunnel: areaScores.ecommerceFunnel ?? 0,
+    technicalAndCroRisk: areaScores.technicalAndCroRisk ?? 0,
+    stockAndAvailability: areaScores.stockAndAvailability ?? 0,
+    dataConfidence,
+  };
+
+  const hasCriticalOrHigh = pageFindings.some(
+    (f) => f.status === "open" && (f.severity === "critical" || f.severity === "high"),
+  );
+
+  const shortReason = _buildEconomicPriorityShortReason({
+    breakdown,
+    areaScores: areaScores as Record<EconomicAreaKey, number>,
+    commerceMeta,
+    gscMeta,
+    ga4Meta,
+    analyticsMeta,
+    hasCriticalOrHigh,
+  });
+
+  const reasons = _buildEconomicPriorityReasons({
+    commerceMeta,
+    gscMeta,
+    ga4Meta,
+    analyticsMeta,
+    performanceScore: perfScore,
+    croScore,
+    findings: pageFindings,
+    dataConfidence,
+    page,
+  });
+
+  return {
+    pageId: page.id,
+    url: page.url,
+    title: page.title || page.url,
+    handle: _extractProductHandle(page),
+    score,
+    level,
+    label: getGrowthAuditEconomicPriorityLevelLabel(level),
+    shortReason,
+    reasons,
+    breakdown,
+    metrics: _buildEconomicPriorityMetrics({
+      page,
+      commerceMeta,
+      gscMeta,
+      analyticsMeta,
+      ga4Meta,
+      performanceScore: perfScore,
+      croScore,
+    }),
+  };
+}
+
+export function buildGrowthAuditEconomicPriorityRanking(input: {
+  pages: GrowthAuditPage[];
+  findings: GrowthAuditFinding[];
+  tasks: GrowthAuditTask[];
+  limit?: number;
+  runSummary?: GrowthAuditRunSummary | null;
+}): GrowthAuditEconomicPriorityItem[] {
+  const { pages, findings, tasks, limit = 10, runSummary } = input;
+  const productPages = pages.filter(isGrowthAuditProductPage);
+
+  const salesValues = productPages
+    .map((page) => getGrowthAuditPageShopifyCommerceMetadata(page)?.sales ?? 0)
+    .filter((s) => s > 0);
+
+  const peerContext: EconomicPriorityPeerContext = {
+    salesValues,
+    runSummary: runSummary?.shopifyCommerce ?? null,
+  };
+
+  const items = productPages
+    .map((page) =>
+      buildGrowthAuditEconomicPriorityItem({
+        page,
+        findings,
+        tasks,
+        peerContext,
+      }),
+    )
+    .filter((item): item is GrowthAuditEconomicPriorityItem => item != null)
+    .sort((a, b) => b.score - a.score);
+
+  return items.slice(0, limit);
+}
+
+export function filterGrowthAuditEconomicPriorityItems(
+  items: GrowthAuditEconomicPriorityItem[],
+  filter: GrowthAuditEconomicPriorityFilter,
+): GrowthAuditEconomicPriorityItem[] {
+  switch (filter) {
+    case "all":
+      return items;
+    case "high_priority":
+      return items.filter((item) => item.level === "maximum" || item.level === "high");
+    case "with_sales":
+      return items.filter(
+        (item) =>
+          (item.metrics.sales ?? 0) > 0 ||
+          (item.metrics.itemRevenue ?? 0) > 0 ||
+          (item.metrics.purchases ?? 0) > 0,
+      );
+    case "high_impressions":
+      return items.filter((item) => (item.metrics.gscImpressions ?? 0) >= 500);
+    case "with_funnel":
+      return items.filter((item) => (item.metrics.itemViews ?? 0) > 0);
+    case "stock_issues":
+      return items.filter(
+        (item) =>
+          item.breakdown.stockAndAvailability > 0 ||
+          (item.metrics.stock != null && item.metrics.stock <= 0),
+      );
+    case "incomplete_data":
+      return items.filter((item) => item.breakdown.dataConfidence < 40);
+    default:
+      return items;
+  }
+}

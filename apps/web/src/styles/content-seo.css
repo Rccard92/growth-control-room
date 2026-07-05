@@ -5695,6 +5695,312 @@
   }
 }
 
+/* Economic Priority Score */
+.growth-audit-economic-priority {
+  margin-bottom: 1rem;
+  padding: 1.25rem;
+}
+
+.growth-audit-economic-priority__header {
+  margin-bottom: 1rem;
+}
+
+.growth-audit-economic-priority__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.growth-audit-economic-priority__subtitle {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.45;
+}
+
+.growth-audit-economic-priority__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.growth-audit-economic-priority__filter {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--gcr-border);
+  background: transparent;
+  color: var(--gcr-text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.growth-audit-economic-priority__filter:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  color: var(--gcr-text);
+}
+
+.growth-audit-economic-priority__filter--active {
+  border-color: rgba(139, 92, 246, 0.7);
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+}
+
+.growth-audit-economic-priority__empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-economic-priority__table-wrap {
+  overflow-x: auto;
+}
+
+.growth-audit-economic-priority__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.growth-audit-economic-priority__table th,
+.growth-audit-economic-priority__table td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: top;
+}
+
+.growth-audit-economic-priority__table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gcr-text-muted);
+  font-weight: 600;
+}
+
+.growth-audit-economic-priority__score-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.growth-audit-economic-priority__score {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--gcr-text);
+}
+
+.growth-audit-economic-priority__badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.growth-audit-economic-priority__badge--maximum {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.growth-audit-economic-priority__badge--high {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+}
+
+.growth-audit-economic-priority__badge--medium {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde68a;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.growth-audit-economic-priority__badge--low {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.growth-audit-economic-priority__badge--monitor {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.growth-audit-economic-priority__handle {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--gcr-text-muted);
+  margin-top: 0.15rem;
+}
+
+.growth-audit-economic-priority__reason {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.4;
+}
+
+.growth-audit-economic-priority__metrics {
+  font-size: 0.78rem;
+  color: var(--gcr-text-muted);
+  white-space: nowrap;
+}
+
+.growth-audit-economic-priority__cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0.75rem;
+  flex-direction: column;
+}
+
+.growth-audit-economic-priority__card {
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.growth-audit-economic-priority__card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.growth-audit-economic-priority__card-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.growth-audit-economic-priority__card-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.65rem 0;
+  font-size: 0.78rem;
+  color: var(--gcr-text-muted);
+}
+
+/* Detail breakdown inside Product Intelligence */
+.growth-audit-product-intelligence__economic {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.growth-audit-economic-priority__breakdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.growth-audit-economic-priority__breakdown-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.growth-audit-economic-priority__breakdown-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.growth-audit-economic-priority__score-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.growth-audit-economic-priority__score-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--gcr-text-muted);
+  margin-top: 0.2rem;
+}
+
+.growth-audit-economic-priority__breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.growth-audit-economic-priority__breakdown-item {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.growth-audit-economic-priority__breakdown-item span {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.growth-audit-economic-priority__breakdown-item strong {
+  font-size: 0.95rem;
+}
+
+.growth-audit-economic-priority__confidence--low strong {
+  color: #fde68a;
+}
+
+.growth-audit-economic-priority__reasons-list {
+  margin: 0 0 0.65rem;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-economic-priority__reason-item {
+  margin-bottom: 0.25rem;
+}
+
+.growth-audit-economic-priority__variant-note {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: #86efac;
+}
+
+.growth-audit-economic-priority__stock-warning {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #fde68a;
+  background: rgba(234, 179, 8, 0.1);
+  border-left: 3px solid #eab308;
+}
+
+@media (max-width: 768px) {
+  .growth-audit-economic-priority__table-wrap {
+    display: none;
+  }
+
+  .growth-audit-economic-priority__cards {
+    display: flex;
+  }
+
+  .growth-audit-economic-priority__breakdown-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
 .growth-audit-shopify-commerce-panel {
   margin-bottom: 1rem;
 }

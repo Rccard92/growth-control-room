@@ -397,6 +397,16 @@ describe("GrowthAuditPage", () => {
     expect(priorityIndex).toBeLessThan(inventoryIndex);
   });
 
+  it("shows economic priority ranking section before priority dashboard", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    expect(html).toContain("Prodotti da migliorare prima");
+    const economicIndex = html.indexOf("Prodotti da migliorare prima");
+    const priorityIndex = html.indexOf("Priorità Growth Audit");
+    expect(economicIndex).toBeGreaterThan(-1);
+    expect(economicIndex).toBeLessThan(priorityIndex);
+  });
+
   it("puts new scan form in accordion when run exists", () => {
     setupMocks({ withActiveRun: true, withTechnicalScan: true });
     const html = renderPage();

@@ -43,6 +43,9 @@ import {
   buildGrowthAuditAiCoverageStats,
   buildGrowthAuditPageWorkflowSteps,
   buildGrowthAuditProductIntelligenceSummary,
+  buildGrowthAuditEconomicPriorityItem,
+  buildGrowthAuditEconomicPriorityRanking,
+  filterGrowthAuditEconomicPriorityItems,
   getGrowthAuditPriorityLevelLabel,
 } from "./growth-audit-utils";
 
@@ -1521,6 +1524,330 @@ describe("growth-audit-utils", () => {
         priorityActions: [],
       });
       expect(summary.missingData).toContain("GA4 Ecommerce Funnel");
+    });
+  });
+
+  describe("buildGrowthAuditEconomicPriorityItem/Ranking", () => {
+    const baseProductPage: GrowthAuditPage = {
+      id: "p1",
+      runId: "run",
+      projectId: "proj",
+      url: "https://example.com/products/miele",
+      normalizedUrl: "https://example.com/products/miele",
+      pageType: "product",
+      source: "shopify_product",
+      status: "analyzed",
+      priority: "normal",
+      title: "Miele",
+      sourceEntityType: "shopify_product",
+      sourceEntityId: "prod-1",
+    };
+
+    it("returns null for non product pages", () => {
+      const item = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          pageType: "collection",
+          sourceEntityType: "shopify_collection",
+        },
+        findings: [],
+        tasks: [],
+      });
+      expect(item).toBeNull();
+    });
+
+    it("generates high priority for Shopify sales and high finding", () => {
+      const findings: GrowthAuditFinding[] = [
+        {
+          id: "f1",
+          runId: "run",
+          projectId: "proj",
+          pageId: "p1",
+          category: "cro",
+          title: "CTA debole",
+          description: "CTA poco visibile",
+          severity: "high",
+          status: "open",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ];
+      const item = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            shopifyCommerce: {
+              sales: 450,
+              quantitySold: 20,
+              ordersCount: 15,
+              syncedAt: "2026-01-01T00:00:00Z",
+            },
+            searchConsole: {
+              impressions: 2000,
+              ctr: 0.008,
+              position: 10,
+            },
+          },
+        },
+        findings,
+        tasks: [],
+        peerContext: { salesValues: [100, 200, 450] },
+      });
+      expect(item).not.toBeNull();
+      expect(item!.score).toBeGreaterThanOrEqual(60);
+      expect(["high", "maximum"]).toContain(item!.level);
+      expect(item!.reasons.some((r) => r.key === "shopify_sales")).toBe(true);
+    });
+
+    it("generates organic reason for high GSC impressions and low CTR", () => {
+      const item = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            searchConsole: {
+              impressions: 3656,
+              ctr: 0.0055,
+              position: 8,
+              topQueries: [{ query: "miele bio" }],
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+      });
+      expect(item).not.toBeNull();
+      expect(item!.breakdown.organicOpportunity).toBeGreaterThan(0);
+      expect(
+        item!.reasons.some((r) => r.key === "gsc_ctr") ||
+          item!.shortReason.includes("impression"),
+      ).toBe(true);
+    });
+
+    it("generates funnel reason for high itemViews and low purchases", () => {
+      const item = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              itemViews: 10761,
+              itemsAddedToCart: 1061,
+              itemsPurchased: 0,
+              itemRevenue: 50,
+              matchedBy: "shopify_composite_item_id",
+              matchDebug: {
+                shopifyKeys: { productLegacyId: "1", variantLegacyIds: [], skus: [] },
+                matchStatus: "matched",
+                reason: "matched",
+                candidateItems: [],
+              },
+              syncedAt: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+      });
+      expect(item).not.toBeNull();
+      expect(item!.breakdown.ecommerceFunnel).toBeGreaterThan(0);
+      expect(
+        item!.reasons.some((r) => r.key === "funnel_cart_purchase") ||
+          item!.shortReason.includes("conversione"),
+      ).toBe(true);
+    });
+
+    it("generates variant reason for bestVariantByRevenue", () => {
+      const item = buildGrowthAuditEconomicPriorityItem({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            shopifyCommerce: { sales: 200, syncedAt: "2026-01-01T00:00:00Z" },
+            ga4Ecommerce: {
+              itemViews: 500,
+              itemsPurchased: 10,
+              itemRevenue: 300,
+              matchedBy: "shopify_composite_item_id",
+              bestVariantByRevenue: "v500",
+              variantBreakdown: [
+                {
+                  variantLegacyId: "v500",
+                  variantTitle: "500g",
+                  itemRevenue: 200,
+                  itemsPurchased: 8,
+                  matchedBy: "shopify_composite_item_id",
+                },
+                {
+                  variantLegacyId: "v120",
+                  variantTitle: "120g",
+                  itemRevenue: 50,
+                  itemsPurchased: 2,
+                  matchedBy: "shopify_composite_item_id",
+                },
+              ],
+              matchDebug: {
+                shopifyKeys: { productLegacyId: "1", variantLegacyIds: ["v500"], skus: [] },
+                matchStatus: "matched",
+                reason: "matched",
+                candidateItems: [],
+              },
+              syncedAt: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+      });
+      expect(item).not.toBeNull();
+      expect(item!.metrics.bestVariantTitle).toBe("500g");
+      expect(item!.reasons.some((r) => r.key === "best_variant")).toBe(true);
+    });
+
+    it("has low dataConfidence and prudent shortReason when data is missing", () => {
+      const item = buildGrowthAuditEconomicPriorityItem({
+        page: baseProductPage,
+        findings: [],
+        tasks: [],
+      });
+      expect(item).not.toBeNull();
+      expect(item!.breakdown.dataConfidence).toBeLessThan(40);
+      expect(item!.shortReason).toContain("Dati insufficienti");
+      expect(item!.level).not.toBe("maximum");
+    });
+
+    it("ranking sorts by score descending", () => {
+      const pages: GrowthAuditPage[] = [
+        {
+          ...baseProductPage,
+          id: "low",
+          title: "Low priority",
+        },
+        {
+          ...baseProductPage,
+          id: "high",
+          title: "High priority",
+          metadata: {
+            shopifyCommerce: { sales: 800, syncedAt: "2026-01-01T00:00:00Z" },
+            searchConsole: { impressions: 5000, ctr: 0.004, position: 7 },
+            ga4Ecommerce: {
+              itemViews: 2000,
+              itemsAddedToCart: 200,
+              itemsPurchased: 50,
+              itemRevenue: 1200,
+              matchedBy: "item_id",
+              matchDebug: {
+                shopifyKeys: { productLegacyId: "2", variantLegacyIds: [], skus: [] },
+                matchStatus: "matched",
+                reason: "matched",
+                candidateItems: [],
+              },
+              syncedAt: "2026-01-01T00:00:00Z",
+            },
+          },
+        },
+      ];
+      const ranking = buildGrowthAuditEconomicPriorityRanking({
+        pages,
+        findings: [],
+        tasks: [],
+        limit: 10,
+      });
+      expect(ranking.length).toBe(2);
+      expect(ranking[0].pageId).toBe("high");
+      expect(ranking[0].score).toBeGreaterThan(ranking[1].score);
+    });
+
+    it("filter with_sales shows only products with sales or revenue", () => {
+      const items = [
+        {
+          pageId: "a",
+          url: "https://a",
+          title: "A",
+          score: 80,
+          level: "high" as const,
+          label: "Priorità alta",
+          shortReason: "test",
+          reasons: [],
+          breakdown: {
+            businessImpact: 50,
+            organicOpportunity: 0,
+            trafficAndConversion: 0,
+            ecommerceFunnel: 0,
+            technicalAndCroRisk: 0,
+            stockAndAvailability: 0,
+            dataConfidence: 60,
+          },
+          metrics: { sales: 100 },
+        },
+        {
+          pageId: "b",
+          url: "https://b",
+          title: "B",
+          score: 30,
+          level: "low" as const,
+          label: "Priorità bassa",
+          shortReason: "test",
+          reasons: [],
+          breakdown: {
+            businessImpact: 0,
+            organicOpportunity: 0,
+            trafficAndConversion: 0,
+            ecommerceFunnel: 0,
+            technicalAndCroRisk: 0,
+            stockAndAvailability: 0,
+            dataConfidence: 20,
+          },
+          metrics: {},
+        },
+      ];
+      const filtered = filterGrowthAuditEconomicPriorityItems(items, "with_sales");
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].pageId).toBe("a");
+    });
+
+    it("filter incomplete_data shows only low confidence items", () => {
+      const items = [
+        {
+          pageId: "a",
+          url: "https://a",
+          title: "A",
+          score: 80,
+          level: "high" as const,
+          label: "Priorità alta",
+          shortReason: "test",
+          reasons: [],
+          breakdown: {
+            businessImpact: 50,
+            organicOpportunity: 0,
+            trafficAndConversion: 0,
+            ecommerceFunnel: 0,
+            technicalAndCroRisk: 0,
+            stockAndAvailability: 0,
+            dataConfidence: 60,
+          },
+          metrics: {},
+        },
+        {
+          pageId: "b",
+          url: "https://b",
+          title: "B",
+          score: 20,
+          level: "monitor" as const,
+          label: "Monitoraggio",
+          shortReason: "test",
+          reasons: [],
+          breakdown: {
+            businessImpact: 0,
+            organicOpportunity: 0,
+            trafficAndConversion: 0,
+            ecommerceFunnel: 0,
+            technicalAndCroRisk: 0,
+            stockAndAvailability: 0,
+            dataConfidence: 20,
+          },
+          metrics: {},
+        },
+      ];
+      const filtered = filterGrowthAuditEconomicPriorityItems(items, "incomplete_data");
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].pageId).toBe("b");
     });
   });
 });

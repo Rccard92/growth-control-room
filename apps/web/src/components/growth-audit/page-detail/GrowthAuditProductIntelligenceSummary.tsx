@@ -7,7 +7,10 @@ import type {
   GrowthAuditTask,
 } from "@gcr/shared";
 import {
+  buildGrowthAuditEconomicPriorityItem,
   buildGrowthAuditProductIntelligenceSummary,
+  getGrowthAuditEconomicPriorityLevelBadgeClass,
+  getGrowthAuditEconomicPriorityLevelLabel,
   getGrowthAuditProductIntelligenceLevelBadgeClass,
   getGrowthAuditProductIntelligenceLevelLabel,
   type GrowthAuditPriorityAction,
@@ -51,6 +54,11 @@ export function GrowthAuditProductIntelligenceSummary({
     [page, findings, tasks, priorityActions, aiResults, performanceResults, runSummary],
   );
 
+  const economicPriority = useMemo(
+    () => buildGrowthAuditEconomicPriorityItem({ page, findings, tasks }),
+    [page, findings, tasks],
+  );
+
   if (!summary.available) {
     return null;
   }
@@ -84,6 +92,92 @@ export function GrowthAuditProductIntelligenceSummary({
           <p className="growth-audit-product-intelligence__verdict-reason">{summary.mainReason}</p>
         </div>
       </div>
+
+      {economicPriority && (
+        <div className="growth-audit-economic-priority__breakdown growth-audit-product-intelligence__economic">
+          <header className="growth-audit-economic-priority__breakdown-header">
+            <h3 className="growth-audit-economic-priority__breakdown-title">Priorità economica</h3>
+            <span
+              className={getGrowthAuditEconomicPriorityLevelBadgeClass(economicPriority.level)}
+            >
+              {getGrowthAuditEconomicPriorityLevelLabel(economicPriority.level)}
+            </span>
+          </header>
+
+          <div className="growth-audit-economic-priority__breakdown-hero">
+            <div className="growth-audit-economic-priority__score">
+              <span className="growth-audit-economic-priority__score-value">
+                {economicPriority.score}
+              </span>
+              <span className="growth-audit-economic-priority__score-label">
+                Economic Priority Score
+              </span>
+            </div>
+            <p className="growth-audit-economic-priority__reason">{economicPriority.shortReason}</p>
+          </div>
+
+          <div className="growth-audit-economic-priority__breakdown-grid">
+            <div className="growth-audit-economic-priority__breakdown-item">
+              <span>Business</span>
+              <strong>{economicPriority.breakdown.businessImpact}</strong>
+            </div>
+            <div className="growth-audit-economic-priority__breakdown-item">
+              <span>SEO opportunity</span>
+              <strong>{economicPriority.breakdown.organicOpportunity}</strong>
+            </div>
+            <div className="growth-audit-economic-priority__breakdown-item">
+              <span>GA4/Funnel</span>
+              <strong>{economicPriority.breakdown.ecommerceFunnel}</strong>
+            </div>
+            <div className="growth-audit-economic-priority__breakdown-item">
+              <span>CRO/Tech</span>
+              <strong>{economicPriority.breakdown.technicalAndCroRisk}</strong>
+            </div>
+            <div className="growth-audit-economic-priority__breakdown-item">
+              <span>Stock</span>
+              <strong>{economicPriority.breakdown.stockAndAvailability}</strong>
+            </div>
+            <div
+              className={`growth-audit-economic-priority__breakdown-item growth-audit-economic-priority__confidence${
+                economicPriority.breakdown.dataConfidence < 40
+                  ? " growth-audit-economic-priority__confidence--low"
+                  : ""
+              }`}
+            >
+              <span>Data confidence</span>
+              <strong>{economicPriority.breakdown.dataConfidence}</strong>
+            </div>
+          </div>
+
+          {economicPriority.reasons.length > 0 && (
+            <ul className="growth-audit-economic-priority__reasons-list">
+              {economicPriority.reasons.slice(0, 3).map((reason) => (
+                <li key={reason.key} className="growth-audit-economic-priority__reason-item">
+                  {reason.detail}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {economicPriority.metrics.bestVariantTitle &&
+            economicPriority.metrics.bestVariantRevenue != null && (
+              <p className="growth-audit-economic-priority__variant-note">
+                Variante più redditizia: {economicPriority.metrics.bestVariantTitle} ·{" "}
+                {economicPriority.metrics.bestVariantRevenue.toLocaleString("it-IT", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                EUR
+              </p>
+            )}
+
+          {economicPriority.breakdown.stockAndAvailability > 0 && (
+            <p className="growth-audit-economic-priority__stock-warning" role="status">
+              Attenzione: stock o disponibilità potrebbero limitare le vendite su questa pagina.
+            </p>
+          )}
+        </div>
+      )}
 
       {summary.evidence.length > 0 && (
         <div

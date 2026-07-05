@@ -42,6 +42,8 @@ describe("GrowthAuditProductIntelligenceSummary", () => {
 
     expect(html).toContain("Product Intelligence");
     expect(html).toContain("Product Priority Score");
+    expect(html).toContain("Priorità economica");
+    expect(html).toContain("Economic Priority Score");
     expect(html).toContain('id="product-intelligence"');
   });
 

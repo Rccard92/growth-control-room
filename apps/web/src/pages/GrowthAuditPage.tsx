@@ -8,6 +8,7 @@ import type {
 } from "@gcr/shared";
 import { PageHeader } from "../components/PageHeader";
 import { GrowthAuditPriorityDashboard } from "../components/growth-audit/GrowthAuditPriorityDashboard";
+import { GrowthAuditEconomicPriorityPanel } from "../components/growth-audit/GrowthAuditEconomicPriorityPanel";
 import {
   useGrowthAuditFindings,
   useGrowthAuditRun,
@@ -28,6 +29,7 @@ import {
   GROWTH_AUDIT_SCORE_FILTERS,
   GROWTH_AUDIT_STATUS_FILTERS,
   aggregatePageInventory,
+  buildGrowthAuditEconomicPriorityRanking,
   countFindingsByPageId,
   filterInventoryPages,
   filterInventoryPagesByScore,
@@ -261,6 +263,23 @@ export function GrowthAuditPage() {
       pages.length > 0 &&
       resolvedRunId &&
       ["completed", "partial_failed", "failed", "analyzing"].includes(activeRun.status),
+  );
+
+  const productPages = useMemo(
+    () => filterInventoryPages(pages, "product"),
+    [pages],
+  );
+
+  const economicPriorityRanking = useMemo(
+    () =>
+      buildGrowthAuditEconomicPriorityRanking({
+        pages,
+        findings,
+        tasks,
+        limit: 50,
+        runSummary: summary,
+      }),
+    [pages, findings, tasks, summary],
   );
 
   const lastScanLabel =
@@ -982,6 +1001,14 @@ export function GrowthAuditPage() {
             </>
           )}
         </section>
+      )}
+
+      {showPriorityDashboard && productPages.length > 0 && resolvedRunId && (
+        <GrowthAuditEconomicPriorityPanel
+          projectId={projectId}
+          runId={resolvedRunId}
+          items={economicPriorityRanking}
+        />
       )}
 
       {showPriorityDashboard && resolvedRunId && (
