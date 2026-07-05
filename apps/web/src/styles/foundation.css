@@ -361,6 +361,24 @@
   border-color: rgba(34, 211, 238, 0.25);
 }
 
+.gcr-badge--needs_setup {
+  color: rgba(99, 179, 237, 0.95);
+  background: rgba(99, 179, 237, 0.15);
+  border-color: rgba(99, 179, 237, 0.25);
+}
+
+.gcr-badge--missing_credentials {
+  color: rgba(237, 200, 140, 0.95);
+  background: rgba(237, 180, 99, 0.12);
+  border-color: rgba(237, 180, 99, 0.25);
+}
+
+.gcr-badge--setup_incomplete {
+  color: rgba(237, 200, 140, 0.95);
+  background: rgba(237, 180, 99, 0.12);
+  border-color: rgba(237, 180, 99, 0.25);
+}
+
 /* Grid layouts */
 .gcr-grid {
   display: grid;

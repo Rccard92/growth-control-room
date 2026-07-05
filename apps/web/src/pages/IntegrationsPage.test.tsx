@@ -36,30 +36,47 @@ vi.mock("../hooks/useGoogleIntegrations", () => ({
   useStartGoogleOAuth: useStartGoogleOAuthMock,
 }));
 
-function setupMocks() {
+vi.mock("../components/IntegrationGraph", () => ({
+  IntegrationGraph: () => null,
+}));
+
+const googleStatus = {
+  pagespeed: { status: "connected", configured: true },
+  crux: { status: "connected", configured: true },
+  oauth: { status: "connected", configured: true },
+  searchConsole: { status: "needs_setup", configured: true },
+  analytics: { status: "needs_setup", configured: true },
+  googleAds: {
+    status: "setup_incomplete",
+    configured: true,
+    message: "Developer Token Google Ads mancante.",
+  },
+};
+
+function countOccurrences(value: string, needle: string): number {
+  return value.split(needle).length - 1;
+}
+
+function setupMocks(options?: { shopifyStatus?: "connected" | "not_connected" }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
     data: { id: "proj-1", name: "Solmielato" },
     isLoading: false,
   });
   useProjectIntegrationsMock.mockReturnValue({
-    data: [{ id: "int-1", projectId: "proj-1", provider: "shopify", status: "connected" }],
+    data: [
+      {
+        id: "int-1",
+        projectId: "proj-1",
+        provider: "shopify",
+        status: options?.shopifyStatus ?? "connected",
+      },
+    ],
     isLoading: false,
     error: null,
   });
   useGoogleIntegrationStatusMock.mockReturnValue({
-    data: {
-      pagespeed: { status: "connected", configured: true },
-      crux: { status: "connected", configured: true },
-      oauth: { status: "connected", configured: true },
-      searchConsole: { status: "needs_setup", configured: true },
-      analytics: { status: "needs_setup", configured: true },
-      googleAds: {
-        status: "setup_incomplete",
-        configured: true,
-        message: "Developer Token Google Ads mancante.",
-      },
-    },
+    data: googleStatus,
     isLoading: false,
   });
   useStartGoogleOAuthMock.mockReturnValue({
@@ -76,29 +93,57 @@ function renderPage() {
   );
 }
 
-describe("IntegrationsPage Google section", () => {
-  it("shows Google Data Sources section with PageSpeed and CrUX configured", () => {
+describe("IntegrationsPage unified grid", () => {
+  it("does not render the Google Data Sources section", () => {
     setupMocks();
     const html = renderPage();
-    expect(html).toContain("Google Data Sources");
-    expect(html).toContain("PageSpeed Insights");
-    expect(html).toContain("Chrome UX Report");
-    expect(html).toContain("Configurata");
+    expect(html).not.toContain("Google Data Sources");
   });
 
-  it("shows Search Console needs setup and Collega Google CTA", () => {
+  it("renders each Google provider only once in the main grid", () => {
     setupMocks();
     const html = renderPage();
-    expect(html).toContain("Search Console");
+
+    expect(countOccurrences(html, "Google Search Console")).toBe(1);
+    expect(countOccurrences(html, "Google Analytics 4")).toBe(1);
+    expect(countOccurrences(html, "Google Ads")).toBe(1);
+  });
+
+  it("renders PageSpeed and CrUX in the main grid as configured", () => {
+    setupMocks();
+    const html = renderPage();
+
+    expect(html).toContain("PageSpeed Insights");
+    expect(html).toContain("Chrome UX Report");
+    expect(countOccurrences(html, "Configurata")).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows Collega Google for Search Console needs_setup", () => {
+    setupMocks();
+    const html = renderPage();
+
     expect(html).toContain("Da collegare");
     expect(html).toContain("Collega Google");
   });
 
-  it("shows Google Ads developer token missing note", () => {
+  it("shows developer token missing for Google Ads setup_incomplete", () => {
     setupMocks();
     const html = renderPage();
-    expect(html).toContain("Google Ads");
+
     expect(html).toContain("Developer Token mancante");
     expect(html).toContain("Setup incompleto");
+    expect(html).toContain("GOOGLE_ADS_DEVELOPER_TOKEN");
+  });
+
+  it("shows Gestisci when Shopify is connected", () => {
+    setupMocks({ shopifyStatus: "connected" });
+    const html = renderPage();
+    expect(html).toContain("Gestisci");
+  });
+
+  it("shows Connetti when Shopify is not connected", () => {
+    setupMocks({ shopifyStatus: "not_connected" });
+    const html = renderPage();
+    expect(html).toContain("Connetti");
   });
 });

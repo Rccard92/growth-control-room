@@ -1,4 +1,12 @@
-type BadgeVariant = "connected" | "not_connected" | "coming_soon" | "error" | "active";
+type BadgeVariant =
+  | "connected"
+  | "not_connected"
+  | "coming_soon"
+  | "error"
+  | "active"
+  | "needs_setup"
+  | "missing_credentials"
+  | "setup_incomplete";
 
 const LABELS: Record<BadgeVariant, string> = {
   connected: "Connessa",
@@ -6,6 +14,9 @@ const LABELS: Record<BadgeVariant, string> = {
   coming_soon: "Coming soon",
   error: "Errore",
   active: "Attivo",
+  needs_setup: "Da collegare",
+  missing_credentials: "Mancante",
+  setup_incomplete: "Setup incompleto",
 };
 
 interface StatusBadgeProps {
@@ -20,3 +31,5 @@ export function StatusBadge({ variant, label }: StatusBadgeProps) {
     </span>
   );
 }
+
+export type { BadgeVariant };

@@ -42,6 +42,7 @@ export type {
   Integration,
   IntegrationProvider,
   IntegrationStatus,
+  IntegrationUiStatus,
   IntegrationMeta,
 } from "./types/integration";
 export type {

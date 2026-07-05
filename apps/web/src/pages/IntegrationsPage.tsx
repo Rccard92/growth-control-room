@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useParams, useSearchParams } from "react-router-dom";
 import { INTEGRATIONS } from "@gcr/shared";
-import { GoogleIntegrationCard } from "../components/GoogleIntegrationCard";
 import { IntegrationCard } from "../components/IntegrationCard";
 import { IntegrationGraph } from "../components/IntegrationGraph";
 import { PageHeader } from "../components/PageHeader";
@@ -10,6 +9,7 @@ import {
   useGoogleIntegrationStatus,
   useStartGoogleOAuth,
 } from "../hooks/useGoogleIntegrations";
+import { getIntegrationCardProps } from "../lib/integration-card-props";
 import { useProject, useProjectIntegrations } from "../hooks/useProjects";
 import { APP_ROUTES } from "../routes/config";
 
@@ -57,11 +57,13 @@ export function IntegrationsPage() {
   const oauthConnectDisabled =
     startGoogleOAuth.isPending || googleStatus?.oauth.status === "missing_credentials";
 
+  const isGridLoading = isLoading || isGoogleLoading;
+
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <PageHeader
         title="Integration Center"
-        subtitle="Collega le piattaforme e-commerce e marketing al progetto"
+        subtitle="Collega e monitora le fonti dati del progetto."
         breadcrumb={[
           { label: "Progetti", href: APP_ROUTES.projects },
           { label: project?.name ?? id ?? "", href: id ? APP_ROUTES.project(id) : undefined },
@@ -78,106 +80,31 @@ export function IntegrationsPage() {
         </div>
       )}
 
-      {isLoading && <div className="gcr-skeleton" style={{ height: 120 }} />}
       {error && <div className="gcr-alert gcr-alert--error">{error.message}</div>}
 
-      <div className="gcr-grid gcr-grid--auto" style={{ marginBottom: "2rem" }}>
-        {INTEGRATIONS.map((meta) => {
-          const isShopify = meta.provider === "shopify";
-          const apiStatus = statusMap.get(meta.provider);
+      <p className="integrations-page__hint">
+        Le fonti Google usano API key per PageSpeed/CrUX e OAuth per Search Console, GA4 e Ads.
+      </p>
 
-          if (isShopify) {
-            const connected = apiStatus === "connected";
-            return (
-              <IntegrationCard
-                key={meta.provider}
-                meta={meta}
-                status={apiStatus ?? "not_connected"}
-                href={
-                  connected
-                    ? APP_ROUTES.projectShopify(id!)
-                    : APP_ROUTES.projectShopifyConnect(id!)
-                }
-                actionLabel={connected ? "Gestisci" : "Connetti"}
-              />
-            );
-          }
+      {isGridLoading && <div className="gcr-skeleton" style={{ height: 120 }} />}
 
-          return (
+      {!isGridLoading && id && (
+        <div className="gcr-grid gcr-grid--auto" style={{ marginBottom: "2rem" }}>
+          {INTEGRATIONS.map((meta) => (
             <IntegrationCard
               key={meta.provider}
-              meta={meta}
-              status="coming_soon"
-              actionLabel="Coming soon"
-              disabled
+              {...getIntegrationCardProps({
+                meta,
+                apiStatus: statusMap.get(meta.provider),
+                googleStatus,
+                oauthConnectDisabled,
+                handleConnectGoogle: () => void handleConnectGoogle(),
+                projectId: id,
+              })}
             />
-          );
-        })}
-      </div>
-
-      <section className="google-integrations-section">
-        <h2 className="google-integrations-section__title">Google Data Sources</h2>
-        <p className="google-integrations-section__subtitle">
-          Stato delle integrazioni Google per performance, SEO e advertising.
-        </p>
-
-        {isGoogleLoading && <div className="gcr-skeleton" style={{ height: 120 }} />}
-
-        {googleStatus && (
-          <div className="google-integrations-section__grid">
-            <GoogleIntegrationCard
-              title="PageSpeed Insights"
-              description="Performance e Lighthouse lab data per le pagine prioritarie."
-              icon="⚡"
-              status={googleStatus.pagespeed}
-            />
-            <GoogleIntegrationCard
-              title="Chrome UX Report"
-              description="Core Web Vitals real-user per capire l'esperienza reale."
-              icon="📊"
-              status={googleStatus.crux}
-            />
-            <GoogleIntegrationCard
-              title="Search Console"
-              description="Query, CTR, posizionamento e indicizzazione."
-              icon="🔎"
-              status={googleStatus.searchConsole}
-              actionLabel="Collega Google"
-              onAction={() => void handleConnectGoogle()}
-              disabled={oauthConnectDisabled}
-            />
-            <GoogleIntegrationCard
-              title="Google Analytics 4"
-              description="Traffico, conversioni e priorità economiche."
-              icon="📈"
-              status={googleStatus.analytics}
-              actionLabel="Collega Google"
-              onAction={() => void handleConnectGoogle()}
-              disabled={oauthConnectDisabled}
-            />
-            <GoogleIntegrationCard
-              title="Google Ads"
-              description="Landing ads e priorità economiche per campagne."
-              icon="🎯"
-              status={googleStatus.googleAds}
-              actionLabel={
-                googleStatus.googleAds.status === "setup_incomplete"
-                  ? "Configura token Google Ads"
-                  : "Collega Google"
-              }
-              onAction={() => void handleConnectGoogle()}
-              disabled={
-                oauthConnectDisabled || googleStatus.googleAds.status === "setup_incomplete"
-              }
-              note={
-                googleStatus.googleAds.status === "setup_incomplete"
-                  ? "Developer Token mancante"
-                  : undefined
-              }
-            />
-          </div>
-        )}
-      </section>
+          ))}
+        </div>
+      )}
 
       <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--gcr-text)", marginBottom: "1rem" }}>
         Integration Graph

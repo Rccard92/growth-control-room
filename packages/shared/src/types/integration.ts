@@ -1,14 +1,23 @@
 export type IntegrationProvider =
   | "shopify"
-  | "meta_ads"
-  | "google_ads"
-  | "klaviyo"
-  | "ga4"
   | "google_search_console"
+  | "ga4"
+  | "google_ads"
+  | "google_pagespeed"
+  | "google_crux"
+  | "meta_ads"
+  | "klaviyo"
   | "merchant_center"
   | "tiktok_ads";
 
 export type IntegrationStatus = "not_connected" | "connected" | "error";
+
+export type IntegrationUiStatus =
+  | IntegrationStatus
+  | "coming_soon"
+  | "needs_setup"
+  | "missing_credentials"
+  | "setup_incomplete";
 
 export interface Integration {
   id: string | null;

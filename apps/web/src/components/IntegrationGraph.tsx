@@ -13,6 +13,11 @@ interface IntegrationGraphProps {
   integrations: Integration[];
 }
 
+const GRAPH_PROVIDERS = INTEGRATIONS.filter(
+  (integration) =>
+    integration.provider !== "google_pagespeed" && integration.provider !== "google_crux",
+);
+
 const PROVIDER_POSITIONS: Record<string, { x: number; y: number }> = {
   shopify: { x: 0, y: -120 },
   meta_ads: { x: 120, y: -60 },
@@ -91,7 +96,7 @@ export function IntegrationGraph({ projectName, integrations }: IntegrationGraph
 
     const graphEdges: Edge[] = [];
 
-    for (const integration of INTEGRATIONS) {
+    for (const integration of GRAPH_PROVIDERS) {
       const provider = integration.provider;
       const apiStatus = statusMap.get(provider);
       const status =
