@@ -191,4 +191,51 @@ describe("GrowthAuditPageWorkspaceGa4EcommerceSection", () => {
     expect(html).toContain("Nessun dato ecommerce item-level trovato per questo periodo");
     expect(html).toContain("Prova 90 giorni");
   });
+
+  it("renders composite match label, funnel and GA4 itemId without no-match block", () => {
+    const compositeItemId = "shopify_IT_14916300964188_54906504773980";
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageWorkspaceGa4EcommerceSection
+        page={{
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 10089,
+              itemsAddedToCart: 1061,
+              itemsCheckedOut: 400,
+              itemsPurchased: 307,
+              itemRevenue: 2425.3,
+              viewToCartRate: 0.1052,
+              cartToPurchaseRate: 0.2893,
+              matchedBy: "shopify_composite_item_id",
+              matchedItemIds: [compositeItemId],
+              matchDebug: {
+                shopifyKeys: {
+                  productGid: "gid://shopify/Product/14916300964188",
+                  productLegacyId: "14916300964188",
+                  variantLegacyIds: ["54906504773980"],
+                  skus: [],
+                  titleNormalized: "miele",
+                  handleNormalized: "miele",
+                },
+                matchedBy: "shopify_composite_item_id",
+                matchStatus: "matched",
+                reason:
+                  "Prodotto abbinato tramite itemId Shopify composto: product legacy id e/o variant id coincidono.",
+                candidateItems: [],
+              },
+              syncedAt: "2026-06-13T10:00:00.000Z",
+            },
+          },
+        }}
+      />,
+    );
+    expect(html).toContain("Shopify composite itemId");
+    expect(html).toContain("itemId GA4");
+    expect(html).toContain(compositeItemId);
+    expect(html).toContain("View item");
+    expect(html).toContain("Purchase");
+    expect(html).not.toContain("Dati GA4 non abbinati a questo prodotto");
+  });
 });

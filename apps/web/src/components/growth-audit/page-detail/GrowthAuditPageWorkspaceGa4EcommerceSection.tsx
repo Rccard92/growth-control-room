@@ -32,6 +32,8 @@ function formatRate(value?: number | null): string {
 
 function formatMatchTypeLabel(matchedBy?: string | null): string {
   switch (matchedBy) {
+    case "shopify_composite_item_id":
+      return "Shopify composite itemId";
     case "item_id":
       return "item_id";
     case "variant_id":
@@ -43,6 +45,13 @@ function formatMatchTypeLabel(matchedBy?: string | null): string {
     default:
       return matchedBy ?? "none";
   }
+}
+
+const SHOPIFY_COMPOSITE_ITEM_ID_RE = /^shopify_[A-Za-z]{2}_\d+_\d+$/i;
+
+function findCompositeGa4ItemId(itemIds?: string[] | null): string | null {
+  if (!itemIds?.length) return null;
+  return itemIds.find((itemId) => SHOPIFY_COMPOSITE_ITEM_ID_RE.test(itemId)) ?? null;
 }
 
 function buildFunnelDiagnosis(
@@ -86,9 +95,13 @@ function hasGa4EcommerceZeroData(
   );
 }
 
-function renderMatchDebugBlock(matchDebug: GrowthAuditGa4MatchDebug) {
+function renderMatchDebugBlock(
+  matchDebug: GrowthAuditGa4MatchDebug,
+  matchedItemIds?: string[] | null,
+) {
   const keys = matchDebug.shopifyKeys;
   const isNoMatch = matchDebug.matchStatus === "no_reliable_match";
+  const compositeItemId = findCompositeGa4ItemId(matchedItemIds);
 
   return (
     <div className="growth-audit-ga4-funnel__match-debug">
@@ -137,6 +150,12 @@ function renderMatchDebugBlock(matchDebug: GrowthAuditGa4MatchDebug) {
           <span>Handle</span>
           <strong>{keys.handleNormalized || "—"}</strong>
         </div>
+        {compositeItemId && (
+          <div>
+            <span>itemId GA4</span>
+            <strong>{compositeItemId}</strong>
+          </div>
+        )}
         <div>
           <span>Match status</span>
           <strong>{matchDebug.matchStatus}</strong>
@@ -238,7 +257,8 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
 
       {funnelMeta ? (
         <>
-          {funnelMeta.matchDebug && renderMatchDebugBlock(funnelMeta.matchDebug)}
+          {funnelMeta.matchDebug &&
+            renderMatchDebugBlock(funnelMeta.matchDebug, funnelMeta.matchedItemIds)}
 
           {!isNoReliableMatch && (
             <>

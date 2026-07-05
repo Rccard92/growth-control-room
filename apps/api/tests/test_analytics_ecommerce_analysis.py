@@ -24,6 +24,7 @@ from app.services.growth_audit.analytics_ecommerce_analysis import (
 )
 from app.services.growth_audit.exceptions import GrowthAuditValidationError
 from app.services.growth_audit.ga4_item_product_matching import (
+    _parse_shopify_composite_item_id,
     build_product_match_profiles,
     match_ga4_rows_to_pages,
 )
@@ -150,6 +151,202 @@ def test_match_by_variant_id() -> None:
     )
     assert unmatched == 0
     assert aggregates[page.id]["matchedBy"] == "variant_id"
+
+
+def test_parse_shopify_composite_item_id_valid() -> None:
+    parsed = _parse_shopify_composite_item_id(
+        "shopify_IT_14916300964188_54906504773980"
+    )
+    assert parsed == {
+        "productLegacyId": "14916300964188",
+        "variantLegacyId": "54906504773980",
+    }
+    parsed_case_insensitive = _parse_shopify_composite_item_id(
+        "Shopify_IT_14916300964188_54906504773980"
+    )
+    assert parsed_case_insensitive == parsed
+
+
+def test_parse_shopify_composite_item_id_invalid() -> None:
+    assert _parse_shopify_composite_item_id("abc") is None
+    assert _parse_shopify_composite_item_id("shopify_IT_invalid") is None
+    assert _parse_shopify_composite_item_id("shopify_IT_123") is None
+
+
+def test_match_by_shopify_composite_product_legacy_id() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+    )
+    profiles = build_product_match_profiles([page])
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
+        profiles,
+        [
+            {
+                "itemId": "shopify_IT_14916300964188_54906504773980",
+                "itemName": "Polline biologico",
+                "itemVariant": "",
+                "itemsViewed": 50,
+                "itemsAddedToCart": 5,
+                "itemsPurchased": 1,
+                "itemRevenue": 20.0,
+            }
+        ],
+    )
+    assert unmatched == 0
+    assert ambiguous == 0
+    assert aggregates[page.id]["matchedBy"] == "shopify_composite_item_id"
+    assert "shopify_IT_14916300964188_54906504773980" in aggregates[page.id]["matchedItemIds"]
+
+
+def test_match_by_shopify_composite_variant_id() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/999",
+    )
+    profiles = build_product_match_profiles(
+        [page],
+        variant_data_by_gid={
+            "gid://shopify/Product/999": {
+                "variantLegacyIds": ["54906504773980"],
+                "skus": [],
+            }
+        },
+    )
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
+        profiles,
+        [
+            {
+                "itemId": "shopify_IT_14916300964188_54906504773980",
+                "itemName": "Variant match",
+                "itemVariant": "500g",
+                "itemsViewed": 30,
+                "itemsAddedToCart": 3,
+                "itemsPurchased": 1,
+                "itemRevenue": 15.0,
+            }
+        ],
+    )
+    assert unmatched == 0
+    assert aggregates[page.id]["matchedBy"] == "shopify_composite_item_id"
+
+
+def test_ambiguous_shopify_composite_item_id_does_not_assign() -> None:
+    project_id = uuid4()
+    run_id = uuid4()
+    pages = [
+        _build_product_page(
+            project_id=project_id,
+            run_id=run_id,
+            page_id=uuid4(),
+            product_gid="gid://shopify/Product/14916300964188",
+            title="Polline A",
+        ),
+        _build_product_page(
+            project_id=project_id,
+            run_id=run_id,
+            page_id=uuid4(),
+            product_gid="gid://shopify/Product/14916300964188",
+            title="Polline B",
+        ),
+    ]
+    profiles = build_product_match_profiles(pages)
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
+        profiles,
+        [
+            {
+                "itemId": "shopify_IT_14916300964188_54906504773980",
+                "itemName": "Polline",
+                "itemVariant": "",
+                "itemsViewed": 40,
+                "itemsAddedToCart": 3,
+                "itemsPurchased": 1,
+                "itemRevenue": 20,
+            }
+        ],
+    )
+    assert aggregates == {}
+    assert unmatched == 1
+    assert ambiguous == 1
+
+
+def test_composite_match_excludes_candidate_items() -> None:
+    from app.services.growth_audit.ga4_item_product_matching import (
+        build_page_match_debug,
+        find_potential_unmatched_candidates_for_profile,
+    )
+
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+        title="Polline biologico",
+    )
+    profiles = build_product_match_profiles([page])
+    rows = [
+        {
+            "itemId": "shopify_IT_14916300964188_54906504773980",
+            "itemName": "Polline biologico extra",
+            "itemVariant": "",
+            "itemsViewed": 120,
+            "itemsAddedToCart": 8,
+            "itemsPurchased": 2,
+            "itemRevenue": 40.0,
+        }
+    ]
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(profiles, rows)
+    candidates = find_potential_unmatched_candidates_for_profile(profiles[0], rows)
+    debug = build_page_match_debug(profiles[0], aggregate=aggregates.get(page.id), rows=rows)
+
+    assert unmatched == 0
+    assert aggregates[page.id]["itemViews"] == 120
+    assert candidates == []
+    assert debug["matchStatus"] == "matched"
+    assert debug["matchedBy"] == "shopify_composite_item_id"
+    assert debug["candidateItems"] == []
+    assert "itemId Shopify composto" in debug["reason"]
+
+
+def test_polline_real_shopify_composite_match_metrics() -> None:
+    page = _build_product_page(
+        project_id=uuid4(),
+        run_id=uuid4(),
+        product_gid="gid://shopify/Product/14916300964188",
+        title="Polline biologico",
+    )
+    profiles = build_product_match_profiles(
+        [page],
+        variant_data_by_gid={
+            "gid://shopify/Product/14916300964188": {
+                "variantLegacyIds": ["54906504773980"],
+                "skus": [],
+            }
+        },
+    )
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
+        profiles,
+        [
+            {
+                "itemId": "shopify_IT_14916300964188_54906504773980",
+                "itemName": "Polline biologico",
+                "itemVariant": "",
+                "itemsViewed": 10089,
+                "itemsAddedToCart": 1061,
+                "itemsCheckedOut": 400,
+                "itemsPurchased": 307,
+                "itemRevenue": 2425.30,
+            }
+        ],
+    )
+    assert unmatched == 0
+    assert ambiguous == 0
+    assert aggregates[page.id]["matchedBy"] == "shopify_composite_item_id"
+    assert aggregates[page.id]["itemViews"] == 10089
+    assert aggregates[page.id]["itemsAddedToCart"] == 1061
+    assert aggregates[page.id]["itemsPurchased"] == 307
+    assert aggregates[page.id]["itemRevenue"] == 2425.30
 
 
 def test_match_by_normalized_item_name() -> None:
@@ -308,6 +505,13 @@ def test_summary_includes_matching_mode_strict() -> None:
     assert summary["ambiguousItemsCount"] == 1
     assert summary["unmatchedItems"] == 2
     assert summary["matchedProducts"] == 1
+    assert summary["matchingSupportedPatterns"] == [
+        "shopify_composite_item_id",
+        "product_legacy_id",
+        "variant_legacy_id",
+        "sku",
+        "item_name_exact",
+    ]
 
 
 def test_build_page_metadata_zero_safe_rates() -> None:

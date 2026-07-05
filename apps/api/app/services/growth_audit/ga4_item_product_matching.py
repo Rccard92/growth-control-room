@@ -10,7 +10,18 @@ from uuid import UUID
 
 from app.models.growth_audit import GrowthAuditPage
 
-MATCH_PRIORITY = ("item_id", "variant_id", "sku", "item_name")
+MATCH_PRIORITY = (
+    "shopify_composite_item_id",
+    "item_id",
+    "variant_id",
+    "sku",
+    "item_name",
+)
+
+_SHOPIFY_COMPOSITE_ITEM_ID_RE = re.compile(
+    r"^shopify_([A-Za-z]{2})_(\d+)_(\d+)$",
+    re.IGNORECASE,
+)
 
 
 def _normalize_match_text(value: str | None) -> str:
@@ -27,6 +38,32 @@ def _extract_shopify_legacy_id(gid: str | None) -> str | None:
         return None
     match = re.search(r"/(\d+)$", gid.strip())
     return match.group(1) if match else None
+
+
+def _parse_shopify_composite_item_id(item_id: str) -> dict[str, str] | None:
+    normalized = (item_id or "").strip()
+    if not normalized:
+        return None
+    match = _SHOPIFY_COMPOSITE_ITEM_ID_RE.match(normalized)
+    if not match:
+        return None
+    return {
+        "productLegacyId": match.group(2),
+        "variantLegacyId": match.group(3),
+    }
+
+
+def _profile_matches_composite_item_id(
+    profile: ProductMatchProfile,
+    parsed: dict[str, str],
+) -> bool:
+    product_legacy_id = parsed.get("productLegacyId")
+    variant_legacy_id = parsed.get("variantLegacyId")
+    if product_legacy_id and profile.product_legacy_id == product_legacy_id:
+        return True
+    if variant_legacy_id and variant_legacy_id in profile.variant_legacy_ids:
+        return True
+    return False
 
 
 @dataclass
@@ -157,11 +194,18 @@ def build_page_match_debug(
     matched_by = (aggregate or {}).get("matchedBy")
 
     if aggregate and matched_by and matched_by != "none":
+        if matched_by == "shopify_composite_item_id":
+            reason = (
+                "Prodotto abbinato tramite itemId Shopify composto: "
+                "product legacy id e/o variant id coincidono."
+            )
+        else:
+            reason = f"Prodotto abbinato tramite {matched_by}."
         return {
             "shopifyKeys": shopify_keys,
             "matchedBy": matched_by,
             "matchStatus": "matched",
-            "reason": f"Prodotto abbinato tramite {matched_by}.",
+            "reason": reason,
             "candidateItems": [],
         }
 
@@ -246,6 +290,19 @@ def _find_profiles_by_item_id(
     if not normalized_item_id or normalized_item_id == "(not set)":
         return []
 
+    parsed_composite = _parse_shopify_composite_item_id(normalized_item_id)
+    if parsed_composite:
+        composite_matches: list[ProductMatchProfile] = []
+        seen_page_ids: set[UUID] = set()
+        for profile in profiles:
+            if profile.page_id in seen_page_ids:
+                continue
+            if _profile_matches_composite_item_id(profile, parsed_composite):
+                composite_matches.append(profile)
+                seen_page_ids.add(profile.page_id)
+        if composite_matches:
+            return composite_matches
+
     matches: list[ProductMatchProfile] = []
     item_id_lower = normalized_item_id.lower()
 
@@ -287,6 +344,10 @@ def _resolve_match_type(
 ) -> str | None:
     normalized_item_id = item_id.strip()
     item_id_lower = normalized_item_id.lower()
+
+    parsed_composite = _parse_shopify_composite_item_id(normalized_item_id)
+    if parsed_composite and _profile_matches_composite_item_id(profile, parsed_composite):
+        return "shopify_composite_item_id"
 
     if profile.product_legacy_id and profile.product_legacy_id == normalized_item_id:
         return "item_id"

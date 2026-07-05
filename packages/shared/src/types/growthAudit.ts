@@ -287,6 +287,7 @@ export interface GrowthAuditRunGa4EcommerceSummary {
   ambiguousItemsCount?: number;
   matchingMode?: string;
   matchingWarning?: string;
+  matchingSupportedPatterns?: string[];
   highViewLowCartProducts?: number;
   highCartLowPurchaseProducts?: number;
   topFunnelProducts?: Array<{

@@ -374,6 +374,13 @@ def _compute_run_ga4_ecommerce_summary(
             "I dati item-level sono assegnati solo quando item_id, variant_id, SKU o "
             "nome prodotto coincidono in modo affidabile."
         ),
+        "matchingSupportedPatterns": [
+            "shopify_composite_item_id",
+            "product_legacy_id",
+            "variant_legacy_id",
+            "sku",
+            "item_name_exact",
+        ],
         "highViewLowCartProducts": high_view_low_cart_products,
         "highCartLowPurchaseProducts": high_cart_low_purchase_products,
         "topFunnelProducts": [item[1] for item in top_candidates[:10]],
