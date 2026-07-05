@@ -251,12 +251,15 @@ describe("GrowthAuditPageDetailPage", () => {
   it("renders priority section before Shopify with workspace anchors", () => {
     setupDetailMocks();
     const html = renderDetailPage();
+    const productIntelligenceIndex = indexOfOrFail(html, 'id="product-intelligence"');
     const priorityIndex = indexOfOrFail(html, 'id="priority-actions"');
     const shopifyIndex = indexOfOrFail(html, 'id="shopify-edit"');
     const performanceIndex = indexOfOrFail(html, 'id="performance"');
     const searchConsoleIndex = indexOfOrFail(html, 'id="search-console"');
     const analyticsIndex = indexOfOrFail(html, 'id="analytics"');
     const aiIndex = indexOfOrFail(html, 'id="ai-geo-cro"');
+    expect(html).toContain("Product Intelligence");
+    expect(productIntelligenceIndex).toBeLessThan(priorityIndex);
     expect(priorityIndex).toBeLessThan(shopifyIndex);
     expect(shopifyIndex).toBeLessThan(performanceIndex);
     expect(performanceIndex).toBeLessThan(searchConsoleIndex);

@@ -40,6 +40,7 @@ describe("GrowthAuditPageWorkspaceSidebar", () => {
 
     expect(html).toContain("Workflow consigliato");
     expect(html).toContain("Collegamenti rapidi");
+    expect(html).toContain("Product Intelligence");
     expect(html).toContain("Cosa sistemare prima");
     expect(html).toContain("Modifica Shopify");
     expect(html).toContain("AI/GEO/CRO");

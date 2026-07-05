@@ -2700,8 +2700,15 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       ? "available"
       : "todo";
 
+  const isProductPage = isGrowthAuditProductPage(page);
+
   return [
-    { key: "priority", label: "Priorità", status: priorityStatus, anchorId: "priority-actions" },
+    {
+      key: "priority",
+      label: isProductPage ? "Valuta priorità" : "Priorità",
+      status: priorityStatus,
+      anchorId: isProductPage ? "product-intelligence" : "priority-actions",
+    },
     { key: "edit", label: "Modifica", status: modifyStatus, anchorId: "shopify-edit" },
     { key: "performance", label: "Performance", status: performanceStatus, anchorId: "performance" },
     {
@@ -2732,4 +2739,765 @@ export function getGrowthAuditWorkflowStepStatusLabel(
     recommended: "Consigliato",
   };
   return labels[status];
+}
+
+export type GrowthAuditProductIntelligenceLevel =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "monitor";
+
+export type GrowthAuditProductIntelligenceSignal = {
+  key: string;
+  label: string;
+  value: string;
+  tone: "good" | "warning" | "danger" | "neutral";
+  explanation: string;
+};
+
+export type GrowthAuditProductIntelligenceAction = {
+  title: string;
+  reason: string;
+  expectedImpact: string;
+  whereToFix: string;
+  howToValidate: string;
+};
+
+export type GrowthAuditProductIntelligenceSummary = {
+  available: boolean;
+  level: GrowthAuditProductIntelligenceLevel;
+  score: number;
+  title: string;
+  verdict: string;
+  mainReason: string;
+  evidence: GrowthAuditProductIntelligenceSignal[];
+  missingData: string[];
+  recommendedActions: GrowthAuditProductIntelligenceAction[];
+};
+
+const PRODUCT_INTELLIGENCE_LEVEL_LABELS: Record<GrowthAuditProductIntelligenceLevel, string> = {
+  critical: "Priorità massima",
+  high: "Priorità alta",
+  medium: "Priorità media",
+  low: "Priorità bassa",
+  monitor: "Monitoraggio",
+};
+
+const CWV_LCP_NEEDS_IMPROVEMENT_MS = 2500;
+const CWV_CLS_NEEDS_IMPROVEMENT = 0.1;
+const CWV_INP_NEEDS_IMPROVEMENT_MS = 200;
+
+export function isGrowthAuditProductPage(page: GrowthAuditPage): boolean {
+  return page.pageType === "product" || page.sourceEntityType === "shopify_product";
+}
+
+export function getGrowthAuditProductIntelligenceLevelLabel(
+  level: GrowthAuditProductIntelligenceLevel,
+): string {
+  return PRODUCT_INTELLIGENCE_LEVEL_LABELS[level];
+}
+
+export function getGrowthAuditProductIntelligenceLevelBadgeClass(
+  level: GrowthAuditProductIntelligenceLevel,
+): string {
+  return `growth-audit-product-intelligence__priority-badge growth-audit-product-intelligence__priority-badge--${level}`;
+}
+
+function _getLatestCompletedPageResult(
+  results: GrowthAuditPageResult[] | undefined,
+): GrowthAuditPageResult | null {
+  const completed = (results ?? []).filter((result) => result.status === "completed");
+  if (completed.length === 0) return null;
+  return completed.sort((a, b) => {
+    const aTime = a.completedAt ?? a.createdAt ?? "";
+    const bTime = b.completedAt ?? b.createdAt ?? "";
+    return bTime.localeCompare(aTime);
+  })[0];
+}
+
+type PerformanceArtifactsSnapshot = {
+  performanceScore: number | null;
+  lcp: number | null;
+  cls: number | null;
+  inp: number | null;
+};
+
+function _getProductIntelligencePerformanceSnapshot(
+  page: GrowthAuditPage,
+  performanceResults?: GrowthAuditPageResult[],
+): PerformanceArtifactsSnapshot {
+  const performanceMeta = getGrowthAuditPagePerformanceMetadata(page);
+  const latestResult = _getLatestCompletedPageResult(performanceResults);
+  const artifacts = latestResult?.artifacts as
+    | {
+        pagespeed?: { performanceScore?: number | null; lcp?: number | null; cls?: number | null };
+        crux?: {
+          lcpP75?: number | null;
+          clsP75?: number | null;
+          inpP75?: number | null;
+        };
+      }
+    | undefined;
+  const pagespeed = artifacts?.pagespeed;
+  const crux = artifacts?.crux;
+
+  const performanceScore =
+    performanceMeta?.latestScore ??
+    page.performanceScore ??
+    latestResult?.score ??
+    pagespeed?.performanceScore ??
+    null;
+
+  const lcp = crux?.lcpP75 ?? performanceMeta?.lcp ?? pagespeed?.lcp ?? null;
+  const cls = crux?.clsP75 ?? performanceMeta?.cls ?? pagespeed?.cls ?? null;
+  const inp = crux?.inpP75 ?? performanceMeta?.inp ?? null;
+
+  return { performanceScore, lcp, cls, inp };
+}
+
+function _isPoorLcp(value: number | null): boolean {
+  return value != null && value > CWV_LCP_NEEDS_IMPROVEMENT_MS;
+}
+
+function _isPoorCls(value: number | null): boolean {
+  return value != null && value > CWV_CLS_NEEDS_IMPROVEMENT;
+}
+
+function _isPoorInp(value: number | null): boolean {
+  return value != null && value > CWV_INP_NEEDS_IMPROVEMENT_MS;
+}
+
+function _scoreToProductIntelligenceLevel(
+  score: number,
+): GrowthAuditProductIntelligenceLevel {
+  if (score >= 80) return "critical";
+  if (score >= 60) return "high";
+  if (score >= 35) return "medium";
+  if (score >= 15) return "low";
+  return "monitor";
+}
+
+function _hasProductIntelligenceAiData(
+  page: GrowthAuditPage,
+  aiResults?: GrowthAuditPageResult[],
+): boolean {
+  if (hasGrowthAuditPageAiAnalysis(page)) return true;
+  if (aiResults?.some((result) => result.status === "completed")) return true;
+  const aiMeta = getGrowthAuditPageAiMetadata(page);
+  return (
+    aiMeta?.latestScore != null ||
+    aiMeta?.croScore != null ||
+    aiMeta?.geoScore != null ||
+    aiMeta?.adsReadinessScore != null ||
+    page.croScore != null ||
+    page.geoScore != null
+  );
+}
+
+function _hasProductIntelligencePerformanceData(
+  page: GrowthAuditPage,
+  performanceResults?: GrowthAuditPageResult[],
+): boolean {
+  if (hasGrowthAuditPagePerformanceAnalysis(page)) return true;
+  return _getLatestCompletedPageResult(performanceResults) != null;
+}
+
+function _buildProductIntelligenceMissingData(
+  page: GrowthAuditPage,
+  aiResults?: GrowthAuditPageResult[],
+  performanceResults?: GrowthAuditPageResult[],
+): string[] {
+  const missing: string[] = [];
+  if (!hasGrowthAuditPageSearchConsoleData(page)) missing.push("Search Console");
+  if (!hasGrowthAuditPageAnalyticsData(page)) missing.push("GA4");
+  if (!_hasProductIntelligencePerformanceData(page, performanceResults)) {
+    missing.push("Performance");
+  }
+  if (!_hasProductIntelligenceAiData(page, aiResults)) missing.push("AI/GEO/CRO");
+  if (page.sourceEntityType !== "shopify_product") missing.push("Shopify product link");
+  return missing;
+}
+
+type ProductIntelligenceTheme =
+  | "gsc_ctr"
+  | "gsc_position"
+  | "ga4_conversion"
+  | "performance"
+  | "cro_ai"
+  | "incomplete_data"
+  | "general";
+
+type ProductIntelligenceScoreContext = {
+  score: number;
+  themes: Partial<Record<ProductIntelligenceTheme, number>>;
+  gscMeta: GrowthAuditPageSearchConsoleMetadata | null;
+  analyticsMeta: GrowthAuditPageAnalyticsMetadata | null;
+  performanceSnapshot: PerformanceArtifactsSnapshot;
+  croScore: number | null;
+  geoScore: number | null;
+  adsScore: number | null;
+  aiLatestScore: number | null;
+  openFindings: GrowthAuditFinding[];
+};
+
+function _computeProductPriorityScore(input: {
+  page: GrowthAuditPage;
+  findings: GrowthAuditFinding[];
+  tasks: GrowthAuditTask[];
+  performanceResults?: GrowthAuditPageResult[];
+}): ProductIntelligenceScoreContext {
+  const { page, findings, tasks, performanceResults } = input;
+  const themes: Partial<Record<ProductIntelligenceTheme, number>> = {};
+  const addTheme = (theme: ProductIntelligenceTheme, points: number) => {
+    themes[theme] = (themes[theme] ?? 0) + points;
+  };
+
+  let score = 0;
+  const gscMeta = getGrowthAuditPageSearchConsoleMetadata(page);
+  const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
+  const aiMeta = getGrowthAuditPageAiMetadata(page);
+  const performanceSnapshot = _getProductIntelligencePerformanceSnapshot(page, performanceResults);
+
+  if (gscMeta) {
+    const impressions = gscMeta.impressions ?? 0;
+    const ctr = gscMeta.ctr ?? 0;
+    const position = gscMeta.position ?? 0;
+
+    if (impressions > 1000) {
+      score += 20;
+      addTheme("gsc_ctr", 20);
+    } else if (impressions >= 200) {
+      score += 12;
+      addTheme("gsc_ctr", 12);
+    }
+
+    if (impressions > 200 && ctr < 0.01) {
+      score += 18;
+      addTheme("gsc_ctr", 18);
+    } else if (impressions > 200 && ctr < 0.02) {
+      score += 10;
+      addTheme("gsc_ctr", 10);
+    }
+
+    if (position >= 4 && position <= 15) {
+      score += 15;
+      addTheme("gsc_position", 15);
+    }
+
+    if ((gscMeta.topQueries?.length ?? 0) > 0) {
+      score += 5;
+      addTheme("gsc_position", 5);
+    }
+  }
+
+  if (analyticsMeta) {
+    const sessions = analyticsMeta.sessions ?? 0;
+    const engagementRate = analyticsMeta.engagementRate ?? 0;
+    const conversions = analyticsMeta.conversions ?? 0;
+    const revenue = analyticsMeta.revenue;
+
+    if (sessions > 300) {
+      score += 18;
+      addTheme("ga4_conversion", 18);
+    } else if (sessions >= 50) {
+      score += 10;
+      addTheme("ga4_conversion", 10);
+    }
+
+    if (engagementRate < 0.45 && sessions > 50) {
+      score += 12;
+      addTheme("ga4_conversion", 12);
+    }
+
+    if (conversions === 0 && sessions > 50) {
+      score += 15;
+      addTheme("ga4_conversion", 15);
+    }
+
+    if (revenue != null) {
+      if (revenue > 0) {
+        score += 10;
+        addTheme("ga4_conversion", 10);
+      }
+      if (revenue >= 100) {
+        score += 15;
+        addTheme("ga4_conversion", 15);
+      }
+    }
+  }
+
+  const perfScore = performanceSnapshot.performanceScore;
+  if (perfScore != null) {
+    if (perfScore < 50) {
+      score += 12;
+      addTheme("performance", 12);
+    } else if (perfScore < 80) {
+      score += 7;
+      addTheme("performance", 7);
+    }
+  }
+
+  if (_isPoorLcp(performanceSnapshot.lcp)) {
+    score += 8;
+    addTheme("performance", 8);
+  }
+  if (_isPoorCls(performanceSnapshot.cls)) {
+    score += 8;
+    addTheme("performance", 8);
+  }
+  if (_isPoorInp(performanceSnapshot.inp)) {
+    score += 8;
+    addTheme("performance", 8);
+  }
+
+  const croScore = aiMeta?.croScore ?? page.croScore ?? null;
+  const geoScore = aiMeta?.geoScore ?? page.geoScore ?? null;
+  const adsScore = aiMeta?.adsReadinessScore ?? null;
+  const aiLatestScore = aiMeta?.latestScore ?? null;
+
+  if (croScore != null && croScore < 70) {
+    score += 12;
+    addTheme("cro_ai", 12);
+  }
+  if (geoScore != null && geoScore < 70) {
+    score += 8;
+    addTheme("cro_ai", 8);
+  }
+  if (adsScore != null && adsScore < 70) {
+    score += 8;
+    addTheme("cro_ai", 8);
+  }
+  if (aiLatestScore != null && aiLatestScore < 70) {
+    score += 10;
+    addTheme("cro_ai", 10);
+  }
+
+  const openFindings = findings.filter((finding) => finding.status === "open");
+  const openTasks = tasks.filter((task) => task.status === "open");
+
+  for (const finding of openFindings) {
+    if (finding.severity === "critical") score += 15;
+    else if (finding.severity === "high") score += 8;
+  }
+
+  for (const task of openTasks) {
+    if (task.priority === "high") score += 6;
+  }
+
+  if (page.sourceEntityType === "shopify_product") {
+    score += 5;
+  }
+
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    themes,
+    gscMeta,
+    analyticsMeta,
+    performanceSnapshot,
+    croScore,
+    geoScore,
+    adsScore,
+    aiLatestScore,
+    openFindings,
+  };
+}
+
+function _getDominantProductIntelligenceTheme(
+  themes: Partial<Record<ProductIntelligenceTheme, number>>,
+): ProductIntelligenceTheme {
+  const entries = Object.entries(themes) as [ProductIntelligenceTheme, number][];
+  if (entries.length === 0) return "general";
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries[0][0];
+}
+
+function _buildProductIntelligenceVerdict(input: {
+  context: ProductIntelligenceScoreContext;
+  missingData: string[];
+}): { title: string; verdict: string; mainReason: string } {
+  const { context, missingData } = input;
+  const { gscMeta, analyticsMeta, performanceSnapshot, croScore, aiLatestScore, themes } = context;
+
+  const dominant = _getDominantProductIntelligenceTheme(themes);
+  const dominantWeight = themes[dominant] ?? 0;
+  const hasStrongSignal = dominantWeight >= 15;
+
+  const impressions = gscMeta?.impressions ?? 0;
+  const ctr = gscMeta?.ctr ?? 0;
+  const position = gscMeta?.position ?? 0;
+  const sessions = analyticsMeta?.sessions ?? 0;
+  const conversions = analyticsMeta?.conversions ?? 0;
+  const perfScore = performanceSnapshot.performanceScore;
+
+  if (
+    dominant === "gsc_ctr" ||
+    (impressions > 200 && ctr < 0.01)
+  ) {
+    return {
+      title: "Pagina con visibilità organica da sfruttare meglio",
+      verdict:
+        "La pagina riceve impression da Google ma il CTR è basso. Prima priorità: migliorare snippet, title/meta e allineamento con le query principali.",
+      mainReason: "Visibilità organica alta ma pochi click rispetto alle impression.",
+    };
+  }
+
+  if (
+    dominant === "ga4_conversion" ||
+    (sessions > 50 && conversions === 0)
+  ) {
+    return {
+      title: "Pagina con traffico ma conversione debole",
+      verdict:
+        "La pagina riceve traffico ma non trasforma abbastanza. Prima priorità: CRO, trust, CTA, immagini e chiarezza dell'offerta.",
+      mainReason: "Traffico GA4 presente senza conversioni sufficienti.",
+    };
+  }
+
+  if (
+    dominant === "performance" ||
+    (perfScore != null && perfScore < 50) ||
+    _isPoorLcp(performanceSnapshot.lcp) ||
+    _isPoorCls(performanceSnapshot.cls) ||
+    _isPoorInp(performanceSnapshot.inp)
+  ) {
+    return {
+      title: "Pagina da alleggerire prima di spingere traffico",
+      verdict:
+        "La performance può limitare esperienza utente e conversioni, soprattutto mobile.",
+      mainReason: "Velocità o Core Web Vitals sotto soglia.",
+    };
+  }
+
+  if (
+    dominant === "cro_ai" ||
+    (croScore != null && croScore < 70) ||
+    (aiLatestScore != null && aiLatestScore < 70)
+  ) {
+    return {
+      title: "Pagina persuasiva da rinforzare",
+      verdict:
+        "L'analisi AI/CRO indica debolezze su fiducia, CTA o completezza del contenuto.",
+      mainReason: "Score persuasivo o AI sotto soglia.",
+    };
+  }
+
+  if (dominant === "gsc_position" || (position >= 4 && position <= 15 && impressions >= 200)) {
+    return {
+      title: "Pagina vicina a posizioni più redditizie",
+      verdict:
+        "La pagina è nelle vicinanze della prima pagina Google. Prima priorità: rafforzare contenuto e FAQ sulle query principali.",
+      mainReason: "Posizione media tra 4 e 15 con impression significative.",
+    };
+  }
+
+  if (missingData.length >= 3 && !hasStrongSignal) {
+    return {
+      title: "Dati ancora incompleti",
+      verdict:
+        "La pagina è collegata, ma mancano dati sufficienti per una priorità forte. Completa GSC, GA4, Performance e AI/GEO/CRO.",
+      mainReason: "Priorità meno affidabile finché mancano analisi chiave.",
+    };
+  }
+
+  return {
+    title: "Pagina prodotto da monitorare",
+    verdict:
+      "Non emergono urgenze forti, ma conviene tenere sotto controllo organico, analytics e performance.",
+    mainReason: "Segnali misti senza un tema dominante critico.",
+  };
+}
+
+function _formatItalianNumber(value: number): string {
+  return value.toLocaleString("it-IT");
+}
+
+function _formatItalianPercent(value: number): string {
+  return `${(value * 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
+function _buildProductIntelligenceEvidence(input: {
+  context: ProductIntelligenceScoreContext;
+  priorityActionsCount: number;
+}): GrowthAuditProductIntelligenceSignal[] {
+  const { context, priorityActionsCount } = input;
+  const signals: GrowthAuditProductIntelligenceSignal[] = [];
+  const { gscMeta, analyticsMeta, performanceSnapshot, croScore, openFindings } = context;
+
+  if (gscMeta?.impressions != null) {
+    const impressions = gscMeta.impressions;
+    signals.push({
+      key: "gsc-impressions",
+      label: "Impression GSC",
+      value: _formatItalianNumber(impressions),
+      tone: impressions > 1000 ? "warning" : impressions >= 200 ? "neutral" : "good",
+      explanation:
+        impressions > 1000
+          ? "Alta visibilità organica: ottimizzare CTR e snippet può generare click extra."
+          : "Volume impression da Search Console.",
+    });
+  }
+
+  if (gscMeta?.ctr != null) {
+    const ctr = gscMeta.ctr;
+    const impressions = gscMeta.impressions ?? 0;
+    signals.push({
+      key: "gsc-ctr",
+      label: "CTR organico",
+      value: _formatItalianPercent(ctr),
+      tone: impressions > 200 && ctr < 0.01 ? "danger" : ctr < 0.02 ? "warning" : "good",
+      explanation:
+        impressions > 200 && ctr < 0.01
+          ? "CTR basso rispetto alle impression: title e meta meritano attenzione."
+          : "Click-through rate medio da Search Console.",
+    });
+  }
+
+  if (gscMeta?.position != null) {
+    const position = gscMeta.position;
+    signals.push({
+      key: "gsc-position",
+      label: "Posizione media",
+      value: position.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+      tone: position >= 4 && position <= 15 ? "warning" : position <= 3 ? "good" : "neutral",
+      explanation:
+        position >= 4 && position <= 15
+          ? "Vicino alla prima pagina: contenuto mirato può spingere il ranking."
+          : "Posizione media organica.",
+    });
+  }
+
+  if (analyticsMeta?.sessions != null) {
+    const sessions = analyticsMeta.sessions;
+    signals.push({
+      key: "ga4-sessions",
+      label: "Sessioni GA4",
+      value: _formatItalianNumber(sessions),
+      tone: sessions > 300 ? "warning" : sessions >= 50 ? "neutral" : "good",
+      explanation: "Traffico post-click misurato da GA4.",
+    });
+  }
+
+  if (analyticsMeta?.conversions != null) {
+    const conversions = analyticsMeta.conversions;
+    const sessions = analyticsMeta.sessions ?? 0;
+    signals.push({
+      key: "ga4-conversions",
+      label: "Conversioni GA4",
+      value: _formatItalianNumber(conversions),
+      tone: sessions > 50 && conversions === 0 ? "danger" : conversions > 0 ? "good" : "neutral",
+      explanation:
+        sessions > 50 && conversions === 0
+          ? "Traffico senza conversioni: priorità CRO."
+          : "Conversioni registrate nel periodo GA4.",
+    });
+  }
+
+  if (analyticsMeta?.revenue != null) {
+    signals.push({
+      key: "ga4-revenue",
+      label: "Revenue GA4",
+      value: analyticsMeta.revenue.toLocaleString("it-IT", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      tone: analyticsMeta.revenue > 0 ? "good" : "warning",
+      explanation: "Ricavi attribuiti alla pagina in GA4.",
+    });
+  }
+
+  if (performanceSnapshot.performanceScore != null) {
+    const perfScore = performanceSnapshot.performanceScore;
+    signals.push({
+      key: "performance-score",
+      label: "Performance score",
+      value: String(perfScore),
+      tone: perfScore < 50 ? "danger" : perfScore < 80 ? "warning" : "good",
+      explanation: "Score Lighthouse/PageSpeed dell'ultima analisi.",
+    });
+  }
+
+  if (croScore != null) {
+    signals.push({
+      key: "cro-score",
+      label: "CRO score",
+      value: String(croScore),
+      tone: croScore < 70 ? "danger" : croScore < 80 ? "warning" : "good",
+      explanation: "Valutazione persuasione e conversione da analisi AI.",
+    });
+  }
+
+  if (openFindings.length > 0) {
+    signals.push({
+      key: "open-findings",
+      label: "Problemi aperti",
+      value: String(openFindings.length),
+      tone: openFindings.some((f) => f.severity === "critical" || f.severity === "high")
+        ? "danger"
+        : "warning",
+      explanation: "Findings tecnici o SEO ancora da risolvere.",
+    });
+  }
+
+  if (priorityActionsCount > 0) {
+    signals.push({
+      key: "priority-actions",
+      label: "Azioni prioritarie",
+      value: String(priorityActionsCount),
+      tone: priorityActionsCount >= 3 ? "warning" : "neutral",
+      explanation: "Azioni già calcolate nel pannello sottostante.",
+    });
+  }
+
+  return signals.slice(0, 6);
+}
+
+function _buildProductIntelligenceRecommendedActions(input: {
+  context: ProductIntelligenceScoreContext;
+  missingData: string[];
+}): GrowthAuditProductIntelligenceAction[] {
+  const { context, missingData } = input;
+  const { gscMeta, analyticsMeta, performanceSnapshot, croScore, aiLatestScore } = context;
+  const actions: GrowthAuditProductIntelligenceAction[] = [];
+
+  const impressions = gscMeta?.impressions ?? 0;
+  const ctr = gscMeta?.ctr ?? 0;
+  const position = gscMeta?.position ?? 0;
+  const sessions = analyticsMeta?.sessions ?? 0;
+  const conversions = analyticsMeta?.conversions ?? 0;
+  const perfScore = performanceSnapshot.performanceScore;
+
+  if (gscMeta && impressions > 200 && ctr < 0.02) {
+    actions.push({
+      title: "Riscrivi title e meta description con query reali",
+      reason: "Search Console mostra impression ma pochi click.",
+      expectedImpact: "Miglior CTR organico e più click sulle query principali.",
+      whereToFix: "Modifica Shopify → campi SEO",
+      howToValidate: "Dopo 14/30 giorni controlla CTR e click Search Console.",
+    });
+  }
+
+  if (gscMeta && position >= 4 && position <= 15 && impressions >= 200) {
+    actions.push({
+      title: "Rafforza contenuto e FAQ sulle query principali",
+      reason: "La pagina è vicina a posizioni più redditizie.",
+      expectedImpact: "Più impression in top posizioni e traffico organico qualificato.",
+      whereToFix: "Modifica Shopify → descrizione prodotto / FAQ",
+      howToValidate: "Monitora posizione media e impression.",
+    });
+  }
+
+  if (analyticsMeta && sessions > 50 && conversions === 0) {
+    actions.push({
+      title: "Rinforza trust, CTA e proposta d'acquisto",
+      reason: "La pagina riceve traffico ma non converte abbastanza.",
+      expectedImpact: "Più add to cart e conversioni da traffico esistente.",
+      whereToFix: "Modifica Shopify → descrizione prodotto / sezioni trust",
+      howToValidate: "Controlla add to cart, conversioni e revenue.",
+    });
+  }
+
+  if (
+    perfScore != null &&
+    (perfScore < 80 ||
+      _isPoorLcp(performanceSnapshot.lcp) ||
+      _isPoorCls(performanceSnapshot.cls) ||
+      _isPoorInp(performanceSnapshot.inp))
+  ) {
+    actions.push({
+      title: "Ottimizza immagini e risorse above the fold",
+      reason: "La velocità può ridurre conversione e qualità esperienza mobile.",
+      expectedImpact: "Migliore LCP/CLS/INP e UX mobile più fluida.",
+      whereToFix: "Tema Shopify / immagini prodotto / sviluppo",
+      howToValidate: "Rilancia Performance e controlla LCP/CLS/INP.",
+    });
+  }
+
+  if (
+    (croScore != null && croScore < 70) ||
+    (aiLatestScore != null && aiLatestScore < 70)
+  ) {
+    actions.push({
+      title: "Completa contenuto persuasivo e risposte alle obiezioni",
+      reason:
+        "L'analisi AI/CRO rileva debolezze su fiducia, chiarezza o decisione d'acquisto.",
+      expectedImpact: "Maggiore fiducia e chiarezza nella decisione d'acquisto.",
+      whereToFix: "Modifica Shopify → descrizione, blocchi trust, FAQ",
+      howToValidate: "Rilancia AI/GEO/CRO e monitora GA4.",
+    });
+  }
+
+  if (missingData.length > 0) {
+    actions.push({
+      title: "Completa le analisi mancanti",
+      reason: "Servono più dati per decidere priorità e impatto.",
+      expectedImpact: "Priorità operativa più affidabile e meno rischio di interventi sbagliati.",
+      whereToFix: "Sezioni Performance, Search Console, GA4, AI/GEO/CRO",
+      howToValidate: "Verifica che la Product Intelligence mostri meno dati mancanti.",
+    });
+  }
+
+  return actions.slice(0, 5);
+}
+
+function _emptyProductIntelligenceSummary(): GrowthAuditProductIntelligenceSummary {
+  return {
+    available: false,
+    level: "monitor",
+    score: 0,
+    title: "",
+    verdict: "",
+    mainReason: "",
+    evidence: [],
+    missingData: [],
+    recommendedActions: [],
+  };
+}
+
+export function buildGrowthAuditProductIntelligenceSummary(input: {
+  page: GrowthAuditPage;
+  findings: GrowthAuditFinding[];
+  tasks: GrowthAuditTask[];
+  priorityActions: GrowthAuditPriorityAction[];
+  aiResults?: GrowthAuditPageResult[];
+  performanceResults?: GrowthAuditPageResult[];
+}): GrowthAuditProductIntelligenceSummary {
+  const { page, findings, tasks, priorityActions, aiResults, performanceResults } = input;
+
+  if (!isGrowthAuditProductPage(page)) {
+    return _emptyProductIntelligenceSummary();
+  }
+
+  const missingData = _buildProductIntelligenceMissingData(page, aiResults, performanceResults);
+  const context = _computeProductPriorityScore({
+    page,
+    findings,
+    tasks,
+    performanceResults,
+  });
+  const level = _scoreToProductIntelligenceLevel(context.score);
+  const { title, verdict, mainReason } = _buildProductIntelligenceVerdict({
+    context,
+    missingData,
+  });
+  const evidence = _buildProductIntelligenceEvidence({
+    context,
+    priorityActionsCount: priorityActions.length,
+  });
+  const recommendedActions = _buildProductIntelligenceRecommendedActions({
+    context,
+    missingData,
+  });
+
+  return {
+    available: true,
+    level,
+    score: context.score,
+    title,
+    verdict,
+    mainReason,
+    evidence,
+    missingData,
+    recommendedActions,
+  };
 }

@@ -9,6 +9,7 @@ import {
   getGrowthAuditWorkflowStepStatusLabel,
   getGrowthAuditWorkspaceOperativeNote,
   isGrowthAuditPageShopifyLinked,
+  isGrowthAuditProductPage,
   mapGrowthAuditPageToSeoEntity,
   type GrowthAuditWorkflowStepStatus,
 } from "../../../lib/growth-audit-utils";
@@ -66,6 +67,7 @@ export function GrowthAuditPageWorkspaceSidebar({
   const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
   const shopifyLinked = isGrowthAuditPageShopifyLinked(page);
   const mappedEntity = mapGrowthAuditPageToSeoEntity(page);
+  const isProductPage = isGrowthAuditProductPage(page);
 
   const workflowSteps = buildGrowthAuditPageWorkflowSteps({
     page,
@@ -152,6 +154,15 @@ export function GrowthAuditPageWorkspaceSidebar({
       <section className="growth-audit-workspace-sidebar__block gcr-card">
         <h3 className="growth-audit-workspace-sidebar__title">Collegamenti rapidi</h3>
         <div className="growth-audit-workspace-sidebar__links">
+          {isProductPage && (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              onClick={() => onScrollToSection("product-intelligence")}
+            >
+              Product Intelligence
+            </button>
+          )}
           <button
             type="button"
             className="gcr-btn gcr-btn--secondary gcr-btn--sm"

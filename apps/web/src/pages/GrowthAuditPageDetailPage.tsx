@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { GrowthAuditPageResult } from "@gcr/shared";
+import { GrowthAuditProductIntelligenceSummary } from "../components/growth-audit/page-detail/GrowthAuditProductIntelligenceSummary";
 import { GrowthAuditPriorityActionsPanel } from "../components/growth-audit/GrowthAuditPriorityActionsPanel";
 import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailShopifySection";
 import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailTechnicalSection";
@@ -118,16 +119,18 @@ export function GrowthAuditPageDetailPage() {
   const mappedEntity = page ? mapGrowthAuditPageToSeoEntity(page) : null;
   const aiAvailable = page?.status === "analyzed";
 
-  const priorityActionsCount = useMemo(() => {
-    if (!page) return 0;
+  const priorityActions = useMemo(() => {
+    if (!page) return [];
     return buildGrowthAuditPriorityActions({
       page,
       findings: pageFindings,
       tasks: pageTasks,
       improvementItems: buildGrowthAuditPageImprovementItems(page, pageFindings),
       aiResults: pageResults,
-    }).length;
+    });
   }, [page, pageFindings, pageTasks, pageResults]);
+
+  const priorityActionsCount = priorityActions.length;
 
   const canRescan = Boolean(
     projectId &&
@@ -200,6 +203,15 @@ export function GrowthAuditPageDetailPage() {
 
       <div className="growth-audit-workspace__layout">
         <main className="growth-audit-workspace__main">
+          <GrowthAuditProductIntelligenceSummary
+            page={page}
+            findings={pageFindings}
+            tasks={pageTasks}
+            priorityActions={priorityActions}
+            aiResults={pageResults}
+            performanceResults={performanceResults}
+          />
+
           <GrowthAuditPriorityActionsPanel
             page={page}
             findings={pageFindings}

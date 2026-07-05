@@ -42,6 +42,7 @@ import {
   buildGrowthAuditSiteIssueClusters,
   buildGrowthAuditAiCoverageStats,
   buildGrowthAuditPageWorkflowSteps,
+  buildGrowthAuditProductIntelligenceSummary,
   getGrowthAuditPriorityLevelLabel,
 } from "./growth-audit-utils";
 
@@ -1054,6 +1055,181 @@ describe("growth-audit-utils", () => {
       const performanceStep = steps.find((step) => step.key === "performance");
       expect(performanceStep?.status).toBe("done");
       expect(performanceStep?.anchorId).toBe("performance");
+    });
+
+    it("points product workflow priority step to product-intelligence", () => {
+      const steps = buildGrowthAuditPageWorkflowSteps({
+        page: {
+          id: "p1",
+          runId: "run",
+          projectId: "proj",
+          url: "https://example.com/products/a",
+          normalizedUrl: "https://example.com/products/a",
+          pageType: "product",
+          source: "shopify_product",
+          status: "analyzed",
+          priority: "normal",
+          sourceEntityType: "shopify_product",
+        },
+        priorityActionsCount: 1,
+        hasAiResult: false,
+        shopifyEditable: true,
+        openFindingsCount: 0,
+      });
+      const priorityStep = steps.find((step) => step.key === "priority");
+      expect(priorityStep?.label).toBe("Valuta priorità");
+      expect(priorityStep?.anchorId).toBe("product-intelligence");
+    });
+  });
+
+  describe("buildGrowthAuditProductIntelligenceSummary", () => {
+    const baseProductPage: GrowthAuditPage = {
+      id: "p1",
+      runId: "run",
+      projectId: "proj",
+      url: "https://example.com/products/a",
+      normalizedUrl: "https://example.com/products/a",
+      pageType: "product",
+      source: "shopify_product",
+      status: "analyzed",
+      priority: "normal",
+      sourceEntityType: "shopify_product",
+      sourceEntityId: "prod-1",
+    };
+
+    it("returns available=false for non product pages", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          pageType: "collection",
+          sourceEntityType: "shopify_collection",
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(summary.available).toBe(false);
+    });
+
+    it("generates high/critical priority for high GSC impressions and low CTR", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            searchConsole: {
+              impressions: 1500,
+              ctr: 0.005,
+              position: 11,
+              topQueries: [{ query: "miele bio" }],
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(summary.available).toBe(true);
+      expect(summary.score).toBeGreaterThanOrEqual(60);
+      expect(["high", "critical"]).toContain(summary.level);
+      expect(summary.title).toContain("visibilità organica");
+    });
+
+    it("generates CRO action for high GA4 sessions and zero conversions", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            analytics: {
+              sessions: 420,
+              conversions: 0,
+              engagementRate: 0.35,
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(summary.recommendedActions.some((action) => action.title.includes("trust, CTA"))).toBe(
+        true,
+      );
+      expect(summary.title).toContain("traffico");
+    });
+
+    it("generates performance action for low performance score", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          performanceScore: 42,
+          metadata: {
+            performance: {
+              latestScore: 42,
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(
+        summary.recommendedActions.some((action) =>
+          action.title.includes("Ottimizza immagini"),
+        ),
+      ).toBe(true);
+    });
+
+    it("lists missing Search Console, GA4, Performance and AI when absent", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: baseProductPage,
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(summary.missingData).toContain("Search Console");
+      expect(summary.missingData).toContain("GA4");
+      expect(summary.missingData).toContain("Performance");
+      expect(summary.missingData).toContain("AI/GEO/CRO");
+    });
+
+    it("does not invent revenue when analytics revenue is absent", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            analytics: {
+              sessions: 120,
+              conversions: 2,
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(summary.evidence.some((signal) => signal.key === "ga4-revenue")).toBe(false);
+      const withoutRevenue = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            analytics: { sessions: 400, conversions: 0 },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      const withRevenue = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            analytics: { sessions: 400, conversions: 0, revenue: 150 },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(withRevenue.score).toBeGreaterThan(withoutRevenue.score);
     });
   });
 });
