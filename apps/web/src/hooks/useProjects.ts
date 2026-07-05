@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CreateProjectInput, Integration, Project } from "@gcr/shared";
+import type { CreateProjectInput, Integration, Project, UpdateProjectInput } from "@gcr/shared";
 import { apiFetch } from "../lib/api";
+import { createProject, updateProject } from "../lib/projects-api";
 import { queryKeys } from "../lib/queryKeys";
 
 export function useProjects() {
@@ -29,17 +30,25 @@ export function useProjectIntegrations(id: string | undefined) {
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateProjectInput) =>
-      apiFetch<Project>("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: input.name,
-          description: input.description ?? null,
-        }),
-      }),
+    mutationFn: (input: CreateProjectInput) => createProject(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    },
+  });
+}
+
+export function useUpdateProject(projectId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateProjectInput) => {
+      if (!projectId) {
+        throw new Error("Project id is required");
+      }
+      return updateProject(projectId, input);
+    },
+    onSuccess: (project) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(project.id) });
     },
   });
 }

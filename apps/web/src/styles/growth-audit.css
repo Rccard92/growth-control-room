@@ -774,6 +774,30 @@
   font-weight: 600;
 }
 
+.growth-audit-public-site-setting {
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.growth-audit-public-site-setting__warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(237, 180, 99, 0.1);
+  border: 1px solid rgba(237, 180, 99, 0.25);
+  color: var(--gcr-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.growth-audit-public-site-setting__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .growth-audit-page--dashboard {
   gap: 14px;
 }

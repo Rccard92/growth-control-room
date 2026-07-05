@@ -11,7 +11,7 @@ from app.models.enums import IntegrationStatus
 from app.models.integration import Integration
 from app.models.project import Project
 from app.schemas.integration import IntegrationRead
-from app.schemas.project import ProjectCreate, ProjectRead
+from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.services.projects import get_project_in_default_workspace
 from app.services.workspace import get_default_workspace
 from app.utils.slug import unique_project_slug
@@ -46,6 +46,7 @@ async def create_project(
             name=body.name,
             slug=slug,
             description=body.description,
+            public_site_url=body.public_site_url,
             status="active",
         )
         session.add(project)
@@ -84,6 +85,34 @@ async def get_project(
     session: AsyncSession = Depends(get_db),
 ) -> Project:
     return await get_project_in_default_workspace(project_id, session)
+
+
+@router.patch("/{project_id}", response_model=ProjectRead, response_model_by_alias=True)
+async def update_project(
+    project_id: UUID,
+    body: ProjectUpdate,
+    session: AsyncSession = Depends(get_db),
+) -> Project:
+    try:
+        project = await get_project_in_default_workspace(project_id, session)
+        updates = body.model_dump(exclude_unset=True)
+        for field, value in updates.items():
+            setattr(project, field, value)
+        session.add(project)
+        await session.commit()
+        await session.refresh(project)
+        return project
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Errore aggiornamento progetto")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "update_project_failed",
+                "message": "Impossibile aggiornare il progetto. Riprova più tardi.",
+            },
+        ) from exc
 
 
 @router.get(

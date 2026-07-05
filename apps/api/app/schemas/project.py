@@ -1,12 +1,83 @@
 from datetime import datetime
+from urllib.parse import urlparse, urlunparse
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+def normalize_public_site_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+
+    candidate = trimmed
+    parsed = urlparse(candidate)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in ("http", "https"):
+        if "://" in candidate:
+            raise ValueError("Il dominio pubblico deve usare http o https")
+        candidate = f"https://{candidate.lstrip('/')}"
+        parsed = urlparse(candidate)
+        scheme = (parsed.scheme or "").lower()
+
+    if scheme not in ("http", "https"):
+        raise ValueError("Il dominio pubblico deve usare http o https")
+    if not parsed.netloc:
+        raise ValueError("Il dominio pubblico non è valido")
+
+    path = parsed.path or ""
+    if path != "/" and path.endswith("/"):
+        path = path.rstrip("/")
+
+    normalized = urlunparse(
+        (
+            scheme,
+            parsed.netloc.lower(),
+            path,
+            "",
+            "",
+            "",
+        )
+    )
+    if normalized.endswith("/") and parsed.path in ("", "/"):
+        normalized = normalized.rstrip("/")
+    return normalized
+
+
 class ProjectCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
+    public_site_url: str | None = Field(default=None, validation_alias="publicSiteUrl")
+
+    @field_validator("public_site_url", mode="before")
+    @classmethod
+    def validate_public_site_url_create(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Il dominio pubblico deve essere una stringa")
+        return normalize_public_site_url(value)
+
+
+class ProjectUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    public_site_url: str | None = Field(default=None, validation_alias="publicSiteUrl")
+
+    @field_validator("public_site_url", mode="before")
+    @classmethod
+    def validate_public_site_url_update(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Il dominio pubblico deve essere una stringa")
+        return normalize_public_site_url(value)
 
 
 class ProjectRead(BaseModel):
@@ -16,6 +87,7 @@ class ProjectRead(BaseModel):
     name: str
     slug: str
     description: str | None = None
+    public_site_url: str | None = Field(default=None, serialization_alias="publicSiteUrl")
     status: str
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")

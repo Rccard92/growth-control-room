@@ -6,6 +6,7 @@ import { GrowthAuditPage } from "./GrowthAuditPage";
 const {
   useParamsMock,
   useProjectMock,
+  useUpdateProjectMock,
   useShopifyStatusMock,
   useGrowthAuditRunsMock,
   useGrowthAuditRunMock,
@@ -16,6 +17,7 @@ const {
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
+  useUpdateProjectMock: vi.fn(),
   useShopifyStatusMock: vi.fn(),
   useGrowthAuditRunsMock: vi.fn(),
   useGrowthAuditRunMock: vi.fn(),
@@ -35,6 +37,7 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("../hooks/useProjects", () => ({
   useProject: useProjectMock,
+  useUpdateProject: useUpdateProjectMock,
 }));
 
 vi.mock("../hooks/useShopify", () => ({
@@ -77,11 +80,28 @@ vi.mock("../hooks/useContentSeo", () => ({
   })),
 }));
 
-function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boolean }) {
+function setupMocks(options?: {
+  withActiveRun?: boolean;
+  withTechnicalScan?: boolean;
+  publicSiteUrl?: string | null;
+}) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
-    data: { id: "proj-1", name: "Solmielato" },
+    data: {
+      id: "proj-1",
+      name: "Solmielato",
+      publicSiteUrl: options?.publicSiteUrl ?? null,
+    },
     isLoading: false,
+  });
+  useUpdateProjectMock.mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({
+      id: "proj-1",
+      name: "Solmielato",
+      publicSiteUrl: "https://solmielato.it",
+    }),
+    isPending: false,
+    isError: false,
   });
   useShopifyStatusMock.mockReturnValue({
     data: { connected: true, shopDomain: "solmielato.myshopify.com" },
@@ -278,12 +298,21 @@ describe("GrowthAuditPage", () => {
     setupMocks();
     const html = renderPage();
     expect(html).toContain("Dominio o URL principale");
+    expect(html).toContain("Dominio pubblico del sito");
+    expect(html).toContain("Salva dominio pubblico");
+    expect(html).toContain("dominio tecnico");
     expect(html).toContain("Pagine massime");
     expect(html).toContain("Avvia scansione sito");
     expect(html).not.toContain("solmielato.myshopify.com");
     expect(html).toContain("https://tuodominio.it");
     expect(html).toContain("<option value=\"50\"");
     expect(html).not.toContain("Full Site Audit");
+  });
+
+  it("uses project publicSiteUrl as default scan root URL", () => {
+    setupMocks({ publicSiteUrl: "https://solmielato.it" });
+    const html = renderPage();
+    expect(html).toContain('value="https://solmielato.it"');
   });
 
   it("hides flow steps and shows dashboard mode with completed run", () => {
@@ -337,7 +366,7 @@ describe("GrowthAuditPage", () => {
   });
 
   it("prefills public root URL from completed run and shows technical KPIs", () => {
-    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    setupMocks({ withActiveRun: true, withTechnicalScan: true, publicSiteUrl: "https://solmielato.it" });
     const html = renderPage();
     expect(html).toContain('value="https://solmielato.it"');
     expect(html).toContain("Score tecnico");
@@ -346,6 +375,13 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Pagine analizzate");
     expect(html).toContain("Performance");
     expect(html).toContain("In arrivo");
+  });
+
+  it("shows configured public site hostname in dashboard hero", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true, publicSiteUrl: "https://solmielato.it" });
+    const html = renderPage();
+    expect(html).toContain("Sito");
+    expect(html).toContain("solmielato.it");
   });
 
   it("renders priority findings and open tasks", () => {

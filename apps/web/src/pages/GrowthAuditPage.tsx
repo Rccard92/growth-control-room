@@ -15,7 +15,8 @@ import {
   useGrowthAuditTasks,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
-import { useProject } from "../hooks/useProjects";
+import { useProject, useUpdateProject } from "../hooks/useProjects";
+import { useShopifyStatus } from "../hooks/useShopify";
 import {
   GROWTH_AUDIT_INVENTORY_FILTERS,
   GROWTH_AUDIT_MAX_PAGES_OPTIONS,
@@ -28,6 +29,7 @@ import {
   filterInventoryPagesByStatus,
   formatGrowthAuditScore,
   formatPageFindingsCount,
+  formatGrowthAuditPublicSiteHostname,
   getDefaultRootUrl,
   getGrowthAuditDashboardKpiItems,
   getGrowthAuditInventoryFilterLabel,
@@ -37,6 +39,7 @@ import {
   getGrowthAuditPageTypeLabel,
   getGrowthAuditPhaseLabel,
   getGrowthAuditPublicDomainDisplay,
+  isMyshopifyDomain,
   getGrowthAuditScoreBadgeClass,
   getGrowthAuditSeverityBadgeClass,
   getGrowthAuditShopifyLinkBadgeClass,
@@ -94,16 +97,23 @@ export function GrowthAuditPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const { data: project } = useProject(id);
+  const { data: shopifyStatus } = useShopifyStatus(id);
+  const updateProject = useUpdateProject(id);
   const { data: runs } = useGrowthAuditRuns(projectId);
   const startRun = useStartGrowthAuditRun(projectId);
 
   const latestRun = runs?.[0];
   const [rootUrlOverride, setRootUrlOverride] = useState<string | null>(null);
+  const [publicSiteUrlDraft, setPublicSiteUrlDraft] = useState("");
   const [maxPages, setMaxPages] = useState<number>(50);
   const [inventoryFilter, setInventoryFilter] = useState<GrowthAuditInventoryFilter>("all");
   const [scoreFilter, setScoreFilter] = useState<GrowthAuditScoreFilter>("all");
   const [statusFilter, setStatusFilter] = useState<GrowthAuditPageStatusFilter>("all");
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
+
+  useEffect(() => {
+    setPublicSiteUrlDraft(project?.publicSiteUrl ?? "");
+  }, [project?.publicSiteUrl]);
 
   useEffect(() => {
     if (activeRunId) return;
@@ -145,10 +155,11 @@ export function GrowthAuditPage() {
     () =>
       getDefaultRootUrl({
         rootUrlOverride,
+        projectPublicSiteUrl: project?.publicSiteUrl,
         activeRun,
         latestRun,
       }),
-    [rootUrlOverride, activeRun, latestRun],
+    [rootUrlOverride, project?.publicSiteUrl, activeRun, latestRun],
   );
   const rootUrl = rootUrlOverride ?? defaultRootUrl;
 
@@ -219,6 +230,20 @@ export function GrowthAuditPage() {
     formatGrowthAuditRunDate(activeRun?.updatedAt) ??
     formatGrowthAuditRunDate(activeRun?.startedAt);
 
+  const publicSiteHostname = formatGrowthAuditPublicSiteHostname(project?.publicSiteUrl);
+  const showMyshopifyWarning = Boolean(
+    shopifyStatus?.shopDomain && isMyshopifyDomain(shopifyStatus.shopDomain),
+  );
+
+  const handleSavePublicSiteUrl = async () => {
+    if (!projectId) return;
+    const saved = await updateProject.mutateAsync({
+      publicSiteUrl: publicSiteUrlDraft.trim() || null,
+    });
+    setPublicSiteUrlDraft(saved.publicSiteUrl ?? "");
+    setRootUrlOverride(null);
+  };
+
   const handleStartAudit = async () => {
     const trimmed = rootUrl.trim();
     if (!trimmed) return;
@@ -237,6 +262,38 @@ export function GrowthAuditPage() {
 
   const scanFormFields = (
     <>
+      <div className="growth-audit-public-site-setting gcr-card">
+        <label className="growth-audit-url-field">
+          <span className="growth-audit-url-field__label">Dominio pubblico del sito</span>
+          <input
+            type="url"
+            className="gcr-input"
+            value={publicSiteUrlDraft}
+            onChange={(event) => setPublicSiteUrlDraft(event.target.value)}
+            placeholder="https://tuodominio.it"
+          />
+          <span className="growth-audit-url-field__hint">
+            Inserisci il dominio visto dagli utenti, non il dominio Shopify admin.
+          </span>
+        </label>
+        {showMyshopifyWarning && (
+          <p className="growth-audit-public-site-setting__warning" role="status">
+            Shopify è collegato come dominio tecnico, ma per l&apos;audit serve il dominio
+            pubblico.
+          </p>
+        )}
+        <div className="growth-audit-public-site-setting__actions">
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary"
+            disabled={updateProject.isPending || !projectId}
+            onClick={() => void handleSavePublicSiteUrl()}
+          >
+            {updateProject.isPending ? "Salvataggio…" : "Salva dominio pubblico"}
+          </button>
+        </div>
+      </div>
+
       <div className="growth-audit-full-site__header">
         <div>
           <h2 className="growth-audit-full-site__title">Scansione sito</h2>
@@ -525,8 +582,12 @@ export function GrowthAuditPage() {
                 </div>
               )}
               <div>
-                <dt>URL analizzato</dt>
-                <dd>{getGrowthAuditPublicDomainDisplay(activeRun)}</dd>
+                <dt>Sito</dt>
+                <dd>
+                  {publicSiteHostname
+                    ? publicSiteHostname
+                    : getGrowthAuditPublicDomainDisplay(project, activeRun)}
+                </dd>
               </div>
               <div>
                 <dt>Stato run</dt>

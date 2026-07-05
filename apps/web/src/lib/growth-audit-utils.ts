@@ -259,6 +259,7 @@ function resolvePublicRootUrl(url?: string | null): string | null {
 
 export type GetDefaultRootUrlInput = {
   rootUrlOverride?: string | null;
+  projectPublicSiteUrl?: string | null;
   activeRun?: { rootUrl?: string } | null;
   latestRun?: { rootUrl?: string } | null;
 };
@@ -270,6 +271,9 @@ export function getDefaultRootUrl(input?: GetDefaultRootUrlInput): string {
     return resolvePublicRootUrl(override) ?? "";
   }
 
+  const fromProject = resolvePublicRootUrl(input?.projectPublicSiteUrl);
+  if (fromProject) return fromProject;
+
   const fromActive = resolvePublicRootUrl(input?.activeRun?.rootUrl);
   if (fromActive) return fromActive;
 
@@ -279,9 +283,23 @@ export function getDefaultRootUrl(input?: GetDefaultRootUrlInput): string {
   return "";
 }
 
+export function formatGrowthAuditPublicSiteHostname(url?: string | null): string | null {
+  const resolved = resolvePublicRootUrl(url);
+  if (!resolved) return null;
+  try {
+    return new URL(resolved).hostname;
+  } catch {
+    return null;
+  }
+}
+
 export function getGrowthAuditPublicDomainDisplay(
+  project?: { publicSiteUrl?: string | null } | null,
   run?: { rootUrl?: string } | null,
 ): string {
+  const fromProject = resolvePublicRootUrl(project?.publicSiteUrl);
+  if (fromProject) return fromProject;
+
   return resolvePublicRootUrl(run?.rootUrl) ?? "Dominio pubblico non configurato";
 }
 

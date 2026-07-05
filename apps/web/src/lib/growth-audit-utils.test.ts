@@ -10,6 +10,7 @@ import {
   computeGrowthAuditPageScoreAverages,
   isMyshopifyDomain,
   getGrowthAuditPublicDomainDisplay,
+  formatGrowthAuditPublicSiteHostname,
   getFindingsForPage,
   getGrowthAuditInventoryFilterLabel,
   getGrowthAuditPageScoreLabel,
@@ -168,6 +169,12 @@ describe("growth-audit-utils", () => {
   it("builds default root URL from public run URL, ignoring myshopify", () => {
     expect(
       getDefaultRootUrl({
+        projectPublicSiteUrl: "https://solmielato.it",
+        activeRun: { rootUrl: "https://example.com" },
+      }),
+    ).toBe("https://solmielato.it");
+    expect(
+      getDefaultRootUrl({
         activeRun: { rootUrl: "https://solmielato.it" },
         latestRun: { rootUrl: "https://solmielato.myshopify.com" },
       }),
@@ -184,13 +191,24 @@ describe("growth-audit-utils", () => {
     ).toBe("https://shop.example.com");
   });
 
-  it("returns public domain display label", () => {
-    expect(getGrowthAuditPublicDomainDisplay({ rootUrl: "https://solmielato.it" })).toBe(
+  it("returns public domain display label with project priority", () => {
+    expect(
+      getGrowthAuditPublicDomainDisplay(
+        { publicSiteUrl: "https://solmielato.it" },
+        { rootUrl: "https://example.com" },
+      ),
+    ).toBe("https://solmielato.it");
+    expect(getGrowthAuditPublicDomainDisplay({ publicSiteUrl: "https://solmielato.it" })).toBe(
       "https://solmielato.it",
     );
-    expect(getGrowthAuditPublicDomainDisplay({ rootUrl: "solmielato.myshopify.com" })).toBe(
+    expect(getGrowthAuditPublicDomainDisplay(null, { rootUrl: "solmielato.myshopify.com" })).toBe(
       "Dominio pubblico non configurato",
     );
+  });
+
+  it("formats public site hostname for dashboard hero", () => {
+    expect(formatGrowthAuditPublicSiteHostname("https://solmielato.it/")).toBe("solmielato.it");
+    expect(formatGrowthAuditPublicSiteHostname("solmielato.myshopify.com")).toBeNull();
   });
 
   it("computes dashboard KPI averages from page AI metadata", () => {

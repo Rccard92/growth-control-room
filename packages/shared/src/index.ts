@@ -20,7 +20,7 @@ export type {
   AiModelValidateInput,
   AiModelValidateResponse,
 } from "./types/ai-model-settings";
-export type { Project, CreateProjectInput, ProjectStatus } from "./types/project";
+export type { Project, CreateProjectInput, UpdateProjectInput, ProjectStatus } from "./types/project";
 export type {
   DateRangePreset,
   DateRangeParams,
