@@ -20,15 +20,74 @@ from app.api.routes.google_integrations import (
     start_google_oauth,
 )
 from app.schemas.google_integration import GoogleOAuthStartRequest
-from app.services.encryption import decrypt_secret
+from app.services.encryption import decrypt_secret, encrypt_secret
 from app.services.google.google_config import get_google_config_status
 from app.services.google.google_integrations import (
+    GOOGLE_OAUTH_PROVIDERS,
     credential_has_refresh_token,
     get_google_integration_status,
     persist_google_oauth_tokens,
 )
 from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
+
+
+def _make_persist_session(
+    execute_responses: list[Integration | IntegrationCredential | None],
+) -> tuple[AsyncMock, list[object]]:
+    session = AsyncMock()
+    session.flush = AsyncMock()
+    session.commit = AsyncMock()
+    added: list[object] = []
+
+    def add_side_effect(obj: object) -> None:
+        added.append(obj)
+        if isinstance(obj, Integration) and getattr(obj, "id", None) is None:
+            obj.id = uuid4()
+
+    session.add = MagicMock(side_effect=add_side_effect)
+
+    execute_results = []
+    for value in execute_responses:
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none = MagicMock(return_value=value)
+        execute_results.append(result_mock)
+
+    session.execute = AsyncMock(side_effect=execute_results)
+    return session, added
+
+
+def _build_existing_integration(
+    *,
+    project_id,
+    provider: str,
+) -> Integration:
+    now = datetime.now(UTC)
+    return Integration(
+        id=uuid4(),
+        project_id=project_id,
+        provider=provider,
+        status="connected",
+        connected_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _token_data(
+    *,
+    access_token: str = "access-123",
+    refresh_token: str | None = "refresh-456",
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "access_token": access_token,
+        "expires_in": 3600,
+        "token_type": "Bearer",
+        "scope": "scope",
+    }
+    if refresh_token is not None:
+        payload["refresh_token"] = refresh_token
+    return payload
 
 
 def test_get_google_config_status_with_env(monkeypatch) -> None:
@@ -281,34 +340,145 @@ def test_google_ads_setup_incomplete_without_developer_token(monkeypatch) -> Non
 def test_persist_google_oauth_tokens_saves_refresh_token() -> None:
     async def run() -> None:
         project_id = uuid4()
-        session = AsyncMock()
-        session.flush = AsyncMock()
-        session.commit = AsyncMock()
+        session, added = _make_persist_session([None] * (len(GOOGLE_OAUTH_PROVIDERS) * 2))
 
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none = MagicMock(return_value=None)
-        session.execute = AsyncMock(return_value=result_mock)
-
-        added: list[object] = []
-        session.add = MagicMock(side_effect=lambda obj: added.append(obj))
-
-        await persist_google_oauth_tokens(
-            session,
-            project_id,
-            {
-                "access_token": "access-123",
-                "refresh_token": "refresh-456",
-                "expires_in": 3600,
-                "token_type": "Bearer",
-                "scope": "scope",
-            },
-        )
+        await persist_google_oauth_tokens(session, project_id, _token_data())
 
         credentials = [obj for obj in added if isinstance(obj, IntegrationCredential)]
         assert len(credentials) == 3
         payload = json.loads(decrypt_secret(credentials[0].encrypted_payload))
         assert payload["refresh_token"] == "refresh-456"
         session.commit.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_persist_google_oauth_tokens_creates_integrations_and_credentials() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session, added = _make_persist_session([None] * (len(GOOGLE_OAUTH_PROVIDERS) * 2))
+
+        await persist_google_oauth_tokens(session, project_id, _token_data())
+
+        integrations = [obj for obj in added if isinstance(obj, Integration)]
+        credentials = [obj for obj in added if isinstance(obj, IntegrationCredential)]
+
+        assert len(integrations) == 3
+        assert len(credentials) == 3
+        assert {integration.provider for integration in integrations} == set(GOOGLE_OAUTH_PROVIDERS)
+        assert all(integration.status == "connected" for integration in integrations)
+        assert all(integration.connected_at is not None for integration in integrations)
+        assert all(credential.encrypted_payload for credential in credentials)
+        session.commit.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_persist_google_oauth_tokens_updates_existing_credential() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        execute_responses: list[Integration | IntegrationCredential | None] = []
+        existing_credentials: list[IntegrationCredential] = []
+
+        for provider in GOOGLE_OAUTH_PROVIDERS:
+            integration = _build_existing_integration(project_id=project_id, provider=provider)
+            credential = IntegrationCredential(
+                integration_id=integration.id,
+                encrypted_payload=encrypt_secret(
+                    json.dumps({"access_token": "old", "refresh_token": "old-refresh"})
+                ),
+            )
+            existing_credentials.append(credential)
+            execute_responses.extend([integration, credential])
+
+        session, added = _make_persist_session(execute_responses)
+
+        await persist_google_oauth_tokens(
+            session,
+            project_id,
+            _token_data(access_token="new-access", refresh_token="new-refresh"),
+        )
+
+        new_credentials = [obj for obj in added if isinstance(obj, IntegrationCredential)]
+        assert len(new_credentials) == 0
+
+        for credential in existing_credentials:
+            payload = json.loads(decrypt_secret(credential.encrypted_payload))
+            assert payload["access_token"] == "new-access"
+            assert payload["refresh_token"] == "new-refresh"
+
+        session.commit.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_persist_google_oauth_tokens_preserves_refresh_token() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+
+        session_first, added_first = _make_persist_session(
+            [None] * (len(GOOGLE_OAUTH_PROVIDERS) * 2)
+        )
+        await persist_google_oauth_tokens(
+            session_first,
+            project_id,
+            _token_data(refresh_token="refresh-keep"),
+        )
+
+        integrations = [obj for obj in added_first if isinstance(obj, Integration)]
+        credentials = [obj for obj in added_first if isinstance(obj, IntegrationCredential)]
+        assert len(integrations) == 3
+        assert len(credentials) == 3
+
+        execute_responses: list[Integration | IntegrationCredential | None] = []
+        for integration, credential in zip(integrations, credentials, strict=True):
+            execute_responses.extend([integration, credential])
+
+        session_second, added_second = _make_persist_session(execute_responses)
+        await persist_google_oauth_tokens(
+            session_second,
+            project_id,
+            _token_data(access_token="access-renewed", refresh_token=None),
+        )
+
+        new_credentials = [obj for obj in added_second if isinstance(obj, IntegrationCredential)]
+        assert len(new_credentials) == 0
+
+        for credential in credentials:
+            payload = json.loads(decrypt_secret(credential.encrypted_payload))
+            assert payload["access_token"] == "access-renewed"
+            assert payload["refresh_token"] == "refresh-keep"
+
+    asyncio.run(run())
+
+
+def test_persist_google_oauth_tokens_uses_explicit_credential_query() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        integrations = [
+            _build_existing_integration(project_id=project_id, provider=provider)
+            for provider in GOOGLE_OAUTH_PROVIDERS
+        ]
+        execute_responses: list[Integration | IntegrationCredential | None] = []
+        for integration in integrations:
+            assert "credential" not in integration.__dict__
+            execute_responses.extend([integration, None])
+
+        session, _added = _make_persist_session(execute_responses)
+
+        await persist_google_oauth_tokens(session, project_id, _token_data())
+
+        assert session.execute.await_count == len(GOOGLE_OAUTH_PROVIDERS) * 2
+
+        credential_query_calls = 0
+        for call in session.execute.await_args_list:
+            statement = call.args[0]
+            if getattr(statement, "column_descriptions", None):
+                entities = [item["entity"] for item in statement.column_descriptions]
+                if IntegrationCredential in entities:
+                    credential_query_calls += 1
+
+        assert credential_query_calls == len(GOOGLE_OAUTH_PROVIDERS)
 
     asyncio.run(run())
 

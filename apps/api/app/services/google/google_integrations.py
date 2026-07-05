@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -20,6 +21,8 @@ from app.services.google.google_config import (
 )
 
 GOOGLE_OAUTH_PROVIDERS = ("google_search_console", "ga4", "google_ads")
+
+logger = logging.getLogger(__name__)
 
 
 def _api_key_service_status(configured: bool) -> GoogleServiceStatus:
@@ -131,13 +134,17 @@ async def persist_google_oauth_tokens(
     }
 
     for provider in GOOGLE_OAUTH_PROVIDERS:
+        logger.info(
+            "Persisting Google OAuth credential project_id=%s provider=%s",
+            project_id,
+            provider,
+        )
+
         result = await session.execute(
-            select(Integration)
-            .where(
+            select(Integration).where(
                 Integration.project_id == project_id,
                 Integration.provider == provider,
             )
-            .options(selectinload(Integration.credential))
         )
         integration = result.scalar_one_or_none()
 
@@ -153,9 +160,16 @@ async def persist_google_oauth_tokens(
         else:
             integration.status = "connected"
             integration.connected_at = now
+            await session.flush()
+
+        credential_result = await session.execute(
+            select(IntegrationCredential).where(
+                IntegrationCredential.integration_id == integration.id
+            )
+        )
+        existing_credential = credential_result.scalar_one_or_none()
 
         payload = dict(shared_payload)
-        existing_credential = integration.credential
         if (
             not payload.get("refresh_token")
             and existing_credential
@@ -165,7 +179,7 @@ async def persist_google_oauth_tokens(
                 existing = json.loads(decrypt_secret(existing_credential.encrypted_payload))
                 if existing.get("refresh_token"):
                     payload["refresh_token"] = existing["refresh_token"]
-            except (json.JSONDecodeError, TypeError):
+            except (json.JSONDecodeError, TypeError, ValueError):
                 pass
 
         encrypted_payload = encrypt_secret(json.dumps(payload))

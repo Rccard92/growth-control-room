@@ -40,7 +40,7 @@ export function IntegrationsPage() {
     } else if (searchParams.get("google_error")) {
       setBanner({
         type: "error",
-        message: "Collegamento Google non completato. Riprova.",
+        message: "Collegamento Google non completato. Se hai appena autorizzato l'account, attendi il deploy del fix e riprova.",
       });
       searchParams.delete("google_error");
       setSearchParams(searchParams, { replace: true });
