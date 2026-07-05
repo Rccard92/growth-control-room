@@ -181,4 +181,16 @@ describe("growth-audit-api", () => {
       }),
     );
   });
+
+  it("calls analytics-ecommerce-analysis run endpoint with POST body", async () => {
+    const { analyzeGrowthAuditGa4Ecommerce } = await import("./growth-audit-api");
+    await analyzeGrowthAuditGa4Ecommerce("proj-1", "run-42", { days: 30 });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/analytics-ecommerce-analysis",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ days: 30 }),
+      }),
+    );
+  });
 });

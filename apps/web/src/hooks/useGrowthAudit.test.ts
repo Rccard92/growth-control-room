@@ -6,6 +6,7 @@ const invalidateQueriesMock = vi.fn();
 const rescanGrowthAuditPageMock = vi.fn();
 const analyzeGrowthAuditPageWithAiMock = vi.fn();
 const analyzeGrowthAuditShopifyCommerceMock = vi.fn();
+const analyzeGrowthAuditGa4EcommerceMock = vi.fn();
 
 let capturedMutation: {
   mutationFn: (input: unknown) => Promise<unknown>;
@@ -30,6 +31,7 @@ vi.mock("../lib/growth-audit-api", () => ({
   rescanGrowthAuditPage: rescanGrowthAuditPageMock,
   analyzeGrowthAuditPageWithAi: analyzeGrowthAuditPageWithAiMock,
   analyzeGrowthAuditShopifyCommerce: analyzeGrowthAuditShopifyCommerceMock,
+  analyzeGrowthAuditGa4Ecommerce: analyzeGrowthAuditGa4EcommerceMock,
   fetchGrowthAuditPageResults: vi.fn(),
   startGrowthAuditRun: vi.fn(),
   listGrowthAuditRuns: vi.fn(),
@@ -217,6 +219,66 @@ describe("useAnalyzeGrowthAuditShopifyCommerce", () => {
     await hook.mutateAsync({ days: 30 });
 
     expect(analyzeGrowthAuditShopifyCommerceMock).toHaveBeenCalledWith(
+      "proj-1",
+      "run-42",
+      { days: 30 },
+    );
+  });
+});
+
+describe("useAnalyzeGrowthAuditGa4Ecommerce", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedMutation = null;
+  });
+
+  it("invalidates growth audit queries on success", async () => {
+    const { useAnalyzeGrowthAuditGa4Ecommerce } = await import("./useGrowthAudit");
+    useAnalyzeGrowthAuditGa4Ecommerce("proj-1", "run-42");
+
+    expect(capturedMutation).not.toBeNull();
+
+    const response = {
+      run: { id: "run-42" } as GrowthAuditRun,
+      summary: { totalItemViews: 120 },
+      message: "Funnel ecommerce GA4 aggiornato",
+    };
+
+    capturedMutation!.onSuccess?.(response);
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.runs("proj-1"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.run("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.pages("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.findings("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.tasks("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.events("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(6);
+  });
+
+  it("calls ga4 ecommerce API with project and run ids", async () => {
+    const { useAnalyzeGrowthAuditGa4Ecommerce } = await import("./useGrowthAudit");
+    analyzeGrowthAuditGa4EcommerceMock.mockResolvedValue({
+      run: { id: "run-42" },
+      summary: { totalItemViews: 50 },
+      message: "ok",
+    });
+
+    const hook = useAnalyzeGrowthAuditGa4Ecommerce("proj-1", "run-42");
+    await hook.mutateAsync({ days: 30 });
+
+    expect(analyzeGrowthAuditGa4EcommerceMock).toHaveBeenCalledWith(
       "proj-1",
       "run-42",
       { days: 30 },

@@ -8,6 +8,7 @@ import type {
   GrowthAuditPageSearchConsoleMetadata,
   GrowthAuditPageAnalyticsMetadata,
   GrowthAuditPageShopifyCommerceMetadata,
+  GrowthAuditPageGa4EcommerceMetadata,
   GrowthAuditRunShopifyCommerceSummary,
   GrowthAuditPageResult,
   GrowthAuditPageStatusFilter,
@@ -1857,6 +1858,19 @@ export function hasGrowthAuditPageShopifyCommerceData(page: GrowthAuditPage): bo
   return Boolean(meta?.syncedAt);
 }
 
+export function getGrowthAuditPageGa4EcommerceMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageGa4EcommerceMetadata | null {
+  const funnel = page.metadata?.ga4Ecommerce;
+  if (!funnel || typeof funnel !== "object") return null;
+  return funnel as GrowthAuditPageGa4EcommerceMetadata;
+}
+
+export function hasGrowthAuditPageGa4EcommerceData(page: GrowthAuditPage): boolean {
+  const meta = getGrowthAuditPageGa4EcommerceMetadata(page);
+  return Boolean(meta?.syncedAt);
+}
+
 function _getAnalyticsPriorityBoost(page: GrowthAuditPage): number {
   const meta = getGrowthAuditPageAnalyticsMetadata(page);
   if (!meta) return 0;
@@ -2649,6 +2663,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   hasSearchConsoleData?: boolean;
   hasAnalyticsData?: boolean;
   hasShopifyCommerceData?: boolean;
+  hasGa4EcommerceData?: boolean;
   shopifyEditable: boolean;
   openFindingsCount: number;
 }): GrowthAuditWorkflowStep[] {
@@ -2660,6 +2675,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
     hasSearchConsoleData = false,
     hasAnalyticsData = false,
     hasShopifyCommerceData = false,
+    hasGa4EcommerceData = false,
     shopifyEditable,
     openFindingsCount,
   } = input;
@@ -2719,6 +2735,12 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
 
   const isProductPage = isGrowthAuditProductPage(page);
 
+  const ga4EcommerceStatus: GrowthAuditWorkflowStepStatus = hasGa4EcommerceData
+    ? "done"
+    : isProductPage
+      ? "available"
+      : "todo";
+
   const commerceStatus: GrowthAuditWorkflowStepStatus = hasShopifyCommerceData
     ? "done"
     : isProductPage
@@ -2758,6 +2780,18 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       status: analyticsStatus,
       anchorId: "analytics",
     },
+  );
+
+  if (isProductPage) {
+    workflowSteps.push({
+      key: "ga4-ecommerce",
+      label: "GA4 Funnel",
+      status: ga4EcommerceStatus,
+      anchorId: "ga4-ecommerce-funnel",
+    });
+  }
+
+  workflowSteps.push(
     { key: "ai", label: "Analisi AI", status: aiStatus, anchorId: "ai-geo-cro" },
     { key: "rescan", label: "Rescan", status: rescanStatus },
     { key: "verify", label: "Verifica", status: verifyStatus, anchorId: "technical-data" },
@@ -2956,6 +2990,9 @@ function _buildProductIntelligenceMissingData(
   if (isGrowthAuditProductPage(page) && !hasGrowthAuditPageShopifyCommerceData(page)) {
     missing.push("Shopify Commerce");
   }
+  if (isGrowthAuditProductPage(page) && !hasGrowthAuditPageGa4EcommerceData(page)) {
+    missing.push("GA4 Ecommerce Funnel");
+  }
   return missing;
 }
 
@@ -2967,6 +3004,7 @@ type ProductIntelligenceTheme =
   | "cro_ai"
   | "shopify_commerce"
   | "shopify_stock"
+  | "ga4_ecommerce_funnel"
   | "incomplete_data"
   | "general";
 
@@ -2976,6 +3014,7 @@ type ProductIntelligenceScoreContext = {
   gscMeta: GrowthAuditPageSearchConsoleMetadata | null;
   analyticsMeta: GrowthAuditPageAnalyticsMetadata | null;
   commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
+  ga4EcommerceMeta: GrowthAuditPageGa4EcommerceMetadata | null;
   performanceSnapshot: PerformanceArtifactsSnapshot;
   croScore: number | null;
   geoScore: number | null;
@@ -3017,6 +3056,7 @@ function _computeProductPriorityScore(input: {
   const gscMeta = getGrowthAuditPageSearchConsoleMetadata(page);
   const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
   const commerceMeta = getGrowthAuditPageShopifyCommerceMetadata(page);
+  const ga4EcommerceMeta = getGrowthAuditPageGa4EcommerceMetadata(page);
   const aiMeta = getGrowthAuditPageAiMetadata(page);
   const performanceSnapshot = _getProductIntelligencePerformanceSnapshot(page, performanceResults);
 
@@ -3199,12 +3239,59 @@ function _computeProductPriorityScore(input: {
     }
   }
 
+  if (ga4EcommerceMeta) {
+    const itemViews = ga4EcommerceMeta.itemViews ?? ga4EcommerceMeta.itemViewEvents ?? 0;
+    const itemsAddedToCart = ga4EcommerceMeta.itemsAddedToCart ?? 0;
+    const itemsCheckedOut = ga4EcommerceMeta.itemsCheckedOut ?? 0;
+    const itemsPurchased = ga4EcommerceMeta.itemsPurchased ?? 0;
+    const itemRevenue = ga4EcommerceMeta.itemRevenue ?? 0;
+    const viewToCartRate = ga4EcommerceMeta.viewToCartRate ?? 0;
+    const cartToPurchaseRate = ga4EcommerceMeta.cartToPurchaseRate ?? 0;
+
+    if (itemViews > 100) {
+      score += 15;
+      addTheme("ga4_ecommerce_funnel", 15);
+    } else if (itemViews >= 30) {
+      score += 8;
+      addTheme("ga4_ecommerce_funnel", 8);
+    }
+    if (itemViews > 50 && itemsAddedToCart === 0) {
+      score += 18;
+      addTheme("ga4_ecommerce_funnel", 18);
+    }
+    if (itemsAddedToCart > 0 && itemsPurchased === 0) {
+      score += 15;
+      addTheme("ga4_ecommerce_funnel", 15);
+    }
+    if (itemsCheckedOut > 0 && itemsPurchased === 0) {
+      score += 12;
+      addTheme("ga4_ecommerce_funnel", 12);
+    }
+    if (itemsPurchased > 0) {
+      score += 12;
+      addTheme("ga4_ecommerce_funnel", 12);
+    }
+    if (itemRevenue > 0) {
+      score += 12;
+      addTheme("ga4_ecommerce_funnel", 12);
+    }
+    if (viewToCartRate < 0.05 && itemViews > 50) {
+      score += 12;
+      addTheme("ga4_ecommerce_funnel", 12);
+    }
+    if (cartToPurchaseRate < 0.2 && itemsAddedToCart > 5) {
+      score += 10;
+      addTheme("ga4_ecommerce_funnel", 10);
+    }
+  }
+
   return {
     score: Math.min(100, Math.max(0, score)),
     themes,
     gscMeta,
     analyticsMeta,
     commerceMeta,
+    ga4EcommerceMeta,
     performanceSnapshot,
     croScore,
     geoScore,
@@ -3228,7 +3315,7 @@ function _buildProductIntelligenceVerdict(input: {
   missingData: string[];
 }): { title: string; verdict: string; mainReason: string } {
   const { context, missingData } = input;
-  const { gscMeta, analyticsMeta, commerceMeta, performanceSnapshot, croScore, aiLatestScore, themes, openFindings } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, ga4EcommerceMeta, performanceSnapshot, croScore, aiLatestScore, themes, openFindings } = context;
 
   const dominant = _getDominantProductIntelligenceTheme(themes);
   const dominantWeight = themes[dominant] ?? 0;
@@ -3246,6 +3333,50 @@ function _buildProductIntelligenceVerdict(input: {
   const hasCriticalFindings = openFindings.some(
     (finding) => finding.severity === "critical" || finding.severity === "high",
   );
+
+  if (
+    ga4EcommerceMeta &&
+    ga4EcommerceMeta.matchedBy === "none" &&
+    (impressions > 200 || sessions > 50 || sales > 0)
+  ) {
+    return {
+      title: "Tracking ecommerce GA4 da verificare",
+      verdict:
+        "Il prodotto ha segnali di domanda ma GA4 non ha abbinato dati item-level in modo affidabile.",
+      mainReason: "Possibile mismatch item_id/SKU o tracking ecommerce incompleto.",
+    };
+  }
+
+  const funnelViews = ga4EcommerceMeta?.itemViews ?? ga4EcommerceMeta?.itemViewEvents ?? 0;
+  const funnelCart = ga4EcommerceMeta?.itemsAddedToCart ?? 0;
+  const funnelPurchases = ga4EcommerceMeta?.itemsPurchased ?? 0;
+
+  if (ga4EcommerceMeta && funnelViews > 50 && funnelCart === 0) {
+    return {
+      title: "View item alte ma add to cart assenti",
+      verdict:
+        "GA4 mostra visualizzazioni prodotto ma pochi o zero add to cart nel periodo.",
+      mainReason: "Frizione su offerta, prezzo, trust, immagini o CTA.",
+    };
+  }
+
+  if (ga4EcommerceMeta && funnelCart > 0 && funnelPurchases === 0) {
+    return {
+      title: "Carrello attivo ma acquisti assenti",
+      verdict:
+        "GA4 mostra add to cart ma pochi acquisti: possibile frizione tra carrello e checkout.",
+      mainReason: "Verifica spedizione, costi finali, trust e checkout.",
+    };
+  }
+
+  if (ga4EcommerceMeta && funnelPurchases > 0) {
+    return {
+      title: "Funnel GA4 che monetizza",
+      verdict:
+        "GA4 mostra acquisti item-level. Le ottimizzazioni possono amplificare un prodotto già validato.",
+      mainReason: "Purchase o item revenue presenti nel funnel GA4.",
+    };
+  }
 
   if (
     dominant === "shopify_stock" ||
@@ -3379,7 +3510,91 @@ function _buildProductIntelligenceEvidence(input: {
 }): GrowthAuditProductIntelligenceSignal[] {
   const { context, priorityActionsCount } = input;
   const signals: GrowthAuditProductIntelligenceSignal[] = [];
-  const { gscMeta, analyticsMeta, commerceMeta, performanceSnapshot, croScore, openFindings } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, ga4EcommerceMeta, performanceSnapshot, croScore, openFindings } = context;
+
+  if (ga4EcommerceMeta) {
+    const itemViews = ga4EcommerceMeta.itemViews ?? ga4EcommerceMeta.itemViewEvents ?? 0;
+    if (itemViews > 0) {
+      signals.push({
+        key: "ga4-item-views",
+        label: "View item",
+        value: _formatItalianNumber(itemViews),
+        tone: itemViews > 100 ? "warning" : "neutral",
+        explanation: "Visualizzazioni prodotto item-level in GA4.",
+      });
+    }
+    if (ga4EcommerceMeta.itemsAddedToCart != null) {
+      signals.push({
+        key: "ga4-add-to-cart",
+        label: "Add to cart",
+        value: _formatItalianNumber(ga4EcommerceMeta.itemsAddedToCart),
+        tone:
+          itemViews > 50 && ga4EcommerceMeta.itemsAddedToCart === 0
+            ? "danger"
+            : ga4EcommerceMeta.itemsAddedToCart > 0
+              ? "good"
+              : "neutral",
+        explanation: "Aggiunte al carrello item-level in GA4.",
+      });
+    }
+    if (ga4EcommerceMeta.itemsCheckedOut != null) {
+      signals.push({
+        key: "ga4-checkout",
+        label: "Checkout",
+        value: _formatItalianNumber(ga4EcommerceMeta.itemsCheckedOut),
+        tone: ga4EcommerceMeta.itemsCheckedOut > 0 ? "good" : "neutral",
+        explanation: "Inizi checkout item-level in GA4.",
+      });
+    }
+    if (ga4EcommerceMeta.itemsPurchased != null) {
+      signals.push({
+        key: "ga4-purchase",
+        label: "Purchase",
+        value: _formatItalianNumber(ga4EcommerceMeta.itemsPurchased),
+        tone: ga4EcommerceMeta.itemsPurchased > 0 ? "good" : "warning",
+        explanation: "Acquisti item-level in GA4.",
+      });
+    }
+    if (ga4EcommerceMeta.itemRevenue != null && ga4EcommerceMeta.itemRevenue > 0) {
+      const currency = ga4EcommerceMeta.currency ? ` ${ga4EcommerceMeta.currency}` : "";
+      signals.push({
+        key: "ga4-item-revenue",
+        label: "Item revenue",
+        value:
+          ga4EcommerceMeta.itemRevenue.toLocaleString("it-IT", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }) + currency,
+        tone: "good",
+        explanation: "Ricavo item-level attribuito in GA4.",
+      });
+    }
+    if (ga4EcommerceMeta.viewToCartRate != null) {
+      signals.push({
+        key: "ga4-view-to-cart",
+        label: "View → cart rate",
+        value: _formatItalianPercent(ga4EcommerceMeta.viewToCartRate),
+        tone:
+          ga4EcommerceMeta.viewToCartRate < 0.05 && itemViews > 50
+            ? "danger"
+            : "neutral",
+        explanation: "Tasso conversione da view a carrello.",
+      });
+    }
+    if (ga4EcommerceMeta.cartToPurchaseRate != null) {
+      signals.push({
+        key: "ga4-cart-to-purchase",
+        label: "Cart → purchase rate",
+        value: _formatItalianPercent(ga4EcommerceMeta.cartToPurchaseRate),
+        tone:
+          ga4EcommerceMeta.cartToPurchaseRate < 0.2 &&
+          (ga4EcommerceMeta.itemsAddedToCart ?? 0) > 5
+            ? "warning"
+            : "neutral",
+        explanation: "Tasso conversione da carrello ad acquisto.",
+      });
+    }
+  }
 
   if (commerceMeta?.sales != null && commerceMeta.sales > 0) {
     const currency = commerceMeta.currency ? ` ${commerceMeta.currency}` : "";
@@ -3573,7 +3788,7 @@ function _buildProductIntelligenceRecommendedActions(input: {
   missingData: string[];
 }): GrowthAuditProductIntelligenceAction[] {
   const { context, missingData } = input;
-  const { gscMeta, analyticsMeta, commerceMeta, performanceSnapshot, croScore, aiLatestScore, openFindings } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, ga4EcommerceMeta, performanceSnapshot, croScore, aiLatestScore, openFindings } = context;
   const actions: GrowthAuditProductIntelligenceAction[] = [];
 
   const impressions = gscMeta?.impressions ?? 0;
@@ -3588,6 +3803,51 @@ function _buildProductIntelligenceRecommendedActions(input: {
   const hasCriticalFindings = openFindings.some(
     (finding) => finding.severity === "critical" || finding.severity === "high",
   );
+
+  const funnelViews = ga4EcommerceMeta?.itemViews ?? ga4EcommerceMeta?.itemViewEvents ?? 0;
+  const funnelCart = ga4EcommerceMeta?.itemsAddedToCart ?? 0;
+  const funnelPurchases = ga4EcommerceMeta?.itemsPurchased ?? 0;
+  const funnelRevenue = ga4EcommerceMeta?.itemRevenue ?? 0;
+
+  if (ga4EcommerceMeta && funnelViews > 50 && funnelCart === 0) {
+    actions.push({
+      title: "Migliora offerta, immagini e CTA",
+      reason: "GA4 mostra visualizzazioni prodotto ma pochi add to cart.",
+      expectedImpact: "Più add to cart e miglior View → Cart rate.",
+      whereToFix: "Pagina prodotto Shopify / immagini / prezzo / CTA / trust",
+      howToValidate: "Controlla View → Cart rate nei prossimi 14/30 giorni.",
+    });
+  }
+
+  if (ga4EcommerceMeta && funnelCart > 0 && funnelPurchases === 0) {
+    actions.push({
+      title: "Analizza frizione tra carrello e acquisto",
+      reason: "GA4 mostra add to cart ma pochi acquisti.",
+      expectedImpact: "Più purchase e item revenue dal funnel esistente.",
+      whereToFix: "Carrello, checkout, spedizione, costi finali, trust",
+      howToValidate: "Controlla Cart → Purchase rate.",
+    });
+  }
+
+  if (ga4EcommerceMeta && (funnelPurchases > 0 || funnelRevenue > 0)) {
+    actions.push({
+      title: "Scala una pagina che già monetizza",
+      reason: "GA4 mostra acquisti o item revenue. Le ottimizzazioni possono amplificare un prodotto già validato.",
+      expectedImpact: "Maggiore item revenue da un funnel già attivo.",
+      whereToFix: "SEO snippet, CRO, immagini, performance, trust",
+      howToValidate: "Confronta item revenue e purchase dopo le modifiche.",
+    });
+  }
+
+  if (ga4EcommerceMeta && ga4EcommerceMeta.matchedBy === "none") {
+    actions.push({
+      title: "Verifica tracciamento ecommerce GA4",
+      reason: "Il prodotto non è stato abbinato in modo affidabile ai dati item-level.",
+      expectedImpact: "Dati funnel affidabili per decisioni CRO.",
+      whereToFix: "GA4 ecommerce tracking / Shopify channel / item_id / SKU",
+      howToValidate: "Rilancia GA4 Ecommerce Funnel e verifica matchedBy.",
+    });
+  }
 
   if (sales > 0 && hasCriticalFindings) {
     actions.push({

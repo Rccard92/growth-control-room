@@ -258,6 +258,7 @@ describe("GrowthAuditPageDetailPage", () => {
     const performanceIndex = indexOfOrFail(html, 'id="performance"');
     const searchConsoleIndex = indexOfOrFail(html, 'id="search-console"');
     const analyticsIndex = indexOfOrFail(html, 'id="analytics"');
+    const ga4FunnelIndex = indexOfOrFail(html, 'id="ga4-ecommerce-funnel"');
     const aiIndex = indexOfOrFail(html, 'id="ai-geo-cro"');
     expect(html).toContain("Product Intelligence");
     expect(productIntelligenceIndex).toBeLessThan(priorityIndex);
@@ -266,7 +267,8 @@ describe("GrowthAuditPageDetailPage", () => {
     expect(shopifyCommerceIndex).toBeLessThan(performanceIndex);
     expect(performanceIndex).toBeLessThan(searchConsoleIndex);
     expect(searchConsoleIndex).toBeLessThan(analyticsIndex);
-    expect(analyticsIndex).toBeLessThan(aiIndex);
+    expect(analyticsIndex).toBeLessThan(ga4FunnelIndex);
+    expect(ga4FunnelIndex).toBeLessThan(aiIndex);
     expect(html).toContain("Cosa sistemare prima");
     expect(html).toContain("Dove intervenire");
     expect(html).toContain("Workflow consigliato");

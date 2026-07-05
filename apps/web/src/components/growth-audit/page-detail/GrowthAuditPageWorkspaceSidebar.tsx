@@ -24,6 +24,7 @@ export interface GrowthAuditPageWorkspaceSidebarProps {
   hasSearchConsoleData?: boolean;
   hasAnalyticsData?: boolean;
   hasShopifyCommerceData?: boolean;
+  hasGa4EcommerceData?: boolean;
   shopifySectionAvailable: boolean;
   aiSectionAvailable: boolean;
   onScrollToSection: (sectionId: string) => void;
@@ -59,6 +60,7 @@ export function GrowthAuditPageWorkspaceSidebar({
   hasSearchConsoleData = false,
   hasAnalyticsData = false,
   hasShopifyCommerceData = false,
+  hasGa4EcommerceData = false,
   shopifySectionAvailable,
   aiSectionAvailable,
   onScrollToSection,
@@ -79,6 +81,7 @@ export function GrowthAuditPageWorkspaceSidebar({
     hasSearchConsoleData,
     hasAnalyticsData,
     hasShopifyCommerceData,
+    hasGa4EcommerceData,
     shopifyEditable: shopifySectionAvailable && Boolean(mappedEntity),
     openFindingsCount,
   });
@@ -221,6 +224,15 @@ export function GrowthAuditPageWorkspaceSidebar({
           >
             GA4
           </button>
+          {isProductPage && hasGa4EcommerceData && (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              onClick={() => onScrollToSection("ga4-ecommerce-funnel")}
+            >
+              GA4 Funnel
+            </button>
+          )}
           <button
             type="button"
             className="gcr-btn gcr-btn--secondary gcr-btn--sm"

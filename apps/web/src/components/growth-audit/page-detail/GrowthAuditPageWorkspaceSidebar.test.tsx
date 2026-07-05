@@ -34,6 +34,7 @@ describe("GrowthAuditPageWorkspaceSidebar", () => {
         hasAiResult={false}
         shopifySectionAvailable
         hasShopifyCommerceData
+        hasGa4EcommerceData
         aiSectionAvailable
         onScrollToSection={() => {}}
       />,
@@ -45,6 +46,7 @@ describe("GrowthAuditPageWorkspaceSidebar", () => {
     expect(html).toContain("Cosa sistemare prima");
     expect(html).toContain("Modifica Shopify");
     expect(html).toContain("Shopify Commerce");
+    expect(html).toContain("GA4 Funnel");
     expect(html).toContain("AI/GEO/CRO");
     expect(html).toContain("Dati tecnici");
     expect(html).toContain("trust, CTA, immagini");

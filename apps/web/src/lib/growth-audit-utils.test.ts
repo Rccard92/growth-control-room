@@ -1312,5 +1312,77 @@ describe("growth-audit-utils", () => {
       ).toBe(true);
       expect(summary.missingData).not.toContain("Shopify Commerce");
     });
+
+    it("boosts score and evidence when GA4 ecommerce funnel data is present", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 120,
+              itemsAddedToCart: 0,
+              itemsCheckedOut: 0,
+              itemsPurchased: 0,
+              itemRevenue: 0,
+              viewToCartRate: 0,
+              cartToPurchaseRate: 0,
+              matchedBy: "item_id",
+              syncedAt: "2026-06-13T10:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+
+      expect(summary.evidence.some((signal) => signal.key === "ga4-item-views")).toBe(true);
+      expect(summary.evidence.some((signal) => signal.key === "ga4-add-to-cart")).toBe(true);
+      expect(
+        summary.recommendedActions.some((action) =>
+          action.title.includes("Migliora offerta, immagini e CTA"),
+        ),
+      ).toBe(true);
+    });
+
+    it("generates cart friction action for GA4 add to cart without purchase", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 60,
+              itemsAddedToCart: 12,
+              itemsCheckedOut: 0,
+              itemsPurchased: 0,
+              itemRevenue: 0,
+              matchedBy: "item_id",
+              syncedAt: "2026-06-13T10:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+
+      expect(
+        summary.recommendedActions.some((action) =>
+          action.title.includes("Analizza frizione tra carrello e acquisto"),
+        ),
+      ).toBe(true);
+    });
+
+    it("includes GA4 Ecommerce Funnel in missingData when absent", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: baseProductPage,
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+      expect(summary.missingData).toContain("GA4 Ecommerce Funnel");
+    });
   });
 });

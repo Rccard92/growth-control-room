@@ -20,6 +20,8 @@ from app.schemas.growth_audit import (
     GrowthAuditAnalyticsAnalysisResponse,
     GrowthAuditShopifyCommerceAnalysisRequest,
     GrowthAuditShopifyCommerceAnalysisResponse,
+    GrowthAuditGa4EcommerceAnalysisRequest,
+    GrowthAuditGa4EcommerceAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
@@ -62,6 +64,9 @@ from app.services.growth_audit.analytics_analysis import (
 )
 from app.services.growth_audit.shopify_commerce_analysis import (
     analyze_growth_audit_shopify_commerce,
+)
+from app.services.growth_audit.analytics_ecommerce_analysis import (
+    analyze_growth_audit_analytics_ecommerce,
 )
 from app.services.shopify.exceptions import (
     ShopifyCommerceApiError,
@@ -587,6 +592,40 @@ async def analyze_growth_audit_shopify_commerce_endpoint(
         run=GrowthAuditRunRead.model_validate(result["run"]),
         summary=summary,
         message=result.get("message") or "Dati ecommerce Shopify aggiornati",
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/analytics-ecommerce-analysis",
+    response_model=GrowthAuditGa4EcommerceAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_analytics_ecommerce_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    request: GrowthAuditGa4EcommerceAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditGa4EcommerceAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        result = await analyze_growth_audit_analytics_ecommerce(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            days=request.days,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    summary = result["summary"]
+    return GrowthAuditGa4EcommerceAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(result["run"]),
+        summary=summary,
+        message=result.get("message") or "Funnel ecommerce GA4 aggiornato",
     )
 
 

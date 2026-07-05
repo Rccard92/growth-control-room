@@ -9,6 +9,7 @@ import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audi
 import { GrowthAuditPageWorkspacePerformanceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspacePerformanceSection";
 import { GrowthAuditPageWorkspaceSearchConsoleSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceSearchConsoleSection";
 import { GrowthAuditPageWorkspaceAnalyticsSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAnalyticsSection";
+import { GrowthAuditPageWorkspaceGa4EcommerceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceGa4EcommerceSection";
 import { GrowthAuditPageWorkspaceAiSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAiSection";
 import { GrowthAuditPageWorkspaceHeader } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceHeader";
 import { GrowthAuditPageWorkspaceSidebar } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceSidebar";
@@ -28,6 +29,7 @@ import {
   hasGrowthAuditPageAnalyticsData,
   hasGrowthAuditPageSearchConsoleData,
   hasGrowthAuditPageShopifyCommerceData,
+  hasGrowthAuditPageGa4EcommerceData,
   isGrowthAuditRunActive,
   mapGrowthAuditPageToSeoEntity,
   sortGrowthAuditFindings,
@@ -120,6 +122,10 @@ export function GrowthAuditPageDetailPage() {
   );
   const hasShopifyCommerceData = useMemo(
     () => (page ? hasGrowthAuditPageShopifyCommerceData(page) : false),
+    [page],
+  );
+  const hasGa4EcommerceData = useMemo(
+    () => (page ? hasGrowthAuditPageGa4EcommerceData(page) : false),
     [page],
   );
   const runSummary = runDetail?.run.summary ?? null;
@@ -244,6 +250,8 @@ export function GrowthAuditPageDetailPage() {
 
           <GrowthAuditPageWorkspaceAnalyticsSection page={page} />
 
+          <GrowthAuditPageWorkspaceGa4EcommerceSection page={page} />
+
           <GrowthAuditPageWorkspaceAiSection
             projectId={projectId}
             runId={runId}
@@ -265,6 +273,7 @@ export function GrowthAuditPageDetailPage() {
           hasSearchConsoleData={hasSearchConsoleData}
           hasAnalyticsData={hasAnalyticsData}
           hasShopifyCommerceData={hasShopifyCommerceData}
+          hasGa4EcommerceData={hasGa4EcommerceData}
           shopifySectionAvailable={Boolean(mappedEntity)}
           aiSectionAvailable={Boolean(aiAvailable)}
           onScrollToSection={scrollToSection}

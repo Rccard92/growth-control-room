@@ -15,6 +15,8 @@ import type {
   GrowthAuditAnalyticsAnalysisResponse,
   GrowthAuditShopifyCommerceAnalysisRequest,
   GrowthAuditShopifyCommerceAnalysisResponse,
+  GrowthAuditGa4EcommerceAnalysisRequest,
+  GrowthAuditGa4EcommerceAnalysisResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
@@ -200,6 +202,20 @@ export function analyzeGrowthAuditShopifyCommerce(
 ): Promise<GrowthAuditShopifyCommerceAnalysisResponse> {
   return apiFetch<GrowthAuditShopifyCommerceAnalysisResponse>(
     `${growthAuditBasePath(projectId)}/runs/${runId}/shopify-commerce-analysis`,
+    {
+      method: "POST",
+      ...jsonBody(payload ?? { days: 30 }),
+    },
+  );
+}
+
+export function analyzeGrowthAuditGa4Ecommerce(
+  projectId: string,
+  runId: string,
+  payload?: GrowthAuditGa4EcommerceAnalysisRequest,
+): Promise<GrowthAuditGa4EcommerceAnalysisResponse> {
+  return apiFetch<GrowthAuditGa4EcommerceAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/analytics-ecommerce-analysis`,
     {
       method: "POST",
       ...jsonBody(payload ?? { days: 30 }),

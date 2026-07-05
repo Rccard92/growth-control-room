@@ -127,6 +127,7 @@ export interface GrowthAuditRunSummary {
   searchConsole?: GrowthAuditRunSearchConsoleSummary;
   analytics?: GrowthAuditRunAnalyticsSummary;
   shopifyCommerce?: GrowthAuditRunShopifyCommerceSummary;
+  ga4Ecommerce?: GrowthAuditRunGa4EcommerceSummary;
 }
 
 export interface GrowthAuditRunAnalyticsSummary {
@@ -214,6 +215,56 @@ export interface GrowthAuditRunShopifyCommerceSummary {
     ordersCount?: number;
   }>;
   lastSyncedAt?: string | null;
+}
+
+export interface GrowthAuditPageGa4EcommerceMetadata {
+  periodDays?: number;
+  itemViews?: number;
+  itemViewEvents?: number;
+  itemsAddedToCart?: number;
+  itemsCheckedOut?: number;
+  itemsPurchased?: number;
+  itemRevenue?: number;
+  currency?: string;
+  viewToCartRate?: number;
+  cartToCheckoutRate?: number;
+  checkoutToPurchaseRate?: number;
+  viewToPurchaseRate?: number;
+  cartToPurchaseRate?: number;
+  dropoffViewToCart?: number;
+  dropoffCartToCheckout?: number;
+  dropoffCheckoutToPurchase?: number;
+  matchedBy?: string;
+  matchedItemIds?: string[];
+  matchedItemNames?: string[];
+  source?: string;
+  syncedAt?: string;
+}
+
+export interface GrowthAuditRunGa4EcommerceSummary {
+  periodDays?: number;
+  totalItemViews?: number;
+  totalItemsAddedToCart?: number;
+  totalItemsCheckedOut?: number;
+  totalItemsPurchased?: number;
+  totalItemRevenue?: number;
+  averageViewToCartRate?: number;
+  averageCartToPurchaseRate?: number;
+  productsWithFunnelData?: number;
+  productsWithoutFunnelData?: number;
+  unmatchedItems?: number;
+  highViewLowCartProducts?: number;
+  highCartLowPurchaseProducts?: number;
+  topFunnelProducts?: Array<{
+    pageId: string;
+    title?: string | null;
+    itemViews?: number;
+    itemsAddedToCart?: number;
+    itemsPurchased?: number;
+    itemRevenue?: number;
+  }>;
+  lastSyncedAt?: string | null;
+  currency?: string;
 }
 
 export interface GrowthAuditPageAiMetadata {
@@ -524,6 +575,16 @@ export interface GrowthAuditShopifyCommerceAnalysisRequest {
 export interface GrowthAuditShopifyCommerceAnalysisResponse {
   run: GrowthAuditRun;
   summary: GrowthAuditRunShopifyCommerceSummary;
+  message: string;
+}
+
+export interface GrowthAuditGa4EcommerceAnalysisRequest {
+  days?: number;
+}
+
+export interface GrowthAuditGa4EcommerceAnalysisResponse {
+  run: GrowthAuditRun;
+  summary: GrowthAuditRunGa4EcommerceSummary;
   message: string;
 }
 

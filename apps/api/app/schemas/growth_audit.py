@@ -427,6 +427,20 @@ class GrowthAuditShopifyCommerceAnalysisResponse(BaseModel):
     message: str
 
 
+class GrowthAuditGa4EcommerceAnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    days: int = Field(default=30, ge=7, le=90)
+
+
+class GrowthAuditGa4EcommerceAnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    run: GrowthAuditRunRead
+    summary: dict[str, Any]
+    message: str
+
+
 class GrowthAuditPageResultsListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

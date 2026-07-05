@@ -16,6 +16,7 @@ import {
   useAnalyzeGrowthAuditAnalytics,
   useAnalyzeGrowthAuditSearchConsole,
   useAnalyzeGrowthAuditShopifyCommerce,
+  useAnalyzeGrowthAuditGa4Ecommerce,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
 import { useGoogleIntegrationStatus } from "../hooks/useGoogleIntegrations";
@@ -116,6 +117,7 @@ export function GrowthAuditPage() {
   const [statusFilter, setStatusFilter] = useState<GrowthAuditPageStatusFilter>("all");
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
   const [commerceDays, setCommerceDays] = useState<7 | 30 | 90>(30);
+  const [ga4FunnelDays, setGa4FunnelDays] = useState<7 | 30 | 90>(30);
 
   useEffect(() => {
     setPublicSiteUrlDraft(project?.publicSiteUrl ?? "");
@@ -134,7 +136,9 @@ export function GrowthAuditPage() {
   const analyzeSearchConsole = useAnalyzeGrowthAuditSearchConsole(projectId, resolvedRunId);
   const analyzeAnalytics = useAnalyzeGrowthAuditAnalytics(projectId, resolvedRunId);
   const analyzeShopifyCommerce = useAnalyzeGrowthAuditShopifyCommerce(projectId, resolvedRunId);
+  const analyzeGa4Ecommerce = useAnalyzeGrowthAuditGa4Ecommerce(projectId, resolvedRunId);
   const shopifyConnected = shopifyStatus?.connected ?? false;
+  const ga4Connected = googleStatus?.analytics.status === "connected";
 
   const { data: runDetail } = useGrowthAuditRun(projectId, resolvedRunId, Boolean(resolvedRunId));
   const runStatus = runDetail?.run.status;
@@ -802,6 +806,116 @@ export function GrowthAuditPage() {
                         ? formatGrowthAuditRunDate(summary.shopifyCommerce.lastSyncedAt)
                         : "—"}
                     </strong>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {isDashboardMode && resolvedRunId && (
+        <section className="growth-audit-ga4-funnel-panel gcr-card">
+          <header className="growth-audit-ga4-funnel-panel__header">
+            <h2 className="growth-audit-ga4-funnel-panel__title">GA4 Ecommerce Funnel</h2>
+          </header>
+
+          {!project?.googleAnalyticsPropertyId ? (
+            <p className="growth-audit-ga4-funnel-panel__callout">
+              Seleziona una proprietà GA4 per leggere eventi ecommerce prodotto. Vai al{" "}
+              <Link to={APP_ROUTES.projectIntegrations(projectId)}>Integration Center</Link>.
+            </p>
+          ) : !ga4Connected ? (
+            <p className="growth-audit-ga4-funnel-panel__callout">
+              Collega Google Analytics 4 per sincronizzare il funnel ecommerce item-level. Vai al{" "}
+              <Link to={APP_ROUTES.projectIntegrations(projectId)}>Integration Center</Link>.
+            </p>
+          ) : (
+            <>
+              <div className="growth-audit-ga4-funnel-panel__actions">
+                <label className="growth-audit-ga4-funnel-panel__period">
+                  Periodo
+                  <select
+                    value={ga4FunnelDays}
+                    onChange={(event) =>
+                      setGa4FunnelDays(Number(event.target.value) as 7 | 30 | 90)
+                    }
+                  >
+                    <option value={7}>7 giorni</option>
+                    <option value={30}>30 giorni</option>
+                    <option value={90}>90 giorni</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--primary"
+                  disabled={analyzeGa4Ecommerce.isPending || activeRun?.status === "analyzing"}
+                  onClick={() => void analyzeGa4Ecommerce.mutateAsync({ days: ga4FunnelDays })}
+                >
+                  {analyzeGa4Ecommerce.isPending
+                    ? "Aggiornamento in corso…"
+                    : "Aggiorna funnel ecommerce GA4"}
+                </button>
+              </div>
+
+              {analyzeGa4Ecommerce.isError && (
+                <p className="growth-audit-ga4-funnel-panel__error" role="alert">
+                  {analyzeGa4Ecommerce.error instanceof Error
+                    ? analyzeGa4Ecommerce.error.message
+                    : "Impossibile aggiornare il funnel ecommerce GA4."}
+                </p>
+              )}
+
+              {summary?.ga4Ecommerce && (
+                <div className="growth-audit-ga4-funnel-panel__kpis">
+                  <div>
+                    <span>Item views</span>
+                    <strong>{summary.ga4Ecommerce.totalItemViews ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Add to cart</span>
+                    <strong>{summary.ga4Ecommerce.totalItemsAddedToCart ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Checkout</span>
+                    <strong>{summary.ga4Ecommerce.totalItemsCheckedOut ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Purchase</span>
+                    <strong>{summary.ga4Ecommerce.totalItemsPurchased ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Item revenue</span>
+                    <strong>
+                      {(summary.ga4Ecommerce.totalItemRevenue ?? 0).toLocaleString("it-IT", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>View → cart</span>
+                    <strong>
+                      {summary.ga4Ecommerce.averageViewToCartRate != null
+                        ? `${(summary.ga4Ecommerce.averageViewToCartRate * 100).toFixed(1)}%`
+                        : "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Cart → purchase</span>
+                    <strong>
+                      {summary.ga4Ecommerce.averageCartToPurchaseRate != null
+                        ? `${(summary.ga4Ecommerce.averageCartToPurchaseRate * 100).toFixed(1)}%`
+                        : "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Prodotti con funnel</span>
+                    <strong>{summary.ga4Ecommerce.productsWithFunnelData ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Unmatched items</span>
+                    <strong>{summary.ga4Ecommerce.unmatchedItems ?? 0}</strong>
                   </div>
                 </div>
               )}

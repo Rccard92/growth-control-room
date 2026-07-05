@@ -18,6 +18,7 @@ const {
   useAnalyzeGrowthAuditSearchConsoleMock,
   useAnalyzeGrowthAuditAnalyticsMock,
   useAnalyzeGrowthAuditShopifyCommerceMock,
+  useAnalyzeGrowthAuditGa4EcommerceMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
@@ -33,6 +34,7 @@ const {
   useAnalyzeGrowthAuditSearchConsoleMock: vi.fn(),
   useAnalyzeGrowthAuditAnalyticsMock: vi.fn(),
   useAnalyzeGrowthAuditShopifyCommerceMock: vi.fn(),
+  useAnalyzeGrowthAuditGa4EcommerceMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -62,6 +64,7 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useAnalyzeGrowthAuditSearchConsole: useAnalyzeGrowthAuditSearchConsoleMock,
   useAnalyzeGrowthAuditAnalytics: useAnalyzeGrowthAuditAnalyticsMock,
   useAnalyzeGrowthAuditShopifyCommerce: useAnalyzeGrowthAuditShopifyCommerceMock,
+  useAnalyzeGrowthAuditGa4Ecommerce: useAnalyzeGrowthAuditGa4EcommerceMock,
 }));
 
 vi.mock("../hooks/useGoogleIntegrations", () => ({
@@ -314,6 +317,10 @@ function setupMocks(options?: {
     mutateAsync: vi.fn(),
     isPending: false,
   });
+  useAnalyzeGrowthAuditGa4EcommerceMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
 }
 
 function renderPage() {
@@ -453,6 +460,18 @@ describe("GrowthAuditPage", () => {
     const html = renderPage();
     expect(html).toContain("Shopify vendite prodotto");
     expect(html).toContain("Aggiorna vendite Shopify");
+  });
+
+  it("shows GA4 ecommerce funnel CTA when GA4 is connected", () => {
+    setupMocks({
+      withActiveRun: true,
+      withTechnicalScan: true,
+      analyticsConnected: true,
+      googleAnalyticsPropertyId: "123456789",
+    });
+    const html = renderPage();
+    expect(html).toContain("GA4 Ecommerce Funnel");
+    expect(html).toContain("Aggiorna funnel ecommerce GA4");
   });
 
   it("shows configured public site hostname in dashboard hero", () => {

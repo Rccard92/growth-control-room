@@ -7,6 +7,7 @@ import type {
   GrowthAuditSearchConsoleAnalysisRequest,
   GrowthAuditAnalyticsAnalysisRequest,
   GrowthAuditShopifyCommerceAnalysisRequest,
+  GrowthAuditGa4EcommerceAnalysisRequest,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunStatus,
   GrowthAuditTasksFilters,
@@ -17,6 +18,7 @@ import {
   analyzeGrowthAuditSearchConsole,
   analyzeGrowthAuditAnalytics,
   analyzeGrowthAuditShopifyCommerce,
+  analyzeGrowthAuditGa4Ecommerce,
   fetchGrowthAuditEvents,
   fetchGrowthAuditFindings,
   fetchGrowthAuditPageResults,
@@ -399,6 +401,42 @@ export function useAnalyzeGrowthAuditShopifyCommerce(projectId?: string, runId?:
         throw new Error("projectId and runId are required");
       }
       return analyzeGrowthAuditShopifyCommerce(projectId, runId, payload);
+    },
+    onSuccess: (data) => {
+      if (!projectId) return;
+
+      const resolvedRunId = data.run.id;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.runs(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.run(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pages(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.findings(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.tasks(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.events(projectId, resolvedRunId),
+      });
+    },
+  });
+}
+
+export function useAnalyzeGrowthAuditGa4Ecommerce(projectId?: string, runId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: GrowthAuditGa4EcommerceAnalysisRequest) => {
+      if (!projectId || !runId) {
+        throw new Error("projectId and runId are required");
+      }
+      return analyzeGrowthAuditGa4Ecommerce(projectId, runId, payload);
     },
     onSuccess: (data) => {
       if (!projectId) return;
