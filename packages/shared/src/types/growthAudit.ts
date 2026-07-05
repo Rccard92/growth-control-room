@@ -119,6 +119,11 @@ export interface GrowthAuditRunSummary {
   adsFindings?: number;
   lastAiAnalysisAt?: string | null;
   lastAiAnalysisUrl?: string | null;
+  performancePagesAnalyzed?: number;
+  averagePerformanceScore?: number | null;
+  performanceIssuesOpen?: number;
+  lastPerformanceAnalysisAt?: string | null;
+  lastPerformanceAnalysisUrl?: string | null;
 }
 
 export interface GrowthAuditPageAiMetadata {
@@ -129,6 +134,17 @@ export interface GrowthAuditPageAiMetadata {
   croScore?: number;
   adsReadinessScore?: number;
   analyzedAt?: string;
+}
+
+export interface GrowthAuditPagePerformanceMetadata {
+  latestResultId?: string;
+  latestScore?: number;
+  analyzedAt?: string;
+  cruxSource?: string | null;
+  lcp?: number | null;
+  cls?: number | null;
+  inp?: number | null;
+  strategy?: string;
 }
 
 export interface GrowthAuditRunCreateRequest {
@@ -370,6 +386,19 @@ export interface GrowthAuditPageAiAnalysisRequest {
 }
 
 export interface GrowthAuditPageAiAnalysisResponse {
+  run: GrowthAuditRun;
+  page: GrowthAuditPage;
+  result: GrowthAuditPageResult;
+  findingsCount: number;
+  tasksCount: number;
+  message: string;
+}
+
+export interface GrowthAuditPagePerformanceAnalysisRequest {
+  strategy?: "mobile" | "desktop";
+}
+
+export interface GrowthAuditPagePerformanceAnalysisResponse {
   run: GrowthAuditRun;
   page: GrowthAuditPage;
   result: GrowthAuditPageResult;

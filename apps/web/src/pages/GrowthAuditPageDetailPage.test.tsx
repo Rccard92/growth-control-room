@@ -11,6 +11,7 @@ const {
   useGrowthAuditPageResultsMock,
   useRescanGrowthAuditPageMock,
   useAnalyzeGrowthAuditPageWithAiMock,
+  useAnalyzeGrowthAuditPagePerformanceMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useGrowthAuditRunMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   useGrowthAuditPageResultsMock: vi.fn(),
   useRescanGrowthAuditPageMock: vi.fn(),
   useAnalyzeGrowthAuditPageWithAiMock: vi.fn(),
+  useAnalyzeGrowthAuditPagePerformanceMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -36,6 +38,7 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useGrowthAuditPageResults: useGrowthAuditPageResultsMock,
   useRescanGrowthAuditPage: useRescanGrowthAuditPageMock,
   useAnalyzeGrowthAuditPageWithAi: useAnalyzeGrowthAuditPageWithAiMock,
+  useAnalyzeGrowthAuditPagePerformance: useAnalyzeGrowthAuditPagePerformanceMock,
 }));
 
 vi.mock("../hooks/useContentSeo", async (importOriginal) => {
@@ -167,10 +170,40 @@ function setupDetailMocks() {
     ],
   });
 
-  useGrowthAuditPageResultsMock.mockReturnValue({
-    data: [],
-    isLoading: false,
-  });
+  useGrowthAuditPageResultsMock.mockImplementation(
+    (_projectId, _runId, _pageId, filters?: { resultType?: string }) => ({
+      data:
+        filters?.resultType === "performance"
+          ? [
+              {
+                id: "perf-result-1",
+                runId: "run-1",
+                projectId: "proj-1",
+                pageId: "page-2",
+                resultType: "performance",
+                status: "completed",
+                score: 68,
+                summary: "Performance score 68.",
+                artifacts: {
+                  pagespeed: {
+                    performanceScore: 68,
+                    accessibilityScore: 90,
+                    bestPracticesScore: 85,
+                    seoLighthouseScore: 88,
+                    lcp: 2800,
+                    cls: 0.08,
+                    tbt: 250,
+                    fcp: 1200,
+                  },
+                  crux: { source: "missing" },
+                  strategy: "mobile",
+                },
+              },
+            ]
+          : [],
+      isLoading: false,
+    }),
+  );
 
   useRescanGrowthAuditPageMock.mockReturnValue({
     mutateAsync: vi.fn(),
@@ -178,6 +211,11 @@ function setupDetailMocks() {
   });
 
   useAnalyzeGrowthAuditPageWithAiMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
+
+  useAnalyzeGrowthAuditPagePerformanceMock.mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
   });
@@ -215,12 +253,24 @@ describe("GrowthAuditPageDetailPage", () => {
     const html = renderDetailPage();
     const priorityIndex = indexOfOrFail(html, 'id="priority-actions"');
     const shopifyIndex = indexOfOrFail(html, 'id="shopify-edit"');
+    const performanceIndex = indexOfOrFail(html, 'id="performance"');
     const aiIndex = indexOfOrFail(html, 'id="ai-geo-cro"');
     expect(priorityIndex).toBeLessThan(shopifyIndex);
-    expect(shopifyIndex).toBeLessThan(aiIndex);
+    expect(shopifyIndex).toBeLessThan(performanceIndex);
+    expect(performanceIndex).toBeLessThan(aiIndex);
     expect(html).toContain("Cosa sistemare prima");
     expect(html).toContain("Dove intervenire");
     expect(html).toContain("Workflow consigliato");
+  });
+
+  it("renders performance section with CTA, scores and CrUX missing message", () => {
+    setupDetailMocks();
+    const html = renderDetailPage();
+    expect(html).toContain("Performance / Core Web Vitals");
+    expect(html).toContain("Analizza performance");
+    expect(html).toContain("Performance Score");
+    expect(html).toContain("CrUX non ha dati sufficienti per questa URL");
+    expect(html).toContain("68");
   });
 
   it("renders Shopify callout and AI cost warning", () => {

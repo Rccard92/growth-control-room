@@ -4,6 +4,7 @@ import type {
   GrowthAuditInventoryFilter,
   GrowthAuditPage,
   GrowthAuditPageAiMetadata,
+  GrowthAuditPagePerformanceMetadata,
   GrowthAuditPageResult,
   GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
@@ -1773,6 +1774,24 @@ export function hasGrowthAuditPageAiAnalysis(page: GrowthAuditPage): boolean {
   return Boolean(aiMeta?.analyzedAt || aiMeta?.latestResultId || aiMeta?.latestScore != null);
 }
 
+export function getGrowthAuditPagePerformanceMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPagePerformanceMetadata | null {
+  const performance = page.metadata?.performance;
+  if (!performance || typeof performance !== "object") return null;
+  return performance as GrowthAuditPagePerformanceMetadata;
+}
+
+export function hasGrowthAuditPagePerformanceAnalysis(page: GrowthAuditPage): boolean {
+  const performanceMeta = getGrowthAuditPagePerformanceMetadata(page);
+  return Boolean(
+    performanceMeta?.analyzedAt ||
+      performanceMeta?.latestResultId ||
+      performanceMeta?.latestScore != null ||
+      page.performanceScore != null,
+  );
+}
+
 export type GrowthAuditDashboardKpiItem = {
   label: string;
   value: string;
@@ -1831,6 +1850,8 @@ export function getGrowthAuditDashboardKpiItems(
     summary?.aiPagesAnalyzed ?? (aiPagesFromPages > 0 ? aiPagesFromPages : null);
   const { geoAverage, croAverage, adsAverage } = computeGrowthAuditPageScoreAverages(pages);
   const formatAverage = (average: number | null) => (average != null ? String(average) : "—");
+  const performanceScore =
+    summary?.averagePerformanceScore ?? run?.performanceScore ?? null;
 
   return [
     {
@@ -1868,8 +1889,9 @@ export function getGrowthAuditDashboardKpiItems(
     },
     {
       label: "Performance",
-      value: run?.performanceScore != null ? String(run.performanceScore) : "—",
-      meta: run?.performanceScore == null ? "In arrivo" : undefined,
+      value: performanceScore != null ? String(performanceScore) : "—",
+      score: performanceScore,
+      meta: performanceScore == null ? "Non analizzato" : undefined,
     },
   ];
 }
@@ -2028,6 +2050,12 @@ function _buildPagePriorityReasons(input: {
   }
   if (openTasks > 0) {
     reasons.push("Task aperti");
+  }
+  if (
+    !hasGrowthAuditPagePerformanceAnalysis(page) &&
+    (page.pageType === "product" || page.pageType === "landing")
+  ) {
+    reasons.push("Performance non ancora analizzata");
   }
   if (page.pageType === "collection" && page.score != null && page.score < 80) {
     reasons.push("Collection commerciale da ottimizzare");
@@ -2424,10 +2452,18 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   page: GrowthAuditPage;
   priorityActionsCount: number;
   hasAiResult: boolean;
+  hasPerformanceResult?: boolean;
   shopifyEditable: boolean;
   openFindingsCount: number;
 }): GrowthAuditWorkflowStep[] {
-  const { page, priorityActionsCount, hasAiResult, shopifyEditable, openFindingsCount } = input;
+  const {
+    page,
+    priorityActionsCount,
+    hasAiResult,
+    hasPerformanceResult = false,
+    shopifyEditable,
+    openFindingsCount,
+  } = input;
   const isAnalyzed = page.status === "analyzed";
   const isStrategic = STRATEGIC_WORKFLOW_PAGE_TYPES.has((page.pageType ?? "").toLowerCase());
   const canRescan = page.status !== "analyzing";
@@ -2464,9 +2500,16 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       ? "available"
       : "todo";
 
+  const performanceStatus: GrowthAuditWorkflowStepStatus = hasPerformanceResult
+    ? "done"
+    : isStrategic || page.pageType === "product" || page.pageType === "landing"
+      ? "recommended"
+      : "available";
+
   return [
     { key: "priority", label: "Priorità", status: priorityStatus, anchorId: "priority-actions" },
     { key: "edit", label: "Modifica", status: modifyStatus, anchorId: "shopify-edit" },
+    { key: "performance", label: "Performance", status: performanceStatus, anchorId: "performance" },
     { key: "ai", label: "Analisi AI", status: aiStatus, anchorId: "ai-geo-cro" },
     { key: "rescan", label: "Rescan", status: rescanStatus },
     { key: "verify", label: "Verifica", status: verifyStatus, anchorId: "technical-data" },

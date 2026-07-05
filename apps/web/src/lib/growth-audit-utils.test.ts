@@ -240,7 +240,24 @@ describe("growth-audit-utils", () => {
     );
     expect(kpis.find((kpi) => kpi.label === "Score tecnico")?.value).toBe("78");
     expect(kpis.find((kpi) => kpi.label === "GEO medio")?.value).toBe("70");
-    expect(kpis.find((kpi) => kpi.label === "Performance")?.meta).toBe("In arrivo");
+    expect(kpis.find((kpi) => kpi.label === "Performance")?.meta).toBe("Non analizzato");
+  });
+
+  it("uses averagePerformanceScore for dashboard KPI when present", () => {
+    const kpis = getGrowthAuditDashboardKpiItems(
+      {
+        siteScore: 78,
+        pagesAnalyzed: 3,
+        performanceScore: 55,
+        summary: {
+          pagesAnalyzed: 3,
+          averagePerformanceScore: 72,
+        },
+      },
+      samplePages,
+    );
+    expect(kpis.find((kpi) => kpi.label === "Performance")?.value).toBe("72");
+    expect(kpis.find((kpi) => kpi.label === "Performance")?.meta).toBeUndefined();
   });
 
   it("maps score bands and badge classes", () => {
@@ -776,6 +793,15 @@ describe("growth-audit-utils", () => {
       expect(items[0].isShopifyLinked).toBe(true);
     });
 
+    it("adds performance reason for strategic pages without performance analysis", () => {
+      const items = buildGrowthAuditPagePriorityItems({
+        pages: [productPage],
+        findings: [],
+        tasks: [],
+      });
+      expect(items[0].reasons).toContain("Performance non ancora analizzata");
+    });
+
     it("getGrowthAuditPriorityLevelLabel returns Italian labels", () => {
       expect(getGrowthAuditPriorityLevelLabel("critical")).toBe("Critico");
       expect(getGrowthAuditPriorityLevelLabel("high")).toBe("Alto");
@@ -899,6 +925,30 @@ describe("growth-audit-utils", () => {
       });
       const editStep = steps.find((step) => step.key === "edit");
       expect(editStep?.status).toBe("available");
+    });
+
+    it("marks performance step done when result exists", () => {
+      const steps = buildGrowthAuditPageWorkflowSteps({
+        page: {
+          id: "p1",
+          runId: "run",
+          projectId: "proj",
+          url: "https://example.com/products/a",
+          normalizedUrl: "https://example.com/products/a",
+          pageType: "product",
+          source: "shopify_product",
+          status: "analyzed",
+          priority: "normal",
+        },
+        priorityActionsCount: 0,
+        hasAiResult: false,
+        hasPerformanceResult: true,
+        shopifyEditable: true,
+        openFindingsCount: 0,
+      });
+      const performanceStep = steps.find((step) => step.key === "performance");
+      expect(performanceStep?.status).toBe("done");
+      expect(performanceStep?.anchorId).toBe("performance");
     });
   });
 });

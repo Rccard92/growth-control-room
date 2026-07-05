@@ -2,6 +2,7 @@ import type { GrowthAuditPage } from "@gcr/shared";
 import {
   buildGrowthAuditPageWorkflowSteps,
   getGrowthAuditPageAiMetadata,
+  getGrowthAuditPagePerformanceMetadata,
   getGrowthAuditSourceEntityTypeLabel,
   getGrowthAuditWorkflowStepStatusLabel,
   getGrowthAuditWorkspaceOperativeNote,
@@ -16,6 +17,7 @@ export interface GrowthAuditPageWorkspaceSidebarProps {
   openFindingsCount: number;
   openTasksCount: number;
   hasAiResult: boolean;
+  hasPerformanceResult?: boolean;
   shopifySectionAvailable: boolean;
   aiSectionAvailable: boolean;
   onScrollToSection: (sectionId: string) => void;
@@ -47,11 +49,13 @@ export function GrowthAuditPageWorkspaceSidebar({
   openFindingsCount,
   openTasksCount,
   hasAiResult,
+  hasPerformanceResult = false,
   shopifySectionAvailable,
   aiSectionAvailable,
   onScrollToSection,
 }: GrowthAuditPageWorkspaceSidebarProps) {
   const aiMeta = getGrowthAuditPageAiMetadata(page);
+  const performanceMeta = getGrowthAuditPagePerformanceMetadata(page);
   const shopifyLinked = isGrowthAuditPageShopifyLinked(page);
   const mappedEntity = mapGrowthAuditPageToSeoEntity(page);
 
@@ -59,6 +63,7 @@ export function GrowthAuditPageWorkspaceSidebar({
     page,
     priorityActionsCount,
     hasAiResult,
+    hasPerformanceResult,
     shopifyEditable: shopifySectionAvailable && Boolean(mappedEntity),
     openFindingsCount,
   });
@@ -92,6 +97,10 @@ export function GrowthAuditPageWorkspaceSidebar({
           <div>
             <dt>Ultima analisi AI</dt>
             <dd>{formatDate(aiMeta?.analyzedAt)}</dd>
+          </div>
+          <div>
+            <dt>Ultima analisi performance</dt>
+            <dd>{formatDate(performanceMeta?.analyzedAt)}</dd>
           </div>
           <div>
             <dt>Problemi aperti</dt>
@@ -150,6 +159,13 @@ export function GrowthAuditPageWorkspaceSidebar({
               AI/GEO/CRO
             </button>
           )}
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+            onClick={() => onScrollToSection("performance")}
+          >
+            Performance
+          </button>
           <button
             type="button"
             className="gcr-btn gcr-btn--secondary gcr-btn--sm"

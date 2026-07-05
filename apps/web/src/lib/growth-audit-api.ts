@@ -4,6 +4,8 @@ import type {
   GrowthAuditFindingsListResponse,
   GrowthAuditPageAiAnalysisRequest,
   GrowthAuditPageAiAnalysisResponse,
+  GrowthAuditPagePerformanceAnalysisRequest,
+  GrowthAuditPagePerformanceAnalysisResponse,
   GrowthAuditPageRescanRequest,
   GrowthAuditPageRescanResponse,
   GrowthAuditPageResultsListResponse,
@@ -138,6 +140,21 @@ export function analyzeGrowthAuditPageWithAi(
           includeAdsReadiness: true,
         },
       ),
+    },
+  );
+}
+
+export function analyzeGrowthAuditPagePerformance(
+  projectId: string,
+  runId: string,
+  pageId: string,
+  payload?: GrowthAuditPagePerformanceAnalysisRequest,
+): Promise<GrowthAuditPagePerformanceAnalysisResponse> {
+  return apiFetch<GrowthAuditPagePerformanceAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/pages/${pageId}/performance-analysis`,
+    {
+      method: "POST",
+      ...jsonBody(payload ?? { strategy: "mobile" }),
     },
   );
 }

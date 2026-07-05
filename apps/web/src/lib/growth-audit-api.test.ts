@@ -131,4 +131,18 @@ describe("growth-audit-api", () => {
       "/api/projects/proj-1/growth-audit/runs/run-42/pages/page-7/results?resultType=ai_deep_analysis",
     );
   });
+
+  it("calls performance-analysis page endpoint with POST body", async () => {
+    const { analyzeGrowthAuditPagePerformance } = await import("./growth-audit-api");
+    await analyzeGrowthAuditPagePerformance("proj-1", "run-42", "page-7", {
+      strategy: "desktop",
+    });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/pages/page-7/performance-analysis",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ strategy: "desktop" }),
+      }),
+    );
+  });
 });

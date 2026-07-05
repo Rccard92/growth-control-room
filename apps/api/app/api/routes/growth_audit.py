@@ -12,6 +12,8 @@ from app.schemas.growth_audit import (
     GrowthAuditFindingsListResponse,
     GrowthAuditPageAiAnalysisRequest,
     GrowthAuditPageAiAnalysisResponse,
+    GrowthAuditPagePerformanceAnalysisRequest,
+    GrowthAuditPagePerformanceAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
@@ -26,6 +28,7 @@ from app.schemas.growth_audit import (
     GrowthAuditTaskRead,
     GrowthAuditTasksListResponse,
 )
+from app.services.google.exceptions import GoogleApiRequestError, GoogleIntegrationNotConfiguredError
 from app.services.growth_audit.exceptions import (
     GrowthAuditError,
     GrowthAuditRunNotFoundError,
@@ -34,6 +37,9 @@ from app.services.growth_audit.exceptions import (
 from app.services.growth_audit.page_ai_analysis import (
     analyze_growth_audit_page_with_ai,
     list_growth_audit_page_results,
+)
+from app.services.growth_audit.page_performance_analysis import (
+    analyze_growth_audit_page_performance,
 )
 from app.services.growth_audit.run_service import (
     get_growth_audit_run_detail,
@@ -66,6 +72,16 @@ def _map_growth_audit_error(
     if isinstance(exc, GrowthAuditRunNotFoundError):
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    if isinstance(exc, GoogleIntegrationNotConfiguredError):
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    if isinstance(exc, GoogleApiRequestError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         )
     if isinstance(exc, GrowthAuditError):
@@ -358,6 +374,49 @@ async def analyze_growth_audit_page_ai_endpoint(
         else f"Analisi AI fallita: {result.error_message or 'errore sconosciuto'}"
     )
     return GrowthAuditPageAiAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(run),
+        page=GrowthAuditPageRead.model_validate(page),
+        result=GrowthAuditPageResultRead.model_validate(result),
+        findings_count=findings_count,
+        tasks_count=tasks_count,
+        message=message,
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/performance-analysis",
+    response_model=GrowthAuditPagePerformanceAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_page_performance_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID,
+    request: GrowthAuditPagePerformanceAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditPagePerformanceAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        run, page, result, findings_count, tasks_count = await analyze_growth_audit_page_performance(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            page_id=page_id,
+            strategy=request.strategy,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    message = (
+        f"Analisi performance completata. Score: {result.score}."
+        if result.status == "completed"
+        else f"Analisi performance fallita: {result.error_message or 'errore sconosciuto'}"
+    )
+    return GrowthAuditPagePerformanceAnalysisResponse(
         run=GrowthAuditRunRead.model_validate(run),
         page=GrowthAuditPageRead.model_validate(page),
         result=GrowthAuditPageResultRead.model_validate(result),

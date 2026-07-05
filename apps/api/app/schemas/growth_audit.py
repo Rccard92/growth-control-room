@@ -368,6 +368,23 @@ class GrowthAuditPageAiAnalysisResponse(BaseModel):
     message: str
 
 
+class GrowthAuditPagePerformanceAnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    strategy: Literal["mobile", "desktop"] = "mobile"
+
+
+class GrowthAuditPagePerformanceAnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    run: GrowthAuditRunRead
+    page: GrowthAuditPageRead
+    result: GrowthAuditPageResultRead
+    findings_count: int = Field(serialization_alias="findingsCount")
+    tasks_count: int = Field(serialization_alias="tasksCount")
+    message: str
+
+
 class GrowthAuditPageResultsListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

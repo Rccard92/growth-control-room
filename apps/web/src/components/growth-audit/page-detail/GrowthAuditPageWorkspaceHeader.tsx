@@ -5,6 +5,7 @@ import { APP_ROUTES } from "../../../routes/config";
 import {
   formatGrowthAuditScore,
   getGrowthAuditPageAiMetadata,
+  getGrowthAuditPagePerformanceMetadata,
   getGrowthAuditPageInventoryStatusLabel,
   getGrowthAuditPageScoreLabel,
   getGrowthAuditPageSourceLabel,
@@ -63,9 +64,11 @@ export function GrowthAuditPageWorkspaceHeader({
   const aiAvailable = page.status === "analyzed";
   const rescanLabel = page.status === "failed" ? "Riprova scansione" : "Riscansiona pagina";
   const aiMeta = getGrowthAuditPageAiMetadata(page);
+  const performanceMeta = getGrowthAuditPagePerformanceMetadata(page);
   const rawOutput = latestAiResult?.rawOutput as Record<string, unknown> | undefined;
 
   const aiScore = latestAiResult?.score ?? aiMeta?.latestScore ?? null;
+  const performanceScore = page.performanceScore ?? performanceMeta?.latestScore ?? null;
   const geoScore =
     (rawOutput?.geoScore as number | undefined) ?? page.geoScore ?? aiMeta?.geoScore ?? null;
   const croScore =
@@ -150,6 +153,7 @@ export function GrowthAuditPageWorkspaceHeader({
           </div>
           <div className="growth-audit-workspace-header__score-mini">
             <span>AI {formatGrowthAuditScore(aiScore)}</span>
+            <span>Performance {formatScoreValue(performanceScore)}</span>
             <span>GEO {formatScoreValue(geoScore)}</span>
             <span>CRO {formatScoreValue(croScore)}</span>
             <span>Ads {formatScoreValue(adsScore)}</span>
@@ -193,6 +197,13 @@ export function GrowthAuditPageWorkspaceHeader({
             Analizza AI/GEO/CRO
           </button>
         )}
+        <button
+          type="button"
+          className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+          onClick={() => onScrollToSection("performance")}
+        >
+          Performance
+        </button>
         <button
           type="button"
           className="gcr-btn gcr-btn--secondary gcr-btn--sm"

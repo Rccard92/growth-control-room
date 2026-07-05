@@ -374,7 +374,7 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("78");
     expect(html).toContain("Pagine analizzate");
     expect(html).toContain("Performance");
-    expect(html).toContain("In arrivo");
+    expect(html).toContain("Non analizzato");
   });
 
   it("shows configured public site hostname in dashboard hero", () => {

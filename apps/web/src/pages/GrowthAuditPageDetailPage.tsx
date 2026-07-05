@@ -4,6 +4,7 @@ import type { GrowthAuditPageResult } from "@gcr/shared";
 import { GrowthAuditPriorityActionsPanel } from "../components/growth-audit/GrowthAuditPriorityActionsPanel";
 import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailShopifySection";
 import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailTechnicalSection";
+import { GrowthAuditPageWorkspacePerformanceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspacePerformanceSection";
 import { GrowthAuditPageWorkspaceAiSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAiSection";
 import { GrowthAuditPageWorkspaceHeader } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceHeader";
 import { GrowthAuditPageWorkspaceSidebar } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceSidebar";
@@ -19,6 +20,7 @@ import {
   buildGrowthAuditPriorityActions,
   getFindingsForPage,
   getTasksForPage,
+  hasGrowthAuditPagePerformanceAnalysis,
   isGrowthAuditRunActive,
   mapGrowthAuditPageToSeoEntity,
   sortGrowthAuditFindings,
@@ -73,6 +75,13 @@ export function GrowthAuditPageDetailPage() {
     { resultType: "ai_deep_analysis" },
     Boolean(projectId && runId && pageId),
   );
+  const { data: performanceResults = [] } = useGrowthAuditPageResults(
+    projectId,
+    runId,
+    pageId,
+    { resultType: "performance" },
+    Boolean(projectId && runId && pageId),
+  );
   const rescanPage = useRescanGrowthAuditPage(projectId);
 
   const page = useMemo(
@@ -88,6 +97,12 @@ export function GrowthAuditPageDetailPage() {
     [tasks, pageId],
   );
   const latestAiResult = useMemo(() => getLatestCompletedAiResult(pageResults), [pageResults]);
+  const hasPerformanceResult = useMemo(
+    () =>
+      getLatestCompletedAiResult(performanceResults) != null ||
+      (page ? hasGrowthAuditPagePerformanceAnalysis(page) : false),
+    [performanceResults, page],
+  );
   const mappedEntity = page ? mapGrowthAuditPageToSeoEntity(page) : null;
   const aiAvailable = page?.status === "analyzed";
 
@@ -184,6 +199,13 @@ export function GrowthAuditPageDetailPage() {
 
           <GrowthAuditPageDetailShopifySection projectId={projectId} page={page} />
 
+          <GrowthAuditPageWorkspacePerformanceSection
+            projectId={projectId}
+            runId={runId}
+            page={page}
+            runStatus={runStatus}
+          />
+
           <GrowthAuditPageWorkspaceAiSection
             projectId={projectId}
             runId={runId}
@@ -201,6 +223,7 @@ export function GrowthAuditPageDetailPage() {
           openFindingsCount={pageFindings.length}
           openTasksCount={pageTasks.length}
           hasAiResult={Boolean(latestAiResult)}
+          hasPerformanceResult={hasPerformanceResult}
           shopifySectionAvailable={Boolean(mappedEntity)}
           aiSectionAvailable={Boolean(aiAvailable)}
           onScrollToSection={scrollToSection}
