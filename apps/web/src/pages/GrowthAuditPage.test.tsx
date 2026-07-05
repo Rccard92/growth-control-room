@@ -14,6 +14,8 @@ const {
   useGrowthAuditTasksMock,
   useStartGrowthAuditRunMock,
   useRescanGrowthAuditPageMock,
+  useGoogleIntegrationStatusMock,
+  useAnalyzeGrowthAuditSearchConsoleMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
@@ -25,6 +27,8 @@ const {
   useGrowthAuditTasksMock: vi.fn(),
   useStartGrowthAuditRunMock: vi.fn(),
   useRescanGrowthAuditPageMock: vi.fn(),
+  useGoogleIntegrationStatusMock: vi.fn(),
+  useAnalyzeGrowthAuditSearchConsoleMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -51,6 +55,11 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useGrowthAuditTasks: useGrowthAuditTasksMock,
   useStartGrowthAuditRun: useStartGrowthAuditRunMock,
   useRescanGrowthAuditPage: useRescanGrowthAuditPageMock,
+  useAnalyzeGrowthAuditSearchConsole: useAnalyzeGrowthAuditSearchConsoleMock,
+}));
+
+vi.mock("../hooks/useGoogleIntegrations", () => ({
+  useGoogleIntegrationStatus: useGoogleIntegrationStatusMock,
 }));
 
 vi.mock("../hooks/useContentSeo", () => ({
@@ -84,6 +93,7 @@ function setupMocks(options?: {
   withActiveRun?: boolean;
   withTechnicalScan?: boolean;
   publicSiteUrl?: string | null;
+  searchConsoleSiteUrl?: string | null;
 }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
@@ -91,6 +101,7 @@ function setupMocks(options?: {
       id: "proj-1",
       name: "Solmielato",
       publicSiteUrl: options?.publicSiteUrl ?? null,
+      searchConsoleSiteUrl: options?.searchConsoleSiteUrl ?? null,
     },
     isLoading: false,
   });
@@ -266,6 +277,21 @@ function setupMocks(options?: {
     isPending: false,
     isError: false,
   });
+  useGoogleIntegrationStatusMock.mockReturnValue({
+    data: {
+      pagespeed: { status: "connected", configured: true },
+      crux: { status: "connected", configured: true },
+      oauth: { status: "connected", configured: true },
+      searchConsole: { status: "connected", configured: true },
+      analytics: { status: "needs_setup", configured: true },
+      googleAds: { status: "setup_incomplete", configured: true },
+    },
+    isLoading: false,
+  });
+  useAnalyzeGrowthAuditSearchConsoleMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
 }
 
 function renderPage() {
@@ -375,6 +401,16 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Pagine analizzate");
     expect(html).toContain("Performance");
     expect(html).toContain("Non analizzato");
+  });
+
+  it("shows Search Console sync CTA when property is configured", () => {
+    setupMocks({
+      withActiveRun: true,
+      withTechnicalScan: true,
+      searchConsoleSiteUrl: "https://solmielato.it/",
+    });
+    const html = renderPage();
+    expect(html).toContain("Aggiorna dati Search Console");
   });
 
   it("shows configured public site hostname in dashboard hero", () => {

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useParams, useSearchParams } from "react-router-dom";
 import { INTEGRATIONS } from "@gcr/shared";
 import { IntegrationCard } from "../components/IntegrationCard";
+import { GoogleSearchConsolePropertyPanel } from "../components/integrations/GoogleSearchConsolePropertyPanel";
 import { IntegrationGraph } from "../components/IntegrationGraph";
 import { PageHeader } from "../components/PageHeader";
 import {
@@ -91,17 +92,26 @@ export function IntegrationsPage() {
       {!isGridLoading && id && (
         <div className="gcr-grid gcr-grid--auto" style={{ marginBottom: "2rem" }}>
           {INTEGRATIONS.map((meta) => (
-            <IntegrationCard
-              key={meta.provider}
-              {...getIntegrationCardProps({
-                meta,
-                apiStatus: statusMap.get(meta.provider),
-                googleStatus,
-                oauthConnectDisabled,
-                handleConnectGoogle: () => void handleConnectGoogle(),
-                projectId: id,
-              })}
-            />
+            <div key={meta.provider} className="integrations-page__card-wrap">
+              <IntegrationCard
+                {...getIntegrationCardProps({
+                  meta,
+                  apiStatus: statusMap.get(meta.provider),
+                  googleStatus,
+                  oauthConnectDisabled,
+                  handleConnectGoogle: () => void handleConnectGoogle(),
+                  projectId: id,
+                  searchConsoleSiteUrl: project?.searchConsoleSiteUrl,
+                })}
+              />
+              {meta.provider === "google_search_console" &&
+                googleStatus?.searchConsole.status === "connected" && (
+                  <GoogleSearchConsolePropertyPanel
+                    projectId={id}
+                    selectedSiteUrl={project?.searchConsoleSiteUrl}
+                  />
+                )}
+            </div>
           ))}
         </div>
       )}

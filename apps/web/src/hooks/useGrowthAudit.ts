@@ -4,6 +4,7 @@ import type {
   GrowthAuditPageAiAnalysisRequest,
   GrowthAuditPagePerformanceAnalysisRequest,
   GrowthAuditPageRescanRequest,
+  GrowthAuditSearchConsoleAnalysisRequest,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunStatus,
   GrowthAuditTasksFilters,
@@ -11,6 +12,7 @@ import type {
 import {
   analyzeGrowthAuditPagePerformance,
   analyzeGrowthAuditPageWithAi,
+  analyzeGrowthAuditSearchConsole,
   fetchGrowthAuditEvents,
   fetchGrowthAuditFindings,
   fetchGrowthAuditPageResults,
@@ -307,6 +309,42 @@ export function useAnalyzeGrowthAuditPagePerformance(projectId?: string, runId?:
           resolvedRunId,
           data.page.id,
         ),
+      });
+    },
+  });
+}
+
+export function useAnalyzeGrowthAuditSearchConsole(projectId?: string, runId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: GrowthAuditSearchConsoleAnalysisRequest) => {
+      if (!projectId || !runId) {
+        throw new Error("projectId and runId are required");
+      }
+      return analyzeGrowthAuditSearchConsole(projectId, runId, payload);
+    },
+    onSuccess: (data) => {
+      if (!projectId) return;
+
+      const resolvedRunId = data.run.id;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.runs(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.run(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pages(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.findings(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.tasks(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.events(projectId, resolvedRunId),
       });
     },
   });

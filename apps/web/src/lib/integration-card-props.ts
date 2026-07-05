@@ -15,6 +15,7 @@ interface GetIntegrationCardPropsInput {
   oauthConnectDisabled: boolean;
   handleConnectGoogle: () => void;
   projectId: string;
+  searchConsoleSiteUrl?: string | null;
 }
 
 function mapGoogleStatus(status: GoogleServiceStatus["status"]): IntegrationUiStatus {
@@ -105,6 +106,7 @@ export function getIntegrationCardProps({
   oauthConnectDisabled,
   handleConnectGoogle,
   projectId,
+  searchConsoleSiteUrl,
 }: GetIntegrationCardPropsInput): IntegrationCardProps {
   if (meta.provider === "shopify") {
     const connected = apiStatus === "connected";
@@ -137,12 +139,20 @@ export function getIntegrationCardProps({
     case "google_crux":
       return apiKeyCardProps(meta, googleStatus.crux, "GOOGLE_CRUX_API_KEY mancante");
     case "google_search_console":
-      return oauthCardProps(
-        meta,
-        googleStatus.searchConsole,
-        oauthConnectDisabled,
-        handleConnectGoogle,
-      );
+      return {
+        ...oauthCardProps(
+          meta,
+          googleStatus.searchConsole,
+          oauthConnectDisabled,
+          handleConnectGoogle,
+        ),
+        note:
+          googleStatus.searchConsole.status === "connected"
+            ? searchConsoleSiteUrl
+              ? `Proprietà: ${searchConsoleSiteUrl}`
+              : "Proprietà non selezionata"
+            : undefined,
+      };
     case "ga4":
       return oauthCardProps(
         meta,

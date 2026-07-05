@@ -27,6 +27,10 @@ export type {
   GoogleIntegrationStatusResponse,
   GoogleOAuthStartRequest,
   GoogleOAuthStartResponse,
+  GoogleSearchConsoleSite,
+  GoogleSearchConsoleSitesResponse,
+  SelectSearchConsoleSiteRequest,
+  SelectSearchConsoleSiteResponse,
 } from "./types/google";
 export type {
   DateRangePreset,
@@ -318,6 +322,11 @@ export type {
   GrowthAuditPagePerformanceAnalysisRequest,
   GrowthAuditPagePerformanceAnalysisResponse,
   GrowthAuditPagePerformanceMetadata,
+  GrowthAuditPageSearchConsoleMetadata,
+  GrowthAuditPageSearchConsoleQuery,
+  GrowthAuditSearchConsoleAnalysisRequest,
+  GrowthAuditSearchConsoleAnalysisResponse,
+  GrowthAuditRunSearchConsoleSummary,
   GrowthAuditPageResult,
   GrowthAuditPageResultsListResponse,
   GrowthAuditPageRescanRequest,

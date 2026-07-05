@@ -27,3 +27,21 @@ export interface GoogleOAuthStartRequest {
 export interface GoogleOAuthStartResponse {
   authorizationUrl: string;
 }
+
+export interface GoogleSearchConsoleSite {
+  siteUrl: string;
+  permissionLevel?: string | null;
+}
+
+export interface GoogleSearchConsoleSitesResponse {
+  sites: GoogleSearchConsoleSite[];
+}
+
+export interface SelectSearchConsoleSiteRequest {
+  siteUrl: string;
+}
+
+export interface SelectSearchConsoleSiteResponse {
+  siteUrl: string;
+  message: string;
+}

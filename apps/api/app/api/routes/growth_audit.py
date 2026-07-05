@@ -14,6 +14,8 @@ from app.schemas.growth_audit import (
     GrowthAuditPageAiAnalysisResponse,
     GrowthAuditPagePerformanceAnalysisRequest,
     GrowthAuditPagePerformanceAnalysisResponse,
+    GrowthAuditSearchConsoleAnalysisRequest,
+    GrowthAuditSearchConsoleAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
@@ -28,7 +30,13 @@ from app.schemas.growth_audit import (
     GrowthAuditTaskRead,
     GrowthAuditTasksListResponse,
 )
-from app.services.google.exceptions import GoogleApiRequestError, GoogleIntegrationNotConfiguredError
+from app.services.google.exceptions import (
+    GoogleApiRequestError,
+    GoogleIntegrationNotConfiguredError,
+    GoogleIntegrationNotConnectedError,
+    GoogleIntegrationPermissionError,
+    GoogleSearchConsolePropertyError,
+)
 from app.services.growth_audit.exceptions import (
     GrowthAuditError,
     GrowthAuditRunNotFoundError,
@@ -40,6 +48,9 @@ from app.services.growth_audit.page_ai_analysis import (
 )
 from app.services.growth_audit.page_performance_analysis import (
     analyze_growth_audit_page_performance,
+)
+from app.services.growth_audit.search_console_analysis import (
+    analyze_growth_audit_search_console,
 )
 from app.services.growth_audit.run_service import (
     get_growth_audit_run_detail,
@@ -77,6 +88,21 @@ def _map_growth_audit_error(
     if isinstance(exc, GoogleIntegrationNotConfiguredError):
         return HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    if isinstance(exc, GoogleIntegrationNotConnectedError):
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    if isinstance(exc, GoogleIntegrationPermissionError):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        )
+    if isinstance(exc, GoogleSearchConsolePropertyError):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         )
     if isinstance(exc, GoogleApiRequestError):
@@ -423,6 +449,40 @@ async def analyze_growth_audit_page_performance_endpoint(
         findings_count=findings_count,
         tasks_count=tasks_count,
         message=message,
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/search-console-analysis",
+    response_model=GrowthAuditSearchConsoleAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_search_console_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    request: GrowthAuditSearchConsoleAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditSearchConsoleAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        result = await analyze_growth_audit_search_console(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            days=request.days,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    summary = result["summary"]
+    return GrowthAuditSearchConsoleAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(result["run"]),
+        summary=summary,
+        message="Dati Search Console aggiornati.",
     )
 
 

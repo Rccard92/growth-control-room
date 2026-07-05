@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchGoogleIntegrationStatus,
+  fetchSearchConsoleSites,
+  selectSearchConsoleSite,
   startGoogleOAuth,
 } from "./google-integrations-api";
 
@@ -42,6 +44,35 @@ describe("google-integrations-api", () => {
         body: JSON.stringify({
           services: ["search_console", "analytics", "google_ads"],
         }),
+      }),
+    );
+  });
+
+  it("builds search console sites path", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      sites: [{ siteUrl: "https://example.com/", permissionLevel: "siteOwner" }],
+    });
+
+    await fetchSearchConsoleSites("proj-1");
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/google/search-console/sites",
+    );
+  });
+
+  it("builds select search console site path", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      siteUrl: "https://example.com/",
+      message: "Proprietà Search Console salvata.",
+    });
+
+    await selectSearchConsoleSite("proj-1", { siteUrl: "https://example.com/" });
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/google/search-console/select-site",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ siteUrl: "https://example.com/" }),
       }),
     );
   });

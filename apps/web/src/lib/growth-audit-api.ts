@@ -9,6 +9,8 @@ import type {
   GrowthAuditPageRescanRequest,
   GrowthAuditPageRescanResponse,
   GrowthAuditPageResultsListResponse,
+  GrowthAuditSearchConsoleAnalysisRequest,
+  GrowthAuditSearchConsoleAnalysisResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
@@ -155,6 +157,20 @@ export function analyzeGrowthAuditPagePerformance(
     {
       method: "POST",
       ...jsonBody(payload ?? { strategy: "mobile" }),
+    },
+  );
+}
+
+export function analyzeGrowthAuditSearchConsole(
+  projectId: string,
+  runId: string,
+  payload?: GrowthAuditSearchConsoleAnalysisRequest,
+): Promise<GrowthAuditSearchConsoleAnalysisResponse> {
+  return apiFetch<GrowthAuditSearchConsoleAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/search-console-analysis`,
+    {
+      method: "POST",
+      ...jsonBody(payload ?? { days: 28 }),
     },
   );
 }

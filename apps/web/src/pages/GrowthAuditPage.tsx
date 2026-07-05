@@ -13,8 +13,10 @@ import {
   useGrowthAuditRun,
   useGrowthAuditRuns,
   useGrowthAuditTasks,
+  useAnalyzeGrowthAuditSearchConsole,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
+import { useGoogleIntegrationStatus } from "../hooks/useGoogleIntegrations";
 import { useProject, useUpdateProject } from "../hooks/useProjects";
 import { useShopifyStatus } from "../hooks/useShopify";
 import {
@@ -101,6 +103,7 @@ export function GrowthAuditPage() {
   const updateProject = useUpdateProject(id);
   const { data: runs } = useGrowthAuditRuns(projectId);
   const startRun = useStartGrowthAuditRun(projectId);
+  const { data: googleStatus } = useGoogleIntegrationStatus(projectId);
 
   const latestRun = runs?.[0];
   const [rootUrlOverride, setRootUrlOverride] = useState<string | null>(null);
@@ -125,6 +128,7 @@ export function GrowthAuditPage() {
   }, [runs, activeRunId, latestRun]);
 
   const resolvedRunId = activeRunId ?? latestRun?.id;
+  const analyzeSearchConsole = useAnalyzeGrowthAuditSearchConsole(projectId, resolvedRunId);
 
   const { data: runDetail } = useGrowthAuditRun(projectId, resolvedRunId, Boolean(resolvedRunId));
   const runStatus = runDetail?.run.status;
@@ -646,6 +650,35 @@ export function GrowthAuditPage() {
           </div>
         </div>
       ) : null}
+
+      {isDashboardMode &&
+        googleStatus?.searchConsole.status === "connected" &&
+        resolvedRunId && (
+          <section className="growth-audit-gsc-panel gcr-card">
+            {!project?.searchConsoleSiteUrl ? (
+              <p className="growth-audit-gsc-panel__callout">
+                Seleziona una proprietà Search Console per arricchire le priorità SEO. Vai al{" "}
+                <Link to={APP_ROUTES.projectIntegrations(projectId)}>Integration Center</Link>.
+              </p>
+            ) : (
+              <div className="growth-audit-gsc-panel__actions">
+                <p>
+                  Proprietà GSC: <strong>{project.searchConsoleSiteUrl}</strong>
+                </p>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--primary"
+                  disabled={analyzeSearchConsole.isPending || activeRun?.status === "analyzing"}
+                  onClick={() => void analyzeSearchConsole.mutateAsync({ days: 28 })}
+                >
+                  {analyzeSearchConsole.isPending
+                    ? "Aggiornamento in corso…"
+                    : "Aggiorna dati Search Console"}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
 
       {showPriorityDashboard && resolvedRunId && (
         <GrowthAuditPriorityDashboard

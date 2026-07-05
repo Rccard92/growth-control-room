@@ -3,6 +3,7 @@ import {
   buildGrowthAuditPageWorkflowSteps,
   getGrowthAuditPageAiMetadata,
   getGrowthAuditPagePerformanceMetadata,
+  getGrowthAuditPageSearchConsoleMetadata,
   getGrowthAuditSourceEntityTypeLabel,
   getGrowthAuditWorkflowStepStatusLabel,
   getGrowthAuditWorkspaceOperativeNote,
@@ -18,6 +19,7 @@ export interface GrowthAuditPageWorkspaceSidebarProps {
   openTasksCount: number;
   hasAiResult: boolean;
   hasPerformanceResult?: boolean;
+  hasSearchConsoleData?: boolean;
   shopifySectionAvailable: boolean;
   aiSectionAvailable: boolean;
   onScrollToSection: (sectionId: string) => void;
@@ -50,12 +52,14 @@ export function GrowthAuditPageWorkspaceSidebar({
   openTasksCount,
   hasAiResult,
   hasPerformanceResult = false,
+  hasSearchConsoleData = false,
   shopifySectionAvailable,
   aiSectionAvailable,
   onScrollToSection,
 }: GrowthAuditPageWorkspaceSidebarProps) {
   const aiMeta = getGrowthAuditPageAiMetadata(page);
   const performanceMeta = getGrowthAuditPagePerformanceMetadata(page);
+  const searchConsoleMeta = getGrowthAuditPageSearchConsoleMetadata(page);
   const shopifyLinked = isGrowthAuditPageShopifyLinked(page);
   const mappedEntity = mapGrowthAuditPageToSeoEntity(page);
 
@@ -64,6 +68,7 @@ export function GrowthAuditPageWorkspaceSidebar({
     priorityActionsCount,
     hasAiResult,
     hasPerformanceResult,
+    hasSearchConsoleData,
     shopifyEditable: shopifySectionAvailable && Boolean(mappedEntity),
     openFindingsCount,
   });
@@ -101,6 +106,10 @@ export function GrowthAuditPageWorkspaceSidebar({
           <div>
             <dt>Ultima analisi performance</dt>
             <dd>{formatDate(performanceMeta?.analyzedAt)}</dd>
+          </div>
+          <div>
+            <dt>Ultima sync Search Console</dt>
+            <dd>{formatDate(searchConsoleMeta?.syncedAt)}</dd>
           </div>
           <div>
             <dt>Problemi aperti</dt>
@@ -165,6 +174,13 @@ export function GrowthAuditPageWorkspaceSidebar({
             onClick={() => onScrollToSection("performance")}
           >
             Performance
+          </button>
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+            onClick={() => onScrollToSection("search-console")}
+          >
+            Search Console
           </button>
           <button
             type="button"

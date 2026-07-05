@@ -13,6 +13,8 @@ export const queryKeys = {
   },
   google: {
     status: (projectId: string) => ["google", projectId, "status"] as const,
+    searchConsoleSites: (projectId: string) =>
+      ["google", projectId, "search-console-sites"] as const,
   },
   shopify: {
     status: (projectId: string) => ["shopify", projectId, "status"] as const,

@@ -260,6 +260,33 @@ describe("growth-audit-utils", () => {
     expect(kpis.find((kpi) => kpi.label === "Performance")?.meta).toBeUndefined();
   });
 
+  it("includes Search Console KPIs from run summary", () => {
+    const kpis = getGrowthAuditDashboardKpiItems(
+      {
+        siteScore: 78,
+        pagesAnalyzed: 3,
+        summary: {
+          pagesAnalyzed: 3,
+          searchConsole: {
+            totalClicks: 120,
+            totalImpressions: 5400,
+            averageCtr: 0.0222,
+            averagePosition: 9.3,
+            pagesWithData: 4,
+            opportunityPages: 2,
+            lastSyncedAt: "2026-06-13T10:00:00Z",
+          },
+        },
+      },
+      samplePages,
+    );
+    expect(kpis.find((kpi) => kpi.label === "Click organici")?.value).toBe("120");
+    expect(kpis.find((kpi) => kpi.label === "Impression")?.value).toBe("5400");
+    expect(kpis.find((kpi) => kpi.label === "CTR medio")?.value).toBe("2.22%");
+    expect(kpis.find((kpi) => kpi.label === "Posizione media")?.value).toBe("9.3");
+    expect(kpis.find((kpi) => kpi.label === "Pagine con dati GSC")?.value).toBe("4");
+  });
+
   it("maps score bands and badge classes", () => {
     expect(getGrowthAuditScoreBand(85)).toBe("good");
     expect(getGrowthAuditScoreBand(70)).toBe("warning");
@@ -800,6 +827,28 @@ describe("growth-audit-utils", () => {
         tasks: [],
       });
       expect(items[0].reasons).toContain("Performance non ancora analizzata");
+    });
+
+    it("adds Search Console CTR opportunity reason when metadata indicates low CTR", () => {
+      const pageWithGsc: GrowthAuditPage = {
+        ...staticPage,
+        metadata: {
+          searchConsole: {
+            clicks: 2,
+            impressions: 250,
+            ctr: 0.008,
+            position: 11,
+            topQueries: [{ query: "miele", clicks: 1, impressions: 80, ctr: 0.0125, position: 9 }],
+          },
+        },
+      };
+      const items = buildGrowthAuditPagePriorityItems({
+        pages: [pageWithGsc],
+        findings: [],
+        tasks: [],
+      });
+      expect(items[0].reasons).toContain("Opportunità CTR da Search Console");
+      expect(items[0].reasons).toContain("Query reali disponibili");
     });
 
     it("getGrowthAuditPriorityLevelLabel returns Italian labels", () => {

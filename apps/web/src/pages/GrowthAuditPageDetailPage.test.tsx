@@ -254,10 +254,12 @@ describe("GrowthAuditPageDetailPage", () => {
     const priorityIndex = indexOfOrFail(html, 'id="priority-actions"');
     const shopifyIndex = indexOfOrFail(html, 'id="shopify-edit"');
     const performanceIndex = indexOfOrFail(html, 'id="performance"');
+    const searchConsoleIndex = indexOfOrFail(html, 'id="search-console"');
     const aiIndex = indexOfOrFail(html, 'id="ai-geo-cro"');
     expect(priorityIndex).toBeLessThan(shopifyIndex);
     expect(shopifyIndex).toBeLessThan(performanceIndex);
-    expect(performanceIndex).toBeLessThan(aiIndex);
+    expect(performanceIndex).toBeLessThan(searchConsoleIndex);
+    expect(searchConsoleIndex).toBeLessThan(aiIndex);
     expect(html).toContain("Cosa sistemare prima");
     expect(html).toContain("Dove intervenire");
     expect(html).toContain("Workflow consigliato");
@@ -271,6 +273,62 @@ describe("GrowthAuditPageDetailPage", () => {
     expect(html).toContain("Performance Score");
     expect(html).toContain("CrUX non ha dati sufficienti per questa URL");
     expect(html).toContain("68");
+  });
+
+  it("renders Search Console section with metrics and top queries when metadata is present", () => {
+    setupDetailMocks();
+    useGrowthAuditRunMock.mockReturnValue({
+      data: {
+        run: {
+          id: "run-1",
+          projectId: "proj-1",
+          status: "completed",
+          rootUrl: "https://solmielato.it",
+          normalizedDomain: "solmielato.it",
+          auditMode: "full_site_mvp",
+          provider: "openai",
+          progressPercent: 100,
+          pagesDiscovered: 1,
+          pagesClassified: 1,
+          pagesAnalyzed: 1,
+          pagesFailed: 0,
+        },
+        pages: [
+          {
+            ...sampleProductPage,
+            metadata: {
+              ...sampleProductPage.metadata,
+              searchConsole: {
+                clicks: 12,
+                impressions: 450,
+                ctr: 0.0267,
+                position: 8.4,
+                topQueries: [
+                  {
+                    query: "miele biologico",
+                    clicks: 5,
+                    impressions: 120,
+                    ctr: 0.0417,
+                    position: 6.2,
+                  },
+                ],
+              },
+            },
+          },
+        ],
+        events: [],
+        findingsCount: 1,
+        tasksCount: 1,
+      },
+      isLoading: false,
+      isError: false,
+    });
+    const html = renderDetailPage();
+    expect(html).toContain('id="search-console"');
+    expect(html).toContain("Search Console");
+    expect(html).toContain("miele biologico");
+    expect(html).toContain("450");
+    expect(html).toContain("2.67%");
   });
 
   it("renders Shopify callout and AI cost warning", () => {

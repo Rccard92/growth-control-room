@@ -9,12 +9,16 @@ const {
   useProjectIntegrationsMock,
   useGoogleIntegrationStatusMock,
   useStartGoogleOAuthMock,
+  useSearchConsoleSitesMock,
+  useSelectSearchConsoleSiteMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
   useProjectIntegrationsMock: vi.fn(),
   useGoogleIntegrationStatusMock: vi.fn(),
   useStartGoogleOAuthMock: vi.fn(),
+  useSearchConsoleSitesMock: vi.fn(),
+  useSelectSearchConsoleSiteMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -34,6 +38,8 @@ vi.mock("../hooks/useProjects", () => ({
 vi.mock("../hooks/useGoogleIntegrations", () => ({
   useGoogleIntegrationStatus: useGoogleIntegrationStatusMock,
   useStartGoogleOAuth: useStartGoogleOAuthMock,
+  useSearchConsoleSites: useSearchConsoleSitesMock,
+  useSelectSearchConsoleSite: useSelectSearchConsoleSiteMock,
 }));
 
 vi.mock("../components/IntegrationGraph", () => ({
@@ -80,6 +86,15 @@ function setupMocks(options?: { shopifyStatus?: "connected" | "not_connected" })
     isLoading: false,
   });
   useStartGoogleOAuthMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
+  useSearchConsoleSitesMock.mockReturnValue({
+    data: { sites: [{ siteUrl: "https://solmielato.it/", permissionLevel: "siteOwner" }] },
+    isLoading: false,
+    isError: false,
+  });
+  useSelectSearchConsoleSiteMock.mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
   });
@@ -145,6 +160,22 @@ describe("IntegrationsPage unified grid", () => {
     setupMocks({ shopifyStatus: "not_connected" });
     const html = renderPage();
     expect(html).toContain("Connetti");
+  });
+
+  it("shows property selector when Search Console is connected", () => {
+    setupMocks();
+    useGoogleIntegrationStatusMock.mockReturnValue({
+      data: {
+        ...googleStatus,
+        searchConsole: { status: "connected", configured: true },
+      },
+      isLoading: false,
+    });
+    const html = renderPage();
+
+    expect(html).toContain("Collegata");
+    expect(html).toContain("Seleziona una proprietà");
+    expect(html).toContain("Salva proprietà");
   });
 
   it("renders brand SVG icons in the unified grid", () => {

@@ -69,6 +69,10 @@ class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     public_site_url: str | None = Field(default=None, validation_alias="publicSiteUrl")
+    search_console_site_url: str | None = Field(
+        default=None,
+        validation_alias="searchConsoleSiteUrl",
+    )
 
     @field_validator("public_site_url", mode="before")
     @classmethod
@@ -79,6 +83,16 @@ class ProjectUpdate(BaseModel):
             raise ValueError("Il dominio pubblico deve essere una stringa")
         return normalize_public_site_url(value)
 
+    @field_validator("search_console_site_url", mode="before")
+    @classmethod
+    def validate_search_console_site_url_update(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("La proprietà Search Console deve essere una stringa")
+        trimmed = value.strip()
+        return trimmed or None
+
 
 class ProjectRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -88,6 +102,10 @@ class ProjectRead(BaseModel):
     slug: str
     description: str | None = None
     public_site_url: str | None = Field(default=None, serialization_alias="publicSiteUrl")
+    search_console_site_url: str | None = Field(
+        default=None,
+        serialization_alias="searchConsoleSiteUrl",
+    )
     status: str
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")

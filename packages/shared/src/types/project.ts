@@ -6,6 +6,7 @@ export interface Project {
   slug: string;
   description?: string | null;
   publicSiteUrl?: string | null;
+  searchConsoleSiteUrl?: string | null;
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
@@ -21,4 +22,5 @@ export interface UpdateProjectInput {
   name?: string;
   description?: string | null;
   publicSiteUrl?: string | null;
+  searchConsoleSiteUrl?: string | null;
 }

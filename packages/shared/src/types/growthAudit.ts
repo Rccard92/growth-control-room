@@ -124,6 +124,34 @@ export interface GrowthAuditRunSummary {
   performanceIssuesOpen?: number;
   lastPerformanceAnalysisAt?: string | null;
   lastPerformanceAnalysisUrl?: string | null;
+  searchConsole?: GrowthAuditRunSearchConsoleSummary;
+}
+
+export interface GrowthAuditRunSearchConsoleSummary {
+  totalClicks?: number;
+  totalImpressions?: number;
+  averageCtr?: number;
+  averagePosition?: number;
+  pagesWithData?: number;
+  opportunityPages?: number;
+  lastSyncedAt?: string | null;
+}
+
+export interface GrowthAuditPageSearchConsoleQuery {
+  query: string;
+  clicks?: number;
+  impressions?: number;
+  ctr?: number;
+  position?: number;
+}
+
+export interface GrowthAuditPageSearchConsoleMetadata {
+  clicks?: number;
+  impressions?: number;
+  ctr?: number;
+  position?: number;
+  topQueries?: GrowthAuditPageSearchConsoleQuery[];
+  syncedAt?: string;
 }
 
 export interface GrowthAuditPageAiMetadata {
@@ -404,6 +432,16 @@ export interface GrowthAuditPagePerformanceAnalysisResponse {
   result: GrowthAuditPageResult;
   findingsCount: number;
   tasksCount: number;
+  message: string;
+}
+
+export interface GrowthAuditSearchConsoleAnalysisRequest {
+  days?: number;
+}
+
+export interface GrowthAuditSearchConsoleAnalysisResponse {
+  run: GrowthAuditRun;
+  summary: GrowthAuditRunSearchConsoleSummary;
   message: string;
 }
 

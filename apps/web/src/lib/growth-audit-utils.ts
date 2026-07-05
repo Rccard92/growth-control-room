@@ -5,6 +5,7 @@ import type {
   GrowthAuditPage,
   GrowthAuditPageAiMetadata,
   GrowthAuditPagePerformanceMetadata,
+  GrowthAuditPageSearchConsoleMetadata,
   GrowthAuditPageResult,
   GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
@@ -1792,6 +1793,41 @@ export function hasGrowthAuditPagePerformanceAnalysis(page: GrowthAuditPage): bo
   );
 }
 
+export function getGrowthAuditPageSearchConsoleMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageSearchConsoleMetadata | null {
+  const searchConsole = page.metadata?.searchConsole;
+  if (!searchConsole || typeof searchConsole !== "object") return null;
+  return searchConsole as GrowthAuditPageSearchConsoleMetadata;
+}
+
+export function hasGrowthAuditPageSearchConsoleData(page: GrowthAuditPage): boolean {
+  const meta = getGrowthAuditPageSearchConsoleMetadata(page);
+  return Boolean(
+    meta &&
+      ((meta.impressions ?? 0) > 0 ||
+        (meta.clicks ?? 0) > 0 ||
+        (meta.topQueries?.length ?? 0) > 0),
+  );
+}
+
+function _getSearchConsolePriorityBoost(page: GrowthAuditPage): number {
+  const meta = getGrowthAuditPageSearchConsoleMetadata(page);
+  if (!meta) return 0;
+
+  let boost = 0;
+  const impressions = meta.impressions ?? 0;
+  const ctr = meta.ctr ?? 0;
+  const position = meta.position ?? 0;
+
+  if (impressions >= 100 && ctr < 0.02) boost += 12;
+  if (position >= 4 && position <= 15 && impressions >= 20) boost += 8;
+  if (impressions > 0 && (meta.clicks ?? 0) === 0) boost += 6;
+  if ((meta.topQueries?.length ?? 0) > 0) boost += 4;
+
+  return Math.min(boost, 20);
+}
+
 export type GrowthAuditDashboardKpiItem = {
   label: string;
   value: string;
@@ -1892,6 +1928,41 @@ export function getGrowthAuditDashboardKpiItems(
       value: performanceScore != null ? String(performanceScore) : "—",
       score: performanceScore,
       meta: performanceScore == null ? "Non analizzato" : undefined,
+    },
+    {
+      label: "Click organici",
+      value:
+        summary?.searchConsole?.totalClicks != null
+          ? String(summary.searchConsole.totalClicks)
+          : "—",
+    },
+    {
+      label: "Impression",
+      value:
+        summary?.searchConsole?.totalImpressions != null
+          ? String(summary.searchConsole.totalImpressions)
+          : "—",
+    },
+    {
+      label: "CTR medio",
+      value:
+        summary?.searchConsole?.averageCtr != null
+          ? `${(summary.searchConsole.averageCtr * 100).toFixed(2)}%`
+          : "—",
+    },
+    {
+      label: "Posizione media",
+      value:
+        summary?.searchConsole?.averagePosition != null
+          ? summary.searchConsole.averagePosition.toFixed(1)
+          : "—",
+    },
+    {
+      label: "Pagine con dati GSC",
+      value:
+        summary?.searchConsole?.pagesWithData != null
+          ? String(summary.searchConsole.pagesWithData)
+          : "—",
     },
   ];
 }
@@ -2057,6 +2128,19 @@ function _buildPagePriorityReasons(input: {
   ) {
     reasons.push("Performance non ancora analizzata");
   }
+
+  const gscMeta = getGrowthAuditPageSearchConsoleMetadata(page);
+  if (gscMeta) {
+    const impressions = gscMeta.impressions ?? 0;
+    const ctr = gscMeta.ctr ?? 0;
+    if (impressions >= 100 && ctr < 0.02) {
+      reasons.push("Opportunità CTR da Search Console");
+    }
+    if ((gscMeta.topQueries?.length ?? 0) > 0) {
+      reasons.push("Query reali disponibili");
+    }
+  }
+
   if (page.pageType === "collection" && page.score != null && page.score < 80) {
     reasons.push("Collection commerciale da ottimizzare");
   }
@@ -2134,6 +2218,8 @@ function _computePagePriorityScore(input: {
 
   const adsScore = aiMeta?.adsReadinessScore;
   if (adsScore != null && adsScore < 70) score += 8;
+
+  score += _getSearchConsolePriorityBoost(page);
 
   return Math.max(0, score);
 }
@@ -2453,6 +2539,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   priorityActionsCount: number;
   hasAiResult: boolean;
   hasPerformanceResult?: boolean;
+  hasSearchConsoleData?: boolean;
   shopifyEditable: boolean;
   openFindingsCount: number;
 }): GrowthAuditWorkflowStep[] {
@@ -2461,6 +2548,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
     priorityActionsCount,
     hasAiResult,
     hasPerformanceResult = false,
+    hasSearchConsoleData = false,
     shopifyEditable,
     openFindingsCount,
   } = input;
@@ -2506,10 +2594,22 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       ? "recommended"
       : "available";
 
+  const searchConsoleStatus: GrowthAuditWorkflowStepStatus = hasSearchConsoleData
+    ? "done"
+    : isAnalyzed
+      ? "available"
+      : "todo";
+
   return [
     { key: "priority", label: "Priorità", status: priorityStatus, anchorId: "priority-actions" },
     { key: "edit", label: "Modifica", status: modifyStatus, anchorId: "shopify-edit" },
     { key: "performance", label: "Performance", status: performanceStatus, anchorId: "performance" },
+    {
+      key: "search-console",
+      label: "Search Console",
+      status: searchConsoleStatus,
+      anchorId: "search-console",
+    },
     { key: "ai", label: "Analisi AI", status: aiStatus, anchorId: "ai-geo-cro" },
     { key: "rescan", label: "Rescan", status: rescanStatus },
     { key: "verify", label: "Verifica", status: verifyStatus, anchorId: "technical-data" },

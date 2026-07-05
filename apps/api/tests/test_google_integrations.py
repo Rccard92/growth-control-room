@@ -17,9 +17,11 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:
 from app.api.routes.google_integrations import (
     get_google_status,
     google_oauth_callback,
+    list_search_console_sites,
+    select_search_console_site,
     start_google_oauth,
 )
-from app.schemas.google_integration import GoogleOAuthStartRequest
+from app.schemas.google_integration import GoogleOAuthStartRequest, SelectSearchConsoleSiteRequest
 from app.services.encryption import decrypt_secret, encrypt_secret
 from app.services.google.google_config import get_google_config_status
 from app.services.google.google_integrations import (
@@ -30,6 +32,8 @@ from app.services.google.google_integrations import (
 )
 from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
+from app.models.project import Project
+from app.services.google.exceptions import GoogleIntegrationNotConnectedError
 
 
 def _make_persist_session(
@@ -492,3 +496,156 @@ def test_credential_has_refresh_token() -> None:
         ).encrypt_secret(payload),
     )
     assert credential_has_refresh_token(credential) is True
+
+
+def test_list_search_console_sites_returns_sites() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_search_console_sites",
+                new_callable=AsyncMock,
+                return_value=[
+                    {"siteUrl": "https://example.com/", "permissionLevel": "siteOwner"},
+                ],
+            ),
+        ):
+            response = await list_search_console_sites(project_id, session)
+
+        assert response.sites[0].site_url == "https://example.com/"
+        assert response.sites[0].permission_level == "siteOwner"
+
+    asyncio.run(run())
+
+
+def test_list_search_console_sites_returns_503_when_not_connected() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                side_effect=GoogleIntegrationNotConnectedError(
+                    "Account Google non collegato.",
+                    integration="google_search_console",
+                ),
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            await list_search_console_sites(project_id, session)
+
+        assert exc.value.status_code == 503
+
+    asyncio.run(run())
+
+
+def test_select_search_console_site_saves_property() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+        project = Project(
+            id=project_id,
+            workspace_id=uuid4(),
+            name="Example",
+            slug="example",
+            search_console_site_url=None,
+            status="active",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+                return_value=project,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_search_console_sites",
+                new_callable=AsyncMock,
+                return_value=[
+                    {"siteUrl": "https://example.com/", "permissionLevel": "siteOwner"},
+                ],
+            ),
+        ):
+            response = await select_search_console_site(
+                project_id,
+                SelectSearchConsoleSiteRequest(site_url="https://example.com/"),
+                session,
+            )
+
+        assert response.site_url == "https://example.com/"
+        assert project.search_console_site_url == "https://example.com/"
+        session.commit.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_select_search_console_site_returns_422_for_unknown_property() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        project = Project(
+            id=project_id,
+            workspace_id=uuid4(),
+            name="Example",
+            slug="example",
+            search_console_site_url=None,
+            status="active",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+                return_value=project,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_search_console_sites",
+                new_callable=AsyncMock,
+                return_value=[
+                    {"siteUrl": "https://example.com/", "permissionLevel": "siteOwner"},
+                ],
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            await select_search_console_site(
+                project_id,
+                SelectSearchConsoleSiteRequest(site_url="https://other.com/"),
+                session,
+            )
+
+        assert exc.value.status_code == 422
+
+    asyncio.run(run())
