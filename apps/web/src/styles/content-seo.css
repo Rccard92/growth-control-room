@@ -5695,6 +5695,125 @@
   }
 }
 
+.growth-audit-shopify-commerce-panel {
+  margin-bottom: 1rem;
+}
+
+.growth-audit-shopify-commerce-panel__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.growth-audit-shopify-commerce-panel__callout,
+.growth-audit-shopify-commerce-panel__error {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-shopify-commerce-panel__error {
+  color: #fca5a5;
+}
+
+.growth-audit-shopify-commerce-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.growth-audit-shopify-commerce-panel__period {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-shopify-commerce-panel__period select {
+  min-width: 140px;
+}
+
+.growth-audit-shopify-commerce-panel__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.growth-audit-shopify-commerce-panel__kpis div {
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.growth-audit-shopify-commerce-panel__kpis span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.growth-audit-shopify-commerce-panel__kpis strong {
+  font-size: 1.05rem;
+}
+
+.growth-audit-shopify-commerce__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.growth-audit-shopify-commerce__metric {
+  padding: 0.85rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.growth-audit-shopify-commerce__metric--highlight {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.growth-audit-shopify-commerce__metric-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.3rem;
+}
+
+.growth-audit-shopify-commerce__metric-value {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.growth-audit-shopify-commerce__status--good {
+  color: #86efac;
+}
+
+.growth-audit-shopify-commerce__status--warning {
+  color: #fde047;
+}
+
+.growth-audit-shopify-commerce__status--danger {
+  color: #fca5a5;
+}
+
+.growth-audit-shopify-commerce__empty {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--gcr-text-muted);
+  font-size: 0.9rem;
+}
+
 .growth-audit-priority-actions__expand {
   margin-top: 1rem;
 }

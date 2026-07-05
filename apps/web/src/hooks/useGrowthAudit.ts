@@ -6,6 +6,7 @@ import type {
   GrowthAuditPageRescanRequest,
   GrowthAuditSearchConsoleAnalysisRequest,
   GrowthAuditAnalyticsAnalysisRequest,
+  GrowthAuditShopifyCommerceAnalysisRequest,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunStatus,
   GrowthAuditTasksFilters,
@@ -15,6 +16,7 @@ import {
   analyzeGrowthAuditPageWithAi,
   analyzeGrowthAuditSearchConsole,
   analyzeGrowthAuditAnalytics,
+  analyzeGrowthAuditShopifyCommerce,
   fetchGrowthAuditEvents,
   fetchGrowthAuditFindings,
   fetchGrowthAuditPageResults,
@@ -361,6 +363,42 @@ export function useAnalyzeGrowthAuditAnalytics(projectId?: string, runId?: strin
         throw new Error("projectId and runId are required");
       }
       return analyzeGrowthAuditAnalytics(projectId, runId, payload);
+    },
+    onSuccess: (data) => {
+      if (!projectId) return;
+
+      const resolvedRunId = data.run.id;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.runs(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.run(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pages(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.findings(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.tasks(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.events(projectId, resolvedRunId),
+      });
+    },
+  });
+}
+
+export function useAnalyzeGrowthAuditShopifyCommerce(projectId?: string, runId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: GrowthAuditShopifyCommerceAnalysisRequest) => {
+      if (!projectId || !runId) {
+        throw new Error("projectId and runId are required");
+      }
+      return analyzeGrowthAuditShopifyCommerce(projectId, runId, payload);
     },
     onSuccess: (data) => {
       if (!projectId) return;

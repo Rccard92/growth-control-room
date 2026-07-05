@@ -254,6 +254,7 @@ describe("GrowthAuditPageDetailPage", () => {
     const productIntelligenceIndex = indexOfOrFail(html, 'id="product-intelligence"');
     const priorityIndex = indexOfOrFail(html, 'id="priority-actions"');
     const shopifyIndex = indexOfOrFail(html, 'id="shopify-edit"');
+    const shopifyCommerceIndex = indexOfOrFail(html, 'id="shopify-commerce"');
     const performanceIndex = indexOfOrFail(html, 'id="performance"');
     const searchConsoleIndex = indexOfOrFail(html, 'id="search-console"');
     const analyticsIndex = indexOfOrFail(html, 'id="analytics"');
@@ -261,7 +262,8 @@ describe("GrowthAuditPageDetailPage", () => {
     expect(html).toContain("Product Intelligence");
     expect(productIntelligenceIndex).toBeLessThan(priorityIndex);
     expect(priorityIndex).toBeLessThan(shopifyIndex);
-    expect(shopifyIndex).toBeLessThan(performanceIndex);
+    expect(shopifyIndex).toBeLessThan(shopifyCommerceIndex);
+    expect(shopifyCommerceIndex).toBeLessThan(performanceIndex);
     expect(performanceIndex).toBeLessThan(searchConsoleIndex);
     expect(searchConsoleIndex).toBeLessThan(analyticsIndex);
     expect(analyticsIndex).toBeLessThan(aiIndex);

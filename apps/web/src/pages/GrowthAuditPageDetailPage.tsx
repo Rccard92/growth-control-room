@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { GrowthAuditPageResult } from "@gcr/shared";
+import { GrowthAuditPageWorkspaceShopifyCommerceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceShopifyCommerceSection";
 import { GrowthAuditProductIntelligenceSummary } from "../components/growth-audit/page-detail/GrowthAuditProductIntelligenceSummary";
 import { GrowthAuditPriorityActionsPanel } from "../components/growth-audit/GrowthAuditPriorityActionsPanel";
 import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailShopifySection";
@@ -26,6 +27,7 @@ import {
   hasGrowthAuditPagePerformanceAnalysis,
   hasGrowthAuditPageAnalyticsData,
   hasGrowthAuditPageSearchConsoleData,
+  hasGrowthAuditPageShopifyCommerceData,
   isGrowthAuditRunActive,
   mapGrowthAuditPageToSeoEntity,
   sortGrowthAuditFindings,
@@ -116,6 +118,11 @@ export function GrowthAuditPageDetailPage() {
     () => (page ? hasGrowthAuditPageAnalyticsData(page) : false),
     [page],
   );
+  const hasShopifyCommerceData = useMemo(
+    () => (page ? hasGrowthAuditPageShopifyCommerceData(page) : false),
+    [page],
+  );
+  const runSummary = runDetail?.run.summary ?? null;
   const mappedEntity = page ? mapGrowthAuditPageToSeoEntity(page) : null;
   const aiAvailable = page?.status === "analyzed";
 
@@ -210,6 +217,7 @@ export function GrowthAuditPageDetailPage() {
             priorityActions={priorityActions}
             aiResults={pageResults}
             performanceResults={performanceResults}
+            runSummary={runSummary}
           />
 
           <GrowthAuditPriorityActionsPanel
@@ -222,6 +230,8 @@ export function GrowthAuditPageDetailPage() {
           />
 
           <GrowthAuditPageDetailShopifySection projectId={projectId} page={page} />
+
+          <GrowthAuditPageWorkspaceShopifyCommerceSection page={page} />
 
           <GrowthAuditPageWorkspacePerformanceSection
             projectId={projectId}
@@ -254,6 +264,7 @@ export function GrowthAuditPageDetailPage() {
           hasPerformanceResult={hasPerformanceResult}
           hasSearchConsoleData={hasSearchConsoleData}
           hasAnalyticsData={hasAnalyticsData}
+          hasShopifyCommerceData={hasShopifyCommerceData}
           shopifySectionAvailable={Boolean(mappedEntity)}
           aiSectionAvailable={Boolean(aiAvailable)}
           onScrollToSection={scrollToSection}

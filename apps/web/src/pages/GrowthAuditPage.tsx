@@ -15,6 +15,7 @@ import {
   useGrowthAuditTasks,
   useAnalyzeGrowthAuditAnalytics,
   useAnalyzeGrowthAuditSearchConsole,
+  useAnalyzeGrowthAuditShopifyCommerce,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
 import { useGoogleIntegrationStatus } from "../hooks/useGoogleIntegrations";
@@ -114,6 +115,7 @@ export function GrowthAuditPage() {
   const [scoreFilter, setScoreFilter] = useState<GrowthAuditScoreFilter>("all");
   const [statusFilter, setStatusFilter] = useState<GrowthAuditPageStatusFilter>("all");
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
+  const [commerceDays, setCommerceDays] = useState<7 | 30 | 90>(30);
 
   useEffect(() => {
     setPublicSiteUrlDraft(project?.publicSiteUrl ?? "");
@@ -131,6 +133,8 @@ export function GrowthAuditPage() {
   const resolvedRunId = activeRunId ?? latestRun?.id;
   const analyzeSearchConsole = useAnalyzeGrowthAuditSearchConsole(projectId, resolvedRunId);
   const analyzeAnalytics = useAnalyzeGrowthAuditAnalytics(projectId, resolvedRunId);
+  const analyzeShopifyCommerce = useAnalyzeGrowthAuditShopifyCommerce(projectId, resolvedRunId);
+  const shopifyConnected = shopifyStatus?.connected ?? false;
 
   const { data: runDetail } = useGrowthAuditRun(projectId, resolvedRunId, Boolean(resolvedRunId));
   const runStatus = runDetail?.run.status;
@@ -713,6 +717,98 @@ export function GrowthAuditPage() {
             )}
           </section>
         )}
+
+      {isDashboardMode && resolvedRunId && (
+        <section className="growth-audit-shopify-commerce-panel gcr-card">
+          <header className="growth-audit-shopify-commerce-panel__header">
+            <h2 className="growth-audit-shopify-commerce-panel__title">Shopify vendite prodotto</h2>
+          </header>
+
+          {!shopifyConnected ? (
+            <p className="growth-audit-shopify-commerce-panel__callout">
+              Collega Shopify per importare vendite e revenue prodotto. Vai al{" "}
+              <Link to={APP_ROUTES.projectIntegrations(projectId)}>Integration Center</Link>.
+            </p>
+          ) : (
+            <>
+              <div className="growth-audit-shopify-commerce-panel__actions">
+                <label className="growth-audit-shopify-commerce-panel__period">
+                  Periodo
+                  <select
+                    value={commerceDays}
+                    onChange={(event) =>
+                      setCommerceDays(Number(event.target.value) as 7 | 30 | 90)
+                    }
+                  >
+                    <option value={7}>7 giorni</option>
+                    <option value={30}>30 giorni</option>
+                    <option value={90}>90 giorni</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--primary"
+                  disabled={analyzeShopifyCommerce.isPending || activeRun?.status === "analyzing"}
+                  onClick={() => void analyzeShopifyCommerce.mutateAsync({ days: commerceDays })}
+                >
+                  {analyzeShopifyCommerce.isPending
+                    ? "Aggiornamento in corso…"
+                    : "Aggiorna vendite Shopify"}
+                </button>
+              </div>
+
+              {analyzeShopifyCommerce.isError && (
+                <p className="growth-audit-shopify-commerce-panel__error" role="alert">
+                  {analyzeShopifyCommerce.error instanceof Error
+                    ? analyzeShopifyCommerce.error.message
+                    : "Impossibile aggiornare i dati Shopify Commerce."}
+                </p>
+              )}
+
+              {summary?.shopifyCommerce && (
+                <div className="growth-audit-shopify-commerce-panel__kpis">
+                  <div>
+                    <span>Revenue Shopify</span>
+                    <strong>
+                      {(summary.shopifyCommerce.totalSales ?? 0).toLocaleString("it-IT", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                      {summary.shopifyCommerce.currency
+                        ? ` ${summary.shopifyCommerce.currency}`
+                        : ""}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Quantità vendute</span>
+                    <strong>{summary.shopifyCommerce.totalQuantitySold ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Prodotti con vendite</span>
+                    <strong>{summary.shopifyCommerce.productsWithSales ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Prodotti senza vendite</span>
+                    <strong>{summary.shopifyCommerce.productsWithoutSales ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Prodotti out of stock</span>
+                    <strong>{summary.shopifyCommerce.productsOutOfStock ?? 0}</strong>
+                  </div>
+                  <div>
+                    <span>Ultimo sync</span>
+                    <strong>
+                      {summary.shopifyCommerce.lastSyncedAt
+                        ? formatGrowthAuditRunDate(summary.shopifyCommerce.lastSyncedAt)
+                        : "—"}
+                    </strong>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {showPriorityDashboard && resolvedRunId && (
         <GrowthAuditPriorityDashboard

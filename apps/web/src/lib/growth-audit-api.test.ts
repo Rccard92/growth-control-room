@@ -169,4 +169,16 @@ describe("growth-audit-api", () => {
       }),
     );
   });
+
+  it("calls shopify-commerce-analysis run endpoint with POST body", async () => {
+    const { analyzeGrowthAuditShopifyCommerce } = await import("./growth-audit-api");
+    await analyzeGrowthAuditShopifyCommerce("proj-1", "run-42", { days: 30 });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/shopify-commerce-analysis",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ days: 30 }),
+      }),
+    );
+  });
 });

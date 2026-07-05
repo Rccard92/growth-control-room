@@ -126,6 +126,7 @@ export interface GrowthAuditRunSummary {
   lastPerformanceAnalysisUrl?: string | null;
   searchConsole?: GrowthAuditRunSearchConsoleSummary;
   analytics?: GrowthAuditRunAnalyticsSummary;
+  shopifyCommerce?: GrowthAuditRunShopifyCommerceSummary;
 }
 
 export interface GrowthAuditRunAnalyticsSummary {
@@ -178,6 +179,41 @@ export interface GrowthAuditPageAnalyticsMetadata {
   source?: string;
   periodDays?: number;
   syncedAt?: string;
+}
+
+export interface GrowthAuditPageShopifyCommerceMetadata {
+  periodDays?: number;
+  quantitySold?: number;
+  ordersCount?: number;
+  sales?: number;
+  currency?: string;
+  averageUnitPrice?: number;
+  averageOrderValue?: number;
+  stock?: number | null;
+  availableForSale?: boolean | null;
+  productStatus?: string | null;
+  priceMin?: number | null;
+  priceMax?: number | null;
+  syncedAt?: string;
+}
+
+export interface GrowthAuditRunShopifyCommerceSummary {
+  periodDays?: number;
+  totalSales?: number;
+  totalQuantitySold?: number;
+  productsWithSales?: number;
+  productsWithoutSales?: number;
+  productsOutOfStock?: number;
+  currency?: string;
+  topProducts?: Array<{
+    pageId: string;
+    productGid?: string | null;
+    title?: string | null;
+    sales?: number;
+    quantitySold?: number;
+    ordersCount?: number;
+  }>;
+  lastSyncedAt?: string | null;
 }
 
 export interface GrowthAuditPageAiMetadata {
@@ -478,6 +514,16 @@ export interface GrowthAuditAnalyticsAnalysisRequest {
 export interface GrowthAuditAnalyticsAnalysisResponse {
   run: GrowthAuditRun;
   summary: GrowthAuditRunAnalyticsSummary;
+  message: string;
+}
+
+export interface GrowthAuditShopifyCommerceAnalysisRequest {
+  days?: number;
+}
+
+export interface GrowthAuditShopifyCommerceAnalysisResponse {
+  run: GrowthAuditRun;
+  summary: GrowthAuditRunShopifyCommerceSummary;
   message: string;
 }
 

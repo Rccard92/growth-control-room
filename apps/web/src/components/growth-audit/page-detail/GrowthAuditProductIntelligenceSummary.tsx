@@ -3,6 +3,7 @@ import type {
   GrowthAuditFinding,
   GrowthAuditPage,
   GrowthAuditPageResult,
+  GrowthAuditRunSummary,
   GrowthAuditTask,
 } from "@gcr/shared";
 import {
@@ -20,6 +21,7 @@ export interface GrowthAuditProductIntelligenceSummaryProps {
   priorityActions: GrowthAuditPriorityAction[];
   aiResults?: GrowthAuditPageResult[];
   performanceResults?: GrowthAuditPageResult[];
+  runSummary?: GrowthAuditRunSummary | null;
 }
 
 function getSignalClassName(signal: GrowthAuditProductIntelligenceSignal): string {
@@ -33,6 +35,7 @@ export function GrowthAuditProductIntelligenceSummary({
   priorityActions,
   aiResults,
   performanceResults,
+  runSummary,
 }: GrowthAuditProductIntelligenceSummaryProps) {
   const summary = useMemo(
     () =>
@@ -43,8 +46,9 @@ export function GrowthAuditProductIntelligenceSummary({
         priorityActions,
         aiResults,
         performanceResults,
+        runSummary,
       }),
-    [page, findings, tasks, priorityActions, aiResults, performanceResults],
+    [page, findings, tasks, priorityActions, aiResults, performanceResults, runSummary],
   );
 
   if (!summary.available) {

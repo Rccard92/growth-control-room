@@ -11,10 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.shopify import ShopifyStore
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
+from app.services.shopify.exceptions import ShopifyIntegrationPermissionError
 
 REQUIRED_FOR_APPLY = ["write_products"]
 REQUIRED_FOR_PUBLISH = ["write_content"]
 REQUIRED_FOR_IMAGE_UPLOAD = ["write_files"]
+# read_orders is in default SHOPIFY_SCOPES; reconnect only if token predates scope update.
+REQUIRED_FOR_COMMERCE_ANALYSIS = ["read_orders", "read_products"]
+COMMERCE_PERMISSION_MESSAGE = (
+    "Permessi Shopify insufficienti per leggere vendite e revenue. "
+    "Riconnetti Shopify con permessi ordini."
+)
 IMAGE_UPLOAD_FALLBACK_SCOPES = ["write_images"]
 SCOPES_CACHE_TTL = timedelta(hours=1)
 
@@ -217,6 +224,22 @@ async def can_publish_with_write_content(
         ),
         **result,
     }
+
+
+async def assert_commerce_scopes_granted(
+    store: ShopifyStore,
+    session: AsyncSession,
+) -> list[str]:
+    """Verify read_orders/read_products are granted; raise if missing."""
+    result = await resolve_shopify_scopes(store, session, force_refresh=True)
+    granted = result.get("granted_scopes") or []
+    missing = [s for s in REQUIRED_FOR_COMMERCE_ANALYSIS if s not in granted]
+    if missing:
+        raise ShopifyIntegrationPermissionError(
+            COMMERCE_PERMISSION_MESSAGE,
+            missing_scopes=missing,
+        )
+    return granted
 
 
 async def can_upload_shopify_files(

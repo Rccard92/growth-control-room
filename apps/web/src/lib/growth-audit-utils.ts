@@ -7,6 +7,8 @@ import type {
   GrowthAuditPagePerformanceMetadata,
   GrowthAuditPageSearchConsoleMetadata,
   GrowthAuditPageAnalyticsMetadata,
+  GrowthAuditPageShopifyCommerceMetadata,
+  GrowthAuditRunShopifyCommerceSummary,
   GrowthAuditPageResult,
   GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
@@ -1842,6 +1844,19 @@ export function hasGrowthAuditPageAnalyticsData(page: GrowthAuditPage): boolean 
   return Boolean(meta && ((meta.sessions ?? 0) > 0 || (meta.totalUsers ?? 0) > 0));
 }
 
+export function getGrowthAuditPageShopifyCommerceMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageShopifyCommerceMetadata | null {
+  const commerce = page.metadata?.shopifyCommerce;
+  if (!commerce || typeof commerce !== "object") return null;
+  return commerce as GrowthAuditPageShopifyCommerceMetadata;
+}
+
+export function hasGrowthAuditPageShopifyCommerceData(page: GrowthAuditPage): boolean {
+  const meta = getGrowthAuditPageShopifyCommerceMetadata(page);
+  return Boolean(meta?.syncedAt);
+}
+
 function _getAnalyticsPriorityBoost(page: GrowthAuditPage): number {
   const meta = getGrowthAuditPageAnalyticsMetadata(page);
   if (!meta) return 0;
@@ -2633,6 +2648,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   hasPerformanceResult?: boolean;
   hasSearchConsoleData?: boolean;
   hasAnalyticsData?: boolean;
+  hasShopifyCommerceData?: boolean;
   shopifyEditable: boolean;
   openFindingsCount: number;
 }): GrowthAuditWorkflowStep[] {
@@ -2643,6 +2659,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
     hasPerformanceResult = false,
     hasSearchConsoleData = false,
     hasAnalyticsData = false,
+    hasShopifyCommerceData = false,
     shopifyEditable,
     openFindingsCount,
   } = input;
@@ -2702,7 +2719,13 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
 
   const isProductPage = isGrowthAuditProductPage(page);
 
-  return [
+  const commerceStatus: GrowthAuditWorkflowStepStatus = hasShopifyCommerceData
+    ? "done"
+    : isProductPage
+      ? "available"
+      : "todo";
+
+  const workflowSteps: GrowthAuditWorkflowStep[] = [
     {
       key: "priority",
       label: isProductPage ? "Valuta priorità" : "Priorità",
@@ -2710,6 +2733,18 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       anchorId: isProductPage ? "product-intelligence" : "priority-actions",
     },
     { key: "edit", label: "Modifica", status: modifyStatus, anchorId: "shopify-edit" },
+  ];
+
+  if (isProductPage) {
+    workflowSteps.push({
+      key: "shopify-commerce",
+      label: "Shopify Commerce",
+      status: commerceStatus,
+      anchorId: "shopify-commerce",
+    });
+  }
+
+  workflowSteps.push(
     { key: "performance", label: "Performance", status: performanceStatus, anchorId: "performance" },
     {
       key: "search-console",
@@ -2726,7 +2761,9 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
     { key: "ai", label: "Analisi AI", status: aiStatus, anchorId: "ai-geo-cro" },
     { key: "rescan", label: "Rescan", status: rescanStatus },
     { key: "verify", label: "Verifica", status: verifyStatus, anchorId: "technical-data" },
-  ];
+  );
+
+  return workflowSteps;
 }
 
 export function getGrowthAuditWorkflowStepStatusLabel(
@@ -2916,6 +2953,9 @@ function _buildProductIntelligenceMissingData(
   }
   if (!_hasProductIntelligenceAiData(page, aiResults)) missing.push("AI/GEO/CRO");
   if (page.sourceEntityType !== "shopify_product") missing.push("Shopify product link");
+  if (isGrowthAuditProductPage(page) && !hasGrowthAuditPageShopifyCommerceData(page)) {
+    missing.push("Shopify Commerce");
+  }
   return missing;
 }
 
@@ -2925,6 +2965,8 @@ type ProductIntelligenceTheme =
   | "ga4_conversion"
   | "performance"
   | "cro_ai"
+  | "shopify_commerce"
+  | "shopify_stock"
   | "incomplete_data"
   | "general";
 
@@ -2933,6 +2975,7 @@ type ProductIntelligenceScoreContext = {
   themes: Partial<Record<ProductIntelligenceTheme, number>>;
   gscMeta: GrowthAuditPageSearchConsoleMetadata | null;
   analyticsMeta: GrowthAuditPageAnalyticsMetadata | null;
+  commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null;
   performanceSnapshot: PerformanceArtifactsSnapshot;
   croScore: number | null;
   geoScore: number | null;
@@ -2941,13 +2984,30 @@ type ProductIntelligenceScoreContext = {
   openFindings: GrowthAuditFinding[];
 };
 
+function _isTopCommerceProduct(
+  _page: GrowthAuditPage,
+  commerceMeta: GrowthAuditPageShopifyCommerceMetadata | null,
+  runSummary?: GrowthAuditRunShopifyCommerceSummary | null,
+): boolean {
+  const sales = commerceMeta?.sales ?? 0;
+  if (sales <= 0) return false;
+  const topProducts = runSummary?.topProducts ?? [];
+  if (topProducts.length === 0) {
+    return sales >= 100;
+  }
+  const thresholdIndex = Math.max(0, Math.ceil(topProducts.length * 0.2) - 1);
+  const thresholdSales = topProducts[thresholdIndex]?.sales ?? 0;
+  return sales >= thresholdSales;
+}
+
 function _computeProductPriorityScore(input: {
   page: GrowthAuditPage;
   findings: GrowthAuditFinding[];
   tasks: GrowthAuditTask[];
   performanceResults?: GrowthAuditPageResult[];
+  runSummary?: GrowthAuditRunShopifyCommerceSummary | null;
 }): ProductIntelligenceScoreContext {
-  const { page, findings, tasks, performanceResults } = input;
+  const { page, findings, tasks, performanceResults, runSummary } = input;
   const themes: Partial<Record<ProductIntelligenceTheme, number>> = {};
   const addTheme = (theme: ProductIntelligenceTheme, points: number) => {
     themes[theme] = (themes[theme] ?? 0) + points;
@@ -2956,6 +3016,7 @@ function _computeProductPriorityScore(input: {
   let score = 0;
   const gscMeta = getGrowthAuditPageSearchConsoleMetadata(page);
   const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
+  const commerceMeta = getGrowthAuditPageShopifyCommerceMetadata(page);
   const aiMeta = getGrowthAuditPageAiMetadata(page);
   const performanceSnapshot = _getProductIntelligencePerformanceSnapshot(page, performanceResults);
 
@@ -3089,11 +3150,61 @@ function _computeProductPriorityScore(input: {
     score += 5;
   }
 
+  if (commerceMeta) {
+    const sales = commerceMeta.sales ?? 0;
+    const quantitySold = commerceMeta.quantitySold ?? 0;
+    const ordersCount = commerceMeta.ordersCount ?? 0;
+    const stock = commerceMeta.stock;
+    const availableForSale = commerceMeta.availableForSale;
+    const impressions = gscMeta?.impressions ?? 0;
+    const sessions = analyticsMeta?.sessions ?? 0;
+
+    if (sales > 0) {
+      score += 15;
+      addTheme("shopify_commerce", 15);
+    }
+    if (_isTopCommerceProduct(page, commerceMeta, runSummary)) {
+      score += 20;
+      addTheme("shopify_commerce", 20);
+    }
+    if (quantitySold > 0) {
+      score += 10;
+      addTheme("shopify_commerce", 10);
+    }
+    if (ordersCount > 0) {
+      score += 8;
+      addTheme("shopify_commerce", 8);
+    }
+
+    const hasDemandSignal = sales > 0 || impressions > 200 || sessions > 50;
+    if (hasDemandSignal && (stock != null && stock <= 0 || availableForSale === false)) {
+      score += 15;
+      addTheme("shopify_stock", 15);
+    } else if (
+      sales > 0 &&
+      stock != null &&
+      stock > 0 &&
+      stock <= 10
+    ) {
+      score += 10;
+      addTheme("shopify_stock", 10);
+    }
+
+    if (
+      availableForSale === true &&
+      ((impressions > 200 && (gscMeta?.ctr ?? 0) < 0.02) || (sessions > 50 && (analyticsMeta?.conversions ?? 0) === 0))
+    ) {
+      score += 5;
+      addTheme("shopify_commerce", 5);
+    }
+  }
+
   return {
     score: Math.min(100, Math.max(0, score)),
     themes,
     gscMeta,
     analyticsMeta,
+    commerceMeta,
     performanceSnapshot,
     croScore,
     geoScore,
@@ -3117,7 +3228,7 @@ function _buildProductIntelligenceVerdict(input: {
   missingData: string[];
 }): { title: string; verdict: string; mainReason: string } {
   const { context, missingData } = input;
-  const { gscMeta, analyticsMeta, performanceSnapshot, croScore, aiLatestScore, themes } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, performanceSnapshot, croScore, aiLatestScore, themes, openFindings } = context;
 
   const dominant = _getDominantProductIntelligenceTheme(themes);
   const dominantWeight = themes[dominant] ?? 0;
@@ -3129,6 +3240,52 @@ function _buildProductIntelligenceVerdict(input: {
   const sessions = analyticsMeta?.sessions ?? 0;
   const conversions = analyticsMeta?.conversions ?? 0;
   const perfScore = performanceSnapshot.performanceScore;
+  const sales = commerceMeta?.sales ?? 0;
+  const stock = commerceMeta?.stock;
+  const availableForSale = commerceMeta?.availableForSale;
+  const hasCriticalFindings = openFindings.some(
+    (finding) => finding.severity === "critical" || finding.severity === "high",
+  );
+
+  if (
+    dominant === "shopify_stock" ||
+    ((sales > 0 || impressions > 200 || sessions > 50) &&
+      (stock != null && stock <= 0 || availableForSale === false))
+  ) {
+    return {
+      title: "Disponibilità da risolvere prima di spingere traffico",
+      verdict:
+        "Il prodotto ha segnali di domanda o vendite, ma stock o disponibilità possono limitare le conversioni.",
+      mainReason: "Inventario insufficiente rispetto alla domanda rilevata.",
+    };
+  }
+
+  if (
+    sales > 0 &&
+    hasCriticalFindings &&
+    (dominant === "shopify_commerce" || themes.shopify_commerce != null)
+  ) {
+    return {
+      title: "Prodotto che monetizza: priorità alta",
+      verdict:
+        "Shopify mostra vendite nel periodo. Vale la pena intervenire subito su SEO, CRO e performance per amplificare un prodotto già validato.",
+      mainReason: "Revenue Shopify presente con criticità aperte sulla pagina.",
+    };
+  }
+
+  if (
+    commerceMeta &&
+    (impressions > 200 || sessions > 50) &&
+    sales === 0 &&
+    (commerceMeta.quantitySold ?? 0) === 0
+  ) {
+    return {
+      title: "Potenziale non monetizzato",
+      verdict:
+        "La pagina riceve segnali di domanda organica o traffico, ma Shopify non mostra vendite nel periodo.",
+      mainReason: "Traffico o visibilità senza conversione ecommerce.",
+    };
+  }
 
   if (
     dominant === "gsc_ctr" ||
@@ -3222,7 +3379,66 @@ function _buildProductIntelligenceEvidence(input: {
 }): GrowthAuditProductIntelligenceSignal[] {
   const { context, priorityActionsCount } = input;
   const signals: GrowthAuditProductIntelligenceSignal[] = [];
-  const { gscMeta, analyticsMeta, performanceSnapshot, croScore, openFindings } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, performanceSnapshot, croScore, openFindings } = context;
+
+  if (commerceMeta?.sales != null && commerceMeta.sales > 0) {
+    const currency = commerceMeta.currency ? ` ${commerceMeta.currency}` : "";
+    signals.push({
+      key: "shopify-revenue",
+      label: "Revenue Shopify",
+      value: commerceMeta.sales.toLocaleString("it-IT", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) + currency,
+      tone: commerceMeta.sales >= 100 ? "good" : "warning",
+      explanation: "Vendite aggregate nel periodo Shopify.",
+    });
+  }
+
+  if (commerceMeta?.quantitySold != null) {
+    signals.push({
+      key: "shopify-quantity",
+      label: "Vendite Shopify",
+      value: _formatItalianNumber(commerceMeta.quantitySold),
+      tone: commerceMeta.quantitySold > 0 ? "good" : "warning",
+      explanation: "Unità vendute nel periodo.",
+    });
+  }
+
+  if (commerceMeta?.ordersCount != null) {
+    signals.push({
+      key: "shopify-orders",
+      label: "Ordini",
+      value: _formatItalianNumber(commerceMeta.ordersCount),
+      tone: commerceMeta.ordersCount > 0 ? "good" : "neutral",
+      explanation: "Ordini Shopify che includono questo prodotto.",
+    });
+  }
+
+  if (commerceMeta?.stock != null) {
+    signals.push({
+      key: "shopify-stock",
+      label: "Stock",
+      value: _formatItalianNumber(commerceMeta.stock),
+      tone:
+        commerceMeta.stock <= 0
+          ? "danger"
+          : commerceMeta.stock <= 10
+            ? "warning"
+            : "good",
+      explanation: "Inventario totale prodotto su Shopify.",
+    });
+  }
+
+  if (commerceMeta?.availableForSale != null) {
+    signals.push({
+      key: "shopify-availability",
+      label: "Disponibilità",
+      value: commerceMeta.availableForSale ? "Disponibile" : "Non disponibile",
+      tone: commerceMeta.availableForSale ? "good" : "danger",
+      explanation: "Stato vendibilità prodotto su Shopify.",
+    });
+  }
 
   if (gscMeta?.impressions != null) {
     const impressions = gscMeta.impressions;
@@ -3357,7 +3573,7 @@ function _buildProductIntelligenceRecommendedActions(input: {
   missingData: string[];
 }): GrowthAuditProductIntelligenceAction[] {
   const { context, missingData } = input;
-  const { gscMeta, analyticsMeta, performanceSnapshot, croScore, aiLatestScore } = context;
+  const { gscMeta, analyticsMeta, commerceMeta, performanceSnapshot, croScore, aiLatestScore, openFindings } = context;
   const actions: GrowthAuditProductIntelligenceAction[] = [];
 
   const impressions = gscMeta?.impressions ?? 0;
@@ -3366,6 +3582,51 @@ function _buildProductIntelligenceRecommendedActions(input: {
   const sessions = analyticsMeta?.sessions ?? 0;
   const conversions = analyticsMeta?.conversions ?? 0;
   const perfScore = performanceSnapshot.performanceScore;
+  const sales = commerceMeta?.sales ?? 0;
+  const stock = commerceMeta?.stock;
+  const availableForSale = commerceMeta?.availableForSale;
+  const hasCriticalFindings = openFindings.some(
+    (finding) => finding.severity === "critical" || finding.severity === "high",
+  );
+
+  if (sales > 0 && hasCriticalFindings) {
+    actions.push({
+      title: "Dai priorità a questa pagina: prodotto già monetizza",
+      reason: "Shopify mostra vendite/revenue nel periodo. Migliorare la pagina può amplificare un prodotto già validato.",
+      expectedImpact: "Maggiore revenue da un prodotto già validato dal mercato.",
+      whereToFix: "Shopify prodotto / contenuto / immagini / trust / performance",
+      howToValidate: "Confronta revenue, conversioni e CTR nei prossimi 14/30 giorni.",
+    });
+  }
+
+  if (
+    commerceMeta &&
+    (impressions > 200 || sessions > 50) &&
+    sales === 0 &&
+    (commerceMeta.quantitySold ?? 0) === 0
+  ) {
+    actions.push({
+      title: "Trasforma traffico in vendite",
+      reason: "La pagina riceve segnali di domanda ma Shopify non mostra vendite nel periodo.",
+      expectedImpact: "Più purchase e revenue da traffico esistente.",
+      whereToFix: "Offerta, trust, CTA, immagini, prezzo, spedizione, FAQ",
+      howToValidate: "Monitora add to cart, purchase e vendite Shopify.",
+    });
+  }
+
+  if (
+    commerceMeta &&
+    (sales > 0 || impressions > 200 || sessions > 50) &&
+    (stock != null && stock <= 0 || availableForSale === false)
+  ) {
+    actions.push({
+      title: "Risolvi disponibilità prima di spingere traffico",
+      reason: "Il prodotto ha segnali di domanda o vendite, ma lo stock può limitare conversioni.",
+      expectedImpact: "Eviti traffico sprecato e recuperi vendite perse.",
+      whereToFix: "Shopify inventory / disponibilità prodotto",
+      howToValidate: "Verifica stock e vendite dopo il ripristino.",
+    });
+  }
 
   if (gscMeta && impressions > 200 && ctr < 0.02) {
     actions.push({
@@ -3461,8 +3722,9 @@ export function buildGrowthAuditProductIntelligenceSummary(input: {
   priorityActions: GrowthAuditPriorityAction[];
   aiResults?: GrowthAuditPageResult[];
   performanceResults?: GrowthAuditPageResult[];
+  runSummary?: GrowthAuditRunSummary | null;
 }): GrowthAuditProductIntelligenceSummary {
-  const { page, findings, tasks, priorityActions, aiResults, performanceResults } = input;
+  const { page, findings, tasks, priorityActions, aiResults, performanceResults, runSummary } = input;
 
   if (!isGrowthAuditProductPage(page)) {
     return _emptyProductIntelligenceSummary();
@@ -3474,6 +3736,7 @@ export function buildGrowthAuditProductIntelligenceSummary(input: {
     findings,
     tasks,
     performanceResults,
+    runSummary: runSummary?.shopifyCommerce ?? null,
   });
   const level = _scoreToProductIntelligenceLevel(context.score);
   const { title, verdict, mainReason } = _buildProductIntelligenceVerdict({

@@ -18,6 +18,8 @@ from app.schemas.growth_audit import (
     GrowthAuditSearchConsoleAnalysisResponse,
     GrowthAuditAnalyticsAnalysisRequest,
     GrowthAuditAnalyticsAnalysisResponse,
+    GrowthAuditShopifyCommerceAnalysisRequest,
+    GrowthAuditShopifyCommerceAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
@@ -57,6 +59,14 @@ from app.services.growth_audit.search_console_analysis import (
 )
 from app.services.growth_audit.analytics_analysis import (
     analyze_growth_audit_analytics,
+)
+from app.services.growth_audit.shopify_commerce_analysis import (
+    analyze_growth_audit_shopify_commerce,
+)
+from app.services.shopify.exceptions import (
+    ShopifyCommerceApiError,
+    ShopifyIntegrationNotConnectedError,
+    ShopifyIntegrationPermissionError,
 )
 from app.services.growth_audit.run_service import (
     get_growth_audit_run_detail,
@@ -117,6 +127,21 @@ def _map_growth_audit_error(
             detail=str(exc),
         )
     if isinstance(exc, GoogleApiRequestError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+    if isinstance(exc, ShopifyIntegrationNotConnectedError):
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    if isinstance(exc, ShopifyIntegrationPermissionError):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        )
+    if isinstance(exc, ShopifyCommerceApiError):
         return HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
@@ -528,6 +553,40 @@ async def analyze_growth_audit_analytics_endpoint(
         run=GrowthAuditRunRead.model_validate(result["run"]),
         summary=summary,
         message="Dati GA4 aggiornati.",
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/shopify-commerce-analysis",
+    response_model=GrowthAuditShopifyCommerceAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_shopify_commerce_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    request: GrowthAuditShopifyCommerceAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditShopifyCommerceAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        result = await analyze_growth_audit_shopify_commerce(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            days=request.days,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    summary = result["summary"]
+    return GrowthAuditShopifyCommerceAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(result["run"]),
+        summary=summary,
+        message=result.get("message") or "Dati ecommerce Shopify aggiornati",
     )
 
 

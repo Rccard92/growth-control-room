@@ -54,6 +54,7 @@ ORDER_CORE_FIELDS = """
                 id
                 name
                 createdAt
+                cancelledAt
                 processedAt
                 displayFinancialStatus
                 displayFulfillmentStatus

@@ -5,6 +5,7 @@ import { queryKeys } from "../lib/queryKeys";
 const invalidateQueriesMock = vi.fn();
 const rescanGrowthAuditPageMock = vi.fn();
 const analyzeGrowthAuditPageWithAiMock = vi.fn();
+const analyzeGrowthAuditShopifyCommerceMock = vi.fn();
 
 let capturedMutation: {
   mutationFn: (input: unknown) => Promise<unknown>;
@@ -28,6 +29,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("../lib/growth-audit-api", () => ({
   rescanGrowthAuditPage: rescanGrowthAuditPageMock,
   analyzeGrowthAuditPageWithAi: analyzeGrowthAuditPageWithAiMock,
+  analyzeGrowthAuditShopifyCommerce: analyzeGrowthAuditShopifyCommerceMock,
   fetchGrowthAuditPageResults: vi.fn(),
   startGrowthAuditRun: vi.fn(),
   listGrowthAuditRuns: vi.fn(),
@@ -158,6 +160,66 @@ describe("useAnalyzeGrowthAuditPageWithAi", () => {
       "run-42",
       "page-7",
       { provider: "openai", includeGeo: false },
+    );
+  });
+});
+
+describe("useAnalyzeGrowthAuditShopifyCommerce", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedMutation = null;
+  });
+
+  it("invalidates growth audit queries on success", async () => {
+    const { useAnalyzeGrowthAuditShopifyCommerce } = await import("./useGrowthAudit");
+    useAnalyzeGrowthAuditShopifyCommerce("proj-1", "run-42");
+
+    expect(capturedMutation).not.toBeNull();
+
+    const response = {
+      run: { id: "run-42" } as GrowthAuditRun,
+      summary: { totalSales: 120 },
+      message: "Dati ecommerce Shopify aggiornati",
+    };
+
+    capturedMutation!.onSuccess?.(response);
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.runs("proj-1"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.run("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.pages("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.findings("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.tasks("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.growthAudit.events("proj-1", "run-42"),
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(6);
+  });
+
+  it("calls shopify commerce API with project and run ids", async () => {
+    const { useAnalyzeGrowthAuditShopifyCommerce } = await import("./useGrowthAudit");
+    analyzeGrowthAuditShopifyCommerceMock.mockResolvedValue({
+      run: { id: "run-42" },
+      summary: { totalSales: 50 },
+      message: "ok",
+    });
+
+    const hook = useAnalyzeGrowthAuditShopifyCommerce("proj-1", "run-42");
+    await hook.mutateAsync({ days: 30 });
+
+    expect(analyzeGrowthAuditShopifyCommerceMock).toHaveBeenCalledWith(
+      "proj-1",
+      "run-42",
+      { days: 30 },
     );
   });
 });

@@ -1231,5 +1231,86 @@ describe("growth-audit-utils", () => {
       });
       expect(withRevenue.score).toBeGreaterThan(withoutRevenue.score);
     });
+
+    it("boosts score and evidence when Shopify commerce data is present", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            shopifyCommerce: {
+              periodDays: 30,
+              sales: 250,
+              quantitySold: 15,
+              ordersCount: 10,
+              currency: "EUR",
+              stock: 0,
+              availableForSale: false,
+              syncedAt: "2026-06-13T10:00:00Z",
+            },
+            searchConsole: {
+              impressions: 500,
+              ctr: 0.03,
+              position: 8,
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+        runSummary: {
+          shopifyCommerce: {
+            periodDays: 30,
+            totalSales: 1000,
+            totalQuantitySold: 50,
+            productsWithSales: 3,
+            productsWithoutSales: 1,
+            productsOutOfStock: 1,
+            currency: "EUR",
+            topProducts: [],
+            lastSyncedAt: "2026-06-13T10:00:00Z",
+          },
+        },
+      });
+
+      expect(summary.evidence.some((signal) => signal.key === "shopify-revenue")).toBe(true);
+      expect(summary.evidence.some((signal) => signal.key === "shopify-quantity")).toBe(true);
+      expect(
+        summary.recommendedActions.some((action) =>
+          action.title.includes("disponibilità"),
+        ),
+      ).toBe(true);
+    });
+
+    it("suggests monetization action for traffic without Shopify sales", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            shopifyCommerce: {
+              periodDays: 30,
+              sales: 0,
+              quantitySold: 0,
+              ordersCount: 0,
+              syncedAt: "2026-06-13T10:00:00Z",
+            },
+            searchConsole: {
+              impressions: 800,
+              ctr: 0.02,
+              position: 9,
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+
+      expect(
+        summary.recommendedActions.some((action) =>
+          action.title.includes("Trasforma traffico in vendite"),
+        ),
+      ).toBe(true);
+      expect(summary.missingData).not.toContain("Shopify Commerce");
+    });
   });
 });

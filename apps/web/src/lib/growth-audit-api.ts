@@ -13,6 +13,8 @@ import type {
   GrowthAuditSearchConsoleAnalysisResponse,
   GrowthAuditAnalyticsAnalysisRequest,
   GrowthAuditAnalyticsAnalysisResponse,
+  GrowthAuditShopifyCommerceAnalysisRequest,
+  GrowthAuditShopifyCommerceAnalysisResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
@@ -187,6 +189,20 @@ export function analyzeGrowthAuditAnalytics(
     {
       method: "POST",
       ...jsonBody(payload ?? { days: 28 }),
+    },
+  );
+}
+
+export function analyzeGrowthAuditShopifyCommerce(
+  projectId: string,
+  runId: string,
+  payload?: GrowthAuditShopifyCommerceAnalysisRequest,
+): Promise<GrowthAuditShopifyCommerceAnalysisResponse> {
+  return apiFetch<GrowthAuditShopifyCommerceAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/shopify-commerce-analysis`,
+    {
+      method: "POST",
+      ...jsonBody(payload ?? { days: 30 }),
     },
   );
 }
