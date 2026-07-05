@@ -106,6 +106,8 @@ function setupMocks(options?: {
   googleAnalyticsPropertyId?: string | null;
   googleAnalyticsPropertyName?: string | null;
   analyticsConnected?: boolean;
+  ga4EcommerceSummary?: Record<string, unknown>;
+  ga4EcommerceError?: Error;
 }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
@@ -160,6 +162,9 @@ function setupMocks(options?: {
                 criticalFindings: 1,
                 highFindings: 2,
                 tasksOpen: 2,
+                ...(options?.ga4EcommerceSummary
+                  ? { ga4Ecommerce: options.ga4EcommerceSummary }
+                  : {}),
               }
             : {
                 message: "Page inventory completed. AI page analysis is not enabled yet.",
@@ -320,6 +325,8 @@ function setupMocks(options?: {
   useAnalyzeGrowthAuditGa4EcommerceMock.mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
+    isError: Boolean(options?.ga4EcommerceError),
+    error: options?.ga4EcommerceError,
   });
 }
 
@@ -472,6 +479,45 @@ describe("GrowthAuditPage", () => {
     const html = renderPage();
     expect(html).toContain("GA4 Ecommerce Funnel");
     expect(html).toContain("Aggiorna funnel ecommerce GA4");
+  });
+
+  it("shows clearer GA4 ecommerce error message on 502", () => {
+    setupMocks({
+      withActiveRun: true,
+      withTechnicalScan: true,
+      analyticsConnected: true,
+      googleAnalyticsPropertyId: "123456789",
+      ga4EcommerceError: new Error(
+        "Report GA4 item ecommerce non compatibile con questa proprietà.",
+      ),
+    });
+    const html = renderPage();
+    expect(html).toContain("GA4 ha rifiutato il report ecommerce item-level");
+    expect(html).toContain("tracking ecommerce Shopify");
+  });
+
+  it("shows GA4 ecommerce empty state when summary has zero data", () => {
+    setupMocks({
+      withActiveRun: true,
+      withTechnicalScan: true,
+      analyticsConnected: true,
+      googleAnalyticsPropertyId: "123456789",
+      ga4EcommerceSummary: {
+        periodDays: 30,
+        totalItemViews: 0,
+        totalItemsAddedToCart: 0,
+        totalItemsCheckedOut: 0,
+        totalItemsPurchased: 0,
+        totalItemRevenue: 0,
+        productsWithFunnelData: 0,
+        productsWithoutFunnelData: 1,
+        unmatchedItems: 0,
+        lastSyncedAt: "2026-06-13T10:00:00.000Z",
+      },
+    });
+    const html = renderPage();
+    expect(html).toContain("Nessun dato ecommerce item-level trovato per questo periodo");
+    expect(html).toContain("Prova 90 giorni");
   });
 
   it("shows configured public site hostname in dashboard hero", () => {

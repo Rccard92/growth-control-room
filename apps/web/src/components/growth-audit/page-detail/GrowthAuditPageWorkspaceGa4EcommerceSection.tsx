@@ -56,6 +56,20 @@ function buildFunnelDiagnosis(
   return null;
 }
 
+function hasGa4EcommerceZeroData(
+  meta: NonNullable<ReturnType<typeof getGrowthAuditPageGa4EcommerceMetadata>>,
+): boolean {
+  if (!meta.syncedAt) return false;
+  const itemViews = meta.itemViews ?? meta.itemViewEvents ?? 0;
+  return (
+    itemViews === 0 &&
+    (meta.itemsAddedToCart ?? 0) === 0 &&
+    (meta.itemsCheckedOut ?? 0) === 0 &&
+    (meta.itemsPurchased ?? 0) === 0 &&
+    (meta.itemRevenue ?? 0) === 0
+  );
+}
+
 export function GrowthAuditPageWorkspaceGa4EcommerceSection({
   page,
 }: GrowthAuditPageWorkspaceGa4EcommerceSectionProps) {
@@ -65,6 +79,7 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
 
   const funnelMeta = getGrowthAuditPageGa4EcommerceMetadata(page);
   const diagnosis = funnelMeta ? buildFunnelDiagnosis(funnelMeta) : null;
+  const isZeroData = funnelMeta ? hasGa4EcommerceZeroData(funnelMeta) : false;
 
   const funnelSteps = funnelMeta
     ? [
@@ -150,6 +165,14 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
 
           {diagnosis && (
             <p className="growth-audit-ga4-funnel__diagnosis">{diagnosis}</p>
+          )}
+
+          {isZeroData && (
+            <p className="growth-audit-ga4-funnel__empty">
+              Nessun dato ecommerce item-level trovato per questo periodo. Prova 90 giorni o verifica
+              in GA4 DebugView/Reports se gli eventi view_item, add_to_cart e purchase sono
+              presenti.
+            </p>
           )}
         </>
       ) : (

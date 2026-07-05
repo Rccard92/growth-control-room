@@ -95,4 +95,29 @@ describe("GrowthAuditPageWorkspaceGa4EcommerceSection", () => {
     );
     expect(html).toContain("non iniziano il checkout");
   });
+
+  it("renders zero-data message when metadata is synced but empty", () => {
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageWorkspaceGa4EcommerceSection
+        page={{
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 0,
+              itemsAddedToCart: 0,
+              itemsCheckedOut: 0,
+              itemsPurchased: 0,
+              itemRevenue: 0,
+              matchedBy: "none",
+              syncedAt: "2026-06-13T10:00:00.000Z",
+            },
+          },
+        }}
+      />,
+    );
+    expect(html).toContain("View item");
+    expect(html).toContain("Nessun dato ecommerce item-level trovato per questo periodo");
+    expect(html).toContain("Prova 90 giorni");
+  });
 });

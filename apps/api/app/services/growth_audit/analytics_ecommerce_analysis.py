@@ -588,6 +588,7 @@ async def analyze_growth_audit_analytics_ecommerce(
         variant_data_by_gid=variant_data_by_gid,
     )
     page_aggregates, unmatched_items = match_ga4_rows_to_pages(profiles, rows)
+    has_ga4_rows = len(rows) > 0
 
     synced_at = _utcnow().isoformat()
     pages_updated = 0
@@ -629,7 +630,9 @@ async def analyze_growth_audit_analytics_ecommerce(
         )
     )
     open_findings = list(findings_result.scalars().all())
-    finding_specs = _build_ga4_ecommerce_findings(product_pages, open_findings)
+    finding_specs = (
+        _build_ga4_ecommerce_findings(product_pages, open_findings) if has_ga4_rows else []
+    )
     findings_created = 0
     for spec in finding_specs:
         finding = GrowthAuditFinding(
@@ -649,15 +652,19 @@ async def analyze_growth_audit_analytics_ecommerce(
         session.add(finding)
         findings_created += 1
 
+    completion_message = (
+        "Funnel ecommerce GA4 aggiornato. Nessun dato item-level trovato nel periodo selezionato."
+        if not has_ga4_rows
+        else f"Funnel ecommerce GA4 aggiornato: {summary['productsWithFunnelData']} prodotti con dati."
+    )
+
     await create_growth_audit_event(
         session,
         run_id=run.id,
         project_id=project_id,
         event_type="ga4_ecommerce_analysis_completed",
         phase="ga4_ecommerce",
-        message=(
-            f"Funnel ecommerce GA4 aggiornato: {summary['productsWithFunnelData']} prodotti con dati."
-        ),
+        message=completion_message,
         progress_percent=run.progress_percent,
         payload={
             "pagesUpdated": pages_updated,
@@ -675,5 +682,9 @@ async def analyze_growth_audit_analytics_ecommerce(
         "summary": summary,
         "pages_updated": pages_updated,
         "findings_created": findings_created,
-        "message": "Funnel ecommerce GA4 aggiornato",
+        "message": (
+            "Funnel ecommerce GA4 aggiornato. Nessun dato item-level trovato nel periodo selezionato."
+            if not has_ga4_rows
+            else "Funnel ecommerce GA4 aggiornato"
+        ),
     }

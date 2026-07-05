@@ -29,7 +29,12 @@ from app.services.growth_audit.ga4_item_product_matching import (
 )
 from app.services.google.exceptions import GoogleApiRequestError
 from app.services.google.analytics_client import (
-    ITEM_ECOMMERCE_FALLBACK_METRICS,
+    ITEM_ECOMMERCE_BASE_DIMENSIONS,
+    ITEM_ECOMMERCE_BASE_METRICS,
+    ITEM_ECOMMERCE_CHECKOUT_METRICS,
+    ITEM_ECOMMERCE_ID_ONLY_DIMENSIONS,
+    ITEM_ECOMMERCE_NAME_ONLY_DIMENSIONS,
+    _parse_item_report_rows,
     fetch_ga4_item_ecommerce_report,
 )
 
@@ -362,30 +367,107 @@ def test_analyze_updates_page_metadata_and_summary() -> None:
     asyncio.run(run())
 
 
-def test_fetch_ga4_item_ecommerce_report_fallback_metrics() -> None:
+def _base_report_payload(
+    *,
+    item_id: str = "123",
+    item_name: str = "Prodotto",
+    item_variant: str = "",
+    items_viewed: str = "10",
+    items_added: str = "2",
+    items_purchased: str = "1",
+    item_revenue: str = "15.5",
+    dimensions: list[str] | None = None,
+) -> dict:
+    dims = dimensions or ITEM_ECOMMERCE_BASE_DIMENSIONS
+    dimension_values = []
+    if "itemId" in dims:
+        dimension_values.append({"value": item_id})
+    if "itemName" in dims:
+        dimension_values.append({"value": item_name})
+    if "itemVariant" in dims:
+        dimension_values.append({"value": item_variant})
+    return {
+        "rows": [
+            {
+                "dimensionValues": dimension_values,
+                "metricValues": [
+                    {"value": items_viewed},
+                    {"value": items_added},
+                    {"value": items_purchased},
+                    {"value": item_revenue},
+                ],
+            }
+        ]
+    }
+
+
+def _checkout_report_payload(*, items_checked_out: str = "3") -> dict:
+    return {
+        "rows": [
+            {
+                "dimensionValues": [
+                    {"value": "123"},
+                    {"value": "Prodotto"},
+                ],
+                "metricValues": [{"value": items_checked_out}],
+            }
+        ]
+    }
+
+
+def test_base_metrics_do_not_include_item_view_events() -> None:
+    assert "itemViewEvents" not in ITEM_ECOMMERCE_BASE_METRICS
+    assert "itemViewEvents" not in ITEM_ECOMMERCE_CHECKOUT_METRICS
+
+
+def test_fetch_ga4_item_ecommerce_report_base_success() -> None:
     async def run() -> None:
-        incompatible = {"_metric_incompatible": True, "error": {}}
-        fallback_payload = {
-            "rows": [
-                {
-                    "dimensionValues": [
-                        {"value": "123"},
-                        {"value": "Prodotto"},
-                        {"value": ""},
-                    ],
-                    "metricValues": [
-                        {"value": "10"},
-                        {"value": "2"},
-                        {"value": "1"},
-                        {"value": "15.5"},
-                    ],
-                }
-            ]
-        }
+        base_payload = _base_report_payload()
+        checkout_payload = _checkout_report_payload()
 
         with patch(
             "app.services.google.analytics_client._run_ga4_item_report",
-            new=AsyncMock(side_effect=[incompatible, fallback_payload]),
+            new=AsyncMock(
+                side_effect=[
+                    base_payload,
+                    checkout_payload,
+                    {"_metric_incompatible": True, "error": {}},
+                ]
+            ),
+        ) as mock_report:
+            result = await fetch_ga4_item_ecommerce_report(
+                "access-token",
+                property_id="123456789",
+                start_date=datetime.now(UTC).date(),
+                end_date=datetime.now(UTC).date(),
+            )
+
+        assert result["dimensionsUsed"] == ITEM_ECOMMERCE_BASE_DIMENSIONS
+        assert ITEM_ECOMMERCE_BASE_METRICS[0] in result["metricsUsed"]
+        assert "itemsCheckedOut" in result["metricsUsed"]
+        assert result["rows"][0]["itemId"] == "123"
+        assert result["rows"][0]["itemsViewed"] == 10
+        assert result["rows"][0]["itemsCheckedOut"] == 3
+        first_call = mock_report.await_args_list[0].kwargs
+        assert first_call["dimensions"] == ITEM_ECOMMERCE_BASE_DIMENSIONS
+        assert first_call["metrics"] == ITEM_ECOMMERCE_BASE_METRICS
+
+    asyncio.run(run())
+
+
+def test_fetch_ga4_item_ecommerce_report_checkout_failure_keeps_base_valid() -> None:
+    async def run() -> None:
+        base_payload = _base_report_payload()
+
+        with patch(
+            "app.services.google.analytics_client._run_ga4_item_report",
+            new=AsyncMock(
+                side_effect=[
+                    base_payload,
+                    {"_metric_incompatible": True, "error": {}},
+                    {"_metric_incompatible": True, "error": {}},
+                ]
+            ),
         ):
             result = await fetch_ga4_item_ecommerce_report(
                 "access-token",
@@ -394,14 +476,139 @@ def test_fetch_ga4_item_ecommerce_report_fallback_metrics() -> None:
                 end_date=datetime.now(UTC).date(),
             )
 
-        assert result["metricsUsed"] == ITEM_ECOMMERCE_FALLBACK_METRICS
-        assert result["rows"][0]["itemId"] == "123"
-        assert result["rows"][0]["itemsPurchased"] == 1
+        assert result["rows"][0]["itemsViewed"] == 10
+        assert result["rows"][0]["itemsCheckedOut"] == 0
+        assert "itemsCheckedOut" in result["missingMetrics"]
 
     asyncio.run(run())
 
 
-def test_fetch_ga4_item_ecommerce_report_raises_when_incompatible() -> None:
+def test_fetch_ga4_item_ecommerce_report_variant_failure_keeps_base_valid() -> None:
+    async def run() -> None:
+        base_payload = _base_report_payload()
+        checkout_payload = _checkout_report_payload()
+
+        with patch(
+            "app.services.google.analytics_client._run_ga4_item_report",
+            new=AsyncMock(
+                side_effect=[
+                    base_payload,
+                    checkout_payload,
+                    {"_metric_incompatible": True, "error": {}},
+                ]
+            ),
+        ):
+            result = await fetch_ga4_item_ecommerce_report(
+                "access-token",
+                property_id="123456789",
+                start_date=datetime.now(UTC).date(),
+                end_date=datetime.now(UTC).date(),
+            )
+
+        assert result["rows"][0]["itemsPurchased"] == 1
+        assert result["dimensionsUsed"] == ITEM_ECOMMERCE_BASE_DIMENSIONS
+
+    asyncio.run(run())
+
+
+def test_fetch_ga4_item_ecommerce_report_fallback_item_name() -> None:
+    async def run() -> None:
+        incompatible = {"_metric_incompatible": True, "error": {}}
+        name_payload = _base_report_payload(
+            item_id="",
+            dimensions=ITEM_ECOMMERCE_NAME_ONLY_DIMENSIONS,
+        )
+        checkout_payload = _checkout_report_payload()
+
+        with patch(
+            "app.services.google.analytics_client._run_ga4_item_report",
+            new=AsyncMock(
+                side_effect=[
+                    incompatible,
+                    name_payload,
+                    checkout_payload,
+                    {"_metric_incompatible": True, "error": {}},
+                ]
+            ),
+        ) as mock_report:
+            result = await fetch_ga4_item_ecommerce_report(
+                "access-token",
+                property_id="123456789",
+                start_date=datetime.now(UTC).date(),
+                end_date=datetime.now(UTC).date(),
+            )
+
+        assert result["dimensionsUsed"] == ITEM_ECOMMERCE_NAME_ONLY_DIMENSIONS
+        assert result["rows"][0]["itemName"] == "Prodotto"
+        second_call = mock_report.await_args_list[1].kwargs
+        assert second_call["dimensions"] == ITEM_ECOMMERCE_NAME_ONLY_DIMENSIONS
+
+    asyncio.run(run())
+
+
+def test_fetch_ga4_item_ecommerce_report_fallback_item_id() -> None:
+    async def run() -> None:
+        incompatible = {"_metric_incompatible": True, "error": {}}
+        id_payload = _base_report_payload(
+            item_name="",
+            dimensions=ITEM_ECOMMERCE_ID_ONLY_DIMENSIONS,
+        )
+        checkout_payload = {
+            "rows": [
+                {
+                    "dimensionValues": [{"value": "123"}],
+                    "metricValues": [{"value": "2"}],
+                }
+            ]
+        }
+
+        with patch(
+            "app.services.google.analytics_client._run_ga4_item_report",
+            new=AsyncMock(
+                side_effect=[
+                    incompatible,
+                    incompatible,
+                    id_payload,
+                    checkout_payload,
+                    {"_metric_incompatible": True, "error": {}},
+                ]
+            ),
+        ):
+            result = await fetch_ga4_item_ecommerce_report(
+                "access-token",
+                property_id="123456789",
+                start_date=datetime.now(UTC).date(),
+                end_date=datetime.now(UTC).date(),
+            )
+
+        assert result["dimensionsUsed"] == ITEM_ECOMMERCE_ID_ONLY_DIMENSIONS
+        assert result["rows"][0]["itemId"] == "123"
+
+    asyncio.run(run())
+
+
+def test_fetch_ga4_item_ecommerce_report_empty_rows_success() -> None:
+    async def run() -> None:
+        empty_payload = {"rows": []}
+        checkout_payload = {"rows": []}
+
+        with patch(
+            "app.services.google.analytics_client._run_ga4_item_report",
+            new=AsyncMock(side_effect=[empty_payload, checkout_payload, {"_metric_incompatible": True, "error": {}}]),
+        ):
+            result = await fetch_ga4_item_ecommerce_report(
+                "access-token",
+                property_id="123456789",
+                start_date=datetime.now(UTC).date(),
+                end_date=datetime.now(UTC).date(),
+            )
+
+        assert result["rows"] == []
+
+    asyncio.run(run())
+
+
+def test_fetch_ga4_item_ecommerce_report_raises_when_all_attempts_fail() -> None:
     async def run() -> None:
         incompatible = {"_metric_incompatible": True, "error": {}}
         with (
@@ -409,7 +616,7 @@ def test_fetch_ga4_item_ecommerce_report_raises_when_incompatible() -> None:
                 "app.services.google.analytics_client._run_ga4_item_report",
                 new=AsyncMock(return_value=incompatible),
             ),
-            pytest.raises(GoogleApiRequestError, match="non compatibile"),
+            pytest.raises(GoogleApiRequestError, match="metriche ecommerce item-level"),
         ):
             await fetch_ga4_item_ecommerce_report(
                 "access-token",
@@ -417,6 +624,110 @@ def test_fetch_ga4_item_ecommerce_report_raises_when_incompatible() -> None:
                 start_date=datetime.now(UTC).date(),
                 end_date=datetime.now(UTC).date(),
             )
+
+    asyncio.run(run())
+
+
+def test_parse_item_report_rows_supports_variable_dimensions() -> None:
+    one_dim_payload = _base_report_payload(dimensions=["itemId"], item_name="")
+    two_dim_payload = _base_report_payload()
+    three_dim_payload = {
+        "rows": [
+            {
+                "dimensionValues": [
+                    {"value": "123"},
+                    {"value": "Prodotto"},
+                    {"value": "500g"},
+                ],
+                "metricValues": [
+                    {"value": "8"},
+                    {"value": "1"},
+                    {"value": "0"},
+                    {"value": "9.5"},
+                ],
+            }
+        ]
+    }
+
+    one_dim_rows = _parse_item_report_rows(
+        one_dim_payload,
+        dimensions=["itemId"],
+        metrics=ITEM_ECOMMERCE_BASE_METRICS,
+    )
+    two_dim_rows = _parse_item_report_rows(
+        two_dim_payload,
+        dimensions=ITEM_ECOMMERCE_BASE_DIMENSIONS,
+        metrics=ITEM_ECOMMERCE_BASE_METRICS,
+    )
+    three_dim_rows = _parse_item_report_rows(
+        three_dim_payload,
+        dimensions=["itemId", "itemName", "itemVariant"],
+        metrics=ITEM_ECOMMERCE_BASE_METRICS,
+    )
+
+    assert one_dim_rows[0]["itemId"] == "123"
+    assert one_dim_rows[0]["itemName"] == ""
+    assert two_dim_rows[0]["itemName"] == "Prodotto"
+    assert three_dim_rows[0]["itemVariant"] == "500g"
+
+
+def test_analyze_updates_zero_metadata_when_rows_empty() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        run_id = uuid4()
+        page = _build_product_page(project_id=project_id, run_id=run_id)
+        audit_run = _build_run(project_id, run_id)
+        project = MagicMock()
+        project.google_analytics_property_id = "properties/123456789"
+
+        session = AsyncMock()
+        findings_result = MagicMock()
+        findings_result.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(return_value=findings_result)
+
+        with (
+            patch(
+                "app.services.growth_audit.analytics_ecommerce_analysis.get_growth_audit_run",
+                new=AsyncMock(return_value=audit_run),
+            ),
+            patch(
+                "app.services.growth_audit.analytics_ecommerce_analysis.get_project_in_default_workspace",
+                new=AsyncMock(return_value=project),
+            ),
+            patch(
+                "app.services.growth_audit.analytics_ecommerce_analysis.get_valid_google_access_token",
+                new=AsyncMock(return_value="access-token"),
+            ),
+            patch(
+                "app.services.growth_audit.analytics_ecommerce_analysis.fetch_ga4_item_ecommerce_report",
+                new=AsyncMock(return_value={"rows": []}),
+            ),
+            patch(
+                "app.services.growth_audit.analytics_ecommerce_analysis.list_growth_audit_pages",
+                new=AsyncMock(return_value=[page]),
+            ),
+            patch(
+                "app.services.growth_audit.analytics_ecommerce_analysis.get_shopify_store_for_project",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.services.growth_audit.analytics_ecommerce_analysis.create_growth_audit_event",
+                new=AsyncMock(),
+            ),
+        ):
+            result = await analyze_growth_audit_analytics_ecommerce(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                days=30,
+            )
+
+        assert result["pages_updated"] == 1
+        assert result["findings_created"] == 0
+        assert "Nessun dato item-level" in result["message"]
+        assert page.page_metadata["ga4Ecommerce"]["itemViews"] == 0
+        assert page.page_metadata["ga4Ecommerce"]["matchedBy"] == "none"
+        assert audit_run.summary["ga4Ecommerce"]["productsWithoutFunnelData"] == 1
 
     asyncio.run(run())
 

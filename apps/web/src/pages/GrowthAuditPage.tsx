@@ -98,6 +98,24 @@ function formatGrowthAuditRunDate(value?: string | null): string | null {
   });
 }
 
+function formatGa4EcommerceError(error: unknown): string {
+  const fallback =
+    "GA4 ha rifiutato il report ecommerce item-level. Il collegamento GA4 funziona, ma questa proprietà potrebbe non esporre alcune metriche prodotto o il tracking ecommerce Shopify potrebbe non essere popolato nel periodo selezionato.";
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+  const message = error.message.toLowerCase();
+  if (
+    message.includes("incompatib") ||
+    message.includes("google_analytics_item") ||
+    message.includes("metriche ecommerce item-level") ||
+    message.includes("item ecommerce")
+  ) {
+    return fallback;
+  }
+  return error.message;
+}
+
 export function GrowthAuditPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
@@ -163,6 +181,12 @@ export function GrowthAuditPage() {
   const recentEvents = [...events].reverse().slice(0, 5);
   const summary = activeRun?.summary ?? null;
   const summaryMessage = typeof summary?.message === "string" ? summary.message : null;
+  const ga4EcommerceHasNoData = Boolean(
+    summary?.ga4Ecommerce &&
+      (summary.ga4Ecommerce.totalItemViews ?? 0) === 0 &&
+      (summary.ga4Ecommerce.productsWithFunnelData ?? 0) === 0 &&
+      summary.ga4Ecommerce.lastSyncedAt,
+  );
   const inventoryMessage = getInventoryMessage(activeRun?.pagesDiscovered ?? 0, summary);
 
   const defaultRootUrl = useMemo(
@@ -860,9 +884,15 @@ export function GrowthAuditPage() {
 
               {analyzeGa4Ecommerce.isError && (
                 <p className="growth-audit-ga4-funnel-panel__error" role="alert">
-                  {analyzeGa4Ecommerce.error instanceof Error
-                    ? analyzeGa4Ecommerce.error.message
-                    : "Impossibile aggiornare il funnel ecommerce GA4."}
+                  {formatGa4EcommerceError(analyzeGa4Ecommerce.error)}
+                </p>
+              )}
+
+              {ga4EcommerceHasNoData && (
+                <p className="growth-audit-ga4-funnel-panel__callout">
+                  Nessun dato ecommerce item-level trovato per questo periodo. Prova 90 giorni o
+                  verifica in GA4 DebugView/Reports se gli eventi view_item, add_to_cart e purchase
+                  sono presenti.
                 </p>
               )}
 
