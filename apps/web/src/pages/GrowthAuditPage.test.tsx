@@ -496,6 +496,33 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("tracking ecommerce Shopify");
   });
 
+  it("shows matching mode strict and unmatched microcopy on dashboard", () => {
+    setupMocks({
+      withActiveRun: true,
+      withTechnicalScan: true,
+      analyticsConnected: true,
+      googleAnalyticsPropertyId: "123456789",
+      ga4EcommerceSummary: {
+        periodDays: 30,
+        totalItemViews: 500,
+        totalItemsAddedToCart: 40,
+        totalItemsPurchased: 10,
+        totalItemRevenue: 1200,
+        productsWithFunnelData: 3,
+        productsWithoutFunnelData: 2,
+        productsWithNoReliableMatch: 2,
+        unmatchedItems: 5,
+        matchingMode: "strict",
+        lastSyncedAt: "2026-06-13T10:00:00.000Z",
+      },
+    });
+    const html = renderPage();
+    expect(html).toContain("Matching mode:");
+    expect(html).toContain("strict");
+    expect(html).toContain("Item GA4 non collegati a una pagina prodotto con match sicuro");
+    expect(html).toContain("Alcuni item GA4 non sono stati abbinati ai prodotti Shopify");
+  });
+
   it("shows GA4 ecommerce empty state when summary has zero data", () => {
     setupMocks({
       withActiveRun: true,

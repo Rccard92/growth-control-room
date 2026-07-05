@@ -5956,6 +5956,20 @@
   border-left: 3px solid rgba(99, 102, 241, 0.45);
 }
 
+.growth-audit-ga4-funnel-panel__kpis small {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--gcr-text-muted);
+  font-weight: 400;
+}
+
+.growth-audit-ga4-funnel-panel__matching-mode {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--gcr-text-muted);
+}
+
 .growth-audit-ga4-funnel__empty {
   margin: 0;
   padding: 0.85rem 1rem;
@@ -5963,6 +5977,83 @@
   background: rgba(148, 163, 184, 0.08);
   color: var(--gcr-text-muted);
   font-size: 0.9rem;
+}
+
+.growth-audit-ga4-funnel__match-debug {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.growth-audit-ga4-funnel__match-debug-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.growth-audit-ga4-funnel__match-debug-copy,
+.growth-audit-ga4-funnel__match-debug-reason {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.45;
+}
+
+.growth-audit-ga4-funnel__match-debug-keys {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.growth-audit-ga4-funnel__match-debug-keys div {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.growth-audit-ga4-funnel__match-debug-keys span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--gcr-text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.growth-audit-ga4-funnel__match-debug-keys strong {
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+.growth-audit-ga4-funnel__match-debug-candidates h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+}
+
+.growth-audit-ga4-funnel__match-debug-note {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  color: var(--gcr-text-muted);
+  font-style: italic;
+}
+
+.growth-audit-ga4-funnel__match-debug-candidates-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.growth-audit-ga4-funnel__match-debug-candidates-table th,
+.growth-audit-ga4-funnel__match-debug-candidates-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  text-align: left;
+  vertical-align: top;
+}
+
+.growth-audit-ga4-funnel__match-debug-candidates-table th {
+  color: var(--gcr-text-muted);
+  font-weight: 600;
 }
 
 .growth-audit-priority-actions__expand {

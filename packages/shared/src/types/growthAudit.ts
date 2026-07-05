@@ -217,6 +217,34 @@ export interface GrowthAuditRunShopifyCommerceSummary {
   lastSyncedAt?: string | null;
 }
 
+export interface GrowthAuditGa4MatchCandidateItem {
+  itemId?: string;
+  itemName?: string;
+  itemVariant?: string;
+  itemsViewed?: number;
+  itemsAddedToCart?: number;
+  itemsPurchased?: number;
+  itemRevenue?: number;
+  candidateReason?: string;
+}
+
+export interface GrowthAuditGa4MatchShopifyKeys {
+  productGid?: string;
+  productLegacyId?: string | null;
+  variantLegacyIds?: string[];
+  skus?: string[];
+  titleNormalized?: string;
+  handleNormalized?: string;
+}
+
+export interface GrowthAuditGa4MatchDebug {
+  shopifyKeys: GrowthAuditGa4MatchShopifyKeys;
+  matchedBy?: string;
+  matchStatus: "matched" | "no_reliable_match" | "ambiguous_match";
+  reason: string;
+  candidateItems: GrowthAuditGa4MatchCandidateItem[];
+}
+
 export interface GrowthAuditPageGa4EcommerceMetadata {
   periodDays?: number;
   itemViews?: number;
@@ -237,6 +265,7 @@ export interface GrowthAuditPageGa4EcommerceMetadata {
   matchedBy?: string;
   matchedItemIds?: string[];
   matchedItemNames?: string[];
+  matchDebug?: GrowthAuditGa4MatchDebug;
   source?: string;
   syncedAt?: string;
 }
@@ -253,6 +282,11 @@ export interface GrowthAuditRunGa4EcommerceSummary {
   productsWithFunnelData?: number;
   productsWithoutFunnelData?: number;
   unmatchedItems?: number;
+  matchedProducts?: number;
+  productsWithNoReliableMatch?: number;
+  ambiguousItemsCount?: number;
+  matchingMode?: string;
+  matchingWarning?: string;
   highViewLowCartProducts?: number;
   highCartLowPurchaseProducts?: number;
   topFunnelProducts?: Array<{

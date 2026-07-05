@@ -897,7 +897,19 @@ export function GrowthAuditPage() {
               )}
 
               {summary?.ga4Ecommerce && (
-                <div className="growth-audit-ga4-funnel-panel__kpis">
+                <>
+                  <p className="growth-audit-ga4-funnel-panel__matching-mode">
+                    Matching mode: <strong>strict</strong>
+                  </p>
+
+                  {(summary.ga4Ecommerce.unmatchedItems ?? 0) > 0 && (
+                    <p className="growth-audit-ga4-funnel-panel__callout">
+                      Alcuni item GA4 non sono stati abbinati ai prodotti Shopify. Apri i prodotti
+                      con Match GA4: none per verificare item_id, SKU e title.
+                    </p>
+                  )}
+
+                  <div className="growth-audit-ga4-funnel-panel__kpis">
                   <div>
                     <span>Item views</span>
                     <strong>{summary.ga4Ecommerce.totalItemViews ?? 0}</strong>
@@ -946,8 +958,18 @@ export function GrowthAuditPage() {
                   <div>
                     <span>Unmatched items</span>
                     <strong>{summary.ga4Ecommerce.unmatchedItems ?? 0}</strong>
+                    <small>
+                      Item GA4 non collegati a una pagina prodotto con match sicuro.
+                    </small>
                   </div>
+                  {(summary.ga4Ecommerce.productsWithNoReliableMatch ?? 0) > 0 && (
+                    <div>
+                      <span>Prodotti senza match</span>
+                      <strong>{summary.ga4Ecommerce.productsWithNoReliableMatch}</strong>
+                    </div>
+                  )}
                 </div>
+                </>
               )}
             </>
           )}

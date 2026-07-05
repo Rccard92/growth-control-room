@@ -100,7 +100,7 @@ def _build_product_page(
 def test_match_by_product_legacy_id() -> None:
     page = _build_product_page(project_id=uuid4(), run_id=uuid4())
     profiles = build_product_match_profiles([page])
-    aggregates, unmatched = match_ga4_rows_to_pages(
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
         profiles,
         [
             {
@@ -117,6 +117,7 @@ def test_match_by_product_legacy_id() -> None:
         ],
     )
     assert unmatched == 0
+    assert ambiguous == 0
     assert page.id in aggregates
     assert aggregates[page.id]["itemViews"] == 80
     assert aggregates[page.id]["matchedBy"] == "item_id"
@@ -133,7 +134,7 @@ def test_match_by_variant_id() -> None:
             }
         },
     )
-    aggregates, unmatched = match_ga4_rows_to_pages(
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
         profiles,
         [
             {
@@ -154,7 +155,7 @@ def test_match_by_variant_id() -> None:
 def test_match_by_normalized_item_name() -> None:
     page = _build_product_page(project_id=uuid4(), run_id=uuid4(), title="Miele Bio")
     profiles = build_product_match_profiles([page])
-    aggregates, unmatched = match_ga4_rows_to_pages(
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
         profiles,
         [
             {
@@ -186,7 +187,7 @@ def test_ambiguous_item_name_does_not_assign() -> None:
         ),
     ]
     profiles = build_product_match_profiles(pages)
-    aggregates, unmatched = match_ga4_rows_to_pages(
+    aggregates, unmatched, ambiguous = match_ga4_rows_to_pages(
         profiles,
         [
             {
@@ -202,6 +203,111 @@ def test_ambiguous_item_name_does_not_assign() -> None:
     )
     assert aggregates == {}
     assert unmatched == 1
+    assert ambiguous == 1
+
+
+def test_build_page_match_debug_matched_status() -> None:
+    from app.services.growth_audit.ga4_item_product_matching import build_page_match_debug
+
+    page = _build_product_page(project_id=uuid4(), run_id=uuid4())
+    profiles = build_product_match_profiles([page])
+    aggregate = {
+        "matchedBy": "item_id",
+        "itemViews": 50,
+        "itemsAddedToCart": 5,
+        "itemsPurchased": 1,
+        "itemRevenue": 20.0,
+    }
+    debug = build_page_match_debug(
+        profiles[0],
+        aggregate=aggregate,
+        rows=[],
+    )
+    assert debug["matchStatus"] == "matched"
+    assert debug["candidateItems"] == []
+    assert debug["shopifyKeys"]["productLegacyId"] == "123"
+
+
+def test_build_page_match_debug_no_reliable_match() -> None:
+    from app.services.growth_audit.ga4_item_product_matching import build_page_match_debug
+
+    page = _build_product_page(project_id=uuid4(), run_id=uuid4(), title="Polline biologico")
+    profiles = build_product_match_profiles([page])
+    rows = [
+        {
+            "itemId": "999",
+            "itemName": "Polline biologico premium",
+            "itemVariant": "",
+            "itemsViewed": 80,
+            "itemsAddedToCart": 4,
+            "itemsPurchased": 1,
+            "itemRevenue": 15.0,
+        }
+    ]
+    debug = build_page_match_debug(
+        profiles[0],
+        aggregate=None,
+        rows=rows,
+    )
+    assert debug["matchStatus"] == "no_reliable_match"
+    assert debug["shopifyKeys"]["titleNormalized"] == "polline biologico"
+    assert len(debug["candidateItems"]) > 0
+    assert debug["candidateItems"][0]["itemsViewed"] == 80
+
+
+def test_candidate_items_do_not_affect_page_metrics() -> None:
+    from app.services.growth_audit.ga4_item_product_matching import (
+        build_page_match_debug,
+        find_potential_unmatched_candidates_for_profile,
+    )
+
+    page = _build_product_page(project_id=uuid4(), run_id=uuid4(), title="Polline biologico")
+    profiles = build_product_match_profiles([page])
+    rows = [
+        {
+            "itemId": "999",
+            "itemName": "Polline biologico extra",
+            "itemVariant": "",
+            "itemsViewed": 120,
+            "itemsAddedToCart": 8,
+            "itemsPurchased": 2,
+            "itemRevenue": 40.0,
+        }
+    ]
+    candidates = find_potential_unmatched_candidates_for_profile(profiles[0], rows)
+    metadata = _build_page_ga4_ecommerce_metadata(
+        period_days=30,
+        aggregate=None,
+        synced_at="2026-06-13T10:00:00Z",
+        match_debug=build_page_match_debug(profiles[0], aggregate=None, rows=rows),
+    )
+    assert len(candidates) > 0
+    assert metadata["itemViews"] == 0
+    assert metadata["itemsPurchased"] == 0
+    assert metadata["itemRevenue"] == 0
+    assert metadata["matchDebug"]["candidateItems"][0]["itemsViewed"] == 120
+
+
+def test_summary_includes_matching_mode_strict() -> None:
+    page = _build_product_page(project_id=uuid4(), run_id=uuid4())
+    page.page_metadata = {
+        "ga4Ecommerce": _build_page_ga4_ecommerce_metadata(
+            period_days=30,
+            aggregate={"matchedBy": "item_id", "itemViews": 10, "itemsAddedToCart": 1},
+            synced_at="2026-06-13T10:00:00Z",
+        )
+    }
+    summary = _compute_run_ga4_ecommerce_summary(
+        [page],
+        period_days=30,
+        synced_at="2026-06-13T10:00:00Z",
+        unmatched_items=2,
+        ambiguous_items=1,
+    )
+    assert summary["matchingMode"] == "strict"
+    assert summary["ambiguousItemsCount"] == 1
+    assert summary["unmatchedItems"] == 2
+    assert summary["matchedProducts"] == 1
 
 
 def test_build_page_metadata_zero_safe_rates() -> None:

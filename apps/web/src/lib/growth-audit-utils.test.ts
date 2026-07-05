@@ -1375,6 +1375,88 @@ describe("growth-audit-utils", () => {
       ).toBe(true);
     });
 
+    it("does not use candidateItems for product intelligence score", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 0,
+              itemsAddedToCart: 0,
+              itemsPurchased: 0,
+              itemRevenue: 0,
+              matchedBy: "none",
+              matchDebug: {
+                shopifyKeys: {
+                  productGid: "gid://shopify/Product/1",
+                  productLegacyId: "1",
+                  variantLegacyIds: [],
+                  skus: [],
+                  titleNormalized: "miele",
+                  handleNormalized: "miele",
+                },
+                matchedBy: "none",
+                matchStatus: "no_reliable_match",
+                reason: "Nessuna riga GA4 match.",
+                candidateItems: [
+                  {
+                    itemId: "999",
+                    itemName: "Miele Bio",
+                    itemsViewed: 200,
+                    itemsPurchased: 5,
+                    itemRevenue: 99,
+                    candidateReason: "Nome simile ma non identico.",
+                  },
+                ],
+              },
+              syncedAt: "2026-06-13T10:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+
+      expect(summary.evidence.some((signal) => signal.key === "ga4-item-views")).toBe(false);
+      const purchaseSignal = summary.evidence.find((signal) => signal.key === "ga4-purchase");
+      if (purchaseSignal) {
+        expect(purchaseSignal.value).toBe("0");
+      }
+      expect(
+        summary.recommendedActions.some((action) =>
+          action.title.includes("Verifica tracciamento ecommerce GA4"),
+        ),
+      ).toBe(true);
+    });
+
+    it("updates GA4 tracking action copy when product has traffic signals", () => {
+      const summary = buildGrowthAuditProductIntelligenceSummary({
+        page: {
+          ...baseProductPage,
+          metadata: {
+            searchConsole: { impressions: 500, ctr: 0.03, position: 8 },
+            ga4Ecommerce: {
+              periodDays: 30,
+              itemViews: 0,
+              matchedBy: "none",
+              syncedAt: "2026-06-13T10:00:00Z",
+            },
+          },
+        },
+        findings: [],
+        tasks: [],
+        priorityActions: [],
+      });
+
+      const action = summary.recommendedActions.find((item) =>
+        item.title.includes("Verifica tracciamento ecommerce GA4"),
+      );
+      expect(action?.reason).toContain("funnel item-level non è stato abbinato");
+      expect(action?.howToValidate).toContain("Shopify → GA4");
+    });
+
     it("includes GA4 Ecommerce Funnel in missingData when absent", () => {
       const summary = buildGrowthAuditProductIntelligenceSummary({
         page: baseProductPage,

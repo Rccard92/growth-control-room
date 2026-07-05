@@ -39,6 +39,168 @@ class ProductMatchProfile:
     title_normalized: str = ""
     handle_normalized: str = ""
 
+    def to_shopify_keys_dict(self) -> dict[str, Any]:
+        return {
+            "productGid": self.product_gid,
+            "productLegacyId": self.product_legacy_id,
+            "variantLegacyIds": sorted(self.variant_legacy_ids),
+            "skus": sorted(self.skus),
+            "titleNormalized": self.title_normalized,
+            "handleNormalized": self.handle_normalized,
+        }
+
+
+def _ga4_row_key(row: dict[str, Any]) -> str:
+    item_id = str(row.get("itemId") or "").strip()
+    item_name = str(row.get("itemName") or "").strip()
+    item_variant = str(row.get("itemVariant") or "").strip()
+    return f"{item_id}|{item_name}|{item_variant}"
+
+
+def _candidate_row_dict(row: dict[str, Any], *, candidate_reason: str) -> dict[str, Any]:
+    return {
+        "itemId": str(row.get("itemId") or ""),
+        "itemName": str(row.get("itemName") or ""),
+        "itemVariant": str(row.get("itemVariant") or ""),
+        "itemsViewed": int(row.get("itemsViewed") or row.get("itemViewEvents") or 0),
+        "itemsAddedToCart": int(row.get("itemsAddedToCart") or 0),
+        "itemsPurchased": int(row.get("itemsPurchased") or 0),
+        "itemRevenue": round(float(row.get("itemRevenue") or 0), 2),
+        "candidateReason": candidate_reason,
+    }
+
+
+def _weak_candidate_reason(
+    profile: ProductMatchProfile,
+    *,
+    item_id: str,
+    item_name: str,
+) -> str | None:
+    normalized_item_name = _normalize_match_text(item_name)
+    if not normalized_item_name or normalized_item_name == "(not set)":
+        normalized_item_name = ""
+
+    if profile.title_normalized and normalized_item_name:
+        if (
+            profile.title_normalized in normalized_item_name
+            or normalized_item_name in profile.title_normalized
+        ) and profile.title_normalized != normalized_item_name:
+            return "Nome simile ma non identico: non assegnato automaticamente."
+
+    if profile.handle_normalized and normalized_item_name:
+        if profile.handle_normalized in normalized_item_name:
+            return "Handle Shopify presente nel nome item GA4: non assegnato automaticamente."
+
+    item_id_lower = item_id.strip().lower()
+    if item_id_lower:
+        for sku in profile.skus:
+            if sku and (sku in item_id_lower or item_id_lower in sku) and sku != item_id_lower:
+                return "SKU parzialmente simile: non assegnato automaticamente."
+
+    return None
+
+
+def find_potential_unmatched_candidates_for_profile(
+    profile: ProductMatchProfile,
+    rows: list[dict[str, Any]],
+    *,
+    limit: int = 5,
+    assigned_row_keys: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Suggest GA4 rows to inspect manually. Never used for metric assignment."""
+    assigned = assigned_row_keys or set()
+    candidates: list[tuple[int, dict[str, Any]]] = []
+
+    for row in rows:
+        row_key = _ga4_row_key(row)
+        if row_key in assigned:
+            continue
+
+        item_id = str(row.get("itemId") or "")
+        item_name = str(row.get("itemName") or "")
+
+        id_matches = _find_profiles_by_item_id([profile], item_id)
+        if len(id_matches) == 1:
+            continue
+        name_matches = _find_profiles_by_item_name([profile], item_name)
+        if len(name_matches) == 1:
+            continue
+
+        candidate_reason = _weak_candidate_reason(
+            profile,
+            item_id=item_id,
+            item_name=item_name,
+        )
+        if not candidate_reason:
+            continue
+
+        item_views = int(row.get("itemsViewed") or row.get("itemViewEvents") or 0)
+        candidates.append(
+            (
+                item_views,
+                _candidate_row_dict(row, candidate_reason=candidate_reason),
+            )
+        )
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return [item[1] for item in candidates[:limit]]
+
+
+def build_page_match_debug(
+    profile: ProductMatchProfile,
+    *,
+    aggregate: dict[str, Any] | None,
+    rows: list[dict[str, Any]],
+    assigned_row_keys: set[str] | None = None,
+) -> dict[str, Any]:
+    shopify_keys = profile.to_shopify_keys_dict()
+    matched_by = (aggregate or {}).get("matchedBy")
+
+    if aggregate and matched_by and matched_by != "none":
+        return {
+            "shopifyKeys": shopify_keys,
+            "matchedBy": matched_by,
+            "matchStatus": "matched",
+            "reason": f"Prodotto abbinato tramite {matched_by}.",
+            "candidateItems": [],
+        }
+
+    return {
+        "shopifyKeys": shopify_keys,
+        "matchedBy": "none",
+        "matchStatus": "no_reliable_match",
+        "reason": (
+            "Nessuna riga GA4 ha itemId/SKU/title uguale alle chiavi Shopify del prodotto."
+        ),
+        "candidateItems": find_potential_unmatched_candidates_for_profile(
+            profile,
+            rows,
+            assigned_row_keys=assigned_row_keys,
+        ),
+    }
+
+
+def build_assigned_row_keys(
+    profiles: list[ProductMatchProfile],
+    rows: list[dict[str, Any]],
+) -> set[str]:
+    """Row keys that received a strict unique match to any product page."""
+    assigned: set[str] = set()
+    for row in rows:
+        item_id = str(row.get("itemId") or "")
+        item_name = str(row.get("itemName") or "")
+
+        id_matches = _find_profiles_by_item_id(profiles, item_id)
+        if len(id_matches) == 1:
+            assigned.add(_ga4_row_key(row))
+            continue
+
+        name_matches = _find_profiles_by_item_name(profiles, item_name)
+        if len(name_matches) == 1:
+            assigned.add(_ga4_row_key(row))
+
+    return assigned
+
 
 def build_product_match_profiles(
     pages: list[GrowthAuditPage],
@@ -145,10 +307,14 @@ def _resolve_match_type(
 def match_ga4_rows_to_pages(
     profiles: list[ProductMatchProfile],
     rows: list[dict[str, Any]],
-) -> tuple[dict[UUID, dict[str, Any]], int]:
-    """Match GA4 item rows to product pages. Returns page aggregates and unmatched count."""
+) -> tuple[dict[UUID, dict[str, Any]], int, int]:
+    """Match GA4 item rows to product pages.
+
+    Returns page aggregates, unmatched count, and ambiguous match count.
+    """
     page_aggregates: dict[UUID, dict[str, Any]] = {}
     unmatched_items = 0
+    ambiguous_items = 0
 
     for row in rows:
         item_id = str(row.get("itemId") or "")
@@ -172,6 +338,7 @@ def match_ga4_rows_to_pages(
             ) or "item_id"
         elif len(id_matches) > 1:
             unmatched_items += 1
+            ambiguous_items += 1
             continue
         else:
             name_matches = _find_profiles_by_item_name(profiles, item_name)
@@ -180,6 +347,7 @@ def match_ga4_rows_to_pages(
                 matched_by = "item_name"
             elif len(name_matches) > 1:
                 unmatched_items += 1
+                ambiguous_items += 1
                 continue
             else:
                 unmatched_items += 1
@@ -214,4 +382,4 @@ def match_ga4_rows_to_pages(
             if item_variant and item_variant != "(not set)":
                 bucket["matchedVariants"].add(item_variant)
 
-    return page_aggregates, unmatched_items
+    return page_aggregates, unmatched_items, ambiguous_items

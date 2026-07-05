@@ -3842,10 +3842,14 @@ function _buildProductIntelligenceRecommendedActions(input: {
   if (ga4EcommerceMeta && ga4EcommerceMeta.matchedBy === "none") {
     actions.push({
       title: "Verifica tracciamento ecommerce GA4",
-      reason: "Il prodotto non è stato abbinato in modo affidabile ai dati item-level.",
+      reason:
+        impressions > 0 || sessions > 0 || sales > 0
+          ? "Il prodotto ha segnali di traffico/vendita, ma il funnel item-level non è stato abbinato."
+          : "Il prodotto non è stato abbinato in modo affidabile ai dati item-level.",
       expectedImpact: "Dati funnel affidabili per decisioni CRO.",
       whereToFix: "GA4 ecommerce tracking / Shopify channel / item_id / SKU",
-      howToValidate: "Rilancia GA4 Ecommerce Funnel e verifica matchedBy.",
+      howToValidate:
+        "Controlla item_id, SKU e configurazione ecommerce Shopify → GA4.",
     });
   }
 

@@ -19,6 +19,8 @@ from app.services.growth_audit.exceptions import (
     GrowthAuditValidationError,
 )
 from app.services.growth_audit.ga4_item_product_matching import (
+    build_assigned_row_keys,
+    build_page_match_debug,
     build_product_match_profiles,
     match_ga4_rows_to_pages,
 )
@@ -209,6 +211,7 @@ def _build_page_ga4_ecommerce_metadata(
     aggregate: dict[str, Any] | None,
     synced_at: str,
     currency: str | None = None,
+    match_debug: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     agg = aggregate or {}
     item_views = int(agg.get("itemViews") or 0)
@@ -246,6 +249,8 @@ def _build_page_ga4_ecommerce_metadata(
         "source": "ga4",
         "syncedAt": synced_at,
     }
+    if match_debug:
+        metadata["matchDebug"] = match_debug
     return metadata
 
 
@@ -255,6 +260,7 @@ def _compute_run_ga4_ecommerce_summary(
     period_days: int,
     synced_at: str,
     unmatched_items: int,
+    ambiguous_items: int = 0,
     currency: str | None = None,
 ) -> dict[str, Any]:
     total_item_views = 0
@@ -340,6 +346,14 @@ def _compute_run_ga4_ecommerce_summary(
         else 0.0
     )
 
+    products_with_no_reliable_match = 0
+    for page in product_pages:
+        funnel = (page.page_metadata or {}).get("ga4Ecommerce") or {}
+        if isinstance(funnel, dict) and funnel.get("syncedAt"):
+            matched_by = funnel.get("matchedBy") or "none"
+            if matched_by == "none":
+                products_with_no_reliable_match += 1
+
     return {
         "periodDays": period_days,
         "totalItemViews": total_item_views,
@@ -352,6 +366,14 @@ def _compute_run_ga4_ecommerce_summary(
         "productsWithFunnelData": products_with_funnel_data,
         "productsWithoutFunnelData": products_without_funnel_data,
         "unmatchedItems": unmatched_items,
+        "matchedProducts": products_with_funnel_data,
+        "productsWithNoReliableMatch": products_with_no_reliable_match,
+        "ambiguousItemsCount": ambiguous_items,
+        "matchingMode": "strict",
+        "matchingWarning": (
+            "I dati item-level sono assegnati solo quando item_id, variant_id, SKU o "
+            "nome prodotto coincidono in modo affidabile."
+        ),
         "highViewLowCartProducts": high_view_low_cart_products,
         "highCartLowPurchaseProducts": high_cart_low_purchase_products,
         "topFunnelProducts": [item[1] for item in top_candidates[:10]],
@@ -587,7 +609,9 @@ async def analyze_growth_audit_analytics_ecommerce(
         product_pages,
         variant_data_by_gid=variant_data_by_gid,
     )
-    page_aggregates, unmatched_items = match_ga4_rows_to_pages(profiles, rows)
+    profile_by_page_id = {profile.page_id: profile for profile in profiles}
+    page_aggregates, unmatched_items, ambiguous_items = match_ga4_rows_to_pages(profiles, rows)
+    assigned_row_keys = build_assigned_row_keys(profiles, rows)
     has_ga4_rows = len(rows) > 0
 
     synced_at = _utcnow().isoformat()
@@ -601,10 +625,22 @@ async def analyze_growth_audit_analytics_ecommerce(
                 "matchedItemIds": sorted(aggregate.get("matchedItemIds") or []),
                 "matchedItemNames": sorted(aggregate.get("matchedItemNames") or []),
             }
+        profile = profile_by_page_id.get(page.id)
+        match_debug = (
+            build_page_match_debug(
+                profile,
+                aggregate=aggregate,
+                rows=rows,
+                assigned_row_keys=assigned_row_keys,
+            )
+            if profile
+            else None
+        )
         funnel_meta = _build_page_ga4_ecommerce_metadata(
             period_days=normalized_days,
             aggregate=aggregate,
             synced_at=synced_at,
+            match_debug=match_debug,
         )
         page.page_metadata = {
             **(page.page_metadata or {}),
@@ -618,6 +654,7 @@ async def analyze_growth_audit_analytics_ecommerce(
         period_days=normalized_days,
         synced_at=synced_at,
         unmatched_items=unmatched_items,
+        ambiguous_items=ambiguous_items,
     )
     existing_summary = dict(run.summary or {})
     run.summary = {**existing_summary, "ga4Ecommerce": summary}
