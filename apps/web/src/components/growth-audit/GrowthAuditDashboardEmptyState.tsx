@@ -8,7 +8,7 @@ export function GrowthAuditDashboardEmptyState({
   return (
     <div className="growth-audit-dashboard-empty gcr-card">
       {variant === "no-run" ? (
-        <p>Avvia un Full Site Audit per vedere le priorità.</p>
+        <p>Avvia una scansione sito per vedere le priorità.</p>
       ) : (
         <p>Nessuna pagina disponibile.</p>
       )}

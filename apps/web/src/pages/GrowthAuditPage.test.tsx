@@ -104,6 +104,7 @@ function setupMocks(options?: { withActiveRun?: boolean; withTechnicalScan?: boo
           pagesAnalyzed: options?.withTechnicalScan ? 3 : 0,
           pagesFailed: 0,
           siteScore: options?.withTechnicalScan ? 78 : null,
+          completedAt: "2026-06-01T10:00:00.000Z",
           summary: options?.withTechnicalScan
             ? {
                 message: "Technical page scan completed. AI/GEO/CRO analysis is not enabled yet.",
@@ -262,29 +263,67 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Growth Audit");
   });
 
-  it("renders URL input, maxPages selector and start CTA", () => {
+  it("shows onboarding hero and flow steps without runs", () => {
+    setupMocks();
+    const html = renderPage();
+    expect(html).toContain("growth-audit-page--onboarding");
+    expect(html).toContain("Configura il primo Growth Audit");
+    expect(html).toContain("Scansiona sito");
+    expect(html).toContain("Classifica pagine");
+    expect(html).toContain("Correggi e riscansiona");
+    expect(html).not.toContain("growth-audit-dashboard-hero");
+  });
+
+  it("renders scan form, maxPages selector and start CTA without myshopify default", () => {
     setupMocks();
     const html = renderPage();
     expect(html).toContain("Dominio o URL principale");
     expect(html).toContain("Pagine massime");
-    expect(html).toContain("Avvia Full Site Audit");
-    expect(html).toContain("https://solmielato.myshopify.com");
+    expect(html).toContain("Avvia scansione sito");
+    expect(html).not.toContain("solmielato.myshopify.com");
+    expect(html).toContain("https://tuodominio.it");
     expect(html).toContain("<option value=\"50\"");
+    expect(html).not.toContain("Full Site Audit");
+  });
+
+  it("hides flow steps and shows dashboard mode with completed run", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    expect(html).toContain("growth-audit-page--dashboard");
+    expect(html).toContain("growth-audit-dashboard-hero");
+    expect(html).not.toContain("Configura il primo Growth Audit");
+    expect(html).not.toContain("growth-audit-flow");
+    expect(html).not.toContain("solmielato.myshopify.com");
+  });
+
+  it("shows priority dashboard before inventory in dashboard mode", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    const priorityIndex = html.indexOf("Priorità Growth Audit");
+    const inventoryIndex = html.indexOf("Inventario pagine");
+    expect(priorityIndex).toBeGreaterThan(-1);
+    expect(inventoryIndex).toBeGreaterThan(-1);
+    expect(priorityIndex).toBeLessThan(inventoryIndex);
+  });
+
+  it("puts new scan form in accordion when run exists", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    expect(html).toContain("growth-audit-scan-disclosure");
+    expect(html).toContain("Nuova scansione sito");
+    expect(html).toContain("Riapri solo se vuoi aggiornare");
   });
 
   it("shows inventory table, badges and filters when run exists", () => {
     setupMocks({ withActiveRun: true, withTechnicalScan: true });
     const html = renderPage();
-    expect(html).toContain("Priorità Growth Audit");
     expect(html).toContain("Gestisci pagina");
     expect(html).toContain("Tutte le pagine scoperte e scansionate");
-    expect(html).toContain("Inventario pagine");
     expect(html).toContain("Homepage");
     expect(html).toContain("Shopify prodotto");
     expect(html).toContain("Sitemap");
     expect(html).toContain("Prodotti");
     expect(html).toContain("Categorie");
-    expect(html).toContain("Eventi recenti");
     expect(html).toContain("HTTP");
     expect(html).toContain("Problemi");
     expect(html).toContain("82");
@@ -297,13 +336,16 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Non collegata");
   });
 
-  it("shows Site Score and pagesAnalyzed from technical scan", () => {
+  it("prefills public root URL from completed run and shows technical KPIs", () => {
     setupMocks({ withActiveRun: true, withTechnicalScan: true });
     const html = renderPage();
-    expect(html).toContain("Site Score");
+    expect(html).toContain('value="https://solmielato.it"');
+    expect(html).toContain("Score tecnico");
+    expect(html).not.toContain("Site Score");
     expect(html).toContain("78");
     expect(html).toContain("Pagine analizzate");
-    expect(html).toContain("3");
+    expect(html).toContain("Performance");
+    expect(html).toContain("In arrivo");
   });
 
   it("renders priority findings and open tasks", () => {
@@ -317,11 +359,22 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("deterministica");
   });
 
-  it("renders score filters", () => {
+  it("puts recent events inside events disclosure accordion", () => {
+    setupMocks({ withActiveRun: true, withTechnicalScan: true });
+    const html = renderPage();
+    expect(html).toContain("growth-audit-events-disclosure");
+    expect(html).toContain("Eventi e log scansione");
+    expect(html).toContain("Inventario completato");
+    expect(html).not.toContain("Eventi recenti");
+  });
+
+  it("renders score filters and updated roadmap", () => {
     setupMocks({ withActiveRun: true, withTechnicalScan: true });
     const html = renderPage();
     expect(html).toContain("Critiche &lt;60");
     expect(html).toContain("Buone 80+");
+    expect(html).toContain("Prossimi moduli professionali");
+    expect(html).toContain("PageSpeed/CrUX");
   });
 
   it("sends maxPages in start payload", async () => {

@@ -60,7 +60,7 @@ export function GrowthAuditPriorityDashboard({
 
       <div className="growth-audit-priority-dashboard__health-strip" aria-label="Riepilogo stato sito">
         <div className="growth-audit-priority-dashboard__health-item">
-          <span className="growth-audit-priority-dashboard__health-label">Site Score</span>
+          <span className="growth-audit-priority-dashboard__health-label">Score tecnico</span>
           {siteScore != null ? (
             <span className={getGrowthAuditScoreBadgeClass(siteScore)}>
               {formatGrowthAuditScore(siteScore)}

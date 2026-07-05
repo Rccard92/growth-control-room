@@ -6,6 +6,10 @@ import {
   filterInventoryPagesByScore,
   formatPageFindingsCount,
   getDefaultRootUrl,
+  getGrowthAuditDashboardKpiItems,
+  computeGrowthAuditPageScoreAverages,
+  isMyshopifyDomain,
+  getGrowthAuditPublicDomainDisplay,
   getFindingsForPage,
   getGrowthAuditInventoryFilterLabel,
   getGrowthAuditPageScoreLabel,
@@ -155,9 +159,70 @@ describe("growth-audit-utils", () => {
     ).toContain("Scansione tecnica completata");
   });
 
-  it("builds default root URL from shop domain", () => {
-    expect(getDefaultRootUrl("shop.example.com")).toBe("https://shop.example.com");
-    expect(getDefaultRootUrl("https://shop.example.com")).toBe("https://shop.example.com");
+  it("detects myshopify admin domains", () => {
+    expect(isMyshopifyDomain("solmielato.myshopify.com")).toBe(true);
+    expect(isMyshopifyDomain("https://solmielato.myshopify.com")).toBe(true);
+    expect(isMyshopifyDomain("https://solmielato.it")).toBe(false);
+  });
+
+  it("builds default root URL from public run URL, ignoring myshopify", () => {
+    expect(
+      getDefaultRootUrl({
+        activeRun: { rootUrl: "https://solmielato.it" },
+        latestRun: { rootUrl: "https://solmielato.myshopify.com" },
+      }),
+    ).toBe("https://solmielato.it");
+    expect(
+      getDefaultRootUrl({
+        latestRun: { rootUrl: "solmielato.myshopify.com" },
+      }),
+    ).toBe("");
+    expect(
+      getDefaultRootUrl({
+        rootUrlOverride: "https://shop.example.com",
+      }),
+    ).toBe("https://shop.example.com");
+  });
+
+  it("returns public domain display label", () => {
+    expect(getGrowthAuditPublicDomainDisplay({ rootUrl: "https://solmielato.it" })).toBe(
+      "https://solmielato.it",
+    );
+    expect(getGrowthAuditPublicDomainDisplay({ rootUrl: "solmielato.myshopify.com" })).toBe(
+      "Dominio pubblico non configurato",
+    );
+  });
+
+  it("computes dashboard KPI averages from page AI metadata", () => {
+    const pages: GrowthAuditPage[] = [
+      {
+        ...samplePages[0],
+        metadata: {
+          ai: { geoScore: 80, croScore: 70, adsReadinessScore: 60 },
+        },
+      },
+      {
+        ...samplePages[1],
+        geoScore: 60,
+        croScore: 50,
+      },
+    ];
+    const averages = computeGrowthAuditPageScoreAverages(pages);
+    expect(averages.geoAverage).toBe(70);
+    expect(averages.croAverage).toBe(60);
+    expect(averages.adsAverage).toBe(60);
+
+    const kpis = getGrowthAuditDashboardKpiItems(
+      {
+        siteScore: 78,
+        pagesAnalyzed: 3,
+        summary: { pagesAnalyzed: 3, criticalFindings: 1, highFindings: 2, tasksOpen: 2 },
+      },
+      pages,
+    );
+    expect(kpis.find((kpi) => kpi.label === "Score tecnico")?.value).toBe("78");
+    expect(kpis.find((kpi) => kpi.label === "GEO medio")?.value).toBe("70");
+    expect(kpis.find((kpi) => kpi.label === "Performance")?.meta).toBe("In arrivo");
   });
 
   it("maps score bands and badge classes", () => {

@@ -232,14 +232,57 @@ export function isGrowthAuditRunActive(status?: GrowthAuditRunStatus | string | 
   );
 }
 
-export function getDefaultRootUrl(shopDomain?: string | null): string {
-  if (!shopDomain) return "";
-  const trimmed = shopDomain.trim();
-  if (!trimmed) return "";
+export function isMyshopifyDomain(url: string): boolean {
+  if (!url.trim()) return false;
+  try {
+    const trimmed = url.trim();
+    const withProtocol =
+      trimmed.startsWith("http://") || trimmed.startsWith("https://")
+        ? trimmed
+        : `https://${trimmed}`;
+    const host = new URL(withProtocol).hostname.toLowerCase();
+    return host.endsWith(".myshopify.com");
+  } catch {
+    return false;
+  }
+}
+
+function resolvePublicRootUrl(url?: string | null): string | null {
+  if (!url?.trim()) return null;
+  const trimmed = url.trim();
+  if (isMyshopifyDomain(trimmed)) return null;
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     return trimmed;
   }
   return `https://${trimmed}`;
+}
+
+export type GetDefaultRootUrlInput = {
+  rootUrlOverride?: string | null;
+  activeRun?: { rootUrl?: string } | null;
+  latestRun?: { rootUrl?: string } | null;
+};
+
+export function getDefaultRootUrl(input?: GetDefaultRootUrlInput): string {
+  const override = input?.rootUrlOverride?.trim();
+  if (override) {
+    if (isMyshopifyDomain(override)) return "";
+    return resolvePublicRootUrl(override) ?? "";
+  }
+
+  const fromActive = resolvePublicRootUrl(input?.activeRun?.rootUrl);
+  if (fromActive) return fromActive;
+
+  const fromLatest = resolvePublicRootUrl(input?.latestRun?.rootUrl);
+  if (fromLatest) return fromLatest;
+
+  return "";
+}
+
+export function getGrowthAuditPublicDomainDisplay(
+  run?: { rootUrl?: string } | null,
+): string {
+  return resolvePublicRootUrl(run?.rootUrl) ?? "Dominio pubblico non configurato";
 }
 
 function normalizePageTypeForFilter(pageType?: string | null): GrowthAuditInventoryFilter | "other" {
@@ -357,7 +400,7 @@ export function getTechnicalKpiItems(
     (summary?.criticalFindings ?? 0) + (summary?.highFindings ?? 0) || findingsCount || 0;
   return [
     {
-      label: "Site Score",
+      label: "Score tecnico",
       value: run?.siteScore != null ? String(run.siteScore) : "—",
       score: run?.siteScore,
     },
@@ -1710,6 +1753,107 @@ export function getGrowthAuditPageAiMetadata(
 export function hasGrowthAuditPageAiAnalysis(page: GrowthAuditPage): boolean {
   const aiMeta = getGrowthAuditPageAiMetadata(page);
   return Boolean(aiMeta?.analyzedAt || aiMeta?.latestResultId || aiMeta?.latestScore != null);
+}
+
+export type GrowthAuditDashboardKpiItem = {
+  label: string;
+  value: string;
+  score?: number | null;
+  meta?: string;
+};
+
+export function computeGrowthAuditPageScoreAverages(pages: GrowthAuditPage[]): {
+  geoAverage: number | null;
+  croAverage: number | null;
+  adsAverage: number | null;
+} {
+  const geoScores: number[] = [];
+  const croScores: number[] = [];
+  const adsScores: number[] = [];
+
+  for (const page of pages) {
+    const aiMeta = getGrowthAuditPageAiMetadata(page);
+    const geo = aiMeta?.geoScore ?? page.geoScore;
+    const cro = aiMeta?.croScore ?? page.croScore;
+    const ads = aiMeta?.adsReadinessScore;
+    if (geo != null) geoScores.push(geo);
+    if (cro != null) croScores.push(cro);
+    if (ads != null) adsScores.push(ads);
+  }
+
+  const average = (values: number[]) =>
+    values.length > 0
+      ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+      : null;
+
+  return {
+    geoAverage: average(geoScores),
+    croAverage: average(croScores),
+    adsAverage: average(adsScores),
+  };
+}
+
+export function getGrowthAuditDashboardKpiItems(
+  run?: {
+    siteScore?: number | null;
+    pagesAnalyzed?: number;
+    performanceScore?: number | null;
+    summary?: GrowthAuditRunSummary | null;
+  } | null,
+  pages: GrowthAuditPage[] = [],
+  findingsCount?: number,
+  tasksCount?: number,
+): GrowthAuditDashboardKpiItem[] {
+  const summary = run?.summary;
+  const technicalScore = run?.siteScore ?? summary?.averageTechnicalScore ?? null;
+  const criticalHigh =
+    (summary?.criticalFindings ?? 0) + (summary?.highFindings ?? 0) || findingsCount || 0;
+  const aiPagesFromPages = pages.filter((page) => hasGrowthAuditPageAiAnalysis(page)).length;
+  const aiPagesAnalyzed =
+    summary?.aiPagesAnalyzed ?? (aiPagesFromPages > 0 ? aiPagesFromPages : null);
+  const { geoAverage, croAverage, adsAverage } = computeGrowthAuditPageScoreAverages(pages);
+  const formatAverage = (average: number | null) => (average != null ? String(average) : "—");
+
+  return [
+    {
+      label: "Score tecnico",
+      value: technicalScore != null ? String(technicalScore) : "—",
+      score: technicalScore,
+    },
+    {
+      label: "Pagine analizzate",
+      value: String(run?.pagesAnalyzed ?? summary?.pagesAnalyzed ?? "—"),
+    },
+    {
+      label: "Pagine AI analizzate",
+      value: getGrowthAuditAiKpiLabel(aiPagesAnalyzed),
+    },
+    {
+      label: "Problemi critici/alti",
+      value: criticalHigh > 0 ? String(criticalHigh) : "—",
+    },
+    {
+      label: "Task aperti",
+      value: String(summary?.tasksOpen ?? tasksCount ?? "—"),
+    },
+    {
+      label: "GEO medio",
+      value: formatAverage(geoAverage),
+    },
+    {
+      label: "CRO medio",
+      value: formatAverage(croAverage),
+    },
+    {
+      label: "Ads readiness medio",
+      value: formatAverage(adsAverage),
+    },
+    {
+      label: "Performance",
+      value: run?.performanceScore != null ? String(run.performanceScore) : "—",
+      meta: run?.performanceScore == null ? "In arrivo" : undefined,
+    },
+  ];
 }
 
 export type GrowthAuditPagePriorityLevel = "critical" | "high" | "medium" | "low";
