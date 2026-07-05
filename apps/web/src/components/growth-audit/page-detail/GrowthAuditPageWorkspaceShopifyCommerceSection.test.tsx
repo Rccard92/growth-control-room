@@ -70,6 +70,9 @@ describe("GrowthAuditPageWorkspaceShopifyCommerceSection", () => {
     expect(html).toContain("Ordini");
     expect(html).toContain("Stock");
     expect(html).toContain("Disponibile");
-    expect(html).toContain("ACTIVE");
+    expect(html).toContain("Da 12,90 EUR a 24,90 EUR");
+    expect(html).not.toContain("ACTIVE");
+    expect(html).not.toContain("Ultimo sync");
+    expect(html).not.toContain("Stato prodotto");
   });
 });

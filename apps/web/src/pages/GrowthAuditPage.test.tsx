@@ -481,6 +481,22 @@ describe("GrowthAuditPage", () => {
     expect(html).toContain("Aggiorna funnel ecommerce GA4");
   });
 
+  it("renders dark period selects with gcr-select for Shopify and GA4 panels", () => {
+    setupMocks({
+      withActiveRun: true,
+      withTechnicalScan: true,
+      analyticsConnected: true,
+      googleAnalyticsPropertyId: "123456789",
+    });
+    const html = renderPage();
+    expect(html).toContain("growth-audit-shopify-commerce-panel__period");
+    expect(html).toContain("growth-audit-ga4-funnel-panel__period");
+    expect(html).toMatch(
+      /growth-audit-shopify-commerce-panel__period[\s\S]*class="gcr-select"/,
+    );
+    expect(html).toMatch(/growth-audit-ga4-funnel-panel__period[\s\S]*class="gcr-select"/);
+  });
+
   it("shows clearer GA4 ecommerce error message on 502", () => {
     setupMocks({
       withActiveRun: true,
@@ -517,8 +533,8 @@ describe("GrowthAuditPage", () => {
       },
     });
     const html = renderPage();
-    expect(html).toContain("Matching mode:");
-    expect(html).toContain("strict");
+    expect(html).toContain("Abbinamento dati:");
+    expect(html).toContain("solo match sicuri");
     expect(html).toContain("Item GA4 non collegati a una pagina prodotto con match sicuro");
     expect(html).toContain("Alcuni item GA4 non sono stati abbinati ai prodotti Shopify");
   });

@@ -120,16 +120,19 @@ export function GrowthAuditPagePerformanceAnalysisPanel({
   return (
     <div className="growth-audit-performance-panel">
       <div className="growth-audit-performance-panel__controls">
-        <label className="growth-audit-performance-panel__field">
+        <label className="gcr-select-label growth-audit-performance-panel__field">
           <span>Strategia</span>
-          <select
-            value={strategy}
-            onChange={(event) => setStrategy(event.target.value as "mobile" | "desktop")}
-            disabled={analyzeMutation.isPending}
-          >
-            <option value="mobile">Mobile</option>
-            <option value="desktop">Desktop</option>
-          </select>
+          <span className="gcr-select-wrap">
+            <select
+              className="gcr-select"
+              value={strategy}
+              onChange={(event) => setStrategy(event.target.value as "mobile" | "desktop")}
+              disabled={analyzeMutation.isPending}
+            >
+              <option value="mobile">Mobile</option>
+              <option value="desktop">Desktop</option>
+            </select>
+          </span>
         </label>
         <button
           type="button"

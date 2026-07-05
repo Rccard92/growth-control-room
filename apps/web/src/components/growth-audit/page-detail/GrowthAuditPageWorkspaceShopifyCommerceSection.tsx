@@ -27,6 +27,18 @@ function formatAvailability(value?: boolean | null): string {
   return value ? "Disponibile" : "Non disponibile";
 }
 
+function formatPriceRange(
+  priceMin?: number | null,
+  priceMax?: number | null,
+  currency?: string | null,
+): string {
+  if (priceMin == null && priceMax == null) return "—";
+  if (priceMin != null && priceMax != null && priceMin !== priceMax) {
+    return `Da ${formatMoney(priceMin, currency)} a ${formatMoney(priceMax, currency)}`;
+  }
+  return formatMoney(priceMin ?? priceMax, currency);
+}
+
 export function GrowthAuditPageWorkspaceShopifyCommerceSection({
   page,
 }: GrowthAuditPageWorkspaceShopifyCommerceSectionProps) {
@@ -69,12 +81,6 @@ export function GrowthAuditPageWorkspaceShopifyCommerceSection({
             </strong>
           </div>
           <div className="growth-audit-shopify-commerce__metric">
-            <span className="growth-audit-shopify-commerce__metric-label">Periodo</span>
-            <strong className="growth-audit-shopify-commerce__metric-value">
-              {commerceMeta.periodDays != null ? `${commerceMeta.periodDays} giorni` : "—"}
-            </strong>
-          </div>
-          <div className="growth-audit-shopify-commerce__metric">
             <span className="growth-audit-shopify-commerce__metric-label">Stock</span>
             <strong
               className={`growth-audit-shopify-commerce__metric-value${
@@ -103,29 +109,19 @@ export function GrowthAuditPageWorkspaceShopifyCommerceSection({
             </strong>
           </div>
           <div className="growth-audit-shopify-commerce__metric">
-            <span className="growth-audit-shopify-commerce__metric-label">Prezzo min</span>
+            <span className="growth-audit-shopify-commerce__metric-label">Prezzo</span>
             <strong className="growth-audit-shopify-commerce__metric-value">
-              {formatMoney(commerceMeta.priceMin, commerceMeta.currency)}
+              {formatPriceRange(
+                commerceMeta.priceMin,
+                commerceMeta.priceMax,
+                commerceMeta.currency,
+              )}
             </strong>
           </div>
           <div className="growth-audit-shopify-commerce__metric">
-            <span className="growth-audit-shopify-commerce__metric-label">Prezzo max</span>
+            <span className="growth-audit-shopify-commerce__metric-label">Periodo</span>
             <strong className="growth-audit-shopify-commerce__metric-value">
-              {formatMoney(commerceMeta.priceMax, commerceMeta.currency)}
-            </strong>
-          </div>
-          <div className="growth-audit-shopify-commerce__metric">
-            <span className="growth-audit-shopify-commerce__metric-label">Stato prodotto</span>
-            <strong className="growth-audit-shopify-commerce__metric-value">
-              {commerceMeta.productStatus ?? "—"}
-            </strong>
-          </div>
-          <div className="growth-audit-shopify-commerce__metric">
-            <span className="growth-audit-shopify-commerce__metric-label">Ultimo sync</span>
-            <strong className="growth-audit-shopify-commerce__metric-value">
-              {commerceMeta.syncedAt
-                ? new Date(commerceMeta.syncedAt).toLocaleString("it-IT")
-                : "—"}
+              {commerceMeta.periodDays != null ? `${commerceMeta.periodDays} giorni` : "—"}
             </strong>
           </div>
         </div>

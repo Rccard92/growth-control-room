@@ -173,17 +173,19 @@ export function GrowthAuditPageAiAnalysisPanel({
       </section>
 
       <section className="growth-audit-ai-panel__form">
-        <label className="growth-audit-ai-panel__field">
+        <label className="gcr-select-label growth-audit-ai-panel__field">
           <span className="growth-audit-ai-panel__field-label">Provider</span>
-          <select
-            className="gcr-input"
-            value={provider}
-            onChange={(event) => setProvider(event.target.value as GrowthAuditProvider)}
-            disabled={analyzeMutation.isPending}
-          >
-            <option value="openai">OpenAI</option>
-            <option value="claude">Claude</option>
-          </select>
+          <span className="gcr-select-wrap">
+            <select
+              className="gcr-select"
+              value={provider}
+              onChange={(event) => setProvider(event.target.value as GrowthAuditProvider)}
+              disabled={analyzeMutation.isPending}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude</option>
+            </select>
+          </span>
         </label>
 
         <fieldset className="growth-audit-ai-panel__areas">

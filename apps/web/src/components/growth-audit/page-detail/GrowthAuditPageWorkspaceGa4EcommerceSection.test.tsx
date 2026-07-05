@@ -85,7 +85,13 @@ describe("GrowthAuditPageWorkspaceGa4EcommerceSection", () => {
     expect(html).toContain("Begin checkout");
     expect(html).toContain("Purchase");
     expect(html).toContain("non entra nel carrello");
-    expect(html).toContain("Match affidabile tramite");
+    expect(html).toContain("Dati prodotto abbinati in modo sicuro");
+    const mainViewHtml = html.split('id="ga4-technical-details"')[0] ?? html;
+    expect(mainViewHtml).not.toContain("Product legacy id");
+    expect(mainViewHtml).not.toContain("Match status");
+    expect(mainViewHtml).not.toContain('class="growth-audit-ga4-funnel__match"');
+    expect(html).toContain('id="ga4-technical-details"');
+    expect(html).toContain("Dettagli tecnici matching GA4");
   });
 
   it("renders diagnosis for cart without purchase", () => {
@@ -157,8 +163,12 @@ describe("GrowthAuditPageWorkspaceGa4EcommerceSection", () => {
         }}
       />,
     );
-    expect(html).toContain("Dati GA4 non abbinati a questo prodotto");
+    expect(html).toContain("non abbinati in modo sicuro");
     expect(html).toContain("evitare dati falsati");
+    expect(html).toContain("Vedi dettagli tecnici");
+    expect(html).toContain('id="ga4-technical-details"');
+    expect(html).toContain("Dettagli tecnici matching GA4");
+    expect(html).toContain("Dati GA4 non abbinati a questo prodotto");
     expect(html).toContain("Product legacy id");
     expect(html).toContain("123");
     expect(html).toContain("sku-miele");
@@ -231,12 +241,17 @@ describe("GrowthAuditPageWorkspaceGa4EcommerceSection", () => {
         }}
       />,
     );
-    expect(html).toContain("Shopify composite itemId");
-    expect(html).toContain("itemId GA4");
+    expect(html).toContain("Dati prodotto abbinati in modo sicuro");
+    const mainViewHtml = html.split('id="ga4-technical-details"')[0] ?? html;
+    expect(mainViewHtml).not.toContain("Shopify composite itemId");
+    expect(mainViewHtml).not.toContain("itemId GA4");
+    expect(mainViewHtml).not.toContain('class="growth-audit-ga4-funnel__match"');
+    expect(html).toContain('id="ga4-technical-details"');
+    expect(html).toContain("Dettagli tecnici matching GA4");
     expect(html).toContain(compositeItemId);
     expect(html).toContain("View item");
     expect(html).toContain("Purchase");
-    expect(html).not.toContain("Dati GA4 non abbinati a questo prodotto");
+    expect(html).not.toContain("Dati prodotto non abbinati in modo sicuro");
   });
 
   it("renders variant performance table sorted by revenue", () => {
@@ -304,12 +319,17 @@ describe("GrowthAuditPageWorkspaceGa4EcommerceSection", () => {
       />,
     );
     expect(html).toContain("Performance varianti");
+    expect(html).toContain(
+      "I tassi sono rapporti tra eventi GA4 item-level, non conversion rate utenti unici.",
+    );
     expect(html).toContain("120g");
     expect(html).toContain("250g");
     expect(html).toContain("500g");
+    expect(html).toContain("Top revenue");
     expect(html).toContain("SKU");
     expect(html).toContain("Stock");
     expect(html).toContain("View → cart");
+    expect(html).not.toContain("<th>Match</th>");
     const revenue500Index = html.indexOf("500g");
     const revenue120Index = html.indexOf("120g");
     expect(revenue500Index).toBeGreaterThan(-1);

@@ -214,6 +214,57 @@ function renderMatchDebugBlock(
   );
 }
 
+function renderVariantBadges(
+  variant: GrowthAuditPageGa4EcommerceVariantMetadata,
+  funnelMeta: NonNullable<ReturnType<typeof getGrowthAuditPageGa4EcommerceMetadata>>,
+) {
+  const isMatched = variant.matchedBy && variant.matchedBy !== "none";
+  if (!isMatched) return null;
+
+  const views = variant.itemViews ?? variant.itemViewEvents ?? 0;
+  const cart = variant.itemsAddedToCart ?? 0;
+  const purchases = variant.itemsPurchased ?? 0;
+  const badges: Array<{ key: string; label: string; className: string }> = [];
+
+  if (
+    funnelMeta.bestVariantByRevenue &&
+    variant.variantLegacyId === funnelMeta.bestVariantByRevenue &&
+    (variant.itemRevenue ?? 0) > 0
+  ) {
+    badges.push({
+      key: "revenue",
+      label: "Top revenue",
+      className: "growth-audit-variant-badge growth-audit-variant-badge--revenue",
+    });
+  }
+  if ((variant.stock ?? 1) <= 0 && (views > 0 || cart > 0)) {
+    badges.push({
+      key: "stock",
+      label: "Occhio stock",
+      className: "growth-audit-variant-badge growth-audit-variant-badge--stock",
+    });
+  }
+  if (views > 50 && purchases === 0) {
+    badges.push({
+      key: "demand",
+      label: "Domanda non convertita",
+      className: "growth-audit-variant-badge growth-audit-variant-badge--demand",
+    });
+  }
+
+  if (badges.length === 0) return null;
+
+  return (
+    <div className="growth-audit-variant-badges">
+      {badges.map((badge) => (
+        <span key={badge.key} className={badge.className}>
+          {badge.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function sortVariantBreakdown(
   variants: GrowthAuditPageGa4EcommerceVariantMetadata[],
 ): GrowthAuditPageGa4EcommerceVariantMetadata[] {
@@ -293,10 +344,13 @@ function renderVariantPerformanceSection(
       <header className="growth-audit-ga4-funnel__variants-header">
         <h3 className="growth-audit-ga4-funnel__variants-title">Performance varianti</h3>
         <p className="growth-audit-ga4-funnel__variants-subtitle">
-          Le metriche sono divise per variante solo quando GA4 restituisce un itemId/SKU abbinabile in
-          modo deterministico.
+          Confronta vendite e conversioni delle varianti del prodotto.
         </p>
       </header>
+
+      <p className="growth-audit-ga4-funnel__variants-rates-note">
+        I tassi sono rapporti tra eventi GA4 item-level, non conversion rate utenti unici.
+      </p>
 
       <div className="growth-audit-ga4-funnel__variants-table-wrap">
         <table className="growth-audit-ga4-funnel__variants-table">
@@ -312,40 +366,18 @@ function renderVariantPerformanceSection(
               <th>Revenue</th>
               <th>View → cart</th>
               <th>Cart → purchase</th>
-              <th>Match</th>
             </tr>
           </thead>
           <tbody>
             {sortedVariants.map((variant) => {
               const isMatched = variant.matchedBy && variant.matchedBy !== "none";
-              const isBestRevenue =
-                funnelMeta.bestVariantByRevenue &&
-                variant.variantLegacyId === funnelMeta.bestVariantByRevenue;
               const views = variant.itemViews ?? variant.itemViewEvents ?? 0;
-              const cart = variant.itemsAddedToCart ?? 0;
-              const isHighViewLowCart = isMatched && views > 50 && cart === 0;
-              const isHighCartLowPurchase =
-                isMatched && cart > 5 && (variant.itemsPurchased ?? 0) === 0;
-              const isOutOfStockDemand =
-                isMatched && (variant.stock ?? 1) <= 0 && (views > 0 || cart > 0);
-              const rowClass = [
-                isBestRevenue ? "growth-audit-ga4-funnel__variants-row--best-revenue" : "",
-                isHighViewLowCart ? "growth-audit-ga4-funnel__variants-row--high-view-low-cart" : "",
-                isHighCartLowPurchase
-                  ? "growth-audit-ga4-funnel__variants-row--high-cart-low-purchase"
-                  : "",
-                isOutOfStockDemand ? "growth-audit-ga4-funnel__variants-row--out-of-stock" : "",
-              ]
-                .filter(Boolean)
-                .join(" ");
 
               return (
-                <tr
-                  key={variant.variantLegacyId || variant.variantTitle || variant.sku}
-                  className={rowClass || undefined}
-                >
+                <tr key={variant.variantLegacyId || variant.variantTitle || variant.sku}>
                   <td>
                     <strong>{variant.variantTitle || "—"}</strong>
+                    {renderVariantBadges(variant, funnelMeta)}
                     {!isMatched && (
                       <p className="growth-audit-ga4-funnel__variants-note">
                         Nessun dato item-level abbinato a questa variante nel periodo.
@@ -361,7 +393,6 @@ function renderVariantPerformanceSection(
                   <td>{formatMoney(variant.itemRevenue, funnelMeta.currency)}</td>
                   <td>{formatRate(variant.viewToCartRate)}</td>
                   <td>{formatRate(variant.cartToPurchaseRate)}</td>
-                  <td>{formatMatchTypeLabel(variant.matchedBy)}</td>
                 </tr>
               );
             })}
@@ -394,6 +425,8 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
   const isZeroData = funnelMeta ? hasGa4EcommerceZeroData(funnelMeta) : false;
   const isNoReliableMatch = funnelMeta?.matchDebug?.matchStatus === "no_reliable_match";
   const isMatched = funnelMeta?.matchDebug?.matchStatus === "matched";
+  const showNoMatchCallout =
+    isNoReliableMatch || funnelMeta?.matchedBy === "none";
 
   const funnelSteps = funnelMeta
     ? [
@@ -424,15 +457,27 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
       <header className="growth-audit-workspace-section__header">
         <h2 className="growth-audit-workspace-section__title">GA4 Ecommerce Funnel</h2>
         <p className="growth-audit-workspace-section__subtitle">
-          Mostra il percorso ecommerce item-level del prodotto: visualizzazione, carrello,
-          checkout e acquisto.
+          Mostra come il prodotto passa da visualizzazione a carrello, checkout e acquisto.
         </p>
       </header>
 
       {funnelMeta ? (
         <>
-          {funnelMeta.matchDebug &&
-            renderMatchDebugBlock(funnelMeta.matchDebug, funnelMeta.matchedItemIds)}
+          {isMatched && (
+            <span className="growth-audit-match-badge">
+              Dati prodotto abbinati in modo sicuro
+            </span>
+          )}
+
+          {showNoMatchCallout && (
+            <p className="growth-audit-no-match-callout">
+              Dati prodotto non abbinati in modo sicuro. Il tool non assegna metriche per evitare
+              dati falsati.{" "}
+              {funnelMeta.matchDebug && (
+                <a href="#ga4-technical-details">Vedi dettagli tecnici</a>
+              )}
+            </p>
+          )}
 
           {!isNoReliableMatch && (
             <>
@@ -474,17 +519,11 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
                   <strong>{formatRate(funnelMeta.cartToPurchaseRate)}</strong>
                 </div>
               </div>
-            </>
-          )}
 
-          {isMatched && (
-            <p className="growth-audit-ga4-funnel__match">
-              Match affidabile tramite:{" "}
-              <strong>{formatMatchTypeLabel(funnelMeta.matchedBy)}</strong>
-              {funnelMeta.matchedItemIds && funnelMeta.matchedItemIds.length > 0
-                ? ` · ID: ${funnelMeta.matchedItemIds.join(", ")}`
-                : ""}
-            </p>
+              <p className="growth-audit-ga4-funnel__rates-note">
+                I tassi sono rapporti tra eventi GA4 item-level, non conversion rate utenti unici.
+              </p>
+            </>
           )}
 
           {diagnosis && (
@@ -500,6 +539,13 @@ export function GrowthAuditPageWorkspaceGa4EcommerceSection({
           )}
 
           {renderVariantPerformanceSection(funnelMeta)}
+
+          {funnelMeta.matchDebug && (
+            <details id="ga4-technical-details" className="growth-audit-technical-details">
+              <summary>Dettagli tecnici matching GA4</summary>
+              {renderMatchDebugBlock(funnelMeta.matchDebug, funnelMeta.matchedItemIds)}
+            </details>
+          )}
         </>
       ) : (
         <p className="growth-audit-ga4-funnel__empty">

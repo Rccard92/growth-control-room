@@ -365,19 +365,21 @@ export function GrowthAuditPage() {
           </span>
         </label>
 
-        <label className="growth-audit-url-field">
-          <span className="growth-audit-url-field__label">Pagine massime</span>
-          <select
-            className="gcr-input"
-            value={maxPages}
-            onChange={(event) => setMaxPages(Number(event.target.value))}
-          >
-            {GROWTH_AUDIT_MAX_PAGES_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+        <label className="gcr-select-label growth-audit-url-field">
+          <span>Pagine massime</span>
+          <span className="gcr-select-wrap">
+            <select
+              className="gcr-select"
+              value={maxPages}
+              onChange={(event) => setMaxPages(Number(event.target.value))}
+            >
+              {GROWTH_AUDIT_MAX_PAGES_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </span>
         </label>
       </div>
 
@@ -760,18 +762,21 @@ export function GrowthAuditPage() {
           ) : (
             <>
               <div className="growth-audit-shopify-commerce-panel__actions">
-                <label className="growth-audit-shopify-commerce-panel__period">
-                  Periodo
-                  <select
-                    value={commerceDays}
-                    onChange={(event) =>
-                      setCommerceDays(Number(event.target.value) as 7 | 30 | 90)
-                    }
-                  >
-                    <option value={7}>7 giorni</option>
-                    <option value={30}>30 giorni</option>
-                    <option value={90}>90 giorni</option>
-                  </select>
+                <label className="gcr-select-label growth-audit-shopify-commerce-panel__period">
+                  <span>Periodo</span>
+                  <span className="gcr-select-wrap">
+                    <select
+                      className="gcr-select"
+                      value={commerceDays}
+                      onChange={(event) =>
+                        setCommerceDays(Number(event.target.value) as 7 | 30 | 90)
+                      }
+                    >
+                      <option value={7}>7 giorni</option>
+                      <option value={30}>30 giorni</option>
+                      <option value={90}>90 giorni</option>
+                    </select>
+                  </span>
                 </label>
                 <button
                   type="button"
@@ -857,18 +862,21 @@ export function GrowthAuditPage() {
           ) : (
             <>
               <div className="growth-audit-ga4-funnel-panel__actions">
-                <label className="growth-audit-ga4-funnel-panel__period">
-                  Periodo
-                  <select
-                    value={ga4FunnelDays}
-                    onChange={(event) =>
-                      setGa4FunnelDays(Number(event.target.value) as 7 | 30 | 90)
-                    }
-                  >
-                    <option value={7}>7 giorni</option>
-                    <option value={30}>30 giorni</option>
-                    <option value={90}>90 giorni</option>
-                  </select>
+                <label className="gcr-select-label growth-audit-ga4-funnel-panel__period">
+                  <span>Periodo</span>
+                  <span className="gcr-select-wrap">
+                    <select
+                      className="gcr-select"
+                      value={ga4FunnelDays}
+                      onChange={(event) =>
+                        setGa4FunnelDays(Number(event.target.value) as 7 | 30 | 90)
+                      }
+                    >
+                      <option value={7}>7 giorni</option>
+                      <option value={30}>30 giorni</option>
+                      <option value={90}>90 giorni</option>
+                    </select>
+                  </span>
                 </label>
                 <button
                   type="button"
@@ -899,7 +907,7 @@ export function GrowthAuditPage() {
               {summary?.ga4Ecommerce && (
                 <>
                   <p className="growth-audit-ga4-funnel-panel__matching-mode">
-                    Matching mode: <strong>strict</strong>
+                    Abbinamento dati: <strong>solo match sicuri</strong>
                   </p>
 
                   {(summary.ga4Ecommerce.unmatchedItems ?? 0) > 0 && (
