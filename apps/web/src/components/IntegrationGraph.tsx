@@ -6,17 +6,29 @@ import {
   type Edge,
   type Node,
 } from "@xyflow/react";
-import { INTEGRATIONS, type Integration } from "@gcr/shared";
+import {
+  INTEGRATIONS,
+  type GoogleIntegrationStatusResponse,
+  type GoogleServiceStatusValue,
+  type Integration,
+  type IntegrationProvider,
+} from "@gcr/shared";
+
+export type IntegrationGraphNodeStatus =
+  | "connected"
+  | "not_connected"
+  | "needs_setup"
+  | "missing_credentials"
+  | "setup_incomplete"
+  | "coming_soon"
+  | "error";
 
 interface IntegrationGraphProps {
   projectName: string;
   integrations: Integration[];
+  googleStatus?: GoogleIntegrationStatusResponse;
+  searchConsoleSiteUrl?: string | null;
 }
-
-const GRAPH_PROVIDERS = INTEGRATIONS.filter(
-  (integration) =>
-    integration.provider !== "google_pagespeed" && integration.provider !== "google_crux",
-);
 
 const PROVIDER_POSITIONS: Record<string, { x: number; y: number }> = {
   shopify: { x: 0, y: -120 },
@@ -27,12 +39,56 @@ const PROVIDER_POSITIONS: Record<string, { x: number; y: number }> = {
   google_search_console: { x: -120, y: 140 },
   merchant_center: { x: -170, y: 40 },
   tiktok_ads: { x: -120, y: -60 },
+  google_pagespeed: { x: 230, y: 110 },
+  google_crux: { x: 230, y: 180 },
 };
 
-function nodeStyle(
-  status: string,
-  isShopify: boolean,
-): CSSProperties {
+function mapGoogleServiceToGraphStatus(
+  status: GoogleServiceStatusValue | undefined,
+): IntegrationGraphNodeStatus {
+  if (!status) return "coming_soon";
+  if (status === "connected") return "connected";
+  if (status === "setup_incomplete") return "setup_incomplete";
+  if (status === "missing_credentials") return "missing_credentials";
+  if (status === "needs_setup") return "needs_setup";
+  return "not_connected";
+}
+
+export function getProviderGraphStatus(
+  provider: IntegrationProvider,
+  statusMap: Map<string, string>,
+  googleStatus?: GoogleIntegrationStatusResponse,
+): IntegrationGraphNodeStatus {
+  switch (provider) {
+    case "shopify":
+      return (statusMap.get(provider) as IntegrationGraphNodeStatus | undefined) ?? "not_connected";
+    case "google_search_console":
+      return mapGoogleServiceToGraphStatus(googleStatus?.searchConsole.status);
+    case "ga4":
+      return mapGoogleServiceToGraphStatus(googleStatus?.analytics.status);
+    case "google_ads":
+      return mapGoogleServiceToGraphStatus(googleStatus?.googleAds.status);
+    case "google_pagespeed":
+      return mapGoogleServiceToGraphStatus(googleStatus?.pagespeed.status);
+    case "google_crux":
+      return mapGoogleServiceToGraphStatus(googleStatus?.crux.status);
+    default:
+      return statusMap.has(provider)
+        ? ((statusMap.get(provider) as IntegrationGraphNodeStatus) ?? "not_connected")
+        : "coming_soon";
+  }
+}
+
+export function buildProviderGraphLabel(
+  label: string,
+  status: IntegrationGraphNodeStatus,
+): string {
+  if (status === "coming_soon") return `${label} 🔒`;
+  if (status === "setup_incomplete") return `${label} ⚠`;
+  return label;
+}
+
+function nodeStyle(status: IntegrationGraphNodeStatus, isShopify: boolean): CSSProperties {
   const base: CSSProperties = {
     padding: "10px 14px",
     borderRadius: 10,
@@ -45,7 +101,7 @@ function nodeStyle(
     textAlign: "center",
   };
 
-  if (isShopify && status !== "coming_soon") {
+  if (isShopify && status === "connected") {
     return {
       ...base,
       borderColor: "rgba(34, 211, 238, 0.4)",
@@ -62,13 +118,51 @@ function nodeStyle(
       color: "var(--gcr-success)",
     };
   }
+  if (status === "setup_incomplete" || status === "missing_credentials") {
+    return {
+      ...base,
+      borderColor: "rgba(237, 180, 99, 0.45)",
+      background: "rgba(237, 180, 99, 0.12)",
+      color: "rgba(237, 180, 99, 0.95)",
+    };
+  }
   if (status === "coming_soon") {
     return { ...base, opacity: 0.45 };
   }
   return base;
 }
 
-export function IntegrationGraph({ projectName, integrations }: IntegrationGraphProps) {
+function edgeStyle(status: IntegrationGraphNodeStatus, isShopify: boolean): {
+  stroke: string;
+  strokeWidth: number;
+  animated: boolean;
+} {
+  if (status === "connected") {
+    return {
+      stroke: isShopify ? "var(--gcr-accent-cyan)" : "var(--gcr-success)",
+      strokeWidth: isShopify ? 2 : 2,
+      animated: true,
+    };
+  }
+  if (status === "setup_incomplete" || status === "missing_credentials") {
+    return {
+      stroke: "rgba(237, 180, 99, 0.75)",
+      strokeWidth: 2,
+      animated: false,
+    };
+  }
+  return {
+    stroke: "var(--gcr-border)",
+    strokeWidth: 1,
+    animated: false,
+  };
+}
+
+export function IntegrationGraph({
+  projectName,
+  integrations,
+  googleStatus,
+}: IntegrationGraphProps) {
   const statusMap = useMemo(
     () => new Map(integrations.map((i) => [i.provider, i.status])),
     [integrations],
@@ -96,20 +190,17 @@ export function IntegrationGraph({ projectName, integrations }: IntegrationGraph
 
     const graphEdges: Edge[] = [];
 
-    for (const integration of GRAPH_PROVIDERS) {
+    for (const integration of INTEGRATIONS) {
       const provider = integration.provider;
-      const apiStatus = statusMap.get(provider);
-      const status =
-        provider === "shopify"
-          ? apiStatus ?? "not_connected"
-          : "coming_soon";
+      const status = getProviderGraphStatus(provider, statusMap, googleStatus);
       const pos = PROVIDER_POSITIONS[provider] ?? { x: 0, y: 0 };
       const nodeId = provider;
+      const edge = edgeStyle(status, provider === "shopify");
 
       graphNodes.push({
         id: nodeId,
         data: {
-          label: status === "coming_soon" ? `${integration.label} 🔒` : integration.label,
+          label: buildProviderGraphLabel(integration.label, status),
         },
         position: pos,
         style: nodeStyle(status, provider === "shopify"),
@@ -119,16 +210,16 @@ export function IntegrationGraph({ projectName, integrations }: IntegrationGraph
         id: `${centerId}-${nodeId}`,
         source: centerId,
         target: nodeId,
-        animated: provider === "shopify" && status === "connected",
+        animated: edge.animated,
         style: {
-          stroke: provider === "shopify" ? "var(--gcr-accent-cyan)" : "var(--gcr-border)",
-          strokeWidth: provider === "shopify" ? 2 : 1,
+          stroke: edge.stroke,
+          strokeWidth: edge.strokeWidth,
         },
       });
     }
 
     return { nodes: graphNodes, edges: graphEdges };
-  }, [projectName, statusMap]);
+  }, [projectName, statusMap, googleStatus]);
 
   return (
     <div className="gcr-graph-wrap">

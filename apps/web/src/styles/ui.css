@@ -558,6 +558,108 @@
   line-height: 1.45;
 }
 
+.integration-card__detail {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.integration-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.integration-card__secondary-action {
+  flex-shrink: 0;
+}
+
+.gsc-property-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.gsc-property-modal__status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gcr-text-muted);
+}
+
+.gsc-property-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.gsc-property-modal__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--gcr-border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--gcr-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gsc-property-modal__option:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.gsc-property-modal__option--selected {
+  border-color: rgba(34, 211, 238, 0.55);
+  background: rgba(34, 211, 238, 0.08);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.15);
+}
+
+.gsc-property-modal__option-check {
+  width: 1.25rem;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gcr-accent-cyan);
+  line-height: 1.4;
+}
+
+.gsc-property-modal__option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.gsc-property-modal__option-main {
+  font-size: 0.9rem;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.gsc-property-modal__permission {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--gcr-text-muted);
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .integration-card__brand-icon {
   width: 2.4rem;
   height: 2.4rem;

@@ -1001,24 +1001,6 @@
   padding-left: 1.1rem;
 }
 
-.gsc-property-panel {
-  margin-top: 0.75rem;
-  padding: 0.875rem 1rem;
-}
-
-.gsc-property-panel__field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.75rem;
-}
-
-.gsc-property-panel__actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
 @media (max-width: 768px) {
   .growth-audit-placeholder-card__header,
   .growth-audit-full-site__header {

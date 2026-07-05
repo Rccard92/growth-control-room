@@ -35,4 +35,23 @@ describe("IntegrationCard brand icons", () => {
     expect(html).toContain("✉️");
     expect(html).not.toContain("integration-card__brand-icon");
   });
+
+  it("renders secondary action and detail text", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "google_search_console")!;
+    const html = renderToStaticMarkup(
+      <IntegrationCard
+        meta={meta}
+        status="connected"
+        actionLabel="Collegata"
+        disabled
+        secondaryActionLabel="Modifica proprietà"
+        onSecondaryAction={() => {}}
+        detailText="Proprietà: https://solmielato.it/"
+      />,
+    );
+    expect(html).toContain("integration-card__actions");
+    expect(html).toContain("integration-card__detail");
+    expect(html).toContain("Modifica proprietà");
+    expect(html).toContain("Proprietà: https://solmielato.it/");
+  });
 });

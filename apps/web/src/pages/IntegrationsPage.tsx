@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useParams, useSearchParams } from "react-router-dom";
 import { INTEGRATIONS } from "@gcr/shared";
 import { IntegrationCard } from "../components/IntegrationCard";
-import { GoogleSearchConsolePropertyPanel } from "../components/integrations/GoogleSearchConsolePropertyPanel";
+import { GoogleSearchConsolePropertyModal } from "../components/integrations/GoogleSearchConsolePropertyModal";
 import { IntegrationGraph } from "../components/IntegrationGraph";
 import { PageHeader } from "../components/PageHeader";
 import {
@@ -21,6 +21,7 @@ export function IntegrationsPage() {
   const { data: integrations, isLoading, error } = useProjectIntegrations(id);
   const { data: googleStatus, isLoading: isGoogleLoading } = useGoogleIntegrationStatus(id);
   const startGoogleOAuth = useStartGoogleOAuth(id);
+  const [isSearchConsoleModalOpen, setIsSearchConsoleModalOpen] = useState(false);
   const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(
     null,
   );
@@ -92,40 +93,44 @@ export function IntegrationsPage() {
       {!isGridLoading && id && (
         <div className="gcr-grid gcr-grid--auto" style={{ marginBottom: "2rem" }}>
           {INTEGRATIONS.map((meta) => (
-            <div key={meta.provider} className="integrations-page__card-wrap">
-              <IntegrationCard
-                {...getIntegrationCardProps({
-                  meta,
-                  apiStatus: statusMap.get(meta.provider),
-                  googleStatus,
-                  oauthConnectDisabled,
-                  handleConnectGoogle: () => void handleConnectGoogle(),
-                  projectId: id,
-                  searchConsoleSiteUrl: project?.searchConsoleSiteUrl,
-                })}
-              />
-              {meta.provider === "google_search_console" &&
-                googleStatus?.searchConsole.status === "connected" && (
-                  <GoogleSearchConsolePropertyPanel
-                    projectId={id}
-                    selectedSiteUrl={project?.searchConsoleSiteUrl}
-                  />
-                )}
-            </div>
+            <IntegrationCard
+              key={meta.provider}
+              {...getIntegrationCardProps({
+                meta,
+                apiStatus: statusMap.get(meta.provider),
+                googleStatus,
+                oauthConnectDisabled,
+                handleConnectGoogle: () => void handleConnectGoogle(),
+                projectId: id,
+                searchConsoleSiteUrl: project?.searchConsoleSiteUrl,
+                onSelectSearchConsoleProperty: () => setIsSearchConsoleModalOpen(true),
+              })}
+            />
           ))}
         </div>
+      )}
+
+      {id && (
+        <GoogleSearchConsolePropertyModal
+          projectId={id}
+          selectedSiteUrl={project?.searchConsoleSiteUrl}
+          open={isSearchConsoleModalOpen}
+          onClose={() => setIsSearchConsoleModalOpen(false)}
+        />
       )}
 
       <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--gcr-text)", marginBottom: "1rem" }}>
         Integration Graph
       </h2>
       <p style={{ fontSize: "0.8125rem", color: "var(--gcr-text-muted)", marginBottom: "1rem" }}>
-        Vista relazionale del progetto e dei connettori. Shopify è il primo provider attivo.
+        Vista relazionale delle fonti dati collegate al progetto.
       </p>
       {integrations && (
         <IntegrationGraph
           projectName={project?.name ?? "Progetto"}
           integrations={integrations}
+          googleStatus={googleStatus}
+          searchConsoleSiteUrl={project?.searchConsoleSiteUrl}
         />
       )}
     </motion.div>

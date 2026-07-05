@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { IntegrationsPage } from "./IntegrationsPage";
@@ -30,6 +31,29 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+vi.mock("react-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-dom")>("react-dom");
+  return {
+    ...actual,
+    createPortal: (node: ReactNode) => node,
+  };
+});
+
+vi.mock("../components/integrations/GoogleSearchConsolePropertyModal", () => ({
+  GoogleSearchConsolePropertyModal: ({
+    open,
+    selectedSiteUrl,
+  }: {
+    open: boolean;
+    selectedSiteUrl?: string | null;
+  }) =>
+    open ? (
+      <div data-testid="gsc-property-modal" data-selected={selectedSiteUrl ?? ""}>
+        modal-open
+      </div>
+    ) : null,
+}));
+
 vi.mock("../hooks/useProjects", () => ({
   useProject: useProjectMock,
   useProjectIntegrations: useProjectIntegrationsMock,
@@ -43,7 +67,17 @@ vi.mock("../hooks/useGoogleIntegrations", () => ({
 }));
 
 vi.mock("../components/IntegrationGraph", () => ({
-  IntegrationGraph: () => null,
+  IntegrationGraph: ({
+    googleStatus,
+  }: {
+    googleStatus?: { searchConsole: { status: string }; analytics: { status: string } };
+  }) => (
+    <div
+      data-testid="integration-graph"
+      data-gsc={googleStatus?.searchConsole.status}
+      data-ga4={googleStatus?.analytics.status}
+    />
+  ),
 }));
 
 const googleStatus = {
@@ -63,10 +97,17 @@ function countOccurrences(value: string, needle: string): number {
   return value.split(needle).length - 1;
 }
 
-function setupMocks(options?: { shopifyStatus?: "connected" | "not_connected" }) {
+function setupMocks(options?: {
+  shopifyStatus?: "connected" | "not_connected";
+  searchConsoleSiteUrl?: string | null;
+}) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
-    data: { id: "proj-1", name: "Solmielato" },
+    data: {
+      id: "proj-1",
+      name: "Solmielato",
+      searchConsoleSiteUrl: options?.searchConsoleSiteUrl ?? null,
+    },
     isLoading: false,
   });
   useProjectIntegrationsMock.mockReturnValue({
@@ -162,7 +203,22 @@ describe("IntegrationsPage unified grid", () => {
     expect(html).toContain("Connetti");
   });
 
-  it("shows property selector when Search Console is connected", () => {
+  it("does not render inline property panel under Search Console card", () => {
+    setupMocks();
+    useGoogleIntegrationStatusMock.mockReturnValue({
+      data: {
+        ...googleStatus,
+        searchConsole: { status: "connected", configured: true },
+      },
+      isLoading: false,
+    });
+    const html = renderPage();
+
+    expect(html).not.toContain("gsc-property-panel");
+    expect(html).not.toContain("<select");
+  });
+
+  it("shows Seleziona proprietà on connected Search Console without saved property", () => {
     setupMocks();
     useGoogleIntegrationStatusMock.mockReturnValue({
       data: {
@@ -174,8 +230,42 @@ describe("IntegrationsPage unified grid", () => {
     const html = renderPage();
 
     expect(html).toContain("Collegata");
-    expect(html).toContain("Seleziona una proprietà");
-    expect(html).toContain("Salva proprietà");
+    expect(html).toContain("Seleziona proprietà");
+    expect(html).not.toContain("Modifica proprietà");
+  });
+
+  it("shows property detail and Modifica proprietà when property is saved", () => {
+    setupMocks({ searchConsoleSiteUrl: "https://solmielato.it/" });
+    useGoogleIntegrationStatusMock.mockReturnValue({
+      data: {
+        ...googleStatus,
+        searchConsole: { status: "connected", configured: true },
+      },
+      isLoading: false,
+    });
+    const html = renderPage();
+
+    expect(html).toContain("Proprietà: https://solmielato.it/");
+    expect(html).toContain("Modifica proprietà");
+    expect(html).not.toContain("Seleziona proprietà");
+  });
+
+  it("passes googleStatus to Integration Graph and updates copy", () => {
+    setupMocks();
+    useGoogleIntegrationStatusMock.mockReturnValue({
+      data: {
+        ...googleStatus,
+        searchConsole: { status: "connected", configured: true },
+        analytics: { status: "connected", configured: true },
+      },
+      isLoading: false,
+    });
+    const html = renderPage();
+
+    expect(html).toContain("Vista relazionale delle fonti dati collegate al progetto.");
+    expect(html).not.toContain("Shopify è il primo provider attivo.");
+    expect(html).toContain('data-gsc="connected"');
+    expect(html).toContain('data-ga4="connected"');
   });
 
   it("renders brand SVG icons in the unified grid", () => {

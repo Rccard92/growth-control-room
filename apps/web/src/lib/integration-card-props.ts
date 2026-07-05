@@ -16,6 +16,7 @@ interface GetIntegrationCardPropsInput {
   handleConnectGoogle: () => void;
   projectId: string;
   searchConsoleSiteUrl?: string | null;
+  onSelectSearchConsoleProperty?: () => void;
 }
 
 function mapGoogleStatus(status: GoogleServiceStatus["status"]): IntegrationUiStatus {
@@ -107,6 +108,7 @@ export function getIntegrationCardProps({
   handleConnectGoogle,
   projectId,
   searchConsoleSiteUrl,
+  onSelectSearchConsoleProperty,
 }: GetIntegrationCardPropsInput): IntegrationCardProps {
   if (meta.provider === "shopify") {
     const connected = apiStatus === "connected";
@@ -138,21 +140,23 @@ export function getIntegrationCardProps({
       );
     case "google_crux":
       return apiKeyCardProps(meta, googleStatus.crux, "GOOGLE_CRUX_API_KEY mancante");
-    case "google_search_console":
+    case "google_search_console": {
+      const base = oauthCardProps(
+        meta,
+        googleStatus.searchConsole,
+        oauthConnectDisabled,
+        handleConnectGoogle,
+      );
+      if (googleStatus.searchConsole.status !== "connected") {
+        return base;
+      }
       return {
-        ...oauthCardProps(
-          meta,
-          googleStatus.searchConsole,
-          oauthConnectDisabled,
-          handleConnectGoogle,
-        ),
-        note:
-          googleStatus.searchConsole.status === "connected"
-            ? searchConsoleSiteUrl
-              ? `Proprietà: ${searchConsoleSiteUrl}`
-              : "Proprietà non selezionata"
-            : undefined,
+        ...base,
+        secondaryActionLabel: searchConsoleSiteUrl ? "Modifica proprietà" : "Seleziona proprietà",
+        onSecondaryAction: onSelectSearchConsoleProperty,
+        detailText: searchConsoleSiteUrl ? `Proprietà: ${searchConsoleSiteUrl}` : undefined,
       };
+    }
     case "ga4":
       return oauthCardProps(
         meta,
