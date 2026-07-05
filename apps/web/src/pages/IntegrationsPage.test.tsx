@@ -338,6 +338,13 @@ describe("IntegrationsPage unified grid", () => {
     expect(html).toContain('data-ga4="connected"');
   });
 
+  it("renders reconnect Google action in hint", () => {
+    setupMocks();
+    const html = renderPage();
+    expect(html).toContain("Ricollega Google");
+    expect(html).toContain("Merchant Center");
+  });
+
   it("renders brand SVG icons in the unified grid", () => {
     setupMocks();
     const html = renderPage();

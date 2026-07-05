@@ -33,16 +33,22 @@ from app.schemas.google_integration import (
 )
 from app.services.encryption import decrypt_secret, encrypt_secret
 from app.services.google.google_config import get_google_config_status
+from app.services.google.google_oauth import GoogleOAuthState
+from app.services.google.google_scope_utils import CONTENT_SCOPE, GOOGLE_OAUTH_SCOPES
 from app.services.google.google_integrations import (
     GOOGLE_OAUTH_PROVIDERS,
     credential_has_refresh_token,
+    ensure_google_provider_credential_from_existing_scope,
     get_google_integration_status,
     persist_google_oauth_tokens,
 )
 from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
 from app.models.project import Project
-from app.services.google.exceptions import GoogleIntegrationNotConnectedError
+from app.services.google.exceptions import (
+    GoogleIntegrationNotConnectedError,
+    GoogleIntegrationReconnectRequiredError,
+)
 
 
 def _make_persist_session(
@@ -91,12 +97,13 @@ def _token_data(
     *,
     access_token: str = "access-123",
     refresh_token: str | None = "refresh-456",
+    scope: str | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "access_token": access_token,
         "expires_in": 3600,
         "token_type": "Bearer",
-        "scope": "scope",
+        "scope": scope if scope is not None else " ".join(GOOGLE_OAUTH_SCOPES),
     }
     if refresh_token is not None:
         payload["refresh_token"] = refresh_token
@@ -262,7 +269,7 @@ def test_google_oauth_callback_success_redirect() -> None:
         with (
             patch(
                 "app.api.routes.google_integrations.verify_google_oauth_state",
-                return_value=project_id,
+                return_value=GoogleOAuthState(project_id=project_id),
             ),
             patch(
                 "app.api.routes.google_integrations.get_project_in_default_workspace",
@@ -276,7 +283,7 @@ def test_google_oauth_callback_success_redirect() -> None:
                     "refresh_token": "refresh-456",
                     "expires_in": 3600,
                     "token_type": "Bearer",
-                    "scope": "scope",
+                    "scope": " ".join(GOOGLE_OAUTH_SCOPES),
                 },
             ),
             patch(
@@ -290,7 +297,19 @@ def test_google_oauth_callback_success_redirect() -> None:
         ):
             response = await google_oauth_callback(request, session)
 
-        persist_mock.assert_awaited_once()
+        persist_mock.assert_awaited_once_with(
+            session,
+            project_id,
+            {
+                "access_token": "access-123",
+                "refresh_token": "refresh-456",
+                "expires_in": 3600,
+                "token_type": "Bearer",
+                "scope": " ".join(GOOGLE_OAUTH_SCOPES),
+            },
+            requested_provider=None,
+            mode="connect",
+        )
         assert response.status_code == 302
         assert "google_connected=1" in response.headers["location"]
 
@@ -358,7 +377,7 @@ def test_persist_google_oauth_tokens_saves_refresh_token() -> None:
         await persist_google_oauth_tokens(session, project_id, _token_data())
 
         credentials = [obj for obj in added if isinstance(obj, IntegrationCredential)]
-        assert len(credentials) == 3
+        assert len(credentials) == len(GOOGLE_OAUTH_PROVIDERS)
         payload = json.loads(decrypt_secret(credentials[0].encrypted_payload))
         assert payload["refresh_token"] == "refresh-456"
         session.commit.assert_awaited_once()
@@ -376,8 +395,8 @@ def test_persist_google_oauth_tokens_creates_integrations_and_credentials() -> N
         integrations = [obj for obj in added if isinstance(obj, Integration)]
         credentials = [obj for obj in added if isinstance(obj, IntegrationCredential)]
 
-        assert len(integrations) == 3
-        assert len(credentials) == 3
+        assert len(integrations) == len(GOOGLE_OAUTH_PROVIDERS)
+        assert len(credentials) == len(GOOGLE_OAUTH_PROVIDERS)
         assert {integration.provider for integration in integrations} == set(GOOGLE_OAUTH_PROVIDERS)
         assert all(integration.status == "connected" for integration in integrations)
         assert all(integration.connected_at is not None for integration in integrations)
@@ -440,8 +459,8 @@ def test_persist_google_oauth_tokens_preserves_refresh_token() -> None:
 
         integrations = [obj for obj in added_first if isinstance(obj, Integration)]
         credentials = [obj for obj in added_first if isinstance(obj, IntegrationCredential)]
-        assert len(integrations) == 3
-        assert len(credentials) == 3
+        assert len(integrations) == len(GOOGLE_OAUTH_PROVIDERS)
+        assert len(credentials) == len(GOOGLE_OAUTH_PROVIDERS)
 
         execute_responses: list[Integration | IntegrationCredential | None] = []
         for integration, credential in zip(integrations, credentials, strict=True):
@@ -850,6 +869,10 @@ def test_list_merchant_accounts_returns_accounts() -> None:
                 new_callable=AsyncMock,
             ),
             patch(
+                "app.api.routes.google_integrations.ensure_google_provider_credential_from_existing_scope",
+                new_callable=AsyncMock,
+            ),
+            patch(
                 "app.api.routes.google_integrations.get_valid_google_access_token",
                 new_callable=AsyncMock,
                 return_value="access-token",
@@ -929,5 +952,267 @@ def test_select_merchant_account_saves_account() -> None:
         assert project.google_merchant_account_id == "123456"
         assert project.google_merchant_account_name == "Example Merchant"
         session.commit.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_start_google_oauth_merchant_add_scope_requests_content_scope() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.google_integrations.ensure_google_oauth_configured",
+            ),
+            patch(
+                "app.api.routes.google_integrations.build_google_oauth_authorization_url",
+                return_value="https://accounts.google.com/o/oauth2/v2/auth?scope=content",
+            ) as build_mock,
+        ):
+            await start_google_oauth(
+                project_id,
+                GoogleOAuthStartRequest(provider="merchant_center", mode="add_scope"),
+                session,
+            )
+
+        build_mock.assert_called_once()
+        kwargs = build_mock.call_args.kwargs
+        assert CONTENT_SCOPE in kwargs["scopes"]
+        assert kwargs["provider"] == "merchant_center"
+        assert kwargs["mode"] == "add_scope"
+
+    asyncio.run(run())
+
+
+def test_persist_google_oauth_tokens_content_scope_updates_only_merchant() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        execute_responses: list[Integration | IntegrationCredential | None] = []
+        existing_credentials: list[IntegrationCredential] = []
+
+        for provider in GOOGLE_OAUTH_PROVIDERS:
+            integration = _build_existing_integration(project_id=project_id, provider=provider)
+            credential = IntegrationCredential(
+                integration_id=integration.id,
+                encrypted_payload=encrypt_secret(
+                    json.dumps({"access_token": "old", "refresh_token": "old-refresh"})
+                ),
+            )
+            existing_credentials.append(credential)
+            execute_responses.extend([integration, credential])
+
+        merchant_integration = execute_responses[-2]
+        merchant_credential = execute_responses[-1]
+        ga4_credential = existing_credentials[1]
+        session, added = _make_persist_session([merchant_integration, merchant_credential])
+
+        await persist_google_oauth_tokens(
+            session,
+            project_id,
+            _token_data(scope=CONTENT_SCOPE),
+            requested_provider="merchant_center",
+            mode="add_scope",
+        )
+
+        assert len(added) == 0
+        merchant_payload = json.loads(decrypt_secret(merchant_credential.encrypted_payload))
+        ga4_payload = json.loads(decrypt_secret(ga4_credential.encrypted_payload))
+        assert merchant_payload["access_token"] == "access-123"
+        assert ga4_payload["access_token"] == "old"
+
+    asyncio.run(run())
+
+
+def test_ensure_merchant_credential_backfill_from_sibling_scope() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        now = datetime.now(UTC)
+        ga4_id = uuid4()
+        encrypted = encrypt_secret(
+            json.dumps(
+                {
+                    "refresh_token": "refresh-456",
+                    "access_token": "access-123",
+                    "scope": CONTENT_SCOPE,
+                }
+            )
+        )
+        ga4_integration = Integration(
+            id=ga4_id,
+            project_id=project_id,
+            provider="ga4",
+            status="connected",
+            connected_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        ga4_integration.credential = IntegrationCredential(
+            integration_id=ga4_id,
+            encrypted_payload=encrypted,
+        )
+
+        session = AsyncMock()
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+        added: list[object] = []
+
+        def add_side_effect(obj: object) -> None:
+            added.append(obj)
+            if isinstance(obj, Integration) and getattr(obj, "id", None) is None:
+                obj.id = uuid4()
+
+        session.add = MagicMock(side_effect=add_side_effect)
+
+        integration_result = MagicMock()
+        integration_result.scalars.return_value.all.return_value = [ga4_integration]
+        merchant_integration_result = MagicMock()
+        merchant_integration_result.scalar_one_or_none.return_value = None
+        credential_result = MagicMock()
+        credential_result.scalar_one_or_none.return_value = None
+        session.execute = AsyncMock(
+            side_effect=[integration_result, merchant_integration_result, credential_result]
+        )
+
+        await ensure_google_provider_credential_from_existing_scope(
+            session,
+            project_id,
+            provider="merchant_center",
+        )
+
+        merchant_credentials = [obj for obj in added if isinstance(obj, IntegrationCredential)]
+        assert len(merchant_credentials) == 1
+        assert merchant_credentials[0].encrypted_payload == encrypted
+
+    asyncio.run(run())
+
+
+def test_ensure_merchant_credential_raises_reconnect_without_content_scope() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        now = datetime.now(UTC)
+        gsc_id = uuid4()
+        encrypted = encrypt_secret(
+            json.dumps(
+                {
+                    "refresh_token": "refresh-456",
+                    "access_token": "access-123",
+                    "scope": "https://www.googleapis.com/auth/webmasters.readonly",
+                }
+            )
+        )
+        gsc_integration = Integration(
+            id=gsc_id,
+            project_id=project_id,
+            provider="google_search_console",
+            status="connected",
+            connected_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        gsc_integration.credential = IntegrationCredential(
+            integration_id=gsc_id,
+            encrypted_payload=encrypted,
+        )
+
+        session = AsyncMock()
+        integration_result = MagicMock()
+        integration_result.scalars.return_value.all.return_value = [gsc_integration]
+        session.execute = AsyncMock(return_value=integration_result)
+
+        with pytest.raises(GoogleIntegrationReconnectRequiredError):
+            await ensure_google_provider_credential_from_existing_scope(
+                session,
+                project_id,
+                provider="merchant_center",
+            )
+
+    asyncio.run(run())
+
+
+def test_merchant_status_needs_reconnect_without_content_scope() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        now = datetime.now(UTC)
+        gsc_id = uuid4()
+        encrypted = encrypt_secret(
+            json.dumps(
+                {
+                    "refresh_token": "refresh-456",
+                    "access_token": "access-123",
+                    "scope": "https://www.googleapis.com/auth/webmasters.readonly",
+                }
+            )
+        )
+        gsc_integration = Integration(
+            id=gsc_id,
+            project_id=project_id,
+            provider="google_search_console",
+            status="connected",
+            connected_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        gsc_integration.credential = IntegrationCredential(
+            integration_id=gsc_id,
+            encrypted_payload=encrypted,
+        )
+
+        session = AsyncMock()
+        integration_result = MagicMock()
+        integration_result.scalars.return_value.all.return_value = [gsc_integration]
+        project_result = MagicMock()
+        project_result.scalar_one_or_none.return_value = None
+        session.execute = AsyncMock(side_effect=[integration_result, project_result])
+
+        with (
+            patch(
+                "app.services.google.google_integrations.is_google_oauth_configured",
+                lambda: True,
+            ),
+            patch(
+                "app.services.google.google_integrations.is_pagespeed_configured",
+                lambda: True,
+            ),
+            patch(
+                "app.services.google.google_integrations.is_crux_configured",
+                lambda: True,
+            ),
+        ):
+            status = await get_google_integration_status(session, project_id)
+
+        assert status.merchant_center.status == "needs_reconnect"
+
+    asyncio.run(run())
+
+
+def test_list_merchant_accounts_returns_409_when_reconnect_required() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.google_integrations.ensure_google_provider_credential_from_existing_scope",
+                new_callable=AsyncMock,
+                side_effect=GoogleIntegrationReconnectRequiredError(
+                    "Ricollega Google per concedere i permessi Merchant Center.",
+                    provider="merchant_center",
+                ),
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            await list_merchant_accounts(project_id, session)
+
+        assert exc.value.status_code == 409
+        assert exc.value.detail["error"] == "google_reconnect_required"
 
     asyncio.run(run())

@@ -30,10 +30,12 @@ from app.services.google.exceptions import (
     GoogleIntegrationNotConfiguredError,
     GoogleIntegrationNotConnectedError,
     GoogleIntegrationPermissionError,
+    GoogleIntegrationReconnectRequiredError,
     GoogleSearchConsolePropertyError,
     MerchantAccountError,
 )
 from app.services.google.google_integrations import (
+    ensure_google_provider_credential_from_existing_scope,
     get_google_integration_status,
     persist_google_oauth_tokens,
 )
@@ -43,6 +45,12 @@ from app.services.google.google_oauth import (
     exchange_google_oauth_code,
     frontend_redirect_url,
     verify_google_oauth_state,
+)
+from app.services.google.google_scope_utils import (
+    get_google_scopes_for_reconnect,
+    normalize_oauth_mode,
+    normalize_oauth_provider,
+    resolve_oauth_prompt,
 )
 from app.services.google.google_tokens import get_valid_google_access_token
 from app.services.google.analytics_client import fetch_ga4_account_summaries
@@ -71,6 +79,15 @@ def _redirect_error(project_id: UUID | None, error_code: str) -> RedirectRespons
 
 
 def _map_google_integration_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, GoogleIntegrationReconnectRequiredError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "google_reconnect_required",
+                "provider": exc.provider,
+                "message": str(exc),
+            },
+        )
     if isinstance(exc, GoogleIntegrationNotConnectedError):
         return HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     if isinstance(exc, GoogleIntegrationNotConfiguredError):
@@ -268,6 +285,11 @@ async def list_merchant_accounts(
 ) -> GoogleMerchantAccountsResponse:
     await get_project_in_default_workspace(project_id, session)
     try:
+        await ensure_google_provider_credential_from_existing_scope(
+            session,
+            project_id,
+            provider="merchant_center",
+        )
         access_token = await get_valid_google_access_token(
             session,
             project_id,
@@ -365,7 +387,22 @@ async def start_google_oauth(
 ) -> GoogleOAuthStartResponse:
     await get_project_in_default_workspace(project_id, session)
     ensure_google_oauth_configured()
-    authorization_url = build_google_oauth_authorization_url(project_id)
+
+    request_body = body or GoogleOAuthStartRequest()
+    provider = normalize_oauth_provider(request_body.provider)
+    if request_body.services and not request_body.provider:
+        provider = "all"
+    mode = normalize_oauth_mode(request_body.mode)
+    scopes = get_google_scopes_for_reconnect(provider)
+    prompt = resolve_oauth_prompt(mode)
+
+    authorization_url = build_google_oauth_authorization_url(
+        project_id,
+        scopes=scopes,
+        provider=provider,
+        mode=mode,
+        prompt=prompt,
+    )
     return GoogleOAuthStartResponse(authorization_url=authorization_url)
 
 
@@ -379,21 +416,30 @@ async def google_oauth_callback(
     state_value = query_params.get("state")
     code = query_params.get("code")
     project_id: UUID | None = None
+    oauth_state = None
 
     if state_value:
-        project_id = verify_google_oauth_state(state_value)
+        oauth_state = verify_google_oauth_state(state_value)
+        if oauth_state is not None:
+            project_id = oauth_state.project_id
 
     if error:
         logger.warning("Google OAuth callback error: %s", error)
         return _redirect_error(project_id, error)
 
-    if not state_value or not code or project_id is None:
+    if not state_value or not code or project_id is None or oauth_state is None:
         return _redirect_error(project_id, "invalid_state")
 
     try:
         await get_project_in_default_workspace(project_id, session)
         token_data = await exchange_google_oauth_code(code)
-        await persist_google_oauth_tokens(session, project_id, token_data)
+        await persist_google_oauth_tokens(
+            session,
+            project_id,
+            token_data,
+            requested_provider=oauth_state.provider,
+            mode=oauth_state.mode,
+        )
     except HTTPException as exc:
         logger.warning("Google OAuth callback failed for project %s: %s", project_id, exc.detail)
         return _redirect_error(project_id, "connection_failed")

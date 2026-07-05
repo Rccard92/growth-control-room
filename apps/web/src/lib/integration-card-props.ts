@@ -14,6 +14,7 @@ interface GetIntegrationCardPropsInput {
   googleStatus?: GoogleIntegrationStatusResponse;
   oauthConnectDisabled: boolean;
   handleConnectGoogle: () => void;
+  handleReconnectGoogle?: (provider?: string, mode?: "connect" | "reconnect" | "add_scope") => void;
   projectId: string;
   searchConsoleSiteUrl?: string | null;
   onSelectSearchConsoleProperty?: () => void;
@@ -112,6 +113,7 @@ export function getIntegrationCardProps({
   googleStatus,
   oauthConnectDisabled,
   handleConnectGoogle,
+  handleReconnectGoogle,
   projectId,
   searchConsoleSiteUrl,
   onSelectSearchConsoleProperty,
@@ -202,6 +204,13 @@ export function getIntegrationCardProps({
     case "merchant_center": {
       const service = googleStatus.merchantCenter;
       const oauthConnected = googleStatus.oauth.status === "connected";
+      const reconnectHandler =
+        handleReconnectGoogle ??
+        ((provider?: string, mode?: "connect" | "reconnect" | "add_scope") => {
+          void handleConnectGoogle();
+          void provider;
+          void mode;
+        });
 
       if (service.status === "missing_credentials") {
         return {
@@ -209,6 +218,20 @@ export function getIntegrationCardProps({
           status: "missing_credentials",
           actionLabel: "OAuth mancante",
           disabled: true,
+        };
+      }
+
+      if (service.status === "needs_reconnect") {
+        return {
+          meta,
+          status: "needs_reconnect",
+          badgeLabel: "Da ricollegare",
+          actionLabel: "Aggiungi permessi Merchant",
+          onAction: () => reconnectHandler("merchant_center", "add_scope"),
+          disabled: oauthConnectDisabled,
+          note:
+            service.message ??
+            "Ricollega Google per concedere i permessi Merchant Center.",
         };
       }
 

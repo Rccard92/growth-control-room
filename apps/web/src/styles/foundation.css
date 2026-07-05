@@ -317,6 +317,26 @@
   color: var(--gcr-text);
 }
 
+.gcr-link-button {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--gcr-accent-blue);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gcr-link-button:hover:not(:disabled) {
+  color: var(--gcr-accent-violet);
+}
+
+.gcr-link-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Status Badge */
 .gcr-badge {
   display: inline-flex;
@@ -365,6 +385,12 @@
   color: rgba(99, 179, 237, 0.95);
   background: rgba(99, 179, 237, 0.15);
   border-color: rgba(99, 179, 237, 0.25);
+}
+
+.gcr-badge--needs_reconnect {
+  color: rgba(237, 180, 99, 0.95);
+  background: rgba(237, 180, 99, 0.12);
+  border-color: rgba(237, 180, 99, 0.25);
 }
 
 .gcr-badge--missing_credentials {

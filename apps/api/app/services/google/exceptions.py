@@ -69,3 +69,11 @@ class MerchantAccountError(Exception):
     def __init__(self, message: str, *, account_id: str | None = None) -> None:
         super().__init__(message)
         self.account_id = account_id
+
+
+class GoogleIntegrationReconnectRequiredError(Exception):
+    """Raised when OAuth must be re-run to grant additional Google scopes."""
+
+    def __init__(self, message: str, *, provider: str) -> None:
+        super().__init__(message)
+        self.provider = provider

@@ -25,7 +25,28 @@ def test_create_and_verify_google_oauth_state(monkeypatch) -> None:
     project_id = uuid4()
     state = create_google_oauth_state(project_id)
     verified = verify_google_oauth_state(state)
-    assert verified == project_id
+    assert verified is not None
+    assert verified.project_id == project_id
+    assert verified.provider is None
+    assert verified.mode == "connect"
+
+
+def test_create_google_oauth_state_includes_provider_and_mode(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.google.google_oauth.settings.google_oauth_client_secret",
+        "test-secret",
+    )
+    project_id = uuid4()
+    state = create_google_oauth_state(
+        project_id,
+        provider="merchant_center",
+        mode="add_scope",
+    )
+    verified = verify_google_oauth_state(state)
+    assert verified is not None
+    assert verified.project_id == project_id
+    assert verified.provider == "merchant_center"
+    assert verified.mode == "add_scope"
 
 
 def test_verify_google_oauth_state_rejects_tampered_signature(monkeypatch) -> None:

@@ -64,6 +64,18 @@ export function selectGoogleAnalyticsProperty(
   );
 }
 
+export function isGoogleReconnectRequiredError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("ricollega google")
+    || message.includes("google_reconnect_required")
+    || message.includes("permessi merchant")
+  );
+}
+
 export function startGoogleOAuth(
   projectId: string,
   payload?: GoogleOAuthStartRequest,

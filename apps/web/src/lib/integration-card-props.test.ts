@@ -162,6 +162,32 @@ describe("getIntegrationCardProps", () => {
     expect(props.onSecondaryAction).toBe(onSelect);
   });
 
+  it("maps merchant_center needs_reconnect to Aggiungi permessi Merchant", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "merchant_center")!;
+    const reconnect = vi.fn();
+    const props = getIntegrationCardProps({
+      meta,
+      googleStatus: {
+        ...googleStatus,
+        oauth: { status: "connected", configured: true },
+        merchantCenter: {
+          status: "needs_reconnect",
+          configured: true,
+          message: "Ricollega Google per concedere i permessi Merchant Center.",
+        },
+      },
+      oauthConnectDisabled: false,
+      handleConnectGoogle: vi.fn(),
+      handleReconnectGoogle: reconnect,
+      projectId: "proj-1",
+    });
+
+    expect(props.badgeLabel).toBe("Da ricollegare");
+    expect(props.actionLabel).toBe("Aggiungi permessi Merchant");
+    props.onAction?.();
+    expect(reconnect).toHaveBeenCalledWith("merchant_center", "add_scope");
+  });
+
   it("maps merchant_center with account to Configurata", () => {
     const meta = INTEGRATIONS.find((item) => item.provider === "merchant_center")!;
     const props = getIntegrationCardProps({

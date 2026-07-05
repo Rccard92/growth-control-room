@@ -5,6 +5,7 @@ type BadgeVariant =
   | "error"
   | "active"
   | "needs_setup"
+  | "needs_reconnect"
   | "missing_credentials"
   | "setup_incomplete";
 
@@ -15,6 +16,7 @@ const LABELS: Record<BadgeVariant, string> = {
   error: "Errore",
   active: "Attivo",
   needs_setup: "Da collegare",
+  needs_reconnect: "Da ricollegare",
   missing_credentials: "Mancante",
   setup_incomplete: "Setup incompleto",
 };

@@ -16,6 +16,7 @@ export type IntegrationUiStatus =
   | IntegrationStatus
   | "coming_soon"
   | "needs_setup"
+  | "needs_reconnect"
   | "missing_credentials"
   | "setup_incomplete";
 

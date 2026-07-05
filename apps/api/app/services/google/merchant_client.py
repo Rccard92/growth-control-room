@@ -44,6 +44,22 @@ def _map_http_error(
     response_text: str | None = None,
 ) -> Exception:
     if status_code in (401, 403):
+        response_lower = (response_text or "").lower()
+        if status_code == 403 and (
+            "api has not been used" in response_lower
+            or "has not been used in project" in response_lower
+        ):
+            return GoogleIntegrationNotConfiguredError(
+                "Merchant API non abilitata o progetto GCP non registrato. "
+                "Abilita Merchant API e completa registerGcp nel Merchant Center.",
+                integration="merchant_center",
+            )
+        if "registergcp" in response_lower or "not registered" in response_lower or "developer registration" in response_lower:
+            return GoogleIntegrationNotConfiguredError(
+                "Merchant API non abilitata o progetto GCP non registrato. "
+                "Abilita Merchant API e completa registerGcp nel Merchant Center.",
+                integration="merchant_center",
+            )
         return GoogleIntegrationPermissionError(
             "Permessi insufficienti per Google Merchant Center.",
             status_code=status_code,
@@ -53,12 +69,6 @@ def _map_http_error(
         return MerchantAccountError(
             "Account Merchant Center non trovato o non accessibile.",
             account_id=account_id,
-        )
-    if status_code == 403 and response_text and "API has not been used" in response_text:
-        return GoogleIntegrationNotConfiguredError(
-            "Merchant API non abilitata o progetto GCP non registrato. "
-            "Abilita Merchant API e completa registerGcp nel Merchant Center.",
-            integration="merchant_center",
         )
     return GoogleApiRequestError(
         "Google Merchant Center ha rifiutato la richiesta.",

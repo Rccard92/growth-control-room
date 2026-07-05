@@ -2,6 +2,7 @@ export type GoogleServiceStatusValue =
   | "not_connected"
   | "connected"
   | "needs_setup"
+  | "needs_reconnect"
   | "missing_credentials"
   | "setup_incomplete";
 
@@ -21,8 +22,19 @@ export interface GoogleIntegrationStatusResponse {
   merchantCenter: GoogleServiceStatus;
 }
 
+export type GoogleOAuthProvider =
+  | "google_search_console"
+  | "ga4"
+  | "google_ads"
+  | "merchant_center"
+  | "all";
+
+export type GoogleOAuthMode = "connect" | "reconnect" | "add_scope";
+
 export interface GoogleOAuthStartRequest {
   services?: string[];
+  provider?: GoogleOAuthProvider;
+  mode?: GoogleOAuthMode;
 }
 
 export interface GoogleOAuthStartResponse {

@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
@@ -12,18 +13,24 @@ import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import settings
+from app.services.google.google_scope_utils import (
+    get_google_scopes_for_reconnect,
+    normalize_oauth_mode,
+    normalize_oauth_provider,
+    resolve_oauth_prompt,
+)
 
 GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
-GOOGLE_OAUTH_SCOPES = [
-    "https://www.googleapis.com/auth/webmasters.readonly",
-    "https://www.googleapis.com/auth/analytics.readonly",
-    "https://www.googleapis.com/auth/adwords",
-    "https://www.googleapis.com/auth/content",
-]
-
 OAUTH_STATE_TTL_MINUTES = 10
+
+
+@dataclass(frozen=True)
+class GoogleOAuthState:
+    project_id: UUID
+    provider: str | None = None
+    mode: str = "connect"
 
 
 def ensure_google_oauth_configured() -> None:
@@ -58,18 +65,25 @@ def _sign_state_payload(payload_b64: str) -> str:
     return digest
 
 
-def create_google_oauth_state(project_id: UUID) -> str:
+def create_google_oauth_state(
+    project_id: UUID,
+    *,
+    provider: str | None = None,
+    mode: str | None = None,
+) -> str:
     payload = {
         "project_id": str(project_id),
         "nonce": secrets.token_urlsafe(16),
         "exp": int((datetime.now(UTC) + timedelta(minutes=OAUTH_STATE_TTL_MINUTES)).timestamp()),
+        "provider": normalize_oauth_provider(provider) if provider else None,
+        "mode": normalize_oauth_mode(mode),
     }
     payload_b64 = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     signature = _sign_state_payload(payload_b64)
     return f"{payload_b64}.{signature}"
 
 
-def verify_google_oauth_state(state_value: str) -> UUID | None:
+def verify_google_oauth_state(state_value: str) -> GoogleOAuthState | None:
     if not state_value or "." not in state_value:
         return None
     payload_b64, signature = state_value.rsplit(".", 1)
@@ -81,23 +95,44 @@ def verify_google_oauth_state(state_value: str) -> UUID | None:
         exp = int(payload.get("exp", 0))
         if exp < int(datetime.now(UTC).timestamp()):
             return None
-        return UUID(str(payload["project_id"]))
+        provider_raw = payload.get("provider")
+        mode_raw = payload.get("mode")
+        return GoogleOAuthState(
+            project_id=UUID(str(payload["project_id"])),
+            provider=normalize_oauth_provider(provider_raw) if provider_raw else None,
+            mode=normalize_oauth_mode(mode_raw),
+        )
     except (ValueError, KeyError, json.JSONDecodeError):
         return None
 
 
-def build_google_oauth_authorization_url(project_id: UUID, scopes: list[str] | None = None) -> str:
+def build_google_oauth_authorization_url(
+    project_id: UUID,
+    *,
+    scopes: list[str] | None = None,
+    provider: str | None = None,
+    mode: str | None = None,
+    prompt: str | None = None,
+) -> str:
     ensure_google_oauth_configured()
-    resolved_scopes = scopes or GOOGLE_OAUTH_SCOPES
+    normalized_provider = normalize_oauth_provider(provider)
+    normalized_mode = normalize_oauth_mode(mode)
+    resolved_scopes = scopes or get_google_scopes_for_reconnect(normalized_provider)
+    resolved_prompt = prompt or resolve_oauth_prompt(normalized_mode)
+    state_provider = None if normalized_provider == "all" else normalized_provider
     params = {
         "client_id": settings.google_oauth_client_id,
         "redirect_uri": settings.google_oauth_redirect_uri,
         "response_type": "code",
         "access_type": "offline",
-        "prompt": "consent",
+        "prompt": resolved_prompt,
         "include_granted_scopes": "true",
         "scope": " ".join(resolved_scopes),
-        "state": create_google_oauth_state(project_id),
+        "state": create_google_oauth_state(
+            project_id,
+            provider=state_provider,
+            mode=normalized_mode,
+        ),
     }
     return f"{GOOGLE_OAUTH_AUTHORIZE_URL}?{urlencode(params)}"
 

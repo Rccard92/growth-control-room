@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { GoogleMerchantAccount } from "@gcr/shared";
 import { AppModal } from "../ui/AppModal";
+import { isGoogleReconnectRequiredError } from "../../lib/google-integrations-api";
 import {
   useMerchantAccounts,
   useSelectMerchantAccount,
@@ -11,6 +12,31 @@ interface GoogleMerchantCenterAccountModalProps {
   selectedAccountId?: string | null;
   open: boolean;
   onClose: () => void;
+  onAddMerchantScope?: () => void;
+}
+
+function getMerchantAccountsErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "Impossibile caricare gli account Merchant Center.";
+  }
+
+  const message = error.message.toLowerCase();
+  if (isGoogleReconnectRequiredError(error)) {
+    return "Per accedere a Merchant Center devi concedere i permessi aggiuntivi al tuo account Google.";
+  }
+  if (message.includes("permess") || message.includes("403")) {
+    return "L'account Google non ha permessi sufficienti per Merchant Center.";
+  }
+  if (
+    message.includes("non configurat")
+    || message.includes("503")
+    || message.includes("registergcp")
+    || message.includes("api has not been used")
+  ) {
+    return "Merchant API non abilitata o non registrata nel progetto GCP. Abilita Merchant API e completa la registrazione sviluppatore.";
+  }
+
+  return error.message || "Impossibile caricare gli account Merchant Center.";
 }
 
 export function GoogleMerchantCenterAccountModal({
@@ -18,6 +44,7 @@ export function GoogleMerchantCenterAccountModal({
   selectedAccountId,
   open,
   onClose,
+  onAddMerchantScope,
 }: GoogleMerchantCenterAccountModalProps) {
   const [selectedId, setSelectedId] = useState(selectedAccountId ?? "");
   const accountsQuery = useMerchantAccounts(projectId, open);
@@ -43,6 +70,8 @@ export function GoogleMerchantCenterAccountModal({
   }
 
   const accounts = accountsQuery.data?.accounts ?? [];
+  const reconnectRequired =
+    accountsQuery.isError && isGoogleReconnectRequiredError(accountsQuery.error);
 
   return (
     <AppModal
@@ -61,24 +90,43 @@ export function GoogleMerchantCenterAccountModal({
           >
             Annulla
           </button>
-          <button
-            type="button"
-            className="gcr-btn gcr-btn--primary"
-            disabled={!selectedId || selectAccount.isPending}
-            onClick={() => void handleSave()}
-          >
-            {selectAccount.isPending ? "Salvataggio…" : "Salva account"}
-          </button>
+          {reconnectRequired && onAddMerchantScope ? (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              onClick={onAddMerchantScope}
+            >
+              Aggiungi permessi Merchant
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              disabled={!selectedId || selectAccount.isPending}
+              onClick={() => void handleSave()}
+            >
+              {selectAccount.isPending ? "Salvataggio…" : "Salva account"}
+            </button>
+          )}
         </div>
       }
     >
       {accountsQuery.isLoading ? (
         <p className="merchant-account-modal__status">Caricamento account…</p>
       ) : accountsQuery.isError ? (
-        <p className="gcr-alert gcr-alert--error">
-          Impossibile caricare gli account Merchant Center. Verifica OAuth Google e che Merchant
-          API sia abilitata.
-        </p>
+        <div className="gcr-alert gcr-alert--error">
+          <p>{getMerchantAccountsErrorMessage(accountsQuery.error)}</p>
+          {reconnectRequired && onAddMerchantScope ? (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--primary"
+              style={{ marginTop: "0.75rem" }}
+              onClick={onAddMerchantScope}
+            >
+              Aggiungi permessi Merchant
+            </button>
+          ) : null}
+        </div>
       ) : accounts.length === 0 ? (
         <p className="merchant-account-modal__status">
           Nessun account Merchant Center trovato per questo account Google.

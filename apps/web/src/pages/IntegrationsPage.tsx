@@ -53,11 +53,16 @@ export function IntegrationsPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  const handleConnectGoogle = async () => {
-    const response = await startGoogleOAuth.mutateAsync({
-      services: ["search_console", "analytics", "google_ads", "merchant_center"],
-    });
+  const handleReconnectGoogle = async (
+    provider: "google_search_console" | "ga4" | "google_ads" | "merchant_center" | "all" = "all",
+    mode: "connect" | "reconnect" | "add_scope" = "connect",
+  ) => {
+    const response = await startGoogleOAuth.mutateAsync({ provider, mode });
     window.location.href = response.authorizationUrl;
+  };
+
+  const handleConnectGoogle = async () => {
+    await handleReconnectGoogle("all", "connect");
   };
 
   const oauthConnectDisabled =
@@ -90,7 +95,16 @@ export function IntegrationsPage() {
 
       <p className="integrations-page__hint">
         Le fonti Google usano API key per PageSpeed/CrUX e OAuth per Search Console, GA4, Ads e
-        Merchant Center.
+        Merchant Center.{" "}
+        <button
+          type="button"
+          className="gcr-link-button"
+          disabled={oauthConnectDisabled}
+          onClick={() => void handleReconnectGoogle("all", "reconnect")}
+        >
+          Ricollega Google
+        </button>{" "}
+        quando aggiungiamo nuovi permessi Google, come Merchant Center.
       </p>
 
       {isGridLoading && <div className="gcr-skeleton" style={{ height: 120 }} />}
@@ -106,6 +120,12 @@ export function IntegrationsPage() {
                 googleStatus,
                 oauthConnectDisabled,
                 handleConnectGoogle: () => void handleConnectGoogle(),
+                handleReconnectGoogle: (provider, mode) =>
+                  void handleReconnectGoogle(
+                    (provider as "google_search_console" | "ga4" | "google_ads" | "merchant_center" | "all") ??
+                      "all",
+                    mode ?? "connect",
+                  ),
                 projectId: id,
                 searchConsoleSiteUrl: project?.searchConsoleSiteUrl,
                 onSelectSearchConsoleProperty: () => setIsSearchConsoleModalOpen(true),
@@ -146,6 +166,7 @@ export function IntegrationsPage() {
           selectedAccountId={project?.googleMerchantAccountId}
           open={isMerchantModalOpen}
           onClose={() => setIsMerchantModalOpen(false)}
+          onAddMerchantScope={() => void handleReconnectGoogle("merchant_center", "add_scope")}
         />
       )}
 

@@ -94,4 +94,25 @@ describe("GoogleMerchantCenterAccountModal", () => {
     expect(html).not.toContain("<select");
     expect(html).toContain("Salva account");
   });
+
+  it("shows reconnect CTA when merchant accounts require additional scopes", () => {
+    setupMocks();
+    useMerchantAccountsMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error("Ricollega Google per concedere i permessi Merchant Center."),
+    });
+
+    const html = renderToStaticMarkup(
+      <GoogleMerchantCenterAccountModal
+        projectId="proj-1"
+        open
+        onClose={vi.fn()}
+        onAddMerchantScope={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain("Aggiungi permessi Merchant");
+  });
 });

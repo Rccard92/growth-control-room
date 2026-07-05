@@ -25,6 +25,8 @@ class GoogleOAuthStartRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     services: list[str] | None = None
+    provider: str | None = None
+    mode: str | None = None
 
 
 class GoogleOAuthStartResponse(BaseModel):
