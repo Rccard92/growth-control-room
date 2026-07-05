@@ -15,6 +15,8 @@ export const queryKeys = {
     status: (projectId: string) => ["google", projectId, "status"] as const,
     searchConsoleSites: (projectId: string) =>
       ["google", projectId, "search-console-sites"] as const,
+    analyticsProperties: (projectId: string) =>
+      ["google", projectId, "analytics-properties"] as const,
   },
   shopify: {
     status: (projectId: string) => ["shopify", projectId, "status"] as const,

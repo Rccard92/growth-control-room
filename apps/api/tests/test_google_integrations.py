@@ -17,11 +17,17 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:
 from app.api.routes.google_integrations import (
     get_google_status,
     google_oauth_callback,
+    list_google_analytics_properties,
     list_search_console_sites,
+    select_google_analytics_property,
     select_search_console_site,
     start_google_oauth,
 )
-from app.schemas.google_integration import GoogleOAuthStartRequest, SelectSearchConsoleSiteRequest
+from app.schemas.google_integration import (
+    GoogleOAuthStartRequest,
+    SelectGoogleAnalyticsPropertyRequest,
+    SelectSearchConsoleSiteRequest,
+)
 from app.services.encryption import decrypt_secret, encrypt_secret
 from app.services.google.google_config import get_google_config_status
 from app.services.google.google_integrations import (
@@ -643,6 +649,185 @@ def test_select_search_console_site_returns_422_for_unknown_property() -> None:
             await select_search_console_site(
                 project_id,
                 SelectSearchConsoleSiteRequest(site_url="https://other.com/"),
+                session,
+            )
+
+        assert exc.value.status_code == 422
+
+    asyncio.run(run())
+
+
+def test_list_google_analytics_properties_returns_properties() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_ga4_account_summaries",
+                new_callable=AsyncMock,
+                return_value=[
+                    {
+                        "propertyId": "123456789",
+                        "property": "properties/123456789",
+                        "propertyDisplayName": "Example GA4",
+                        "accountDisplayName": "Example Account",
+                    }
+                ],
+            ),
+        ):
+            response = await list_google_analytics_properties(project_id, session)
+
+        assert response.properties[0].property_id == "123456789"
+        assert response.properties[0].display_name == "Example GA4"
+
+    asyncio.run(run())
+
+
+def test_list_google_analytics_properties_returns_503_when_not_connected() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                side_effect=GoogleIntegrationNotConnectedError(
+                    "Account Google non collegato.",
+                    integration="ga4",
+                ),
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            await list_google_analytics_properties(project_id, session)
+
+        assert exc.value.status_code == 503
+
+    asyncio.run(run())
+
+
+def test_select_google_analytics_property_saves_property() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+        project = Project(
+            id=project_id,
+            workspace_id=uuid4(),
+            name="Example",
+            slug="example",
+            google_analytics_property_id=None,
+            google_analytics_property_name=None,
+            status="active",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+                return_value=project,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_ga4_account_summaries",
+                new_callable=AsyncMock,
+                return_value=[
+                    {
+                        "propertyId": "123456789",
+                        "property": "properties/123456789",
+                        "propertyDisplayName": "Example GA4",
+                        "accountDisplayName": "Example Account",
+                    }
+                ],
+            ),
+        ):
+            response = await select_google_analytics_property(
+                project_id,
+                SelectGoogleAnalyticsPropertyRequest(
+                    property_id="123456789",
+                    property_name="properties/123456789",
+                    display_name="Example GA4",
+                ),
+                session,
+            )
+
+        assert response.property_id == "123456789"
+        assert project.google_analytics_property_id == "123456789"
+        assert project.google_analytics_property_name == "Example GA4"
+        session.commit.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_select_google_analytics_property_returns_422_for_unknown_property() -> None:
+    async def run() -> None:
+        project_id = uuid4()
+        session = AsyncMock()
+        project = Project(
+            id=project_id,
+            workspace_id=uuid4(),
+            name="Example",
+            slug="example",
+            google_analytics_property_id=None,
+            google_analytics_property_name=None,
+            status="active",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+        with (
+            patch(
+                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                new_callable=AsyncMock,
+                return_value=project,
+            ),
+            patch(
+                "app.api.routes.google_integrations.get_valid_google_access_token",
+                new_callable=AsyncMock,
+                return_value="access-token",
+            ),
+            patch(
+                "app.api.routes.google_integrations.fetch_ga4_account_summaries",
+                new_callable=AsyncMock,
+                return_value=[
+                    {
+                        "propertyId": "123456789",
+                        "property": "properties/123456789",
+                        "propertyDisplayName": "Example GA4",
+                        "accountDisplayName": "Example Account",
+                    }
+                ],
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            await select_google_analytics_property(
+                project_id,
+                SelectGoogleAnalyticsPropertyRequest(
+                    property_id="999999999",
+                    property_name="properties/999999999",
+                    display_name="Other GA4",
+                ),
                 session,
             )
 

@@ -45,3 +45,27 @@ export interface SelectSearchConsoleSiteResponse {
   siteUrl: string;
   message: string;
 }
+
+export interface GoogleAnalyticsProperty {
+  propertyId: string;
+  propertyName: string;
+  displayName: string;
+  accountDisplayName?: string | null;
+}
+
+export interface GoogleAnalyticsPropertiesResponse {
+  properties: GoogleAnalyticsProperty[];
+}
+
+export interface SelectGoogleAnalyticsPropertyRequest {
+  propertyId: string;
+  propertyName: string;
+  displayName: string;
+}
+
+export interface SelectGoogleAnalyticsPropertyResponse {
+  propertyId: string;
+  propertyName: string;
+  displayName: string;
+  message: string;
+}

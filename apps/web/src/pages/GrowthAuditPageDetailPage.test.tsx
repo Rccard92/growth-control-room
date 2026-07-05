@@ -255,11 +255,13 @@ describe("GrowthAuditPageDetailPage", () => {
     const shopifyIndex = indexOfOrFail(html, 'id="shopify-edit"');
     const performanceIndex = indexOfOrFail(html, 'id="performance"');
     const searchConsoleIndex = indexOfOrFail(html, 'id="search-console"');
+    const analyticsIndex = indexOfOrFail(html, 'id="analytics"');
     const aiIndex = indexOfOrFail(html, 'id="ai-geo-cro"');
     expect(priorityIndex).toBeLessThan(shopifyIndex);
     expect(shopifyIndex).toBeLessThan(performanceIndex);
     expect(performanceIndex).toBeLessThan(searchConsoleIndex);
-    expect(searchConsoleIndex).toBeLessThan(aiIndex);
+    expect(searchConsoleIndex).toBeLessThan(analyticsIndex);
+    expect(analyticsIndex).toBeLessThan(aiIndex);
     expect(html).toContain("Cosa sistemare prima");
     expect(html).toContain("Dove intervenire");
     expect(html).toContain("Workflow consigliato");

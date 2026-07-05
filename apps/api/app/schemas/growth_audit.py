@@ -399,6 +399,20 @@ class GrowthAuditSearchConsoleAnalysisResponse(BaseModel):
     message: str
 
 
+class GrowthAuditAnalyticsAnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    days: int = Field(default=28, ge=1, le=90)
+
+
+class GrowthAuditAnalyticsAnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    run: GrowthAuditRunRead
+    summary: dict[str, Any]
+    message: str
+
+
 class GrowthAuditPageResultsListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

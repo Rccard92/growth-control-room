@@ -17,6 +17,9 @@ interface GetIntegrationCardPropsInput {
   projectId: string;
   searchConsoleSiteUrl?: string | null;
   onSelectSearchConsoleProperty?: () => void;
+  googleAnalyticsPropertyId?: string | null;
+  googleAnalyticsPropertyName?: string | null;
+  onSelectGoogleAnalyticsProperty?: () => void;
 }
 
 function mapGoogleStatus(status: GoogleServiceStatus["status"]): IntegrationUiStatus {
@@ -109,6 +112,9 @@ export function getIntegrationCardProps({
   projectId,
   searchConsoleSiteUrl,
   onSelectSearchConsoleProperty,
+  googleAnalyticsPropertyId,
+  googleAnalyticsPropertyName,
+  onSelectGoogleAnalyticsProperty,
 }: GetIntegrationCardPropsInput): IntegrationCardProps {
   if (meta.provider === "shopify") {
     const connected = apiStatus === "connected";
@@ -157,13 +163,25 @@ export function getIntegrationCardProps({
         detailText: searchConsoleSiteUrl ? `Proprietà: ${searchConsoleSiteUrl}` : undefined,
       };
     }
-    case "ga4":
-      return oauthCardProps(
+    case "ga4": {
+      const base = oauthCardProps(
         meta,
         googleStatus.analytics,
         oauthConnectDisabled,
         handleConnectGoogle,
       );
+      if (googleStatus.analytics.status !== "connected") {
+        return base;
+      }
+      return {
+        ...base,
+        secondaryActionLabel: googleAnalyticsPropertyId ? "Modifica proprietà" : "Seleziona proprietà",
+        onSecondaryAction: onSelectGoogleAnalyticsProperty,
+        detailText: googleAnalyticsPropertyName
+          ? `Proprietà: ${googleAnalyticsPropertyName}`
+          : undefined,
+      };
+    }
     case "google_ads":
       return oauthCardProps(
         meta,

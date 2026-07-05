@@ -287,6 +287,36 @@ describe("growth-audit-utils", () => {
     expect(kpis.find((kpi) => kpi.label === "Pagine con dati GSC")?.value).toBe("4");
   });
 
+  it("includes GA4 KPIs from run summary", () => {
+    const kpis = getGrowthAuditDashboardKpiItems(
+      {
+        siteScore: 78,
+        pagesAnalyzed: 3,
+        summary: {
+          pagesAnalyzed: 3,
+          analytics: {
+            totalSessions: 320,
+            totalUsers: 250,
+            averageEngagementRate: 0.415,
+            totalConversions: 12,
+            totalRevenue: 1540.5,
+            pagesWithData: 6,
+            lowEngagementPages: 2,
+            highTrafficLowConversionPages: 1,
+            lastSyncedAt: "2026-06-13T10:00:00Z",
+          },
+        },
+      },
+      samplePages,
+    );
+    expect(kpis.find((kpi) => kpi.label === "Sessioni")?.value).toBe("320");
+    expect(kpis.find((kpi) => kpi.label === "Utenti")?.value).toBe("250");
+    expect(kpis.find((kpi) => kpi.label === "Engagement rate medio")?.value).toBe("41.50%");
+    expect(kpis.find((kpi) => kpi.label === "Conversioni")?.value).toBe("12");
+    expect(kpis.find((kpi) => kpi.label === "Revenue")?.value).toBe("1540.50");
+    expect(kpis.find((kpi) => kpi.label === "Pagine con dati GA4")?.value).toBe("6");
+  });
+
   it("maps score bands and badge classes", () => {
     expect(getGrowthAuditScoreBand(85)).toBe("good");
     expect(getGrowthAuditScoreBand(70)).toBe("warning");
@@ -849,6 +879,32 @@ describe("growth-audit-utils", () => {
       });
       expect(items[0].reasons).toContain("Opportunità CTR da Search Console");
       expect(items[0].reasons).toContain("Query reali disponibili");
+    });
+
+    it("adds GA4 no-conversion reason for product with sessions", () => {
+      const pageWithGa4: GrowthAuditPage = {
+        ...productPage,
+        score: 75,
+        metadata: {
+          analytics: {
+            sessions: 45,
+            totalUsers: 40,
+            engagedSessions: 15,
+            engagementRate: 0.33,
+            averageSessionDuration: 70,
+            conversions: 0,
+            revenue: 0,
+            source: "ga4",
+            periodDays: 28,
+          },
+        },
+      };
+      const items = buildGrowthAuditPagePriorityItems({
+        pages: [pageWithGa4],
+        findings: [],
+        tasks: [],
+      });
+      expect(items[0].reasons).toContain("Traffico GA4 senza conversioni");
     });
 
     it("getGrowthAuditPriorityLevelLabel returns Italian labels", () => {

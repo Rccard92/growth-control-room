@@ -6,6 +6,7 @@ import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/
 import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailTechnicalSection";
 import { GrowthAuditPageWorkspacePerformanceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspacePerformanceSection";
 import { GrowthAuditPageWorkspaceSearchConsoleSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceSearchConsoleSection";
+import { GrowthAuditPageWorkspaceAnalyticsSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAnalyticsSection";
 import { GrowthAuditPageWorkspaceAiSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAiSection";
 import { GrowthAuditPageWorkspaceHeader } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceHeader";
 import { GrowthAuditPageWorkspaceSidebar } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceSidebar";
@@ -22,6 +23,7 @@ import {
   getFindingsForPage,
   getTasksForPage,
   hasGrowthAuditPagePerformanceAnalysis,
+  hasGrowthAuditPageAnalyticsData,
   hasGrowthAuditPageSearchConsoleData,
   isGrowthAuditRunActive,
   mapGrowthAuditPageToSeoEntity,
@@ -107,6 +109,10 @@ export function GrowthAuditPageDetailPage() {
   );
   const hasSearchConsoleData = useMemo(
     () => (page ? hasGrowthAuditPageSearchConsoleData(page) : false),
+    [page],
+  );
+  const hasAnalyticsData = useMemo(
+    () => (page ? hasGrowthAuditPageAnalyticsData(page) : false),
     [page],
   );
   const mappedEntity = page ? mapGrowthAuditPageToSeoEntity(page) : null;
@@ -214,6 +220,8 @@ export function GrowthAuditPageDetailPage() {
 
           <GrowthAuditPageWorkspaceSearchConsoleSection page={page} />
 
+          <GrowthAuditPageWorkspaceAnalyticsSection page={page} />
+
           <GrowthAuditPageWorkspaceAiSection
             projectId={projectId}
             runId={runId}
@@ -233,6 +241,7 @@ export function GrowthAuditPageDetailPage() {
           hasAiResult={Boolean(latestAiResult)}
           hasPerformanceResult={hasPerformanceResult}
           hasSearchConsoleData={hasSearchConsoleData}
+          hasAnalyticsData={hasAnalyticsData}
           shopifySectionAvailable={Boolean(mappedEntity)}
           aiSectionAvailable={Boolean(aiAvailable)}
           onScrollToSection={scrollToSection}

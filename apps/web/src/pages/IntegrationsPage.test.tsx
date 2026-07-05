@@ -54,6 +54,21 @@ vi.mock("../components/integrations/GoogleSearchConsolePropertyModal", () => ({
     ) : null,
 }));
 
+vi.mock("../components/integrations/GoogleAnalyticsPropertyModal", () => ({
+  GoogleAnalyticsPropertyModal: ({
+    open,
+    selectedPropertyId,
+  }: {
+    open: boolean;
+    selectedPropertyId?: string | null;
+  }) =>
+    open ? (
+      <div data-testid="ga4-property-modal" data-selected={selectedPropertyId ?? ""}>
+        modal-open
+      </div>
+    ) : null,
+}));
+
 vi.mock("../hooks/useProjects", () => ({
   useProject: useProjectMock,
   useProjectIntegrations: useProjectIntegrationsMock,
@@ -100,6 +115,8 @@ function countOccurrences(value: string, needle: string): number {
 function setupMocks(options?: {
   shopifyStatus?: "connected" | "not_connected";
   searchConsoleSiteUrl?: string | null;
+  googleAnalyticsPropertyId?: string | null;
+  googleAnalyticsPropertyName?: string | null;
 }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
@@ -107,6 +124,8 @@ function setupMocks(options?: {
       id: "proj-1",
       name: "Solmielato",
       searchConsoleSiteUrl: options?.searchConsoleSiteUrl ?? null,
+      googleAnalyticsPropertyId: options?.googleAnalyticsPropertyId ?? null,
+      googleAnalyticsPropertyName: options?.googleAnalyticsPropertyName ?? null,
     },
     isLoading: false,
   });
@@ -248,6 +267,41 @@ describe("IntegrationsPage unified grid", () => {
     expect(html).toContain("Proprietà: https://solmielato.it/");
     expect(html).toContain("Modifica proprietà");
     expect(html).not.toContain("Seleziona proprietà");
+  });
+
+  it("shows Seleziona proprietà on connected GA4 without saved property", () => {
+    setupMocks();
+    useGoogleIntegrationStatusMock.mockReturnValue({
+      data: {
+        ...googleStatus,
+        analytics: { status: "connected", configured: true },
+      },
+      isLoading: false,
+    });
+    const html = renderPage();
+
+    expect(html).toContain("Collegata");
+    expect(html).toContain("Seleziona proprietà");
+    expect(html).not.toContain("ga4-property-panel");
+    expect(html).not.toContain("<select");
+  });
+
+  it("shows GA4 property detail and Modifica proprietà when property is saved", () => {
+    setupMocks({
+      googleAnalyticsPropertyId: "123456789",
+      googleAnalyticsPropertyName: "Solmielato GA4",
+    });
+    useGoogleIntegrationStatusMock.mockReturnValue({
+      data: {
+        ...googleStatus,
+        analytics: { status: "connected", configured: true },
+      },
+      isLoading: false,
+    });
+    const html = renderPage();
+
+    expect(html).toContain("Proprietà: Solmielato GA4");
+    expect(html).toContain("Modifica proprietà");
   });
 
   it("passes googleStatus to Integration Graph and updates copy", () => {

@@ -157,4 +157,16 @@ describe("growth-audit-api", () => {
       }),
     );
   });
+
+  it("calls analytics-analysis run endpoint with POST body", async () => {
+    const { analyzeGrowthAuditAnalytics } = await import("./growth-audit-api");
+    await analyzeGrowthAuditAnalytics("proj-1", "run-42", { days: 28 });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/analytics-analysis",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ days: 28 }),
+      }),
+    );
+  });
 });

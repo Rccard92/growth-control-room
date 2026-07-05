@@ -2,6 +2,7 @@ import type { GrowthAuditPage } from "@gcr/shared";
 import {
   buildGrowthAuditPageWorkflowSteps,
   getGrowthAuditPageAiMetadata,
+  getGrowthAuditPageAnalyticsMetadata,
   getGrowthAuditPagePerformanceMetadata,
   getGrowthAuditPageSearchConsoleMetadata,
   getGrowthAuditSourceEntityTypeLabel,
@@ -20,6 +21,7 @@ export interface GrowthAuditPageWorkspaceSidebarProps {
   hasAiResult: boolean;
   hasPerformanceResult?: boolean;
   hasSearchConsoleData?: boolean;
+  hasAnalyticsData?: boolean;
   shopifySectionAvailable: boolean;
   aiSectionAvailable: boolean;
   onScrollToSection: (sectionId: string) => void;
@@ -53,6 +55,7 @@ export function GrowthAuditPageWorkspaceSidebar({
   hasAiResult,
   hasPerformanceResult = false,
   hasSearchConsoleData = false,
+  hasAnalyticsData = false,
   shopifySectionAvailable,
   aiSectionAvailable,
   onScrollToSection,
@@ -60,6 +63,7 @@ export function GrowthAuditPageWorkspaceSidebar({
   const aiMeta = getGrowthAuditPageAiMetadata(page);
   const performanceMeta = getGrowthAuditPagePerformanceMetadata(page);
   const searchConsoleMeta = getGrowthAuditPageSearchConsoleMetadata(page);
+  const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
   const shopifyLinked = isGrowthAuditPageShopifyLinked(page);
   const mappedEntity = mapGrowthAuditPageToSeoEntity(page);
 
@@ -69,6 +73,7 @@ export function GrowthAuditPageWorkspaceSidebar({
     hasAiResult,
     hasPerformanceResult,
     hasSearchConsoleData,
+    hasAnalyticsData,
     shopifyEditable: shopifySectionAvailable && Boolean(mappedEntity),
     openFindingsCount,
   });
@@ -110,6 +115,10 @@ export function GrowthAuditPageWorkspaceSidebar({
           <div>
             <dt>Ultima sync Search Console</dt>
             <dd>{formatDate(searchConsoleMeta?.syncedAt)}</dd>
+          </div>
+          <div>
+            <dt>Ultima sync GA4</dt>
+            <dd>{formatDate(analyticsMeta?.syncedAt)}</dd>
           </div>
           <div>
             <dt>Problemi aperti</dt>
@@ -181,6 +190,13 @@ export function GrowthAuditPageWorkspaceSidebar({
             onClick={() => onScrollToSection("search-console")}
           >
             Search Console
+          </button>
+          <button
+            type="button"
+            className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+            onClick={() => onScrollToSection("analytics")}
+          >
+            GA4
           </button>
           <button
             type="button"

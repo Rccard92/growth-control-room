@@ -57,6 +57,8 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_site_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     search_console_site_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    google_analytics_property_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    google_analytics_property_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
 
     workspace: Mapped["Workspace"] = relationship(back_populates="projects")

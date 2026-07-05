@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  fetchGoogleAnalyticsProperties,
   fetchGoogleIntegrationStatus,
   fetchSearchConsoleSites,
+  selectGoogleAnalyticsProperty,
   selectSearchConsoleSite,
   startGoogleOAuth,
 } from "./google-integrations-api";
@@ -73,6 +75,51 @@ describe("google-integrations-api", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ siteUrl: "https://example.com/" }),
+      }),
+    );
+  });
+
+  it("builds google analytics properties path", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      properties: [
+        {
+          propertyId: "123456789",
+          propertyName: "properties/123456789",
+          displayName: "Example GA4",
+        },
+      ],
+    });
+
+    await fetchGoogleAnalyticsProperties("proj-1");
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/google/analytics/properties",
+    );
+  });
+
+  it("builds select google analytics property path", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      propertyId: "123456789",
+      propertyName: "properties/123456789",
+      displayName: "Example GA4",
+      message: "Proprietà GA4 salvata.",
+    });
+
+    await selectGoogleAnalyticsProperty("proj-1", {
+      propertyId: "123456789",
+      propertyName: "properties/123456789",
+      displayName: "Example GA4",
+    });
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/google/analytics/select-property",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          propertyId: "123456789",
+          propertyName: "properties/123456789",
+          displayName: "Example GA4",
+        }),
       }),
     );
   });

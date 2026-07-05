@@ -13,6 +13,7 @@ import {
   useGrowthAuditRun,
   useGrowthAuditRuns,
   useGrowthAuditTasks,
+  useAnalyzeGrowthAuditAnalytics,
   useAnalyzeGrowthAuditSearchConsole,
   useStartGrowthAuditRun,
 } from "../hooks/useGrowthAudit";
@@ -129,6 +130,7 @@ export function GrowthAuditPage() {
 
   const resolvedRunId = activeRunId ?? latestRun?.id;
   const analyzeSearchConsole = useAnalyzeGrowthAuditSearchConsole(projectId, resolvedRunId);
+  const analyzeAnalytics = useAnalyzeGrowthAuditAnalytics(projectId, resolvedRunId);
 
   const { data: runDetail } = useGrowthAuditRun(projectId, resolvedRunId, Boolean(resolvedRunId));
   const runStatus = runDetail?.run.status;
@@ -674,6 +676,38 @@ export function GrowthAuditPage() {
                   {analyzeSearchConsole.isPending
                     ? "Aggiornamento in corso…"
                     : "Aggiorna dati Search Console"}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+      {isDashboardMode &&
+        googleStatus?.analytics.status === "connected" &&
+        resolvedRunId && (
+          <section className="growth-audit-analytics-panel gcr-card">
+            {!project?.googleAnalyticsPropertyId ? (
+              <p className="growth-audit-analytics-panel__callout">
+                Seleziona una proprietà GA4 per arricchire priorità CRO e revenue. Vai al{" "}
+                <Link to={APP_ROUTES.projectIntegrations(projectId)}>Integration Center</Link>.
+              </p>
+            ) : (
+              <div className="growth-audit-analytics-panel__actions">
+                <p>
+                  Proprietà GA4:{" "}
+                  <strong>
+                    {project.googleAnalyticsPropertyName ?? project.googleAnalyticsPropertyId}
+                  </strong>
+                </p>
+                <button
+                  type="button"
+                  className="gcr-btn gcr-btn--primary"
+                  disabled={analyzeAnalytics.isPending || activeRun?.status === "analyzing"}
+                  onClick={() => void analyzeAnalytics.mutateAsync({ days: 28 })}
+                >
+                  {analyzeAnalytics.isPending
+                    ? "Aggiornamento in corso…"
+                    : "Aggiorna dati GA4"}
                 </button>
               </div>
             )}

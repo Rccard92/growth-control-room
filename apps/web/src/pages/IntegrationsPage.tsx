@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { INTEGRATIONS } from "@gcr/shared";
 import { IntegrationCard } from "../components/IntegrationCard";
 import { GoogleSearchConsolePropertyModal } from "../components/integrations/GoogleSearchConsolePropertyModal";
+import { GoogleAnalyticsPropertyModal } from "../components/integrations/GoogleAnalyticsPropertyModal";
 import { IntegrationGraph } from "../components/IntegrationGraph";
 import { PageHeader } from "../components/PageHeader";
 import {
@@ -22,6 +23,7 @@ export function IntegrationsPage() {
   const { data: googleStatus, isLoading: isGoogleLoading } = useGoogleIntegrationStatus(id);
   const startGoogleOAuth = useStartGoogleOAuth(id);
   const [isSearchConsoleModalOpen, setIsSearchConsoleModalOpen] = useState(false);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(
     null,
   );
@@ -104,6 +106,9 @@ export function IntegrationsPage() {
                 projectId: id,
                 searchConsoleSiteUrl: project?.searchConsoleSiteUrl,
                 onSelectSearchConsoleProperty: () => setIsSearchConsoleModalOpen(true),
+                googleAnalyticsPropertyId: project?.googleAnalyticsPropertyId,
+                googleAnalyticsPropertyName: project?.googleAnalyticsPropertyName,
+                onSelectGoogleAnalyticsProperty: () => setIsAnalyticsModalOpen(true),
               })}
             />
           ))}
@@ -116,6 +121,16 @@ export function IntegrationsPage() {
           selectedSiteUrl={project?.searchConsoleSiteUrl}
           open={isSearchConsoleModalOpen}
           onClose={() => setIsSearchConsoleModalOpen(false)}
+        />
+      )}
+
+      {id && (
+        <GoogleAnalyticsPropertyModal
+          projectId={id}
+          selectedPropertyId={project?.googleAnalyticsPropertyId}
+          selectedPropertyName={project?.googleAnalyticsPropertyName}
+          open={isAnalyticsModalOpen}
+          onClose={() => setIsAnalyticsModalOpen(false)}
         />
       )}
 

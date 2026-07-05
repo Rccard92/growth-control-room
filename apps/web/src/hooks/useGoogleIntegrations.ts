@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GoogleOAuthStartRequest, SelectSearchConsoleSiteRequest } from "@gcr/shared";
+import type { GoogleOAuthStartRequest, SelectGoogleAnalyticsPropertyRequest, SelectSearchConsoleSiteRequest } from "@gcr/shared";
 import {
+  fetchGoogleAnalyticsProperties,
   fetchGoogleIntegrationStatus,
   fetchSearchConsoleSites,
+  selectGoogleAnalyticsProperty,
   selectSearchConsoleSite,
   startGoogleOAuth,
 } from "../lib/google-integrations-api";
@@ -32,6 +34,31 @@ export function useSelectSearchConsoleSite(projectId: string | undefined) {
         throw new Error("Project id is required");
       }
       return selectSearchConsoleSite(projectId, payload);
+    },
+    onSuccess: () => {
+      if (!projectId) return;
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.google.status(projectId) });
+    },
+  });
+}
+
+export function useGoogleAnalyticsProperties(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.google.analyticsProperties(projectId ?? ""),
+    queryFn: () => fetchGoogleAnalyticsProperties(projectId!),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export function useSelectGoogleAnalyticsProperty(projectId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SelectGoogleAnalyticsPropertyRequest) => {
+      if (!projectId) {
+        throw new Error("Project id is required");
+      }
+      return selectGoogleAnalyticsProperty(projectId, payload);
     },
     onSuccess: () => {
       if (!projectId) return;

@@ -16,6 +16,7 @@ const {
   useRescanGrowthAuditPageMock,
   useGoogleIntegrationStatusMock,
   useAnalyzeGrowthAuditSearchConsoleMock,
+  useAnalyzeGrowthAuditAnalyticsMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
@@ -29,6 +30,7 @@ const {
   useRescanGrowthAuditPageMock: vi.fn(),
   useGoogleIntegrationStatusMock: vi.fn(),
   useAnalyzeGrowthAuditSearchConsoleMock: vi.fn(),
+  useAnalyzeGrowthAuditAnalyticsMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -56,6 +58,7 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useStartGrowthAuditRun: useStartGrowthAuditRunMock,
   useRescanGrowthAuditPage: useRescanGrowthAuditPageMock,
   useAnalyzeGrowthAuditSearchConsole: useAnalyzeGrowthAuditSearchConsoleMock,
+  useAnalyzeGrowthAuditAnalytics: useAnalyzeGrowthAuditAnalyticsMock,
 }));
 
 vi.mock("../hooks/useGoogleIntegrations", () => ({
@@ -94,6 +97,9 @@ function setupMocks(options?: {
   withTechnicalScan?: boolean;
   publicSiteUrl?: string | null;
   searchConsoleSiteUrl?: string | null;
+  googleAnalyticsPropertyId?: string | null;
+  googleAnalyticsPropertyName?: string | null;
+  analyticsConnected?: boolean;
 }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
@@ -102,6 +108,8 @@ function setupMocks(options?: {
       name: "Solmielato",
       publicSiteUrl: options?.publicSiteUrl ?? null,
       searchConsoleSiteUrl: options?.searchConsoleSiteUrl ?? null,
+      googleAnalyticsPropertyId: options?.googleAnalyticsPropertyId ?? null,
+      googleAnalyticsPropertyName: options?.googleAnalyticsPropertyName ?? null,
     },
     isLoading: false,
   });
@@ -283,12 +291,19 @@ function setupMocks(options?: {
       crux: { status: "connected", configured: true },
       oauth: { status: "connected", configured: true },
       searchConsole: { status: "connected", configured: true },
-      analytics: { status: "needs_setup", configured: true },
+      analytics: {
+        status: options?.analyticsConnected ? "connected" : "needs_setup",
+        configured: true,
+      },
       googleAds: { status: "setup_incomplete", configured: true },
     },
     isLoading: false,
   });
   useAnalyzeGrowthAuditSearchConsoleMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
+  useAnalyzeGrowthAuditAnalyticsMock.mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
   });
@@ -411,6 +426,19 @@ describe("GrowthAuditPage", () => {
     });
     const html = renderPage();
     expect(html).toContain("Aggiorna dati Search Console");
+  });
+
+  it("shows GA4 sync CTA when property is configured", () => {
+    setupMocks({
+      withActiveRun: true,
+      withTechnicalScan: true,
+      analyticsConnected: true,
+      googleAnalyticsPropertyId: "123456789",
+      googleAnalyticsPropertyName: "Solmielato GA4",
+    });
+    const html = renderPage();
+    expect(html).toContain("Aggiorna dati GA4");
+    expect(html).toContain("Solmielato GA4");
   });
 
   it("shows configured public site hostname in dashboard hero", () => {

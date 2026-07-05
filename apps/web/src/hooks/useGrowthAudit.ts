@@ -5,6 +5,7 @@ import type {
   GrowthAuditPagePerformanceAnalysisRequest,
   GrowthAuditPageRescanRequest,
   GrowthAuditSearchConsoleAnalysisRequest,
+  GrowthAuditAnalyticsAnalysisRequest,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunStatus,
   GrowthAuditTasksFilters,
@@ -13,6 +14,7 @@ import {
   analyzeGrowthAuditPagePerformance,
   analyzeGrowthAuditPageWithAi,
   analyzeGrowthAuditSearchConsole,
+  analyzeGrowthAuditAnalytics,
   fetchGrowthAuditEvents,
   fetchGrowthAuditFindings,
   fetchGrowthAuditPageResults,
@@ -323,6 +325,42 @@ export function useAnalyzeGrowthAuditSearchConsole(projectId?: string, runId?: s
         throw new Error("projectId and runId are required");
       }
       return analyzeGrowthAuditSearchConsole(projectId, runId, payload);
+    },
+    onSuccess: (data) => {
+      if (!projectId) return;
+
+      const resolvedRunId = data.run.id;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.runs(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.run(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pages(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.findings(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.tasks(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.events(projectId, resolvedRunId),
+      });
+    },
+  });
+}
+
+export function useAnalyzeGrowthAuditAnalytics(projectId?: string, runId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: GrowthAuditAnalyticsAnalysisRequest) => {
+      if (!projectId || !runId) {
+        throw new Error("projectId and runId are required");
+      }
+      return analyzeGrowthAuditAnalytics(projectId, runId, payload);
     },
     onSuccess: (data) => {
       if (!projectId) return;

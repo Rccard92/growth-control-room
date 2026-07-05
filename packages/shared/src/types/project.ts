@@ -7,6 +7,8 @@ export interface Project {
   description?: string | null;
   publicSiteUrl?: string | null;
   searchConsoleSiteUrl?: string | null;
+  googleAnalyticsPropertyId?: string | null;
+  googleAnalyticsPropertyName?: string | null;
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
@@ -23,4 +25,6 @@ export interface UpdateProjectInput {
   description?: string | null;
   publicSiteUrl?: string | null;
   searchConsoleSiteUrl?: string | null;
+  googleAnalyticsPropertyId?: string | null;
+  googleAnalyticsPropertyName?: string | null;
 }

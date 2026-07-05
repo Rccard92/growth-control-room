@@ -97,4 +97,46 @@ describe("getIntegrationCardProps", () => {
     expect(props.secondaryActionLabel).toBe("Modifica proprietà");
     expect(props.detailText).toBe("Proprietà: https://solmielato.it/");
   });
+
+  it("maps connected GA4 without property to Seleziona proprietà", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "ga4")!;
+    const onSelect = vi.fn();
+    const props = getIntegrationCardProps({
+      meta,
+      googleStatus: {
+        ...googleStatus,
+        analytics: { status: "connected", configured: true },
+      },
+      oauthConnectDisabled: false,
+      handleConnectGoogle: vi.fn(),
+      projectId: "proj-1",
+      onSelectGoogleAnalyticsProperty: onSelect,
+    });
+
+    expect(props.actionLabel).toBe("Collegata");
+    expect(props.disabled).toBe(true);
+    expect(props.secondaryActionLabel).toBe("Seleziona proprietà");
+    expect(props.onSecondaryAction).toBe(onSelect);
+    expect(props.detailText).toBeUndefined();
+  });
+
+  it("maps connected GA4 with property to Modifica proprietà and detail", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "ga4")!;
+    const props = getIntegrationCardProps({
+      meta,
+      googleStatus: {
+        ...googleStatus,
+        analytics: { status: "connected", configured: true },
+      },
+      oauthConnectDisabled: false,
+      handleConnectGoogle: vi.fn(),
+      projectId: "proj-1",
+      googleAnalyticsPropertyId: "123456789",
+      googleAnalyticsPropertyName: "Solmielato GA4",
+      onSelectGoogleAnalyticsProperty: vi.fn(),
+    });
+
+    expect(props.secondaryActionLabel).toBe("Modifica proprietà");
+    expect(props.detailText).toBe("Proprietà: Solmielato GA4");
+  });
 });

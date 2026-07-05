@@ -11,6 +11,8 @@ import type {
   GrowthAuditPageResultsListResponse,
   GrowthAuditSearchConsoleAnalysisRequest,
   GrowthAuditSearchConsoleAnalysisResponse,
+  GrowthAuditAnalyticsAnalysisRequest,
+  GrowthAuditAnalyticsAnalysisResponse,
   GrowthAuditPagesListResponse,
   GrowthAuditRunCreateRequest,
   GrowthAuditRunDetailResponse,
@@ -168,6 +170,20 @@ export function analyzeGrowthAuditSearchConsole(
 ): Promise<GrowthAuditSearchConsoleAnalysisResponse> {
   return apiFetch<GrowthAuditSearchConsoleAnalysisResponse>(
     `${growthAuditBasePath(projectId)}/runs/${runId}/search-console-analysis`,
+    {
+      method: "POST",
+      ...jsonBody(payload ?? { days: 28 }),
+    },
+  );
+}
+
+export function analyzeGrowthAuditAnalytics(
+  projectId: string,
+  runId: string,
+  payload?: GrowthAuditAnalyticsAnalysisRequest,
+): Promise<GrowthAuditAnalyticsAnalysisResponse> {
+  return apiFetch<GrowthAuditAnalyticsAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/analytics-analysis`,
     {
       method: "POST",
       ...jsonBody(payload ?? { days: 28 }),

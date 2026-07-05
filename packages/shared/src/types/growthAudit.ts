@@ -125,6 +125,19 @@ export interface GrowthAuditRunSummary {
   lastPerformanceAnalysisAt?: string | null;
   lastPerformanceAnalysisUrl?: string | null;
   searchConsole?: GrowthAuditRunSearchConsoleSummary;
+  analytics?: GrowthAuditRunAnalyticsSummary;
+}
+
+export interface GrowthAuditRunAnalyticsSummary {
+  totalSessions?: number;
+  totalUsers?: number;
+  averageEngagementRate?: number;
+  totalConversions?: number;
+  totalRevenue?: number;
+  pagesWithData?: number;
+  lowEngagementPages?: number;
+  highTrafficLowConversionPages?: number;
+  lastSyncedAt?: string | null;
 }
 
 export interface GrowthAuditRunSearchConsoleSummary {
@@ -151,6 +164,19 @@ export interface GrowthAuditPageSearchConsoleMetadata {
   ctr?: number;
   position?: number;
   topQueries?: GrowthAuditPageSearchConsoleQuery[];
+  syncedAt?: string;
+}
+
+export interface GrowthAuditPageAnalyticsMetadata {
+  sessions?: number;
+  totalUsers?: number;
+  engagedSessions?: number;
+  engagementRate?: number;
+  averageSessionDuration?: number;
+  conversions?: number;
+  revenue?: number;
+  source?: string;
+  periodDays?: number;
   syncedAt?: string;
 }
 
@@ -442,6 +468,16 @@ export interface GrowthAuditSearchConsoleAnalysisRequest {
 export interface GrowthAuditSearchConsoleAnalysisResponse {
   run: GrowthAuditRun;
   summary: GrowthAuditRunSearchConsoleSummary;
+  message: string;
+}
+
+export interface GrowthAuditAnalyticsAnalysisRequest {
+  days?: number;
+}
+
+export interface GrowthAuditAnalyticsAnalysisResponse {
+  run: GrowthAuditRun;
+  summary: GrowthAuditRunAnalyticsSummary;
   message: string;
 }
 

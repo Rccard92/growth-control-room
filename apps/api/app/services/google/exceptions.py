@@ -53,3 +53,11 @@ class GoogleSearchConsolePropertyError(Exception):
     def __init__(self, message: str, *, site_url: str | None = None) -> None:
         super().__init__(message)
         self.site_url = site_url
+
+
+class GoogleAnalyticsPropertyError(Exception):
+    """Raised when a GA4 property is missing or invalid."""
+
+    def __init__(self, message: str, *, property_id: str | None = None) -> None:
+        super().__init__(message)
+        self.property_id = property_id

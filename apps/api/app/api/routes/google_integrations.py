@@ -7,16 +7,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.google_integration import (
+    GoogleAnalyticsPropertiesResponse,
+    GoogleAnalyticsProperty,
     GoogleIntegrationStatusResponse,
     GoogleOAuthStartRequest,
     GoogleOAuthStartResponse,
     GoogleSearchConsoleSite,
     GoogleSearchConsoleSitesResponse,
+    SelectGoogleAnalyticsPropertyRequest,
+    SelectGoogleAnalyticsPropertyResponse,
     SelectSearchConsoleSiteRequest,
     SelectSearchConsoleSiteResponse,
 )
 from app.schemas.project import ProjectRead
 from app.services.google.exceptions import (
+    GoogleAnalyticsPropertyError,
     GoogleApiRequestError,
     GoogleIntegrationNotConfiguredError,
     GoogleIntegrationNotConnectedError,
@@ -35,6 +40,7 @@ from app.services.google.google_oauth import (
     verify_google_oauth_state,
 )
 from app.services.google.google_tokens import get_valid_google_access_token
+from app.services.google.analytics_client import fetch_ga4_account_summaries
 from app.services.google.search_console_client import fetch_search_console_sites
 from app.services.projects import get_project_in_default_workspace
 
@@ -66,6 +72,8 @@ def _map_google_integration_error(exc: Exception) -> HTTPException:
     if isinstance(exc, GoogleIntegrationPermissionError):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, GoogleSearchConsolePropertyError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, GoogleAnalyticsPropertyError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, GoogleApiRequestError):
         return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
@@ -153,6 +161,91 @@ async def select_search_console_site(
     return SelectSearchConsoleSiteResponse(
         site_url=project.search_console_site_url or site_url,
         message="Proprietà Search Console salvata.",
+    )
+
+
+@router.get(
+    "/{project_id}/google/analytics/properties",
+    response_model=GoogleAnalyticsPropertiesResponse,
+    response_model_by_alias=True,
+)
+async def list_google_analytics_properties(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_db),
+) -> GoogleAnalyticsPropertiesResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        access_token = await get_valid_google_access_token(
+            session,
+            project_id,
+            provider="ga4",
+        )
+        properties = await fetch_ga4_account_summaries(access_token)
+    except Exception as exc:
+        raise _map_google_integration_error(exc) from exc
+
+    return GoogleAnalyticsPropertiesResponse(
+        properties=[
+            GoogleAnalyticsProperty(
+                property_id=item["propertyId"],
+                property_name=item["property"],
+                display_name=item["propertyDisplayName"],
+                account_display_name=item.get("accountDisplayName"),
+            )
+            for item in properties
+        ]
+    )
+
+
+@router.post(
+    "/{project_id}/google/analytics/select-property",
+    response_model=SelectGoogleAnalyticsPropertyResponse,
+    response_model_by_alias=True,
+)
+async def select_google_analytics_property(
+    project_id: UUID,
+    body: SelectGoogleAnalyticsPropertyRequest,
+    session: AsyncSession = Depends(get_db),
+) -> SelectGoogleAnalyticsPropertyResponse:
+    project = await get_project_in_default_workspace(project_id, session)
+    property_id = body.property_id.strip()
+    property_name = body.property_name.strip()
+    display_name = body.display_name.strip()
+    if not property_id or not property_name or not display_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="propertyId, propertyName e displayName sono obbligatori.",
+        )
+
+    try:
+        access_token = await get_valid_google_access_token(
+            session,
+            project_id,
+            provider="ga4",
+        )
+        available_properties = await fetch_ga4_account_summaries(access_token)
+        available_ids = {item["propertyId"] for item in available_properties}
+        if available_ids and property_id not in available_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La proprietà GA4 selezionata non è disponibile per questo account.",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _map_google_integration_error(exc) from exc
+
+    project.google_analytics_property_id = property_id
+    project.google_analytics_property_name = display_name
+    session.add(project)
+    await session.commit()
+    await session.refresh(project)
+
+    return SelectGoogleAnalyticsPropertyResponse(
+        property_id=project.google_analytics_property_id or property_id,
+        property_name=property_name,
+        display_name=project.google_analytics_property_name or display_name,
+        message="Proprietà GA4 salvata.",
     )
 
 

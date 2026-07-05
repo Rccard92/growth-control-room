@@ -6,6 +6,7 @@ import type {
   GrowthAuditPageAiMetadata,
   GrowthAuditPagePerformanceMetadata,
   GrowthAuditPageSearchConsoleMetadata,
+  GrowthAuditPageAnalyticsMetadata,
   GrowthAuditPageResult,
   GrowthAuditPageStatusFilter,
   GrowthAuditPageType,
@@ -1828,6 +1829,38 @@ function _getSearchConsolePriorityBoost(page: GrowthAuditPage): number {
   return Math.min(boost, 20);
 }
 
+export function getGrowthAuditPageAnalyticsMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageAnalyticsMetadata | null {
+  const analytics = page.metadata?.analytics;
+  if (!analytics || typeof analytics !== "object") return null;
+  return analytics as GrowthAuditPageAnalyticsMetadata;
+}
+
+export function hasGrowthAuditPageAnalyticsData(page: GrowthAuditPage): boolean {
+  const meta = getGrowthAuditPageAnalyticsMetadata(page);
+  return Boolean(meta && ((meta.sessions ?? 0) > 0 || (meta.totalUsers ?? 0) > 0));
+}
+
+function _getAnalyticsPriorityBoost(page: GrowthAuditPage): number {
+  const meta = getGrowthAuditPageAnalyticsMetadata(page);
+  if (!meta) return 0;
+
+  let boost = 0;
+  const sessions = meta.sessions ?? 0;
+  const engagementRate = meta.engagementRate ?? 0;
+  const conversions = meta.conversions ?? 0;
+  const revenue = meta.revenue ?? 0;
+  const pageType = (page.pageType ?? "").toLowerCase();
+
+  if (sessions >= 50 && engagementRate < 0.4) boost += 10;
+  if (sessions >= 30 && conversions === 0) boost += 10;
+  if (pageType === "product" && sessions >= 30 && conversions === 0) boost += 8;
+  if (revenue >= 100 || sessions >= 100) boost += 6;
+
+  return Math.min(boost, 25);
+}
+
 export type GrowthAuditDashboardKpiItem = {
   label: string;
   value: string;
@@ -1962,6 +1995,48 @@ export function getGrowthAuditDashboardKpiItems(
       value:
         summary?.searchConsole?.pagesWithData != null
           ? String(summary.searchConsole.pagesWithData)
+          : "—",
+    },
+    {
+      label: "Sessioni",
+      value:
+        summary?.analytics?.totalSessions != null
+          ? String(summary.analytics.totalSessions)
+          : "—",
+    },
+    {
+      label: "Utenti",
+      value:
+        summary?.analytics?.totalUsers != null
+          ? String(summary.analytics.totalUsers)
+          : "—",
+    },
+    {
+      label: "Engagement rate medio",
+      value:
+        summary?.analytics?.averageEngagementRate != null
+          ? `${(summary.analytics.averageEngagementRate * 100).toFixed(2)}%`
+          : "—",
+    },
+    {
+      label: "Conversioni",
+      value:
+        summary?.analytics?.totalConversions != null
+          ? String(summary.analytics.totalConversions)
+          : "—",
+    },
+    {
+      label: "Revenue",
+      value:
+        summary?.analytics?.totalRevenue != null
+          ? summary.analytics.totalRevenue.toFixed(2)
+          : "—",
+    },
+    {
+      label: "Pagine con dati GA4",
+      value:
+        summary?.analytics?.pagesWithData != null
+          ? String(summary.analytics.pagesWithData)
           : "—",
     },
   ];
@@ -2141,6 +2216,22 @@ function _buildPagePriorityReasons(input: {
     }
   }
 
+  const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
+  if (analyticsMeta) {
+    const sessions = analyticsMeta.sessions ?? 0;
+    const engagementRate = analyticsMeta.engagementRate ?? 0;
+    const conversions = analyticsMeta.conversions ?? 0;
+    if (sessions >= 50 && engagementRate < 0.4) {
+      reasons.push("Engagement GA4 basso con traffico significativo");
+    }
+    if (sessions >= 30 && conversions === 0) {
+      reasons.push("Traffico GA4 senza conversioni");
+    }
+    if ((analyticsMeta.revenue ?? 0) >= 100 || sessions >= 100) {
+      reasons.push("Alta priorità business da GA4");
+    }
+  }
+
   if (page.pageType === "collection" && page.score != null && page.score < 80) {
     reasons.push("Collection commerciale da ottimizzare");
   }
@@ -2220,6 +2311,7 @@ function _computePagePriorityScore(input: {
   if (adsScore != null && adsScore < 70) score += 8;
 
   score += _getSearchConsolePriorityBoost(page);
+  score += _getAnalyticsPriorityBoost(page);
 
   return Math.max(0, score);
 }
@@ -2540,6 +2632,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   hasAiResult: boolean;
   hasPerformanceResult?: boolean;
   hasSearchConsoleData?: boolean;
+  hasAnalyticsData?: boolean;
   shopifyEditable: boolean;
   openFindingsCount: number;
 }): GrowthAuditWorkflowStep[] {
@@ -2549,6 +2642,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
     hasAiResult,
     hasPerformanceResult = false,
     hasSearchConsoleData = false,
+    hasAnalyticsData = false,
     shopifyEditable,
     openFindingsCount,
   } = input;
@@ -2600,6 +2694,12 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       ? "available"
       : "todo";
 
+  const analyticsStatus: GrowthAuditWorkflowStepStatus = hasAnalyticsData
+    ? "done"
+    : isAnalyzed
+      ? "available"
+      : "todo";
+
   return [
     { key: "priority", label: "Priorità", status: priorityStatus, anchorId: "priority-actions" },
     { key: "edit", label: "Modifica", status: modifyStatus, anchorId: "shopify-edit" },
@@ -2609,6 +2709,12 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       label: "Search Console",
       status: searchConsoleStatus,
       anchorId: "search-console",
+    },
+    {
+      key: "analytics",
+      label: "GA4",
+      status: analyticsStatus,
+      anchorId: "analytics",
     },
     { key: "ai", label: "Analisi AI", status: aiStatus, anchorId: "ai-geo-cro" },
     { key: "rescan", label: "Rescan", status: rescanStatus },

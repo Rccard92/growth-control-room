@@ -16,6 +16,8 @@ from app.schemas.growth_audit import (
     GrowthAuditPagePerformanceAnalysisResponse,
     GrowthAuditSearchConsoleAnalysisRequest,
     GrowthAuditSearchConsoleAnalysisResponse,
+    GrowthAuditAnalyticsAnalysisRequest,
+    GrowthAuditAnalyticsAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
@@ -31,6 +33,7 @@ from app.schemas.growth_audit import (
     GrowthAuditTasksListResponse,
 )
 from app.services.google.exceptions import (
+    GoogleAnalyticsPropertyError,
     GoogleApiRequestError,
     GoogleIntegrationNotConfiguredError,
     GoogleIntegrationNotConnectedError,
@@ -51,6 +54,9 @@ from app.services.growth_audit.page_performance_analysis import (
 )
 from app.services.growth_audit.search_console_analysis import (
     analyze_growth_audit_search_console,
+)
+from app.services.growth_audit.analytics_analysis import (
+    analyze_growth_audit_analytics,
 )
 from app.services.growth_audit.run_service import (
     get_growth_audit_run_detail,
@@ -101,6 +107,11 @@ def _map_growth_audit_error(
             detail=str(exc),
         )
     if isinstance(exc, GoogleSearchConsolePropertyError):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    if isinstance(exc, GoogleAnalyticsPropertyError):
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
@@ -483,6 +494,40 @@ async def analyze_growth_audit_search_console_endpoint(
         run=GrowthAuditRunRead.model_validate(result["run"]),
         summary=summary,
         message="Dati Search Console aggiornati.",
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/analytics-analysis",
+    response_model=GrowthAuditAnalyticsAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_analytics_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    request: GrowthAuditAnalyticsAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditAnalyticsAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        result = await analyze_growth_audit_analytics(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            days=request.days,
+        )
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    summary = result["summary"]
+    return GrowthAuditAnalyticsAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(result["run"]),
+        summary=summary,
+        message="Dati GA4 aggiornati.",
     )
 
 
