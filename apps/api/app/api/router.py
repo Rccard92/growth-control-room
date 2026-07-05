@@ -5,6 +5,7 @@ from app.api.routes import (
     ai_usage,
     brand_intelligence,
     content_seo,
+    google_integrations,
     growth_audit,
     health,
     seo_skills,
@@ -16,6 +17,7 @@ api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(shopify.router)
 api_router.include_router(shopify_oauth.router)
+api_router.include_router(google_integrations.callback_router)
 api_router.include_router(content_seo.router)
 api_router.include_router(seo_skills.router)
 api_router.include_router(growth_audit.router)

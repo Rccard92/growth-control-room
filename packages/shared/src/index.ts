@@ -22,6 +22,13 @@ export type {
 } from "./types/ai-model-settings";
 export type { Project, CreateProjectInput, UpdateProjectInput, ProjectStatus } from "./types/project";
 export type {
+  GoogleServiceStatus,
+  GoogleServiceStatusValue,
+  GoogleIntegrationStatusResponse,
+  GoogleOAuthStartRequest,
+  GoogleOAuthStartResponse,
+} from "./types/google";
+export type {
   DateRangePreset,
   DateRangeParams,
   DateRangeOption,

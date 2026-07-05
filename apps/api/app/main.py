@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
-from app.api.routes import debug, projects
+from app.api.routes import debug, google_integrations, projects
 from app.api.validation_helpers import is_json_string_body_validation_error
 from app.core.config import settings
 from app.db.session import close_db, init_db
@@ -36,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(projects.router, prefix="/api")
+app.include_router(google_integrations.router, prefix="/api")
 app.include_router(debug.router, prefix="/api")
 app.include_router(api_router, prefix="/api")
 

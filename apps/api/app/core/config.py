@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     editorial_image_s3_access_key: str | None = None
     editorial_image_s3_secret_key: str | None = None
     editorial_image_s3_endpoint_url: str | None = None
+    google_pagespeed_api_key: str | None = None
+    google_crux_api_key: str | None = None
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
+    google_oauth_redirect_uri: str | None = None
+    google_ads_developer_token: str | None = None
 
     @model_validator(mode="after")
     def require_database_url(self) -> "Settings":
@@ -88,6 +94,30 @@ class Settings(BaseSettings):
             missing.append("SHOPIFY_CLIENT_SECRET")
         if not self.shopify_redirect_uri:
             missing.append("SHOPIFY_REDIRECT_URI")
+        if not self.frontend_url:
+            missing.append("FRONTEND_URL")
+        return missing
+
+    @property
+    def google_oauth_configured(self) -> bool:
+        return all(
+            [
+                self.google_oauth_client_id,
+                self.google_oauth_client_secret,
+                self.google_oauth_redirect_uri,
+                self.frontend_url,
+            ]
+        )
+
+    @property
+    def google_oauth_missing_vars(self) -> list[str]:
+        missing: list[str] = []
+        if not self.google_oauth_client_id:
+            missing.append("GOOGLE_OAUTH_CLIENT_ID")
+        if not self.google_oauth_client_secret:
+            missing.append("GOOGLE_OAUTH_CLIENT_SECRET")
+        if not self.google_oauth_redirect_uri:
+            missing.append("GOOGLE_OAUTH_REDIRECT_URI")
         if not self.frontend_url:
             missing.append("FRONTEND_URL")
         return missing

@@ -11,6 +11,9 @@ export const queryKeys = {
     detail: (id: string) => ["projects", id] as const,
     integrations: (id: string) => ["projects", id, "integrations"] as const,
   },
+  google: {
+    status: (projectId: string) => ["google", projectId, "status"] as const,
+  },
   shopify: {
     status: (projectId: string) => ["shopify", projectId, "status"] as const,
     scopes: (projectId: string) => ["shopify", projectId, "scopes"] as const,

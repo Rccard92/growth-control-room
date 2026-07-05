@@ -550,3 +550,85 @@
   font-size: 0.75rem;
   color: var(--gcr-text-dim);
 }
+
+.google-integrations-section {
+  margin-bottom: 2rem;
+}
+
+.google-integrations-section__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.google-integrations-section__subtitle {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--gcr-text-muted);
+}
+
+.google-integrations-section__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.google-integration-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.google-integration-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.google-integration-card__icon {
+  font-size: 1.4rem;
+}
+
+.google-integration-card__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.google-integration-card__description,
+.google-integration-card__message,
+.google-integration-card__note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--gcr-text-muted);
+  line-height: 1.45;
+}
+
+.google-integration-card__note {
+  color: rgba(237, 180, 99, 0.95);
+}
+
+.google-integration-card__badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.google-integration-card__badge--connected {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+.google-integration-card__badge--needs-setup {
+  background: rgba(99, 179, 237, 0.15);
+  color: rgba(99, 179, 237, 0.95);
+}
+
+.google-integration-card__badge--setup-incomplete,
+.google-integration-card__badge--missing {
+  background: rgba(237, 180, 99, 0.12);
+  color: rgba(237, 200, 140, 0.95);
+}
