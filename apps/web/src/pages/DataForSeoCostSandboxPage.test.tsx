@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { DataForSeoCostSandboxPage } from "./DataForSeoCostSandboxPage";
+import { DataForSeoCostSandboxPage, formatDataForSeoTestError } from "./DataForSeoCostSandboxPage";
 
 const {
   useParamsMock,
@@ -157,5 +157,32 @@ describe("DataForSeoCostSandboxPage", () => {
     expect(html).toContain("Usage log");
     expect(html).toContain("search_volume");
     expect(html).toContain("$0.0500");
+  });
+
+  it("renders all test type options in select", () => {
+    setupMocks();
+    const html = renderPage();
+    expect(html).toContain("Search volume");
+    expect(html).toContain("Keyword ideas");
+    expect(html).toContain("SERP top 10");
+    expect(html).toContain("Micro bundle");
+    expect(html).toContain('value="search_volume"');
+    expect(html).toContain('value="keyword_ideas"');
+    expect(html).toContain('value="serp"');
+    expect(html).toContain('value="micro_bundle"');
+  });
+});
+
+describe("formatDataForSeoTestError", () => {
+  it("maps validation errors to readable message", () => {
+    expect(formatDataForSeoTestError(new Error("Field required"))).toBe(
+      "Payload non valido: controlla keyword, location e lingua.",
+    );
+  });
+
+  it("keeps real calls disabled message", () => {
+    expect(formatDataForSeoTestError(new Error("DataForSEO real calls disabled."))).toBe(
+      "DataForSEO real calls disabled.",
+    );
   });
 });

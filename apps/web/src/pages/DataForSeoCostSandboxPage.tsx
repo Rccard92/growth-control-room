@@ -33,6 +33,22 @@ function formatUsd(value: number | null | undefined): string {
   return `$${value.toFixed(4)}`;
 }
 
+export function formatDataForSeoTestError(err: unknown): string {
+  if (!(err instanceof Error)) {
+    return "Test non riuscito.";
+  }
+  const lowered = err.message.toLowerCase();
+  if (
+    lowered.includes("field required")
+    || lowered.includes("unprocessable")
+    || lowered.includes("validation")
+    || lowered.includes("422")
+  ) {
+    return "Payload non valido: controlla keyword, location e lingua.";
+  }
+  return err.message || "Test non riuscito.";
+}
+
 export function DataForSeoCostSandboxPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const { data: project } = useProject(projectId);
@@ -72,15 +88,31 @@ export function DataForSeoCostSandboxPage() {
   const handleTest = async () => {
     if (!projectId) return;
     setTestError(null);
+
+    const trimmedKeyword = keyword.trim();
+    if (!trimmedKeyword) {
+      setTestError("Inserisci una keyword.");
+      return;
+    }
+    if (!Number.isFinite(locationCode) || locationCode < 1) {
+      setTestError("Location code non valido.");
+      return;
+    }
+    const trimmedLanguage = languageCode.trim();
+    if (!trimmedLanguage) {
+      setTestError("Inserisci una lingua.");
+      return;
+    }
+
     try {
       await testMutation.mutateAsync({
         testType,
-        keyword: keyword.trim(),
+        keyword: trimmedKeyword,
         locationCode,
-        languageCode,
+        languageCode: trimmedLanguage,
       });
     } catch (error) {
-      setTestError(error instanceof Error ? error.message : "Test non riuscito.");
+      setTestError(formatDataForSeoTestError(error));
     }
   };
 
