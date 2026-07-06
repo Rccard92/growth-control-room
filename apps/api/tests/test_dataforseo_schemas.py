@@ -78,20 +78,22 @@ def test_estimate_request_accepts_camel_case() -> None:
 
 def test_test_response_serializes_camel_case() -> None:
     response = DataForSeoTestResponse(
-        test_type="search_volume",
+        test_type="search_volume_batch",
         keyword="polline biologico",
-        cost_usd=0.05,
+        keywords=["polline biologico", "miele di eucalipto"],
+        cost_usd=0.18,
+        average_cost_per_keyword_usd=0.09,
         endpoints=["/keywords_data/google_ads/search_volume/live"],
-        response_summary={"itemsCount": 1},
+        response_summary={"keywordCount": 2},
         raw_preview={"truncated": True},
     )
 
     dumped = response.model_dump(by_alias=True)
 
-    assert dumped["testType"] == "search_volume"
-    assert dumped["costUsd"] == 0.05
-    assert dumped["responseSummary"] == {"itemsCount": 1}
-    assert dumped["rawPreview"] == {"truncated": True}
+    assert dumped["testType"] == "search_volume_batch"
+    assert dumped["keywords"] == ["polline biologico", "miele di eucalipto"]
+    assert dumped["averageCostPerKeywordUsd"] == 0.09
+    assert dumped["costUsd"] == 0.18
 
 
 def test_camel_case_request_hits_409_not_422() -> None:

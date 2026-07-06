@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
 
 class DataForSeoAccountInfo(BaseModel):
@@ -72,23 +73,44 @@ class DataForSeoEstimateResponse(BaseModel):
     assumptions: list[str]
     budget_warnings: list[str] = Field(default_factory=list, alias="budgetWarnings")
     audit_context: dict[str, Any] | None = Field(default=None, alias="auditContext")
+    estimate_source: str = Field(default="assumed", alias="estimateSource")
+    observed_unit_costs: dict[str, Any] = Field(
+        default_factory=dict,
+        alias="observedUnitCosts",
+    )
 
 
 class DataForSeoTestRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     test_type: str = Field(alias="testType")
-    keyword: str
+    keyword: str = ""
+    keywords: list[str] | None = Field(default=None, alias="keywords")
     location_code: int = Field(default=2380, alias="locationCode")
     language_code: str = Field(default="it", alias="languageCode")
+
+    @model_validator(mode="after")
+    def validate_keywords_for_batch(self) -> Self:
+        if self.test_type != "search_volume_batch":
+            return self
+        has_keyword = bool(self.keyword.strip())
+        has_keywords = bool(self.keywords and any(str(k).strip() for k in self.keywords))
+        if not has_keyword and not has_keywords:
+            raise ValueError("Inserisci almeno una keyword per il batch test.")
+        return self
 
 
 class DataForSeoTestResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     test_type: str = Field(alias="testType")
-    keyword: str
+    keyword: str = ""
+    keywords: list[str] = Field(default_factory=list, alias="keywords")
     cost_usd: float = Field(alias="costUsd")
+    average_cost_per_keyword_usd: float | None = Field(
+        default=None,
+        alias="averageCostPerKeywordUsd",
+    )
     endpoints: list[str]
     response_summary: dict[str, Any] | None = Field(
         default=None,

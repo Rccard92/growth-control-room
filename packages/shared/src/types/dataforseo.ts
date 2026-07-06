@@ -15,7 +15,12 @@ export interface DataForSeoStatus {
 
 export type DataForSeoEstimateMode = "single_page" | "top_10_products" | "full_site";
 
-export type DataForSeoTestType = "search_volume" | "keyword_ideas" | "serp" | "micro_bundle";
+export type DataForSeoTestType =
+  | "search_volume"
+  | "search_volume_batch"
+  | "keyword_ideas"
+  | "serp"
+  | "micro_bundle";
 
 export interface DataForSeoEstimateRequest {
   mode: DataForSeoEstimateMode;
@@ -32,6 +37,12 @@ export interface DataForSeoEstimatedCalls {
   serp: number;
 }
 
+export interface DataForSeoObservedUnitCosts {
+  searchVolume?: number | null;
+  keywordIdeas?: number | null;
+  serp?: number | null;
+}
+
 export interface DataForSeoEstimateResponse {
   mode: DataForSeoEstimateMode;
   estimatedCalls: DataForSeoEstimatedCalls;
@@ -43,19 +54,45 @@ export interface DataForSeoEstimateResponse {
     pagesWithGscQueries?: number;
     avgQueriesPerPage?: number;
   } | null;
+  estimateSource?: "observed" | "assumed";
+  observedUnitCosts?: DataForSeoObservedUnitCosts;
 }
 
 export interface DataForSeoTestRequest {
   testType: DataForSeoTestType;
-  keyword: string;
+  keyword?: string;
+  keywords?: string[];
   locationCode?: number;
   languageCode?: string;
+}
+
+export interface SearchVolumeTrend {
+  direction?: "up" | "down" | "stable" | "unknown" | string;
+  lastMonth?: number | null;
+  previousMonth?: number | null;
+  averageLast12Months?: number | null;
+}
+
+export interface SearchVolumeResult {
+  keyword: string;
+  searchVolume?: number | null;
+  cpc?: number | null;
+  competition?: number | null;
+  competitionIndex?: number | null;
+  monthlySearches?: Array<{
+    year?: number | null;
+    month?: number | null;
+    searchVolume?: number | null;
+  }> | null;
+  trend?: SearchVolumeTrend | null;
 }
 
 export interface DataForSeoTestResponse {
   testType: DataForSeoTestType;
   keyword: string;
+  keywords?: string[];
   costUsd: number;
+  averageCostPerKeywordUsd?: number | null;
   endpoints: string[];
   responseSummary?: Record<string, unknown> | null;
   rawPreview?: Record<string, unknown> | null;

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useParams } from "react-router-dom";
 import type { DataForSeoEstimateMode, DataForSeoTestType } from "@gcr/shared";
+import { DataForSeoTestResultPanel } from "../components/dataforseo/DataForSeoTestResultPanel";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
@@ -13,6 +14,13 @@ import {
 } from "../hooks/useDataForSeo";
 import { useGrowthAuditRuns } from "../hooks/useGrowthAudit";
 import { useProject } from "../hooks/useProjects";
+import {
+  estimateBatchRunCostUsd,
+  formatCostPerItem,
+  parseKeywordBatch,
+  SEARCH_VOLUME_BATCH_MAX_KEYWORDS,
+  SOLMIELATO_DEFAULT_KEYWORDS,
+} from "../lib/dataforseo-sandbox-utils";
 import { APP_ROUTES } from "../routes/config";
 
 const ESTIMATE_MODES: { value: DataForSeoEstimateMode; label: string }[] = [
@@ -23,6 +31,7 @@ const ESTIMATE_MODES: { value: DataForSeoEstimateMode; label: string }[] = [
 
 const TEST_TYPES: { value: DataForSeoTestType; label: string }[] = [
   { value: "search_volume", label: "Search volume" },
+  { value: "search_volume_batch", label: "Search volume batch" },
   { value: "keyword_ideas", label: "Keyword ideas" },
   { value: "serp", label: "SERP top 10" },
   { value: "micro_bundle", label: "Micro bundle" },
@@ -59,6 +68,7 @@ export function DataForSeoCostSandboxPage() {
   const testMutation = useDataForSeoSandboxTest(projectId);
 
   const [keyword, setKeyword] = useState("polline biologico");
+  const [batchKeywordsText, setBatchKeywordsText] = useState("");
   const [locationCode, setLocationCode] = useState(2380);
   const [languageCode, setLanguageCode] = useState("it");
   const [testType, setTestType] = useState<DataForSeoTestType>("search_volume");
@@ -66,16 +76,47 @@ export function DataForSeoCostSandboxPage() {
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [testError, setTestError] = useState<string | null>(null);
 
+  const isBatchTest = testType === "search_volume_batch";
+
+  const parsedBatchKeywords = useMemo(
+    () => parseKeywordBatch(batchKeywordsText),
+    [batchKeywordsText],
+  );
+
+  const effectiveBatchKeywords = useMemo(() => {
+    if (!isBatchTest) return [];
+    if (parsedBatchKeywords.length > 0) return parsedBatchKeywords;
+    const trimmed = keyword.trim();
+    return trimmed ? [trimmed] : [];
+  }, [isBatchTest, parsedBatchKeywords, keyword]);
+
+  const batchOverLimit = isBatchTest && effectiveBatchKeywords.length > SEARCH_VOLUME_BATCH_MAX_KEYWORDS;
+
+  const estimatedBatchCost = useMemo(
+    () => estimateBatchRunCostUsd(effectiveBatchKeywords.length),
+    [effectiveBatchKeywords.length],
+  );
+
+  const batchExceedsSingleRunLimit =
+    isBatchTest
+    && status != null
+    && estimatedBatchCost > status.singleRunLimitUsd;
+
   const completedRuns = useMemo(
     () => (runs ?? []).filter((run) => run.status === "completed"),
     [runs],
   );
 
+  const hasValidKeywords = isBatchTest
+    ? effectiveBatchKeywords.length > 0 && !batchOverLimit
+    : Boolean(keyword.trim());
+
   const testDisabled =
     !status?.configured ||
     !status.realCallsEnabled ||
     testMutation.isPending ||
-    !keyword.trim();
+    !hasValidKeywords ||
+    batchExceedsSingleRunLimit;
 
   const handleEstimate = async () => {
     if (!projectId) return;
@@ -85,13 +126,27 @@ export function DataForSeoCostSandboxPage() {
     });
   };
 
+  const applyPreset = (count: 1 | 5 | 10) => {
+    const keywords = SOLMIELATO_DEFAULT_KEYWORDS.slice(0, count);
+    setBatchKeywordsText(keywords.join("\n"));
+    setKeyword(keywords[0] ?? "");
+  };
+
   const handleTest = async () => {
     if (!projectId) return;
     setTestError(null);
 
     const trimmedKeyword = keyword.trim();
-    if (!trimmedKeyword) {
+    if (!isBatchTest && !trimmedKeyword) {
       setTestError("Inserisci una keyword.");
+      return;
+    }
+    if (isBatchTest && effectiveBatchKeywords.length === 0) {
+      setTestError("Inserisci almeno una keyword nel batch.");
+      return;
+    }
+    if (batchOverLimit) {
+      setTestError(`Massimo ${SEARCH_VOLUME_BATCH_MAX_KEYWORDS} keyword per batch.`);
       return;
     }
     if (!Number.isFinite(locationCode) || locationCode < 1) {
@@ -105,12 +160,22 @@ export function DataForSeoCostSandboxPage() {
     }
 
     try {
-      await testMutation.mutateAsync({
-        testType,
-        keyword: trimmedKeyword,
-        locationCode,
-        languageCode: trimmedLanguage,
-      });
+      if (isBatchTest) {
+        await testMutation.mutateAsync({
+          testType,
+          keywords: effectiveBatchKeywords,
+          keyword: effectiveBatchKeywords[0],
+          locationCode,
+          languageCode: trimmedLanguage,
+        });
+      } else {
+        await testMutation.mutateAsync({
+          testType,
+          keyword: trimmedKeyword,
+          locationCode,
+          languageCode: trimmedLanguage,
+        });
+      }
     } catch (error) {
       setTestError(formatDataForSeoTestError(error));
     }
@@ -173,15 +238,31 @@ export function DataForSeoCostSandboxPage() {
           <h2 className="gcr-panel__title">Test manuale controllato</h2>
         </div>
         <div className="gcr-form-grid">
-          <label className="gcr-field">
-            <span className="gcr-field__label">Keyword</span>
-            <input
-              className="gcr-input"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="polline biologico"
-            />
-          </label>
+          {!isBatchTest && (
+            <label className="gcr-field">
+              <span className="gcr-field__label">Keyword</span>
+              <input
+                className="gcr-input"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="polline biologico"
+              />
+            </label>
+          )}
+          {isBatchTest && (
+            <label className="gcr-field" style={{ gridColumn: "1 / -1" }}>
+              <span className="gcr-field__label">
+                Keyword batch ({effectiveBatchKeywords.length}/{SEARCH_VOLUME_BATCH_MAX_KEYWORDS})
+              </span>
+              <textarea
+                className="gcr-input"
+                rows={6}
+                value={batchKeywordsText}
+                onChange={(event) => setBatchKeywordsText(event.target.value)}
+                placeholder={"Una keyword per riga o separate da virgola\npolline biologico\nmiele di eucalipto"}
+              />
+            </label>
+          )}
           <label className="gcr-field">
             <span className="gcr-field__label">Location code</span>
             <input
@@ -214,6 +295,34 @@ export function DataForSeoCostSandboxPage() {
             </select>
           </label>
         </div>
+
+        {isBatchTest && (
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "1rem" }}>
+            <button type="button" className="gcr-btn gcr-btn--secondary" onClick={() => applyPreset(1)}>
+              Test 1 keyword
+            </button>
+            <button type="button" className="gcr-btn gcr-btn--secondary" onClick={() => applyPreset(5)}>
+              Test 5 keyword
+            </button>
+            <button type="button" className="gcr-btn gcr-btn--secondary" onClick={() => applyPreset(10)}>
+              Test 10 keyword
+            </button>
+          </div>
+        )}
+
+        {isBatchTest && batchOverLimit && (
+          <div className="gcr-alert gcr-alert--error" style={{ marginTop: "1rem" }}>
+            Massimo {SEARCH_VOLUME_BATCH_MAX_KEYWORDS} keyword per batch test.
+          </div>
+        )}
+
+        {status?.realCallsEnabled && isBatchTest && effectiveBatchKeywords.length > 0 && (
+          <div className="gcr-alert" style={{ marginTop: "1rem" }}>
+            Questo test può consumare credito DataForSEO. Limite singola run:{" "}
+            {formatUsd(status.singleRunLimitUsd)} — stima locale: {formatUsd(estimatedBatchCost)}.
+          </div>
+        )}
+
         {!status?.realCallsEnabled && (
           <div className="gcr-alert gcr-alert--error" style={{ marginTop: "1rem" }}>
             Le chiamate reali sono disabilitate. Imposta DATAFORSEO_ENABLE_REAL_CALLS=true sul backend
@@ -236,32 +345,7 @@ export function DataForSeoCostSandboxPage() {
         </button>
       </section>
 
-      {testResult && (
-        <section className="gcr-panel" style={{ marginBottom: "1.5rem" }}>
-          <div className="gcr-panel__header">
-            <h2 className="gcr-panel__title">Risultato test</h2>
-          </div>
-          <p>
-            <strong>Costo:</strong> {formatUsd(testResult.costUsd)}
-          </p>
-          <p>
-            <strong>Endpoint:</strong> {testResult.endpoints.join(", ")}
-          </p>
-          {testResult.responseSummary && (
-            <pre className="gcr-code-block" style={{ marginTop: "0.75rem" }}>
-              {JSON.stringify(testResult.responseSummary, null, 2)}
-            </pre>
-          )}
-          {testResult.rawPreview && (
-            <details style={{ marginTop: "0.75rem" }}>
-              <summary>Raw preview</summary>
-              <pre className="gcr-code-block">
-                {JSON.stringify(testResult.rawPreview, null, 2)}
-              </pre>
-            </details>
-          )}
-        </section>
-      )}
+      {testResult && <DataForSeoTestResultPanel result={testResult} />}
 
       <section className="gcr-panel" style={{ marginBottom: "1.5rem" }}>
         <div className="gcr-panel__header">
@@ -310,6 +394,22 @@ export function DataForSeoCostSandboxPage() {
         </button>
         {estimate && (
           <div style={{ marginTop: "1rem" }}>
+            <StatusBadge
+              variant={estimate.estimateSource === "observed" ? "connected" : "needs_setup"}
+              label={
+                estimate.estimateSource === "observed"
+                  ? "Stima basata su costi osservati"
+                  : "Stima basata su assunzioni"
+              }
+            />
+            {estimate.observedUnitCosts && (
+              <p style={{ marginTop: "0.75rem" }}>
+                <strong>Costi medi osservati:</strong> search volume{" "}
+                {formatUsd(estimate.observedUnitCosts.searchVolume ?? null)}, keyword ideas{" "}
+                {formatUsd(estimate.observedUnitCosts.keywordIdeas ?? null)}, SERP{" "}
+                {formatUsd(estimate.observedUnitCosts.serp ?? null)}
+              </p>
+            )}
             <p>
               <strong>Chiamate previste:</strong> search volume {estimate.estimatedCalls.searchVolume},{" "}
               keyword ideas {estimate.estimatedCalls.keywordIdeas}, SERP {estimate.estimatedCalls.serp}
@@ -360,7 +460,9 @@ export function DataForSeoCostSandboxPage() {
                       <th>Operation</th>
                       <th>Endpoint</th>
                       <th>Status</th>
+                      <th>Items</th>
                       <th>Costo</th>
+                      <th>Cost/item</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -370,7 +472,9 @@ export function DataForSeoCostSandboxPage() {
                         <td>{log.operation}</td>
                         <td>{log.endpoint}</td>
                         <td>{log.status}</td>
+                        <td>{log.itemsCount ?? "—"}</td>
                         <td>{formatUsd(log.costUsd)}</td>
+                        <td>{formatCostPerItem(log.costUsd, log.itemsCount)}</td>
                       </tr>
                     ))}
                   </tbody>

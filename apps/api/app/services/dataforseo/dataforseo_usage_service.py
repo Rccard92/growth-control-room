@@ -92,6 +92,46 @@ async def list_recent_dataforseo_logs(
     return list(result.scalars().all())
 
 
+_OBSERVED_OPERATIONS = (
+    "search_volume",
+    "search_volume_batch",
+    "keyword_ideas",
+    "serp",
+)
+
+
+async def observed_unit_costs(
+    session: AsyncSession,
+    project_id: UUID,
+) -> dict[str, float | None]:
+    result = await session.execute(
+        select(
+            DataProviderUsageLog.operation,
+            func.avg(
+                DataProviderUsageLog.cost_usd / func.nullif(DataProviderUsageLog.items_count, 0)
+            ),
+            func.avg(DataProviderUsageLog.cost_usd),
+        )
+        .where(
+            DataProviderUsageLog.project_id == project_id,
+            DataProviderUsageLog.provider == "dataforseo",
+            DataProviderUsageLog.status == "success",
+            DataProviderUsageLog.cost_usd.is_not(None),
+            DataProviderUsageLog.operation.in_(_OBSERVED_OPERATIONS),
+        )
+        .group_by(DataProviderUsageLog.operation)
+    )
+
+    costs: dict[str, float | None] = {op: None for op in _OBSERVED_OPERATIONS}
+    for operation, avg_per_item, avg_total in result.all():
+        op = str(operation)
+        if avg_per_item is not None:
+            costs[op] = float(avg_per_item)
+        elif avg_total is not None:
+            costs[op] = float(avg_total)
+    return costs
+
+
 async def average_cost_by_operation(
     session: AsyncSession,
     project_id: UUID,

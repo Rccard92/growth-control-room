@@ -318,12 +318,15 @@ export type {
   DataForSeoEstimateRequest,
   DataForSeoEstimateResponse,
   DataForSeoEstimatedCalls,
+  DataForSeoObservedUnitCosts,
   DataForSeoStatus,
   DataForSeoTestRequest,
   DataForSeoTestResponse,
   DataForSeoTestType,
   DataForSeoUsageLog,
   DataForSeoUsageResponse,
+  SearchVolumeResult,
+  SearchVolumeTrend,
 } from "./types/dataforseo";
 export type {
   GrowthAuditEvent,

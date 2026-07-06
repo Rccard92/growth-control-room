@@ -9,8 +9,12 @@ ENDPOINT_SERP_ORGANIC_LIVE_ADVANCED = "/serp/google/organic/live/advanced"
 
 RAW_PREVIEW_MAX_BYTES = 2048
 
+SEARCH_VOLUME_BATCH_MAX_KEYWORDS = 10
+OBSERVED_SEARCH_VOLUME_SINGLE_COST_USD = 0.09
+
 TEST_COST_ESTIMATES: dict[str, float] = {
     "search_volume": 0.05,
+    "search_volume_batch": 0.09,
     "keyword_ideas": 0.10,
     "serp": 0.10,
     "micro_bundle": 0.25,

@@ -80,6 +80,7 @@ function setupMocks(options?: {
           operation: "search_volume",
           status: "success",
           costUsd: 0.05,
+          itemsCount: 1,
           createdAt: "2026-07-06T10:00:00.000Z",
         },
       ],
@@ -163,13 +164,22 @@ describe("DataForSeoCostSandboxPage", () => {
     setupMocks();
     const html = renderPage();
     expect(html).toContain("Search volume");
+    expect(html).toContain("Search volume batch");
     expect(html).toContain("Keyword ideas");
     expect(html).toContain("SERP top 10");
     expect(html).toContain("Micro bundle");
     expect(html).toContain('value="search_volume"');
+    expect(html).toContain('value="search_volume_batch"');
     expect(html).toContain('value="keyword_ideas"');
     expect(html).toContain('value="serp"');
     expect(html).toContain('value="micro_bundle"');
+  });
+
+  it("renders usage log cost per item", () => {
+    setupMocks();
+    const html = renderPage();
+    expect(html).toContain("Cost/item");
+    expect(html).toContain("$0.0500");
   });
 });
 

@@ -77,6 +77,7 @@ def test_test_endpoint_blocks_when_real_calls_disabled() -> None:
         request = SimpleNamespace(
             test_type="search_volume",
             keyword="polline biologico",
+            keywords=None,
             location_code=2380,
             language_code="it",
         )
@@ -134,7 +135,10 @@ def test_estimate_does_not_make_http_calls() -> None:
     async def run() -> None:
         project_id = uuid4()
         session = AsyncMock()
-        with patch("httpx.AsyncClient") as client_mock:
+        with patch("httpx.AsyncClient") as client_mock, patch(
+            "app.services.dataforseo.dataforseo_cost_estimator.observed_unit_costs",
+            new=AsyncMock(return_value={}),
+        ):
             result = await estimate_dataforseo_cost(
                 session,
                 project_id=project_id,
@@ -143,6 +147,7 @@ def test_estimate_does_not_make_http_calls() -> None:
             client_mock.assert_not_called()
         assert result["estimatedCostUsd"] > 0
         assert result["estimatedCalls"]["searchVolume"] == 3
+        assert result["estimateSource"] == "assumed"
 
     asyncio.run(run())
 
@@ -205,6 +210,7 @@ def test_mock_response_cost_is_saved() -> None:
                 project_id=project_id,
                 test_type="search_volume",
                 keyword="polline biologico",
+                keywords=None,
                 location_code=2380,
                 language_code="it",
             )

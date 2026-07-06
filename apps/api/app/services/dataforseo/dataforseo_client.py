@@ -25,6 +25,9 @@ from app.services.dataforseo.exceptions import (
     DataForSeoNotConfiguredError,
     DataForSeoRealCallsDisabledError,
 )
+from app.services.dataforseo.search_volume_normalizer import (
+    normalize_search_volume_batch_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -219,30 +222,15 @@ def build_request_hash(endpoint: str, payload: list[dict[str, Any]]) -> str:
 
 
 def summarize_search_volume_response(result: dict[str, Any], keyword: str) -> dict[str, Any]:
-    tasks = result.get("tasks") or []
-    items: list[dict[str, Any]] = []
-    for task in tasks:
-        if not isinstance(task, dict):
-            continue
-        task_results = task.get("result")
-        if not isinstance(task_results, list):
-            continue
-        for row in task_results:
-            if not isinstance(row, dict):
-                continue
-            items.append(
-                {
-                    "keyword": row.get("keyword") or keyword,
-                    "searchVolume": row.get("search_volume"),
-                    "cpc": row.get("cpc"),
-                    "competition": row.get("competition"),
-                    "competitionIndex": row.get("competition_index"),
-                }
-            )
+    summary = normalize_search_volume_batch_response(result, [keyword])
     return {
         "keyword": keyword,
-        "itemsCount": len(items),
-        "items": items[:5],
+        "keywordCount": summary.get("keywordCount", 1),
+        "totalCostUsd": summary.get("totalCostUsd"),
+        "averageCostPerKeywordUsd": summary.get("averageCostPerKeywordUsd"),
+        "itemsCount": summary.get("itemsCount", 1),
+        "items": summary.get("results", [])[:5],
+        "results": summary.get("results", []),
     }
 
 
@@ -301,6 +289,25 @@ def summarize_serp_response(result: dict[str, Any], keyword: str) -> dict[str, A
         "resultCount": len(organic),
         "topResults": organic[:3],
     }
+
+
+async def safe_test_keyword_search_volume_batch(
+    keywords: list[str],
+    *,
+    location_code: int = DEFAULT_LOCATION_CODE,
+    language_code: str = DEFAULT_LANGUAGE_CODE,
+) -> dict[str, Any]:
+    payload = [
+        {
+            "location_code": location_code,
+            "language_code": language_code,
+            "keywords": keywords,
+        }
+    ]
+    result = await post_dataforseo(ENDPOINT_SEARCH_VOLUME_LIVE, payload)
+    result["summary"] = normalize_search_volume_batch_response(result, keywords)
+    result["rawPreview"] = truncate_json_preview(result.get("raw"))
+    return result
 
 
 async def safe_test_keyword_search_volume(

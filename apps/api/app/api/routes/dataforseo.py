@@ -129,6 +129,8 @@ async def estimate_dataforseo_cost_endpoint(
         assumptions=result["assumptions"],
         budget_warnings=result.get("budgetWarnings", []),
         audit_context=result.get("auditContext"),
+        estimate_source=result.get("estimateSource", "assumed"),
+        observed_unit_costs=result.get("observedUnitCosts", {}),
     )
 
 
@@ -150,6 +152,7 @@ async def run_dataforseo_test_endpoint(
             project_id=project_id,
             test_type=request.test_type,
             keyword=request.keyword.strip(),
+            keywords=request.keywords,
             location_code=request.location_code,
             language_code=request.language_code,
         )
@@ -165,12 +168,20 @@ async def run_dataforseo_test_endpoint(
             detail=exc.message,
         ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        detail = str(exc)
+        status_code = (
+            status.HTTP_422_UNPROCESSABLE_ENTITY
+            if "Massimo" in detail or "keyword" in detail.lower()
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(status_code=status_code, detail=detail) from exc
 
     return DataForSeoTestResponse(
         test_type=result["testType"],
         keyword=result["keyword"],
+        keywords=result.get("keywords", []),
         cost_usd=result["costUsd"],
+        average_cost_per_keyword_usd=result.get("averageCostPerKeywordUsd"),
         endpoints=result["endpoints"],
         response_summary=result.get("responseSummary"),
         raw_preview=result.get("rawPreview"),

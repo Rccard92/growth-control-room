@@ -10,8 +10,9 @@ describe("dataforseo-api", () => {
   it("calls sandbox test endpoint with camelCase POST body", async () => {
     const { runDataForSeoSandboxTest } = await import("./dataforseo-api");
     const payload = {
-      testType: "search_volume" as const,
+      testType: "search_volume_batch" as const,
       keyword: "polline biologico",
+      keywords: ["polline biologico", "miele di eucalipto"],
       locationCode: 2380,
       languageCode: "it",
     };

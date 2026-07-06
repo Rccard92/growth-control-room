@@ -15,6 +15,7 @@ from app.services.dataforseo.constants import (
 from app.services.dataforseo.dataforseo_growth_audit_context import (
     load_run_product_context,
 )
+from app.services.dataforseo.dataforseo_usage_service import observed_unit_costs
 
 
 def _resolve_estimate_params(
@@ -53,11 +54,35 @@ def _compute_call_counts(params: dict[str, int]) -> dict[str, int]:
     }
 
 
-def _compute_estimated_cost(calls: dict[str, int]) -> float:
+def _resolve_unit_costs(observed: dict[str, float | None]) -> tuple[dict[str, float], bool]:
+    search_volume = (
+        observed.get("search_volume_batch")
+        or observed.get("search_volume")
+        or UNIT_COST_ESTIMATES["search_volume"]
+    )
+    keyword_ideas = observed.get("keyword_ideas") or UNIT_COST_ESTIMATES["keyword_ideas"]
+    serp = observed.get("serp") or UNIT_COST_ESTIMATES["serp"]
+
+    has_observed = any(
+        observed.get(op) is not None
+        for op in ("search_volume", "search_volume_batch", "keyword_ideas", "serp")
+    )
+
+    return {
+        "search_volume": float(search_volume),
+        "keyword_ideas": float(keyword_ideas),
+        "serp": float(serp),
+    }, has_observed
+
+
+def _compute_estimated_cost(
+    calls: dict[str, int],
+    unit_costs: dict[str, float],
+) -> float:
     return round(
-        calls["searchVolume"] * UNIT_COST_ESTIMATES["search_volume"]
-        + calls["keywordIdeas"] * UNIT_COST_ESTIMATES["keyword_ideas"]
-        + calls["serp"] * UNIT_COST_ESTIMATES["serp"],
+        calls["searchVolume"] * unit_costs["search_volume"]
+        + calls["keywordIdeas"] * unit_costs["keyword_ideas"]
+        + calls["serp"] * unit_costs["serp"],
         4,
     )
 
@@ -133,8 +158,20 @@ async def estimate_dataforseo_cost(
                     f"Seed query per pagina limitate a {seed_cap} in base alle query GSC medie."
                 )
 
+    observed = await observed_unit_costs(session, project_id)
+    unit_costs, has_observed = _resolve_unit_costs(observed)
     calls = _compute_call_counts(resolved)
-    estimated_cost = _compute_estimated_cost(calls)
+    estimated_cost = _compute_estimated_cost(calls, unit_costs)
+
+    if has_observed:
+        assumptions.append(
+            "Costi unitari basati su usage log osservato per questo progetto."
+        )
+    else:
+        assumptions.append(
+            "Costi unitari conservativi di default: search volume 0.05, "
+            "keyword ideas 0.10, SERP 0.10 USD."
+        )
 
     assumptions.extend(
         [
@@ -143,7 +180,6 @@ async def estimate_dataforseo_cost(
             f"Seed query per pagina: {resolved['seed_queries_per_page']}.",
             f"Keyword ideas per seed (cap stimato): {resolved['keyword_ideas_per_seed']}.",
             f"SERP query per pagina: {resolved['serp_queries_per_page']}.",
-            "Costi unitari conservativi: search volume 0.05, keyword ideas 0.10, SERP 0.10 USD.",
             "Nessuna chiamata reale eseguita durante la stima.",
         ]
     )
@@ -156,4 +192,11 @@ async def estimate_dataforseo_cost(
         "budgetWarnings": _build_budget_warnings(estimated_cost),
         "auditContext": audit_context,
         "params": resolved,
+        "estimateSource": "observed" if has_observed else "assumed",
+        "observedUnitCosts": {
+            "searchVolume": observed.get("search_volume_batch")
+            or observed.get("search_volume"),
+            "keywordIdeas": observed.get("keyword_ideas"),
+            "serp": observed.get("serp"),
+        },
     }
