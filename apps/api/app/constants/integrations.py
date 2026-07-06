@@ -9,4 +9,5 @@ INTEGRATION_PROVIDERS: list[str] = [
     "google_crux",
     "merchant_center",
     "tiktok_ads",
+    "dataforseo",
 ]

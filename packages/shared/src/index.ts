@@ -314,6 +314,18 @@ export type {
 } from "./types/brand-intelligence";
 export { INTEGRATIONS, INTEGRATION_BY_PROVIDER } from "./constants/integrations";
 export type {
+  DataForSeoEstimateMode,
+  DataForSeoEstimateRequest,
+  DataForSeoEstimateResponse,
+  DataForSeoEstimatedCalls,
+  DataForSeoStatus,
+  DataForSeoTestRequest,
+  DataForSeoTestResponse,
+  DataForSeoTestType,
+  DataForSeoUsageLog,
+  DataForSeoUsageResponse,
+} from "./types/dataforseo";
+export type {
   GrowthAuditEvent,
   GrowthAuditFinding,
   GrowthAuditFindingCategory,

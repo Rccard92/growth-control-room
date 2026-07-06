@@ -61,6 +61,12 @@ export const INTEGRATIONS: IntegrationMeta[] = [
     description: "Campagne pubblicitarie TikTok",
     icon: "🎵",
   },
+  {
+    provider: "dataforseo",
+    label: "DataForSEO",
+    description: "Keyword, SERP e competitor data",
+    icon: "🔍",
+  },
 ];
 
 export const INTEGRATION_BY_PROVIDER: Record<

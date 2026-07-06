@@ -24,6 +24,7 @@ export const APP_ROUTES = {
   ) => `/projects/${projectId}/audit/runs/${runId}/pages/${pageId}`,
   projectBrandIntelligence: (id: string) => `/projects/${id}/brand-intelligence`,
   projectIntegrations: (id: string) => `/projects/${id}/integrations`,
+  projectDataForSeoSandbox: (id: string) => `/projects/${id}/integrations/dataforseo`,
   projectShopify: (id: string) => `/projects/${id}/shopify`,
   projectShopifyConnect: (id: string) => `/projects/${id}/shopify/connect`,
   projectContent: (id: string) => `/projects/${id}/content`,

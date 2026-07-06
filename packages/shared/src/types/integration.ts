@@ -8,7 +8,8 @@ export type IntegrationProvider =
   | "meta_ads"
   | "klaviyo"
   | "merchant_center"
-  | "tiktok_ads";
+  | "tiktok_ads"
+  | "dataforseo";
 
 export type IntegrationStatus = "not_connected" | "connected" | "error";
 

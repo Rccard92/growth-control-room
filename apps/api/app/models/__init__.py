@@ -41,6 +41,7 @@ from app.models.growth_audit import (
 from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.models.content_seo_brief_job import ContentSeoBriefGenerationJob
+from app.models.data_provider_usage_log import DataProviderUsageLog
 from app.models.content_seo import (
     ContentBrief,
     ContentOpportunity,
@@ -105,6 +106,7 @@ __all__ = [
     "SeoSkillRunResult",
     "ContentSeoEditorialItem",
     "ContentSeoBriefGenerationJob",
+    "DataProviderUsageLog",
     "ContentBrief",
     "ContentOpportunity",
     "SeoAuditIssue",

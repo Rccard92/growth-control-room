@@ -12,6 +12,7 @@ const {
   useStartGoogleOAuthMock,
   useSearchConsoleSitesMock,
   useSelectSearchConsoleSiteMock,
+  useDataForSeoStatusMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useProjectMock: vi.fn(),
@@ -20,6 +21,7 @@ const {
   useStartGoogleOAuthMock: vi.fn(),
   useSearchConsoleSitesMock: vi.fn(),
   useSelectSearchConsoleSiteMock: vi.fn(),
+  useDataForSeoStatusMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -96,6 +98,10 @@ vi.mock("../hooks/useGoogleIntegrations", () => ({
   useSelectSearchConsoleSite: useSelectSearchConsoleSiteMock,
 }));
 
+vi.mock("../hooks/useDataForSeo", () => ({
+  useDataForSeoStatus: useDataForSeoStatusMock,
+}));
+
 vi.mock("../components/IntegrationGraph", () => ({
   IntegrationGraph: ({
     googleStatus,
@@ -133,6 +139,16 @@ function setupMocks(options?: {
   searchConsoleSiteUrl?: string | null;
   googleAnalyticsPropertyId?: string | null;
   googleAnalyticsPropertyName?: string | null;
+  dataforseoStatus?: {
+    configured: boolean;
+    realCallsEnabled: boolean;
+    missingVars: string[];
+    singleRunLimitUsd: number;
+    dailyBudgetUsd: number;
+    monthlyBudgetUsd: number;
+    usageTodayUsd: number;
+    usageMonthUsd: number;
+  };
 }) {
   useParamsMock.mockReturnValue({ id: "proj-1" });
   useProjectMock.mockReturnValue({
@@ -173,6 +189,20 @@ function setupMocks(options?: {
   useSelectSearchConsoleSiteMock.mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
+  });
+  useDataForSeoStatusMock.mockReturnValue({
+    data:
+      options?.dataforseoStatus ?? {
+        configured: false,
+        realCallsEnabled: false,
+        missingVars: ["DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD"],
+        singleRunLimitUsd: 0.2,
+        dailyBudgetUsd: 1,
+        monthlyBudgetUsd: 10,
+        usageTodayUsd: 0,
+        usageMonthUsd: 0,
+      },
+    isLoading: false,
   });
 }
 
@@ -352,5 +382,45 @@ describe("IntegrationsPage unified grid", () => {
     expect(html).toContain("integration-card__brand-icon");
     expect(html).toContain("<img");
     expect(html).toContain("Klaviyo");
+  });
+
+  it("shows DataForSEO missing credentials when env is absent", () => {
+    setupMocks({
+      dataforseoStatus: {
+        configured: false,
+        realCallsEnabled: false,
+        missingVars: ["DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD"],
+        singleRunLimitUsd: 0.2,
+        dailyBudgetUsd: 1,
+        monthlyBudgetUsd: 10,
+        usageTodayUsd: 0,
+        usageMonthUsd: 0,
+      },
+    });
+    const html = renderPage();
+
+    expect(html).toContain("DataForSEO");
+    expect(html).toContain("Mancano credenziali");
+    expect(html).toContain("DATAFORSEO_LOGIN");
+  });
+
+  it("shows DataForSEO real calls disabled when configured but disabled", () => {
+    setupMocks({
+      dataforseoStatus: {
+        configured: true,
+        realCallsEnabled: false,
+        missingVars: [],
+        singleRunLimitUsd: 0.2,
+        dailyBudgetUsd: 1,
+        monthlyBudgetUsd: 10,
+        usageTodayUsd: 0,
+        usageMonthUsd: 0,
+      },
+    });
+    const html = renderPage();
+
+    expect(html).toContain("Real calls disabilitate");
+    expect(html).toContain("Apri Cost Sandbox");
+    expect(html).toContain("/projects/proj-1/integrations/dataforseo");
   });
 });

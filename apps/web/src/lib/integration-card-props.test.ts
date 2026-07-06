@@ -208,4 +208,52 @@ describe("getIntegrationCardProps", () => {
     expect(props.badgeLabel).toBe("Configurata");
     expect(props.detailText).toBe("Account: Example Merchant");
   });
+
+  it("maps DataForSEO missing credentials", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "dataforseo")!;
+    const props = getIntegrationCardProps({
+      meta,
+      oauthConnectDisabled: false,
+      handleConnectGoogle: vi.fn(),
+      projectId: "proj-1",
+      dataforseoStatus: {
+        configured: false,
+        realCallsEnabled: false,
+        missingVars: ["DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD"],
+        singleRunLimitUsd: 0.2,
+        dailyBudgetUsd: 1,
+        monthlyBudgetUsd: 10,
+        usageTodayUsd: 0,
+        usageMonthUsd: 0,
+      },
+    });
+
+    expect(props.badgeLabel).toBe("Mancano credenziali");
+    expect(props.note).toContain("DATAFORSEO_LOGIN");
+    expect(props.disabled).toBe(true);
+  });
+
+  it("maps DataForSEO configured with real calls disabled", () => {
+    const meta = INTEGRATIONS.find((item) => item.provider === "dataforseo")!;
+    const props = getIntegrationCardProps({
+      meta,
+      oauthConnectDisabled: false,
+      handleConnectGoogle: vi.fn(),
+      projectId: "proj-1",
+      dataforseoStatus: {
+        configured: true,
+        realCallsEnabled: false,
+        missingVars: [],
+        singleRunLimitUsd: 0.2,
+        dailyBudgetUsd: 1,
+        monthlyBudgetUsd: 10,
+        usageTodayUsd: 0,
+        usageMonthUsd: 0,
+      },
+    });
+
+    expect(props.badgeLabel).toBe("Real calls disabilitate");
+    expect(props.actionLabel).toBe("Apri Cost Sandbox");
+    expect(props.href).toBe("/projects/proj-1/integrations/dataforseo");
+  });
 });

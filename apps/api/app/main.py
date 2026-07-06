@@ -11,6 +11,10 @@ from app.api.validation_helpers import is_json_string_body_validation_error
 from app.core.config import settings
 from app.db.session import close_db, init_db
 from app.services.ai.exceptions import AiBudgetExceededError, AiSingleRequestBlockedError
+from app.services.dataforseo.exceptions import (
+    DataForSeoBudgetExceededError,
+    DataForSeoRealCallsDisabledError,
+)
 
 
 @asynccontextmanager
@@ -65,6 +69,26 @@ async def ai_budget_exceeded_handler(_request: Request, exc: AiBudgetExceededErr
 @app.exception_handler(AiSingleRequestBlockedError)
 async def ai_single_request_blocked_handler(
     _request: Request, exc: AiSingleRequestBlockedError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={"detail": exc.message},
+    )
+
+
+@app.exception_handler(DataForSeoRealCallsDisabledError)
+async def dataforseo_real_calls_disabled_handler(
+    _request: Request, exc: DataForSeoRealCallsDisabledError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"detail": exc.message},
+    )
+
+
+@app.exception_handler(DataForSeoBudgetExceededError)
+async def dataforseo_budget_exceeded_handler(
+    _request: Request, exc: DataForSeoBudgetExceededError
 ) -> JSONResponse:
     return JSONResponse(
         status_code=429,

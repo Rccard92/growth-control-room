@@ -1,4 +1,5 @@
 import type {
+  DataForSeoStatus,
   GoogleIntegrationStatusResponse,
   GoogleServiceStatus,
   IntegrationMeta,
@@ -24,6 +25,7 @@ interface GetIntegrationCardPropsInput {
   googleMerchantAccountId?: string | null;
   googleMerchantAccountName?: string | null;
   onSelectMerchantAccount?: () => void;
+  dataforseoStatus?: DataForSeoStatus;
 }
 
 function mapGoogleStatus(status: GoogleServiceStatus["status"]): IntegrationUiStatus {
@@ -123,6 +125,7 @@ export function getIntegrationCardProps({
   googleMerchantAccountId,
   googleMerchantAccountName,
   onSelectMerchantAccount,
+  dataforseoStatus,
 }: GetIntegrationCardPropsInput): IntegrationCardProps {
   if (meta.provider === "shopify") {
     const connected = apiStatus === "connected";
@@ -133,6 +136,41 @@ export function getIntegrationCardProps({
         ? APP_ROUTES.projectShopify(projectId)
         : APP_ROUTES.projectShopifyConnect(projectId),
       actionLabel: connected ? "Gestisci" : "Connetti",
+    };
+  }
+
+  if (meta.provider === "dataforseo") {
+    if (!dataforseoStatus) {
+      return {
+        meta,
+        status: "not_connected",
+        actionLabel: "Caricamento...",
+        disabled: true,
+      };
+    }
+
+    if (!dataforseoStatus.configured) {
+      return {
+        meta,
+        status: "missing_credentials",
+        badgeLabel: "Mancano credenziali",
+        actionLabel: "Configura credenziali",
+        disabled: true,
+        note: `Imposta ${dataforseoStatus.missingVars.join(", ") || "DATAFORSEO_LOGIN e DATAFORSEO_PASSWORD"} su Railway.`,
+      };
+    }
+
+    return {
+      meta,
+      status: "connected",
+      badgeLabel: dataforseoStatus.realCallsEnabled
+        ? "Configurata"
+        : "Real calls disabilitate",
+      actionLabel: "Apri Cost Sandbox",
+      href: APP_ROUTES.projectDataForSeoSandbox(projectId),
+      note: dataforseoStatus.realCallsEnabled
+        ? "Chiamate reali abilitate. Usa il sandbox per test controllati."
+        : "Credenziali presenti ma DATAFORSEO_ENABLE_REAL_CALLS=false.",
     };
   }
 

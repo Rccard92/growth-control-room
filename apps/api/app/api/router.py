@@ -5,6 +5,7 @@ from app.api.routes import (
     ai_usage,
     brand_intelligence,
     content_seo,
+    dataforseo,
     google_integrations,
     growth_audit,
     health,
@@ -21,6 +22,7 @@ api_router.include_router(google_integrations.callback_router)
 api_router.include_router(content_seo.router)
 api_router.include_router(seo_skills.router)
 api_router.include_router(growth_audit.router)
+api_router.include_router(dataforseo.router)
 api_router.include_router(brand_intelligence.router)
 api_router.include_router(ai_usage.router)
 api_router.include_router(ai_usage.global_router)

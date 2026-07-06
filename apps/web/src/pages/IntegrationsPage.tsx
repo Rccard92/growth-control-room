@@ -12,6 +12,7 @@ import {
   useGoogleIntegrationStatus,
   useStartGoogleOAuth,
 } from "../hooks/useGoogleIntegrations";
+import { useDataForSeoStatus } from "../hooks/useDataForSeo";
 import { getIntegrationCardProps } from "../lib/integration-card-props";
 import { useProject, useProjectIntegrations } from "../hooks/useProjects";
 import { APP_ROUTES } from "../routes/config";
@@ -22,6 +23,7 @@ export function IntegrationsPage() {
   const { data: project } = useProject(id);
   const { data: integrations, isLoading, error } = useProjectIntegrations(id);
   const { data: googleStatus, isLoading: isGoogleLoading } = useGoogleIntegrationStatus(id);
+  const { data: dataforseoStatus, isLoading: isDataForSeoLoading } = useDataForSeoStatus(id);
   const startGoogleOAuth = useStartGoogleOAuth(id);
   const [isSearchConsoleModalOpen, setIsSearchConsoleModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
@@ -68,7 +70,7 @@ export function IntegrationsPage() {
   const oauthConnectDisabled =
     startGoogleOAuth.isPending || googleStatus?.oauth.status === "missing_credentials";
 
-  const isGridLoading = isLoading || isGoogleLoading;
+  const isGridLoading = isLoading || isGoogleLoading || isDataForSeoLoading;
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -135,6 +137,7 @@ export function IntegrationsPage() {
                 googleMerchantAccountId: project?.googleMerchantAccountId,
                 googleMerchantAccountName: project?.googleMerchantAccountName,
                 onSelectMerchantAccount: () => setIsMerchantModalOpen(true),
+                dataforseoStatus,
               })}
             />
           ))}

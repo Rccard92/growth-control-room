@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     google_oauth_client_secret: str | None = None
     google_oauth_redirect_uri: str | None = None
     google_ads_developer_token: str | None = None
+    dataforseo_login: str | None = None
+    dataforseo_password: str | None = None
+    dataforseo_enable_real_calls: bool = False
+    dataforseo_single_run_limit_usd: float = 0.20
+    dataforseo_daily_budget_usd: float = 1.00
+    dataforseo_monthly_budget_usd: float = 10.00
 
     @model_validator(mode="after")
     def require_database_url(self) -> "Settings":
@@ -120,6 +126,24 @@ class Settings(BaseSettings):
             missing.append("GOOGLE_OAUTH_REDIRECT_URI")
         if not self.frontend_url:
             missing.append("FRONTEND_URL")
+        return missing
+
+    @property
+    def dataforseo_configured(self) -> bool:
+        return bool(
+            self.dataforseo_login
+            and self.dataforseo_login.strip()
+            and self.dataforseo_password
+            and self.dataforseo_password.strip()
+        )
+
+    @property
+    def dataforseo_missing_vars(self) -> list[str]:
+        missing: list[str] = []
+        if not self.dataforseo_login or not self.dataforseo_login.strip():
+            missing.append("DATAFORSEO_LOGIN")
+        if not self.dataforseo_password or not self.dataforseo_password.strip():
+            missing.append("DATAFORSEO_PASSWORD")
         return missing
 
     @property
