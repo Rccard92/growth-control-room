@@ -14,6 +14,8 @@ from app.schemas.growth_audit import (
     GrowthAuditPageAiAnalysisResponse,
     GrowthAuditPagePerformanceAnalysisRequest,
     GrowthAuditPagePerformanceAnalysisResponse,
+    GrowthAuditKeywordIntelligenceAnalysisRequest,
+    GrowthAuditKeywordIntelligenceAnalysisResponse,
     GrowthAuditSearchConsoleAnalysisRequest,
     GrowthAuditSearchConsoleAnalysisResponse,
     GrowthAuditAnalyticsAnalysisRequest,
@@ -46,6 +48,15 @@ from app.services.google.exceptions import (
     GoogleIntegrationPermissionError,
     GoogleSearchConsolePropertyError,
     MerchantAccountError,
+)
+from app.services.dataforseo.exceptions import (
+    DataForSeoApiError,
+    DataForSeoBudgetExceededError,
+    DataForSeoNotConfiguredError,
+    DataForSeoRealCallsDisabledError,
+)
+from app.services.growth_audit.keyword_intelligence_analysis import (
+    analyze_growth_audit_page_keyword_intelligence,
 )
 from app.services.growth_audit.exceptions import (
     GrowthAuditError,
@@ -501,6 +512,75 @@ async def analyze_growth_audit_page_performance_endpoint(
         findings_count=findings_count,
         tasks_count=tasks_count,
         message=message,
+    )
+
+
+@router.post(
+    "/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/keyword-intelligence",
+    response_model=GrowthAuditKeywordIntelligenceAnalysisResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_growth_audit_page_keyword_intelligence_endpoint(
+    project_id: UUID,
+    run_id: UUID,
+    page_id: UUID,
+    request: GrowthAuditKeywordIntelligenceAnalysisRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GrowthAuditKeywordIntelligenceAnalysisResponse:
+    await get_project_in_default_workspace(project_id, session)
+    try:
+        run, page, summary, cached, findings_count, tasks_count = (
+            await analyze_growth_audit_page_keyword_intelligence(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+                max_seed_queries=request.max_seed_queries,
+                keyword_ideas_seeds=request.keyword_ideas_seeds,
+                serp_keywords=request.serp_keywords,
+                location_code=request.location_code,
+                language_code=request.language_code,
+                force=request.force,
+            )
+        )
+    except DataForSeoRealCallsDisabledError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message) from exc
+    except DataForSeoNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=exc.message,
+        ) from exc
+    except DataForSeoBudgetExceededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=exc.message,
+        ) from exc
+    except DataForSeoApiError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=exc.message,
+        ) from exc
+    except Exception as exc:
+        raise _map_growth_audit_error(
+            exc,
+            project_id=project_id,
+            run_id=run_id,
+        ) from exc
+
+    message = (
+        "Keyword Intelligence aggiornata (dati recenti in cache)."
+        if cached
+        else "Keyword Intelligence aggiornata."
+    )
+    return GrowthAuditKeywordIntelligenceAnalysisResponse(
+        run=GrowthAuditRunRead.model_validate(run),
+        page=GrowthAuditPageRead.model_validate(page),
+        summary=summary,
+        message=message,
+        cached=cached,
+        findings_count=findings_count,
+        tasks_count=tasks_count,
     )
 
 

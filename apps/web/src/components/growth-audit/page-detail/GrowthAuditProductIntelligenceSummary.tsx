@@ -171,6 +171,24 @@ export function GrowthAuditProductIntelligenceSummary({
               </p>
             )}
 
+          {economicPriority.metrics.keywordOpportunityCount != null &&
+            economicPriority.metrics.keywordOpportunityCount > 0 && (
+              <p className="growth-audit-economic-priority__ki-note">
+                Opportunità keyword rilevate: {economicPriority.metrics.keywordOpportunityCount}
+                {economicPriority.metrics.highestSearchVolume != null && (
+                  <>
+                    {" "}
+                    · Volume max:{" "}
+                    {economicPriority.metrics.highestSearchVolume.toLocaleString("it-IT")}
+                  </>
+                )}
+                {economicPriority.metrics.topCompetitorCount != null &&
+                  economicPriority.metrics.topCompetitorCount > 0 && (
+                    <> · Competitor SERP: {economicPriority.metrics.topCompetitorCount}</>
+                  )}
+              </p>
+            )}
+
           {economicPriority.breakdown.stockAndAvailability > 0 && (
             <p className="growth-audit-economic-priority__stock-warning" role="status">
               Attenzione: stock o disponibilità potrebbero limitare le vendite su questa pagina.

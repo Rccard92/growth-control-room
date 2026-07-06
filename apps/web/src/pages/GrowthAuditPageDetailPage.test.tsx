@@ -12,6 +12,7 @@ const {
   useRescanGrowthAuditPageMock,
   useAnalyzeGrowthAuditPageWithAiMock,
   useAnalyzeGrowthAuditPagePerformanceMock,
+  useAnalyzeGrowthAuditPageKeywordIntelligenceMock,
 } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   useGrowthAuditRunMock: vi.fn(),
@@ -21,6 +22,7 @@ const {
   useRescanGrowthAuditPageMock: vi.fn(),
   useAnalyzeGrowthAuditPageWithAiMock: vi.fn(),
   useAnalyzeGrowthAuditPagePerformanceMock: vi.fn(),
+  useAnalyzeGrowthAuditPageKeywordIntelligenceMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -39,6 +41,7 @@ vi.mock("../hooks/useGrowthAudit", () => ({
   useRescanGrowthAuditPage: useRescanGrowthAuditPageMock,
   useAnalyzeGrowthAuditPageWithAi: useAnalyzeGrowthAuditPageWithAiMock,
   useAnalyzeGrowthAuditPagePerformance: useAnalyzeGrowthAuditPagePerformanceMock,
+  useAnalyzeGrowthAuditPageKeywordIntelligence: useAnalyzeGrowthAuditPageKeywordIntelligenceMock,
 }));
 
 vi.mock("../hooks/useContentSeo", async (importOriginal) => {
@@ -72,6 +75,12 @@ vi.mock("../hooks/useSeoAiQueue", () => ({
   useSeoAiQueue: vi.fn(() => ({
     enqueue: vi.fn(),
     isRunning: false,
+  })),
+}));
+
+vi.mock("../hooks/useDataForSeo", () => ({
+  useDataForSeoStatus: vi.fn(() => ({
+    data: { configured: true, realCallsEnabled: true },
   })),
 }));
 
@@ -216,6 +225,11 @@ function setupDetailMocks() {
   });
 
   useAnalyzeGrowthAuditPagePerformanceMock.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
+
+  useAnalyzeGrowthAuditPageKeywordIntelligenceMock.mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
   });

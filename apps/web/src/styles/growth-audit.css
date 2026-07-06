@@ -1061,3 +1061,110 @@
     flex-direction: column;
   }
 }
+
+.growth-audit-keyword-intelligence {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.growth-audit-keyword-intelligence__controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.growth-audit-keyword-intelligence__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.growth-audit-keyword-intelligence__warning {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--gcr-radius-md);
+  background: color-mix(in srgb, var(--gcr-warning) 12%, transparent);
+  color: var(--gcr-text);
+  font-size: 0.9rem;
+}
+
+.growth-audit-keyword-intelligence__warning--error {
+  background: color-mix(in srgb, var(--gcr-danger) 12%, transparent);
+}
+
+.growth-audit-keyword-intelligence__fresh-banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--gcr-radius-md);
+  background: color-mix(in srgb, var(--gcr-success) 10%, transparent);
+  font-size: 0.9rem;
+}
+
+.growth-audit-keyword-intelligence__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.growth-audit-keyword-intelligence__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.growth-audit-keyword-intelligence__summary > div {
+  padding: 0.75rem;
+  border-radius: var(--gcr-radius-md);
+  background: var(--gcr-surface-elevated);
+}
+
+.growth-audit-keyword-intelligence__summary span {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--gcr-text-muted);
+}
+
+.growth-audit-keyword-intelligence__table-wrap,
+.growth-audit-keyword-intelligence__serp,
+.growth-audit-keyword-intelligence__competitors,
+.growth-audit-keyword-intelligence__cost {
+  margin-top: 0.5rem;
+}
+
+.growth-audit-keyword-intelligence__table {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.growth-audit-keyword-intelligence__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+}
+
+.growth-audit-keyword-intelligence__chip {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--gcr-surface-elevated);
+  font-size: 0.8rem;
+}
+
+.growth-audit-keyword-intelligence-panel__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.growth-audit-keyword-intelligence-panel__kpis > div {
+  padding: 0.75rem;
+  border-radius: var(--gcr-radius-md);
+  background: var(--gcr-surface-elevated);
+}
+
+.growth-audit-keyword-intelligence-panel__hint {
+  margin-top: 0.75rem;
+  color: var(--gcr-text-muted);
+  font-size: 0.9rem;
+}

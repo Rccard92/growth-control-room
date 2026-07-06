@@ -129,6 +129,7 @@ export interface GrowthAuditRunSummary {
   shopifyCommerce?: GrowthAuditRunShopifyCommerceSummary;
   ga4Ecommerce?: GrowthAuditRunGa4EcommerceSummary;
   merchantCenter?: GrowthAuditRunMerchantCenterSummary;
+  keywordIntelligence?: GrowthAuditRunKeywordIntelligenceSummary;
 }
 
 export interface GrowthAuditRunAnalyticsSummary {
@@ -168,6 +169,130 @@ export interface GrowthAuditPageSearchConsoleMetadata {
   position?: number;
   topQueries?: GrowthAuditPageSearchConsoleQuery[];
   syncedAt?: string;
+}
+
+export interface GrowthAuditKeywordIntelligenceTrend {
+  direction?: "up" | "down" | "stable" | "unknown" | string;
+  lastMonth?: number | null;
+  previousMonth?: number | null;
+  averageLast12Months?: number | null;
+}
+
+export interface GrowthAuditPageKeywordIntelligenceSeedQuery {
+  query: string;
+  clicks?: number | null;
+  impressions?: number | null;
+  ctr?: number | null;
+  position?: number | null;
+  selected?: boolean;
+  score?: number;
+  selectionReason?: string;
+}
+
+export interface GrowthAuditKeywordSearchVolumeItem {
+  keyword: string;
+  searchVolume?: number | null;
+  cpc?: number | null;
+  competition?: string | null;
+  competitionIndex?: number | null;
+  trend?: GrowthAuditKeywordIntelligenceTrend | null;
+  monthlySearches?: Array<{
+    year?: number | null;
+    month?: number | null;
+    searchVolume?: number | null;
+  }> | null;
+}
+
+export interface GrowthAuditKeywordIdeaItem {
+  keyword: string;
+  searchVolume?: number | null;
+  cpc?: number | null;
+  competition?: string | null;
+  competitionIndex?: number | null;
+  monthlySearches?: Array<{
+    year?: number | null;
+    month?: number | null;
+    searchVolume?: number | null;
+  }> | null;
+}
+
+export interface GrowthAuditSerpResultItem {
+  position?: number | null;
+  title?: string | null;
+  url?: string | null;
+  domain?: string | null;
+  description?: string | null;
+  type?: string | null;
+}
+
+export interface GrowthAuditKeywordSerpSummary {
+  keyword: string;
+  resultCount?: number;
+  topResults?: GrowthAuditSerpResultItem[];
+  refinementChips?: string[];
+  peopleAlsoAsk?: string[];
+  relatedSearches?: string[];
+  serpFeatures?: string[];
+}
+
+export interface GrowthAuditKeywordCompetitorSummary {
+  domain: string;
+  bestPosition?: number | null;
+  appearancesCount?: number;
+  keywords?: string[];
+  urls?: string[];
+  titles?: string[];
+}
+
+export interface GrowthAuditPageKeywordIntelligenceMetadata {
+  period?: string;
+  source?: string;
+  locationCode?: number;
+  languageCode?: string;
+  seedQueries?: GrowthAuditPageKeywordIntelligenceSeedQuery[];
+  searchVolume?: GrowthAuditKeywordSearchVolumeItem[];
+  keywordIdeas?: {
+    seedKeyword?: string;
+    ideasCount?: number;
+    items?: GrowthAuditKeywordIdeaItem[];
+  } | null;
+  serp?: GrowthAuditKeywordSerpSummary[];
+  competitors?: GrowthAuditKeywordCompetitorSummary[];
+  cost?: {
+    totalUsd?: number;
+    searchVolumeUsd?: number;
+    keywordIdeasUsd?: number;
+    serpUsd?: number;
+  };
+  limits?: {
+    maxSeedQueries?: number;
+    keywordIdeasSeeds?: number;
+    serpKeywords?: number;
+  };
+  dataQuality?: {
+    hasGscQueries?: boolean;
+    hasSearchVolume?: boolean;
+    hasKeywordIdeas?: boolean;
+    hasSerp?: boolean;
+    warnings?: string[];
+  };
+  syncedAt?: string;
+}
+
+export interface GrowthAuditRunKeywordIntelligenceSummary {
+  pagesAnalyzed?: number;
+  lastAnalyzedAt?: string | null;
+  lastAnalyzedPageUrl?: string | null;
+  totalCostUsd?: number;
+  averageCostPerPageUsd?: number;
+  keywordsEnriched?: number;
+  serpQueriesAnalyzed?: number;
+  competitorsFound?: number;
+  topCompetitors?: Array<{
+    domain?: string;
+    appearancesCount?: number;
+    bestPosition?: number | null;
+  }>;
 }
 
 export interface GrowthAuditPageAnalyticsMetadata {
@@ -677,6 +802,25 @@ export interface GrowthAuditPagePerformanceAnalysisResponse {
   findingsCount: number;
   tasksCount: number;
   message: string;
+}
+
+export interface GrowthAuditKeywordIntelligenceAnalysisRequest {
+  maxSeedQueries?: number;
+  keywordIdeasSeeds?: number;
+  serpKeywords?: number;
+  locationCode?: number;
+  languageCode?: string;
+  force?: boolean;
+}
+
+export interface GrowthAuditKeywordIntelligenceAnalysisResponse {
+  run: GrowthAuditRun;
+  page: GrowthAuditPage;
+  summary: GrowthAuditPageKeywordIntelligenceMetadata;
+  message: string;
+  cached?: boolean;
+  findingsCount?: number;
+  tasksCount?: number;
 }
 
 export interface GrowthAuditSearchConsoleAnalysisRequest {

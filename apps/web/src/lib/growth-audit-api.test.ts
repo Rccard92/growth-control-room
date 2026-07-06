@@ -146,6 +146,24 @@ describe("growth-audit-api", () => {
     );
   });
 
+  it("calls keyword-intelligence page endpoint with camelCase POST body", async () => {
+    const { analyzeGrowthAuditPageKeywordIntelligence } = await import("./growth-audit-api");
+    const payload = {
+      maxSeedQueries: 5,
+      keywordIdeasSeeds: 1,
+      serpKeywords: 3,
+      force: true,
+    };
+    await analyzeGrowthAuditPageKeywordIntelligence("proj-1", "run-42", "page-7", payload);
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      "/api/projects/proj-1/growth-audit/runs/run-42/pages/page-7/keyword-intelligence",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    );
+  });
+
   it("calls search-console-analysis run endpoint with POST body", async () => {
     const { analyzeGrowthAuditSearchConsole } = await import("./growth-audit-api");
     await analyzeGrowthAuditSearchConsole("proj-1", "run-42", { days: 28 });

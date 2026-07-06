@@ -385,6 +385,29 @@ class GrowthAuditPagePerformanceAnalysisResponse(BaseModel):
     message: str
 
 
+class GrowthAuditKeywordIntelligenceAnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    max_seed_queries: int = Field(default=10, alias="maxSeedQueries", ge=1, le=10)
+    keyword_ideas_seeds: int = Field(default=1, alias="keywordIdeasSeeds", ge=0, le=2)
+    serp_keywords: int = Field(default=3, alias="serpKeywords", ge=0, le=3)
+    location_code: int = Field(default=2380, alias="locationCode")
+    language_code: str = Field(default="it", alias="languageCode")
+    force: bool = False
+
+
+class GrowthAuditKeywordIntelligenceAnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    run: GrowthAuditRunRead
+    page: GrowthAuditPageRead
+    summary: dict[str, Any]
+    message: str
+    cached: bool = False
+    findings_count: int = Field(default=0, serialization_alias="findingsCount")
+    tasks_count: int = Field(default=0, serialization_alias="tasksCount")
+
+
 class GrowthAuditSearchConsoleAnalysisRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

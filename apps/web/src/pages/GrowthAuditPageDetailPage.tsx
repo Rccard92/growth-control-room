@@ -9,6 +9,7 @@ import { GrowthAuditPageDetailShopifySection } from "../components/growth-audit/
 import { GrowthAuditPageDetailTechnicalSection } from "../components/growth-audit/page-detail/GrowthAuditPageDetailTechnicalSection";
 import { GrowthAuditPageWorkspacePerformanceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspacePerformanceSection";
 import { GrowthAuditPageWorkspaceSearchConsoleSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceSearchConsoleSection";
+import { GrowthAuditPageWorkspaceKeywordIntelligenceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceKeywordIntelligenceSection";
 import { GrowthAuditPageWorkspaceAnalyticsSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAnalyticsSection";
 import { GrowthAuditPageWorkspaceGa4EcommerceSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceGa4EcommerceSection";
 import { GrowthAuditPageWorkspaceAiSection } from "../components/growth-audit/page-detail/GrowthAuditPageWorkspaceAiSection";
@@ -29,6 +30,7 @@ import {
   hasGrowthAuditPagePerformanceAnalysis,
   hasGrowthAuditPageAnalyticsData,
   hasGrowthAuditPageSearchConsoleData,
+  hasGrowthAuditPageKeywordIntelligenceData,
   hasGrowthAuditPageShopifyCommerceData,
   hasGrowthAuditPageMerchantCenterData,
   hasGrowthAuditPageGa4EcommerceData,
@@ -116,6 +118,10 @@ export function GrowthAuditPageDetailPage() {
   );
   const hasSearchConsoleData = useMemo(
     () => (page ? hasGrowthAuditPageSearchConsoleData(page) : false),
+    [page],
+  );
+  const hasKeywordIntelligenceData = useMemo(
+    () => (page ? hasGrowthAuditPageKeywordIntelligenceData(page) : false),
     [page],
   );
   const hasAnalyticsData = useMemo(
@@ -256,6 +262,13 @@ export function GrowthAuditPageDetailPage() {
 
           <GrowthAuditPageWorkspaceSearchConsoleSection page={page} />
 
+          <GrowthAuditPageWorkspaceKeywordIntelligenceSection
+            projectId={projectId}
+            runId={runId}
+            page={page}
+            runStatus={runStatus}
+          />
+
           <GrowthAuditPageWorkspaceAnalyticsSection page={page} />
 
           <GrowthAuditPageWorkspaceGa4EcommerceSection page={page} />
@@ -279,6 +292,7 @@ export function GrowthAuditPageDetailPage() {
           hasAiResult={Boolean(latestAiResult)}
           hasPerformanceResult={hasPerformanceResult}
           hasSearchConsoleData={hasSearchConsoleData}
+          hasKeywordIntelligenceData={hasKeywordIntelligenceData}
           hasAnalyticsData={hasAnalyticsData}
           hasShopifyCommerceData={hasShopifyCommerceData}
           hasMerchantCenterData={hasMerchantCenterData}

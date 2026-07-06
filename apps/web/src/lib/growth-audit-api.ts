@@ -6,6 +6,8 @@ import type {
   GrowthAuditPageAiAnalysisResponse,
   GrowthAuditPagePerformanceAnalysisRequest,
   GrowthAuditPagePerformanceAnalysisResponse,
+  GrowthAuditKeywordIntelligenceAnalysisRequest,
+  GrowthAuditKeywordIntelligenceAnalysisResponse,
   GrowthAuditPageRescanRequest,
   GrowthAuditPageRescanResponse,
   GrowthAuditPageResultsListResponse,
@@ -165,6 +167,28 @@ export function analyzeGrowthAuditPagePerformance(
     {
       method: "POST",
       ...jsonBody(payload ?? { strategy: "mobile" }),
+    },
+  );
+}
+
+export function analyzeGrowthAuditPageKeywordIntelligence(
+  projectId: string,
+  runId: string,
+  pageId: string,
+  payload?: GrowthAuditKeywordIntelligenceAnalysisRequest,
+): Promise<GrowthAuditKeywordIntelligenceAnalysisResponse> {
+  return apiFetch<GrowthAuditKeywordIntelligenceAnalysisResponse>(
+    `${growthAuditBasePath(projectId)}/runs/${runId}/pages/${pageId}/keyword-intelligence`,
+    {
+      method: "POST",
+      ...jsonBody(
+        payload ?? {
+          maxSeedQueries: 10,
+          keywordIdeasSeeds: 1,
+          serpKeywords: 3,
+          force: false,
+        },
+      ),
     },
   );
 }

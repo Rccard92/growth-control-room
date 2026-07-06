@@ -954,6 +954,47 @@ export function GrowthAuditPage() {
         </section>
       )}
 
+      {isDashboardMode && resolvedRunId && summary?.keywordIntelligence && (
+        <section className="growth-audit-keyword-intelligence-panel gcr-card">
+          <header className="growth-audit-keyword-intelligence-panel__header">
+            <h2 className="growth-audit-keyword-intelligence-panel__title">Keyword Intelligence</h2>
+          </header>
+          <div className="growth-audit-keyword-intelligence-panel__kpis">
+            <div>
+              <span>Pagine analizzate</span>
+              <strong>{summary.keywordIntelligence.pagesAnalyzed ?? 0}</strong>
+            </div>
+            <div>
+              <span>Costo totale</span>
+              <strong>
+                ${(summary.keywordIntelligence.totalCostUsd ?? 0).toFixed(4)}
+              </strong>
+            </div>
+            <div>
+              <span>Keyword arricchite</span>
+              <strong>{summary.keywordIntelligence.keywordsEnriched ?? 0}</strong>
+            </div>
+            <div>
+              <span>Competitor trovati</span>
+              <strong>{summary.keywordIntelligence.competitorsFound ?? 0}</strong>
+            </div>
+            <div>
+              <span>Ultima analisi</span>
+              <strong>
+                {summary.keywordIntelligence.lastAnalyzedAt
+                  ? formatGrowthAuditRunDate(summary.keywordIntelligence.lastAnalyzedAt)
+                  : "—"}
+              </strong>
+            </div>
+          </div>
+          <p className="growth-audit-keyword-intelligence-panel__hint">
+            Apri una{" "}
+            <Link to={APP_ROUTES.projectGrowthAudit(projectId)}>pagina prodotto</Link> per
+            analizzarla.
+          </p>
+        </section>
+      )}
+
       {isDashboardMode && resolvedRunId && (
         <section className="growth-audit-ga4-funnel-panel gcr-card">
           <header className="growth-audit-ga4-funnel-panel__header">

@@ -24,6 +24,7 @@ from app.services.dataforseo.dataforseo_client import (
     safe_test_keyword_search_volume_batch,
     safe_test_serp,
 )
+from app.services.dataforseo.dataforseo_call_logging import record_dataforseo_call
 from app.services.dataforseo.dataforseo_usage_service import (
     DataForSeoUsageLogInput,
     observed_unit_costs,
@@ -59,32 +60,16 @@ async def _record_call(
     metadata: dict[str, Any],
     items_count: int | None = None,
 ) -> Decimal:
-    cost = result.get("cost_usd")
-    cost_decimal = Decimal(str(cost)) if cost is not None else None
-    summary = result.get("summary") or {}
-    resolved_items_count = (
-        items_count
-        if items_count is not None
-        else summary.get("keywordCount")
-        or summary.get("itemsCount")
-        or summary.get("ideasCount")
-        or summary.get("resultCount")
-    )
-    await record_dataforseo_usage(
+    return await record_dataforseo_call(
         session,
-        DataForSeoUsageLogInput(
-            project_id=project_id,
-            endpoint=endpoint,
-            operation=operation,
-            status="success",
-            request_hash=request_hash,
-            cost_usd=cost_decimal,
-            items_count=resolved_items_count,
-            metadata_json=metadata,
-            response_summary=summary,
-        ),
+        project_id=project_id,
+        endpoint=endpoint,
+        operation=operation,
+        request_hash=request_hash,
+        result=result,
+        metadata=metadata,
+        items_count=items_count,
     )
-    return cost_decimal or Decimal("0")
 
 
 async def run_dataforseo_sandbox_test(

@@ -25,9 +25,11 @@ from app.services.dataforseo.exceptions import (
     DataForSeoNotConfiguredError,
     DataForSeoRealCallsDisabledError,
 )
+from app.services.dataforseo.keyword_ideas_normalizer import normalize_keyword_ideas_response
 from app.services.dataforseo.search_volume_normalizer import (
     normalize_search_volume_batch_response,
 )
+from app.services.dataforseo.serp_normalizer import normalize_serp_response
 
 logger = logging.getLogger(__name__)
 
@@ -235,59 +237,22 @@ def summarize_search_volume_response(result: dict[str, Any], keyword: str) -> di
 
 
 def summarize_keyword_ideas_response(result: dict[str, Any], keyword: str) -> dict[str, Any]:
-    ideas: list[str] = []
-    tasks = result.get("tasks") or []
-    for task in tasks:
-        if not isinstance(task, dict):
-            continue
-        task_results = task.get("result")
-        if not isinstance(task_results, list):
-            continue
-        for row in task_results:
-            if not isinstance(row, dict):
-                continue
-            for item in row.get("items") or []:
-                if isinstance(item, dict) and item.get("keyword"):
-                    ideas.append(str(item["keyword"]))
-                elif isinstance(item, str):
-                    ideas.append(item)
-            if row.get("keyword") and not row.get("items"):
-                ideas.append(str(row["keyword"]))
-    unique_ideas = list(dict.fromkeys(ideas))
+    summary = normalize_keyword_ideas_response(result, keyword)
     return {
-        "seedKeyword": keyword,
-        "ideasCount": len(unique_ideas),
-        "topIdeas": unique_ideas[:5],
+        "seedKeyword": summary.get("seedKeyword", keyword),
+        "ideasCount": summary.get("ideasCount", 0),
+        "topIdeas": summary.get("topIdeas", [])[:5],
+        "items": summary.get("items", [])[:5],
     }
 
 
 def summarize_serp_response(result: dict[str, Any], keyword: str) -> dict[str, Any]:
-    organic: list[dict[str, Any]] = []
-    tasks = result.get("tasks") or []
-    for task in tasks:
-        if not isinstance(task, dict):
-            continue
-        task_results = task.get("result")
-        if not isinstance(task_results, list):
-            continue
-        for row in task_results:
-            if not isinstance(row, dict):
-                continue
-            for item in row.get("items") or []:
-                if not isinstance(item, dict):
-                    continue
-                if item.get("type") == "organic" or item.get("url"):
-                    organic.append(
-                        {
-                            "title": item.get("title"),
-                            "url": item.get("url"),
-                            "position": item.get("rank_group") or item.get("rank_absolute"),
-                        }
-                    )
+    summary = normalize_serp_response(result, keyword)
     return {
         "keyword": keyword,
-        "resultCount": len(organic),
-        "topResults": organic[:3],
+        "resultCount": summary.get("resultCount", 0),
+        "topResults": summary.get("topResults", [])[:3],
+        "refinementChips": summary.get("refinementChips", [])[:5],
     }
 
 
@@ -344,8 +309,9 @@ async def safe_test_keyword_ideas(
         }
     ]
     result = await post_dataforseo(ENDPOINT_KEYWORDS_FOR_KEYWORDS_LIVE, payload)
-    summary = summarize_keyword_ideas_response(result, keyword)
-    if limit > 0 and summary.get("topIdeas"):
+    summary = normalize_keyword_ideas_response(result, keyword)
+    if limit > 0 and summary.get("items"):
+        summary["items"] = summary["items"][:limit]
         summary["topIdeas"] = summary["topIdeas"][:limit]
     result["summary"] = summary
     result["rawPreview"] = truncate_json_preview(result.get("raw"))
@@ -368,6 +334,6 @@ async def safe_test_serp(
         }
     ]
     result = await post_dataforseo(ENDPOINT_SERP_ORGANIC_LIVE_ADVANCED, payload)
-    result["summary"] = summarize_serp_response(result, keyword)
+    result["summary"] = normalize_serp_response(result, keyword)
     result["rawPreview"] = truncate_json_preview(result.get("raw"))
     return result

@@ -5,6 +5,7 @@ import {
   getGrowthAuditPageAnalyticsMetadata,
   getGrowthAuditPagePerformanceMetadata,
   getGrowthAuditPageSearchConsoleMetadata,
+  getGrowthAuditPageKeywordIntelligenceMetadata,
   getGrowthAuditSourceEntityTypeLabel,
   getGrowthAuditWorkflowStepStatusLabel,
   getGrowthAuditWorkspaceOperativeNote,
@@ -22,6 +23,7 @@ export interface GrowthAuditPageWorkspaceSidebarProps {
   hasAiResult: boolean;
   hasPerformanceResult?: boolean;
   hasSearchConsoleData?: boolean;
+  hasKeywordIntelligenceData?: boolean;
   hasAnalyticsData?: boolean;
   hasShopifyCommerceData?: boolean;
   hasMerchantCenterData?: boolean;
@@ -59,6 +61,7 @@ export function GrowthAuditPageWorkspaceSidebar({
   hasAiResult,
   hasPerformanceResult = false,
   hasSearchConsoleData = false,
+  hasKeywordIntelligenceData = false,
   hasAnalyticsData = false,
   hasShopifyCommerceData = false,
   hasMerchantCenterData = false,
@@ -70,6 +73,7 @@ export function GrowthAuditPageWorkspaceSidebar({
   const aiMeta = getGrowthAuditPageAiMetadata(page);
   const performanceMeta = getGrowthAuditPagePerformanceMetadata(page);
   const searchConsoleMeta = getGrowthAuditPageSearchConsoleMetadata(page);
+  const keywordIntelligenceMeta = getGrowthAuditPageKeywordIntelligenceMetadata(page);
   const analyticsMeta = getGrowthAuditPageAnalyticsMetadata(page);
   const shopifyLinked = isGrowthAuditPageShopifyLinked(page);
   const mappedEntity = mapGrowthAuditPageToSeoEntity(page);
@@ -81,6 +85,7 @@ export function GrowthAuditPageWorkspaceSidebar({
     hasAiResult,
     hasPerformanceResult,
     hasSearchConsoleData,
+    hasKeywordIntelligenceData,
     hasAnalyticsData,
     hasShopifyCommerceData,
     hasMerchantCenterData,
@@ -127,6 +132,12 @@ export function GrowthAuditPageWorkspaceSidebar({
             <dt>Ultima sync Search Console</dt>
             <dd>{formatDate(searchConsoleMeta?.syncedAt)}</dd>
           </div>
+          {isProductPage && (
+            <div>
+              <dt>Keyword Intelligence</dt>
+              <dd>{formatDate(keywordIntelligenceMeta?.syncedAt)}</dd>
+            </div>
+          )}
           <div>
             <dt>Ultima sync GA4</dt>
             <dd>{formatDate(analyticsMeta?.syncedAt)}</dd>
@@ -229,6 +240,15 @@ export function GrowthAuditPageWorkspaceSidebar({
           >
             Search Console
           </button>
+          {isProductPage && (
+            <button
+              type="button"
+              className="gcr-btn gcr-btn--secondary gcr-btn--sm"
+              onClick={() => onScrollToSection("keyword-intelligence")}
+            >
+              Keyword Intelligence
+            </button>
+          )}
           <button
             type="button"
             className="gcr-btn gcr-btn--secondary gcr-btn--sm"

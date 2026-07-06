@@ -5,6 +5,7 @@ import type {
   GrowthAuditPage,
   GrowthAuditPageAiMetadata,
   GrowthAuditPagePerformanceMetadata,
+  GrowthAuditPageKeywordIntelligenceMetadata,
   GrowthAuditPageSearchConsoleMetadata,
   GrowthAuditPageAnalyticsMetadata,
   GrowthAuditPageShopifyCommerceMetadata,
@@ -1817,6 +1818,59 @@ export function hasGrowthAuditPageSearchConsoleData(page: GrowthAuditPage): bool
   );
 }
 
+export function getGrowthAuditPageKeywordIntelligenceMetadata(
+  page: GrowthAuditPage,
+): GrowthAuditPageKeywordIntelligenceMetadata | null {
+  const keywordIntelligence = page.metadata?.keywordIntelligence;
+  if (!keywordIntelligence || typeof keywordIntelligence !== "object") return null;
+  return keywordIntelligence as GrowthAuditPageKeywordIntelligenceMetadata;
+}
+
+export function hasGrowthAuditPageKeywordIntelligenceData(page: GrowthAuditPage): boolean {
+  const meta = getGrowthAuditPageKeywordIntelligenceMetadata(page);
+  return Boolean(meta?.syncedAt);
+}
+
+export function isKeywordIntelligenceFresh(
+  metadata: GrowthAuditPageKeywordIntelligenceMetadata | null | undefined,
+  days = 7,
+): boolean {
+  if (!metadata?.syncedAt) return false;
+  const syncedAt = new Date(metadata.syncedAt);
+  if (Number.isNaN(syncedAt.getTime())) return false;
+  const ageMs = Date.now() - syncedAt.getTime();
+  return ageMs < days * 24 * 60 * 60 * 1000;
+}
+
+const DEFAULT_KI_SV_COST = 0.09;
+const DEFAULT_KI_IDEAS_COST = 0.09;
+const DEFAULT_KI_SERP_COST = 0.002;
+
+export function estimateKeywordIntelligenceCostUsd(input: {
+  maxSeedQueries: number;
+  keywordIdeasSeeds: number;
+  serpKeywords: number;
+}): number {
+  const svCost = Math.max(DEFAULT_KI_SV_COST, DEFAULT_KI_SV_COST * input.maxSeedQueries);
+  const ideasCost = DEFAULT_KI_IDEAS_COST * input.keywordIdeasSeeds;
+  const serpCost = DEFAULT_KI_SERP_COST * input.serpKeywords;
+  return Math.round((svCost + ideasCost + serpCost) * 10000) / 10000;
+}
+
+function _getKeywordIntelligenceMetrics(page: GrowthAuditPage) {
+  const meta = getGrowthAuditPageKeywordIntelligenceMetadata(page);
+  if (!meta) return null;
+  const volumes = (meta.searchVolume ?? [])
+    .map((item) => item.searchVolume)
+    .filter((value): value is number => typeof value === "number");
+  const highestSearchVolume = volumes.length > 0 ? Math.max(...volumes) : undefined;
+  const topCompetitorCount = meta.competitors?.length ?? 0;
+  const keywordOpportunityCount = (meta.seedQueries ?? []).filter(
+    (seed) => (seed.impressions ?? 0) > 100 && (seed.ctr ?? 1) < 0.01,
+  ).length;
+  return { highestSearchVolume, topCompetitorCount, keywordOpportunityCount };
+}
+
 function _getSearchConsolePriorityBoost(page: GrowthAuditPage): number {
   const meta = getGrowthAuditPageSearchConsoleMetadata(page);
   if (!meta) return 0;
@@ -2713,6 +2767,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   hasAiResult: boolean;
   hasPerformanceResult?: boolean;
   hasSearchConsoleData?: boolean;
+  hasKeywordIntelligenceData?: boolean;
   hasAnalyticsData?: boolean;
   hasShopifyCommerceData?: boolean;
   hasMerchantCenterData?: boolean;
@@ -2726,6 +2781,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
     hasAiResult,
     hasPerformanceResult = false,
     hasSearchConsoleData = false,
+    hasKeywordIntelligenceData = false,
     hasAnalyticsData = false,
     hasShopifyCommerceData = false,
     hasMerchantCenterData = false,
@@ -2735,6 +2791,7 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
   } = input;
   const isAnalyzed = page.status === "analyzed";
   const isStrategic = STRATEGIC_WORKFLOW_PAGE_TYPES.has((page.pageType ?? "").toLowerCase());
+  const isProductPage = isGrowthAuditProductPage(page);
   const canRescan = page.status !== "analyzing";
   const hasScore = page.score != null;
 
@@ -2781,13 +2838,19 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       ? "available"
       : "todo";
 
+  const keywordIntelligenceStatus: GrowthAuditWorkflowStepStatus = hasKeywordIntelligenceData
+    ? "done"
+    : isProductPage && hasSearchConsoleData
+      ? "recommended"
+      : isProductPage
+        ? "available"
+        : "todo";
+
   const analyticsStatus: GrowthAuditWorkflowStepStatus = hasAnalyticsData
     ? "done"
     : isAnalyzed
       ? "available"
       : "todo";
-
-  const isProductPage = isGrowthAuditProductPage(page);
 
   const ga4EcommerceStatus: GrowthAuditWorkflowStepStatus = hasGa4EcommerceData
     ? "done"
@@ -2840,6 +2903,18 @@ export function buildGrowthAuditPageWorkflowSteps(input: {
       status: searchConsoleStatus,
       anchorId: "search-console",
     },
+  );
+
+  if (isProductPage) {
+    workflowSteps.push({
+      key: "keyword-intelligence",
+      label: "Keyword Intelligence",
+      status: keywordIntelligenceStatus,
+      anchorId: "keyword-intelligence",
+    });
+  }
+
+  workflowSteps.push(
     {
       key: "analytics",
       label: "GA4",
@@ -4345,6 +4420,9 @@ export interface GrowthAuditEconomicPriorityItem {
     performanceScore?: number;
     croScore?: number;
     seoScore?: number;
+    highestSearchVolume?: number;
+    topCompetitorCount?: number;
+    keywordOpportunityCount?: number;
     bestVariantTitle?: string | null;
     bestVariantRevenue?: number | null;
   };
@@ -4422,6 +4500,7 @@ function _computeEconomicDataConfidence(page: GrowthAuditPage): number {
   if (hasGrowthAuditPageMerchantCenterReliableMatch(page)) confidence += 10;
   if (hasGrowthAuditPagePerformanceAnalysis(page)) confidence += 10;
   if (hasGrowthAuditPageAiAnalysis(page)) confidence += 10;
+  if (hasGrowthAuditPageKeywordIntelligenceData(page)) confidence += 10;
 
   const merchantMeta = getGrowthAuditPageMerchantCenterMetadata(page);
   if (
@@ -5004,6 +5083,18 @@ function _buildEconomicPriorityReasons(input: {
     });
   }
 
+  if (hasGrowthAuditPageKeywordIntelligenceData(page)) {
+    const kiMeta = getGrowthAuditPageKeywordIntelligenceMetadata(page);
+    reasons.push({
+      key: "keyword_intelligence",
+      label: "Keyword Intelligence disponibile",
+      detail: kiMeta?.dataQuality?.hasSearchVolume
+        ? "Volumi e competitor SERP arricchiscono le decisioni SEO su questa pagina."
+        : "Analisi keyword disponibile per supportare le priorità organiche.",
+      impact: "neutral",
+    });
+  }
+
   return reasons.slice(0, 5);
 }
 
@@ -5055,6 +5146,17 @@ function _buildEconomicPriorityMetrics(input: {
   if (performanceScore != null) metrics.performanceScore = performanceScore;
   if (croScore != null) metrics.croScore = croScore;
   if (page.score != null) metrics.seoScore = page.score;
+
+  const kiMetrics = _getKeywordIntelligenceMetrics(page);
+  if (kiMetrics?.highestSearchVolume != null) {
+    metrics.highestSearchVolume = kiMetrics.highestSearchVolume;
+  }
+  if (kiMetrics?.topCompetitorCount != null) {
+    metrics.topCompetitorCount = kiMetrics.topCompetitorCount;
+  }
+  if (kiMetrics?.keywordOpportunityCount != null) {
+    metrics.keywordOpportunityCount = kiMetrics.keywordOpportunityCount;
+  }
 
   return metrics;
 }

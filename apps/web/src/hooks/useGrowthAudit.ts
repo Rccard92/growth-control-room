@@ -3,6 +3,7 @@ import type {
   GrowthAuditFindingsFilters,
   GrowthAuditPageAiAnalysisRequest,
   GrowthAuditPagePerformanceAnalysisRequest,
+  GrowthAuditKeywordIntelligenceAnalysisRequest,
   GrowthAuditPageRescanRequest,
   GrowthAuditSearchConsoleAnalysisRequest,
   GrowthAuditAnalyticsAnalysisRequest,
@@ -15,6 +16,7 @@ import type {
 } from "@gcr/shared";
 import {
   analyzeGrowthAuditPagePerformance,
+  analyzeGrowthAuditPageKeywordIntelligence,
   analyzeGrowthAuditPageWithAi,
   analyzeGrowthAuditSearchConsole,
   analyzeGrowthAuditAnalytics,
@@ -288,6 +290,60 @@ export function useAnalyzeGrowthAuditPagePerformance(projectId?: string, runId?:
         throw new Error("projectId and runId are required");
       }
       return analyzeGrowthAuditPagePerformance(projectId, runId, input.pageId, input.payload);
+    },
+    onSuccess: (data) => {
+      if (!projectId) return;
+
+      const resolvedRunId = data.run.id;
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.runs(projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.run(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pages(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.findings(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.tasks(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.events(projectId, resolvedRunId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.growthAudit.pageResults(
+          projectId,
+          resolvedRunId,
+          data.page.id,
+        ),
+      });
+    },
+  });
+}
+
+export function useAnalyzeGrowthAuditPageKeywordIntelligence(
+  projectId?: string,
+  runId?: string,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      pageId: string;
+      payload?: GrowthAuditKeywordIntelligenceAnalysisRequest;
+    }) => {
+      if (!projectId || !runId) {
+        throw new Error("projectId and runId are required");
+      }
+      return analyzeGrowthAuditPageKeywordIntelligence(
+        projectId,
+        runId,
+        input.pageId,
+        input.payload,
+      );
     },
     onSuccess: (data) => {
       if (!projectId) return;

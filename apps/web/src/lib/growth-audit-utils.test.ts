@@ -47,6 +47,8 @@ import {
   buildGrowthAuditEconomicPriorityRanking,
   filterGrowthAuditEconomicPriorityItems,
   getGrowthAuditPriorityLevelLabel,
+  estimateKeywordIntelligenceCostUsd,
+  isKeywordIntelligenceFresh,
 } from "./growth-audit-utils";
 
 const samplePages: GrowthAuditPage[] = [
@@ -1903,6 +1905,21 @@ describe("growth-audit-utils", () => {
       const filtered = filterGrowthAuditEconomicPriorityItems(items, "incomplete_data");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].pageId).toBe("b");
+    });
+  });
+
+  describe("keyword intelligence utils", () => {
+    it("detects fresh metadata", () => {
+      expect(isKeywordIntelligenceFresh({ syncedAt: new Date().toISOString() })).toBe(true);
+    });
+
+    it("estimates cost from settings", () => {
+      const cost = estimateKeywordIntelligenceCostUsd({
+        maxSeedQueries: 5,
+        keywordIdeasSeeds: 1,
+        serpKeywords: 3,
+      });
+      expect(cost).toBeGreaterThan(0.15);
     });
   });
 });
