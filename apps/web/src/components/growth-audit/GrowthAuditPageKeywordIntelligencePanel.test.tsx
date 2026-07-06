@@ -78,6 +78,7 @@ describe("GrowthAuditPageKeywordIntelligencePanel", () => {
     );
     expect(html).toContain("credito DataForSEO");
     expect(html).toContain("$0.1860");
+    expect(html).not.toContain("$0.9960");
     expect(html).toContain("costi osservati");
     expect(html).toContain("gcr-select");
     expect(html).toContain("Max seed query");
@@ -93,7 +94,8 @@ describe("GrowthAuditPageKeywordIntelligencePanel", () => {
       />,
     );
     expect(html).toContain("$0.1860");
-    expect(html).toContain("fallback finché non ci sono costi osservati");
+    expect(html).not.toContain("$0.9960");
+    expect(html).toContain("fallback realistico");
   });
 
   it("renders metadata tables and competitors", () => {

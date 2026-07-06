@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -65,6 +66,17 @@ CACHE_DAYS = 7
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _stringify_finding_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except Exception:
+        return str(value)
 
 
 def _is_product_page(page: GrowthAuditPage) -> bool:
@@ -530,6 +542,12 @@ async def analyze_growth_audit_page_keyword_intelligence(
     await session.flush()
 
     for finding_data in findings:
+        existing_meta = finding_data.get("finding_metadata") or {}
+        finding_metadata = {
+            **existing_meta,
+            "source": "keyword_intelligence",
+            "structuredEvidence": finding_data.get("structuredEvidence"),
+        }
         session.add(
             GrowthAuditFinding(
                 run_id=run.id,
@@ -539,12 +557,13 @@ async def analyze_growth_audit_page_keyword_intelligence(
                 category=finding_data.get("category", "seo"),
                 severity=finding_data.get("severity", "medium"),
                 priority=finding_data.get("priority", "medium"),
-                title=finding_data.get("title", "Opportunità keyword"),
-                description=finding_data.get("description"),
-                evidence=finding_data.get("evidence"),
-                recommendation=finding_data.get("recommendation"),
+                title=_stringify_finding_text(finding_data.get("title"))
+                or "Opportunità keyword",
+                description=_stringify_finding_text(finding_data.get("description")),
+                evidence=_stringify_finding_text(finding_data.get("evidence")),
+                recommendation=_stringify_finding_text(finding_data.get("recommendation")),
                 status="open",
-                finding_metadata={"source": "keyword_intelligence"},
+                finding_metadata=finding_metadata,
             )
         )
 
@@ -554,8 +573,8 @@ async def analyze_growth_audit_page_keyword_intelligence(
                 run_id=run.id,
                 page_id=page.id,
                 project_id=project_id,
-                title=task_data.get("title", "Task keyword"),
-                description=task_data.get("description"),
+                title=_stringify_finding_text(task_data.get("title")) or "Task keyword",
+                description=_stringify_finding_text(task_data.get("description")),
                 owner_type=task_data.get("ownerType", "seo"),
                 priority=task_data.get("priority", "medium"),
                 estimated_effort=task_data.get("estimatedEffort", "medium"),

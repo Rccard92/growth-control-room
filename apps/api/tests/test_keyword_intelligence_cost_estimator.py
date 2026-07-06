@@ -6,6 +6,8 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
+
 from app.services.dataforseo.dataforseo_cost_estimator import (
     compute_keyword_intelligence_cost,
     compute_search_volume_batch_cost_usd,
@@ -29,6 +31,7 @@ def test_compute_keyword_intelligence_cost_with_observed_units() -> None:
     )
 
     assert result["totalUsd"] == 0.186
+    assert result["totalUsd"] != 0.996
     assert result["breakdown"]["searchVolumeBatches"] == 1
     assert result["breakdown"]["searchVolumeUsd"] == 0.09
     assert result["estimateSource"] == "observed"
@@ -136,5 +139,40 @@ def test_estimate_page_cost_fallback_without_logs() -> None:
 
         assert result["totalUsd"] == 0.186
         assert result["estimateSource"] == "fallback"
+
+    asyncio.run(run())
+
+
+def test_keyword_intelligence_budget_allows_correct_estimate() -> None:
+    async def run() -> None:
+        from decimal import Decimal
+
+        from app.core.config import settings
+        from app.services.dataforseo.dataforseo_budget import assert_dataforseo_budget_allows
+        from app.services.dataforseo.exceptions import DataForSeoBudgetExceededError
+
+        project_id = uuid4()
+        session = AsyncMock()
+        settings.dataforseo_enable_real_calls = True
+        settings.dataforseo_single_run_limit_usd = 1.0
+
+        with (
+            patch(
+                "app.services.dataforseo.dataforseo_budget.get_dataforseo_usage_today",
+                new=AsyncMock(return_value=Decimal("0")),
+            ),
+            patch(
+                "app.services.dataforseo.dataforseo_budget.get_dataforseo_usage_month",
+                new=AsyncMock(return_value=Decimal("0")),
+            ),
+        ):
+            await assert_dataforseo_budget_allows(session, project_id, 0.186)
+
+            settings.dataforseo_single_run_limit_usd = 0.10
+            with pytest.raises(DataForSeoBudgetExceededError):
+                await assert_dataforseo_budget_allows(session, project_id, 0.186)
+
+            with pytest.raises(DataForSeoBudgetExceededError):
+                await assert_dataforseo_budget_allows(session, project_id, 0.996)
 
     asyncio.run(run())

@@ -169,6 +169,49 @@ def test_findings_max_five() -> None:
     )
     assert len(findings) <= 5
     assert len(tasks) == len(findings)
+    for finding in findings:
+        assert isinstance(finding["evidence"], str)
+        assert isinstance(finding.get("structuredEvidence"), dict)
+
+
+def test_stringify_finding_text_never_passes_dict_to_orm() -> None:
+    from app.services.growth_audit.keyword_intelligence_analysis import _stringify_finding_text
+
+    assert _stringify_finding_text("testo") == "testo"
+    assert _stringify_finding_text(None) is None
+    serialized = _stringify_finding_text({"domain": "kontak.it"})
+    assert isinstance(serialized, str)
+    assert "kontak.it" in serialized
+
+
+def test_keyword_intelligence_cost_estimate_is_not_per_keyword() -> None:
+    async def run() -> None:
+        from app.services.growth_audit.keyword_intelligence_analysis import (
+            estimate_keyword_intelligence_cost,
+        )
+
+        session = AsyncMock()
+        with patch(
+            "app.services.growth_audit.keyword_intelligence_analysis.estimate_keyword_intelligence_page_cost",
+            new=AsyncMock(
+                return_value={
+                    "totalUsd": 0.186,
+                    "estimateSource": "fallback",
+                }
+            ),
+        ):
+            cost = await estimate_keyword_intelligence_cost(
+                session,
+                uuid4(),
+                seed_count=10,
+                keyword_ideas_seeds=1,
+                serp_keywords=3,
+            )
+
+        assert cost == 0.186
+        assert cost != 0.996
+
+    asyncio.run(run())
 
 
 def test_endpoint_blocks_real_calls_disabled() -> None:

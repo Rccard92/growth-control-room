@@ -6,6 +6,7 @@ import { formatTrend } from "../../lib/dataforseo-sandbox-utils";
 import {
   buildKeywordIntelligenceCostEstimate,
   formatKeywordIntelligenceCostEstimateNote,
+  formatKeywordIntelligenceAnalysisError,
   getGrowthAuditPageKeywordIntelligenceMetadata,
   isGrowthAuditRunActive,
   isKeywordIntelligenceFresh,
@@ -88,7 +89,7 @@ export function GrowthAuditPageKeywordIntelligencePanel({
       });
       setFeedback(result.message);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Analisi non riuscita.");
+      setFeedback(formatKeywordIntelligenceAnalysisError(error));
     }
   };
 

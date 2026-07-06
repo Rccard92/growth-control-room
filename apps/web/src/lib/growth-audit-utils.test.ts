@@ -50,6 +50,7 @@ import {
   estimateKeywordIntelligenceCostUsd,
   buildKeywordIntelligenceCostEstimate,
   formatKeywordIntelligenceCostEstimateNote,
+  formatKeywordIntelligenceAnalysisError,
   isKeywordIntelligenceFresh,
 } from "./growth-audit-utils";
 
@@ -1922,6 +1923,7 @@ describe("growth-audit-utils", () => {
         serpKeywords: 3,
       });
       expect(estimate.totalUsd).toBe(0.186);
+      expect(estimate.totalUsd).not.toBe(0.996);
       expect(estimate.estimateSource).toBe("fallback");
       expect(estimate.breakdown.searchVolumeBatches).toBe(1);
     });
@@ -1957,6 +1959,25 @@ describe("growth-audit-utils", () => {
         serpKeywords: 3,
       });
       expect(cost).toBe(0.186);
+    });
+
+    it("formats generic 500 error for keyword intelligence", () => {
+      expect(
+        formatKeywordIntelligenceAnalysisError(
+          new Error("Unexpected error during Growth Audit operation"),
+        ),
+      ).toBe("Keyword Intelligence non completata. Controlla log backend.");
+    });
+
+    it("formats fallback estimate note", () => {
+      const note = formatKeywordIntelligenceCostEstimateNote(
+        buildKeywordIntelligenceCostEstimate({
+          maxSeedQueries: 10,
+          keywordIdeasSeeds: 1,
+          serpKeywords: 3,
+        }),
+      );
+      expect(note).toContain("fallback realistico");
     });
   });
 });

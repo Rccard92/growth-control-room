@@ -1933,7 +1933,38 @@ export function formatKeywordIntelligenceCostEstimateNote(
   if (estimate.estimateSource === "observed") {
     return `Stima basata sui costi osservati: Search Volume batch $${estimate.unitCosts.searchVolumeBatch.toFixed(2)}, Keyword Ideas $${estimate.unitCosts.keywordIdeas.toFixed(2)}, SERP $${estimate.unitCosts.serp.toFixed(3)}.`;
   }
-  return "Stima basata su fallback finché non ci sono costi osservati.";
+  return "Stima basata su fallback realistico finché non ci sono costi osservati.";
+}
+
+export function formatKeywordIntelligenceAnalysisError(error: unknown): string {
+  const fallback = "Analisi Keyword Intelligence non riuscita.";
+  const raw = error instanceof Error ? error.message.trim() : "";
+  if (!raw) return fallback;
+
+  const lowered = raw.toLowerCase();
+  if (
+    lowered.includes("unexpected error during growth audit operation")
+    || lowered.includes("growth audit operation failed")
+  ) {
+    return "Keyword Intelligence non completata. Controlla log backend.";
+  }
+  if (lowered.includes("budget") || lowered.includes("limite")) {
+    return raw;
+  }
+  if (
+    lowered.includes("dataforseo")
+    || lowered.includes("chiamate reali")
+    || lowered.includes("non configurat")
+    || lowered.includes("502")
+    || lowered.includes("503")
+    || lowered.includes("409")
+  ) {
+    return raw;
+  }
+  if (lowered.includes("validation") || lowered.includes("422")) {
+    return raw;
+  }
+  return raw || fallback;
 }
 
 function _getKeywordIntelligenceMetrics(page: GrowthAuditPage) {
