@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import type { GrowthAuditPage, GrowthAuditPageKeywordIntelligenceMetadata, GrowthAuditKeywordSearchVolumeItem } from "@gcr/shared";
 import { useAnalyzeGrowthAuditPageKeywordIntelligence } from "../../hooks/useGrowthAudit";
-import { useDataForSeoStatus } from "../../hooks/useDataForSeo";
+import { useDataForSeoStatus, useDataForSeoUsage } from "../../hooks/useDataForSeo";
 import { formatTrend } from "../../lib/dataforseo-sandbox-utils";
 import {
-  estimateKeywordIntelligenceCostUsd,
+  buildKeywordIntelligenceCostEstimate,
+  formatKeywordIntelligenceCostEstimateNote,
   getGrowthAuditPageKeywordIntelligenceMetadata,
   isGrowthAuditRunActive,
   isKeywordIntelligenceFresh,
@@ -46,18 +47,22 @@ export function GrowthAuditPageKeywordIntelligencePanel({
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const { data: dfsStatus } = useDataForSeoStatus(projectId);
+  const { data: dfsUsage } = useDataForSeoUsage(projectId);
   const analyzeMutation = useAnalyzeGrowthAuditPageKeywordIntelligence(projectId, runId);
 
   const metadata = getGrowthAuditPageKeywordIntelligenceMetadata(page);
   const isFresh = isKeywordIntelligenceFresh(metadata);
-  const estimatedCost = useMemo(
+  const costEstimate = useMemo(
     () =>
-      estimateKeywordIntelligenceCostUsd({
-        maxSeedQueries,
-        keywordIdeasSeeds,
-        serpKeywords,
-      }),
-    [maxSeedQueries, keywordIdeasSeeds, serpKeywords],
+      buildKeywordIntelligenceCostEstimate(
+        {
+          maxSeedQueries,
+          keywordIdeasSeeds,
+          serpKeywords,
+        },
+        dfsUsage?.averageCostByOperation,
+      ),
+    [maxSeedQueries, keywordIdeasSeeds, serpKeywords, dfsUsage?.averageCostByOperation],
   );
 
   const canAnalyze =
@@ -158,8 +163,11 @@ export function GrowthAuditPageKeywordIntelligencePanel({
       </details>
 
       <p className="growth-audit-keyword-intelligence__warning">
-        Questa analisi usa credito DataForSEO. Stima circa {formatUsd(estimatedCost)} con le
+        Questa analisi usa credito DataForSEO. Stima circa {formatUsd(costEstimate.totalUsd)} con le
         impostazioni attuali.
+      </p>
+      <p className="growth-audit-keyword-intelligence__estimate-note">
+        {formatKeywordIntelligenceCostEstimateNote(costEstimate)}
       </p>
 
       {!dfsStatus?.realCallsEnabled && (

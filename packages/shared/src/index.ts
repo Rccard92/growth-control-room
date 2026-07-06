@@ -347,6 +347,7 @@ export type {
   GrowthAuditPagePerformanceMetadata,
   GrowthAuditKeywordIntelligenceAnalysisRequest,
   GrowthAuditKeywordIntelligenceAnalysisResponse,
+  GrowthAuditKeywordIntelligenceCostEstimate,
   GrowthAuditPageKeywordIntelligenceMetadata,
   GrowthAuditPageKeywordIntelligenceSeedQuery,
   GrowthAuditKeywordSearchVolumeItem,

@@ -82,6 +82,15 @@ vi.mock("../hooks/useDataForSeo", () => ({
   useDataForSeoStatus: vi.fn(() => ({
     data: { configured: true, realCallsEnabled: true },
   })),
+  useDataForSeoUsage: vi.fn(() => ({
+    data: {
+      averageCostByOperation: {
+        search_volume_batch: 0.09,
+        keyword_ideas: 0.09,
+        serp: 0.002,
+      },
+    },
+  })),
 }));
 
 const sampleProductPage = {

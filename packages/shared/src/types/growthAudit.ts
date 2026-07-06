@@ -813,6 +813,22 @@ export interface GrowthAuditKeywordIntelligenceAnalysisRequest {
   force?: boolean;
 }
 
+export interface GrowthAuditKeywordIntelligenceCostEstimate {
+  totalUsd: number;
+  estimateSource: "observed" | "fallback";
+  breakdown: {
+    searchVolumeUsd: number;
+    keywordIdeasUsd: number;
+    serpUsd: number;
+    searchVolumeBatches: number;
+  };
+  unitCosts: {
+    searchVolumeBatch: number;
+    keywordIdeas: number;
+    serp: number;
+  };
+}
+
 export interface GrowthAuditKeywordIntelligenceAnalysisResponse {
   run: GrowthAuditRun;
   page: GrowthAuditPage;

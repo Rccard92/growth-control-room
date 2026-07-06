@@ -6,6 +6,7 @@ import type {
   GrowthAuditPageAiMetadata,
   GrowthAuditPagePerformanceMetadata,
   GrowthAuditPageKeywordIntelligenceMetadata,
+  GrowthAuditKeywordIntelligenceCostEstimate,
   GrowthAuditPageSearchConsoleMetadata,
   GrowthAuditPageAnalyticsMetadata,
   GrowthAuditPageShopifyCommerceMetadata,
@@ -1842,19 +1843,97 @@ export function isKeywordIntelligenceFresh(
   return ageMs < days * 24 * 60 * 60 * 1000;
 }
 
-const DEFAULT_KI_SV_COST = 0.09;
+const SEARCH_VOLUME_BATCH_MAX_KEYWORDS = 10;
+const DEFAULT_KI_SV_BATCH_COST = 0.09;
 const DEFAULT_KI_IDEAS_COST = 0.09;
 const DEFAULT_KI_SERP_COST = 0.002;
 
-export function estimateKeywordIntelligenceCostUsd(input: {
-  maxSeedQueries: number;
-  keywordIdeasSeeds: number;
-  serpKeywords: number;
-}): number {
-  const svCost = Math.max(DEFAULT_KI_SV_COST, DEFAULT_KI_SV_COST * input.maxSeedQueries);
-  const ideasCost = DEFAULT_KI_IDEAS_COST * input.keywordIdeasSeeds;
-  const serpCost = DEFAULT_KI_SERP_COST * input.serpKeywords;
-  return Math.round((svCost + ideasCost + serpCost) * 10000) / 10000;
+function _resolveKeywordIntelligenceUnitCosts(
+  observedCosts?: Record<string, number> | null,
+): { unitCosts: GrowthAuditKeywordIntelligenceCostEstimate["unitCosts"]; hasObserved: boolean } {
+  const searchVolumeBatch =
+    observedCosts?.search_volume_batch ??
+    observedCosts?.keyword_intelligence_search_volume ??
+    DEFAULT_KI_SV_BATCH_COST;
+  const keywordIdeas =
+    observedCosts?.keyword_ideas ??
+    observedCosts?.keyword_intelligence_keyword_ideas ??
+    DEFAULT_KI_IDEAS_COST;
+  const serp =
+    observedCosts?.serp ?? observedCosts?.keyword_intelligence_serp ?? DEFAULT_KI_SERP_COST;
+
+  const hasObserved = Boolean(
+    observedCosts &&
+      (
+        observedCosts.search_volume_batch != null ||
+        observedCosts.keyword_intelligence_search_volume != null ||
+        observedCosts.keyword_ideas != null ||
+        observedCosts.keyword_intelligence_keyword_ideas != null ||
+        observedCosts.serp != null ||
+        observedCosts.keyword_intelligence_serp != null
+      ),
+  );
+
+  return {
+    unitCosts: {
+      searchVolumeBatch: searchVolumeBatch,
+      keywordIdeas,
+      serp,
+    },
+    hasObserved,
+  };
+}
+
+export function buildKeywordIntelligenceCostEstimate(
+  input: {
+    maxSeedQueries: number;
+    keywordIdeasSeeds: number;
+    serpKeywords: number;
+  },
+  observedCosts?: Record<string, number> | null,
+): GrowthAuditKeywordIntelligenceCostEstimate {
+  const { unitCosts, hasObserved } = _resolveKeywordIntelligenceUnitCosts(observedCosts);
+  const searchVolumeBatches =
+    input.maxSeedQueries > 0
+      ? Math.ceil(input.maxSeedQueries / SEARCH_VOLUME_BATCH_MAX_KEYWORDS)
+      : 0;
+  const searchVolumeUsd = Math.round(searchVolumeBatches * unitCosts.searchVolumeBatch * 10000) / 10000;
+  const keywordIdeasUsd =
+    Math.round(input.keywordIdeasSeeds * unitCosts.keywordIdeas * 10000) / 10000;
+  const serpUsd = Math.round(input.serpKeywords * unitCosts.serp * 10000) / 10000;
+  const totalUsd = Math.round((searchVolumeUsd + keywordIdeasUsd + serpUsd) * 10000) / 10000;
+
+  return {
+    totalUsd,
+    estimateSource: hasObserved ? "observed" : "fallback",
+    breakdown: {
+      searchVolumeUsd,
+      keywordIdeasUsd,
+      serpUsd,
+      searchVolumeBatches,
+    },
+    unitCosts,
+  };
+}
+
+export function estimateKeywordIntelligenceCostUsd(
+  input: {
+    maxSeedQueries: number;
+    keywordIdeasSeeds: number;
+    serpKeywords: number;
+  },
+  observedCosts?: Record<string, number> | null,
+): number {
+  return buildKeywordIntelligenceCostEstimate(input, observedCosts).totalUsd;
+}
+
+export function formatKeywordIntelligenceCostEstimateNote(
+  estimate: GrowthAuditKeywordIntelligenceCostEstimate,
+): string {
+  if (estimate.estimateSource === "observed") {
+    return `Stima basata sui costi osservati: Search Volume batch $${estimate.unitCosts.searchVolumeBatch.toFixed(2)}, Keyword Ideas $${estimate.unitCosts.keywordIdeas.toFixed(2)}, SERP $${estimate.unitCosts.serp.toFixed(3)}.`;
+  }
+  return "Stima basata su fallback finché non ci sono costi osservati.";
 }
 
 function _getKeywordIntelligenceMetrics(page: GrowthAuditPage) {

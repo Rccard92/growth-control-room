@@ -48,6 +48,8 @@ import {
   filterGrowthAuditEconomicPriorityItems,
   getGrowthAuditPriorityLevelLabel,
   estimateKeywordIntelligenceCostUsd,
+  buildKeywordIntelligenceCostEstimate,
+  formatKeywordIntelligenceCostEstimateNote,
   isKeywordIntelligenceFresh,
 } from "./growth-audit-utils";
 
@@ -1913,13 +1915,48 @@ describe("growth-audit-utils", () => {
       expect(isKeywordIntelligenceFresh({ syncedAt: new Date().toISOString() })).toBe(true);
     });
 
-    it("estimates cost from settings", () => {
+    it("estimates 10/1/3 as 0.186 with fallback", () => {
+      const estimate = buildKeywordIntelligenceCostEstimate({
+        maxSeedQueries: 10,
+        keywordIdeasSeeds: 1,
+        serpKeywords: 3,
+      });
+      expect(estimate.totalUsd).toBe(0.186);
+      expect(estimate.estimateSource).toBe("fallback");
+      expect(estimate.breakdown.searchVolumeBatches).toBe(1);
+    });
+
+    it("estimates search volume per batch for 20 seeds", () => {
+      const estimate = buildKeywordIntelligenceCostEstimate({
+        maxSeedQueries: 20,
+        keywordIdeasSeeds: 0,
+        serpKeywords: 0,
+      });
+      expect(estimate.breakdown.searchVolumeBatches).toBe(2);
+      expect(estimate.breakdown.searchVolumeUsd).toBe(0.18);
+    });
+
+    it("uses observed costs when provided", () => {
+      const estimate = buildKeywordIntelligenceCostEstimate(
+        { maxSeedQueries: 10, keywordIdeasSeeds: 1, serpKeywords: 3 },
+        {
+          search_volume_batch: 0.09,
+          keyword_ideas: 0.09,
+          serp: 0.002,
+        },
+      );
+      expect(estimate.totalUsd).toBe(0.186);
+      expect(estimate.estimateSource).toBe("observed");
+      expect(formatKeywordIntelligenceCostEstimateNote(estimate)).toContain("costi osservati");
+    });
+
+    it("keeps wrapper estimateKeywordIntelligenceCostUsd", () => {
       const cost = estimateKeywordIntelligenceCostUsd({
         maxSeedQueries: 5,
         keywordIdeasSeeds: 1,
         serpKeywords: 3,
       });
-      expect(cost).toBeGreaterThan(0.15);
+      expect(cost).toBe(0.186);
     });
   });
 });

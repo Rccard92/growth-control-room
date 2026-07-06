@@ -12,9 +12,7 @@ from app.services.dataforseo.constants import (
     ENDPOINT_KEYWORDS_FOR_KEYWORDS_LIVE,
     ENDPOINT_SEARCH_VOLUME_LIVE,
     ENDPOINT_SERP_ORGANIC_LIVE_ADVANCED,
-    OBSERVED_SEARCH_VOLUME_SINGLE_COST_USD,
     TEST_COST_ESTIMATES,
-    UNIT_COST_ESTIMATES,
 )
 from app.services.dataforseo.dataforseo_budget import assert_dataforseo_budget_allows
 from app.services.dataforseo.dataforseo_client import (
@@ -25,9 +23,12 @@ from app.services.dataforseo.dataforseo_client import (
     safe_test_serp,
 )
 from app.services.dataforseo.dataforseo_call_logging import record_dataforseo_call
+from app.services.dataforseo.dataforseo_cost_estimator import (
+    compute_search_volume_batch_cost_usd,
+    resolve_keyword_intelligence_unit_costs,
+)
 from app.services.dataforseo.dataforseo_usage_service import (
     DataForSeoUsageLogInput,
-    observed_unit_costs,
     record_dataforseo_usage,
 )
 from app.services.dataforseo.exceptions import DataForSeoApiError
@@ -39,14 +40,14 @@ async def estimate_search_volume_batch_cost(
     project_id: UUID,
     keyword_count: int,
 ) -> float:
-    observed = await observed_unit_costs(session, project_id)
-    per_keyword = (
-        observed.get("search_volume_batch")
-        or observed.get("search_volume")
-        or UNIT_COST_ESTIMATES["search_volume"]
+    if keyword_count <= 0:
+        return 0.0
+    unit_costs, _ = await resolve_keyword_intelligence_unit_costs(session, project_id)
+    _, cost = compute_search_volume_batch_cost_usd(
+        seed_queries=keyword_count,
+        batch_unit_cost=unit_costs["search_volume_batch"],
     )
-    estimated = max(float(per_keyword) * keyword_count, OBSERVED_SEARCH_VOLUME_SINGLE_COST_USD)
-    return round(estimated, 4)
+    return cost
 
 
 async def _record_call(

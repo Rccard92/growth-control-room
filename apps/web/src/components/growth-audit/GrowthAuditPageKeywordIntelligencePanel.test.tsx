@@ -3,6 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { GrowthAuditPage } from "@gcr/shared";
 import { GrowthAuditPageKeywordIntelligencePanel } from "./GrowthAuditPageKeywordIntelligencePanel";
 
+const { useDataForSeoUsageMock } = vi.hoisted(() => ({
+  useDataForSeoUsageMock: vi.fn(),
+}));
+
 vi.mock("../../hooks/useGrowthAudit", () => ({
   useAnalyzeGrowthAuditPageKeywordIntelligence: () => ({
     mutateAsync: vi.fn(),
@@ -14,6 +18,7 @@ vi.mock("../../hooks/useDataForSeo", () => ({
   useDataForSeoStatus: () => ({
     data: { configured: true, realCallsEnabled: true },
   }),
+  useDataForSeoUsage: useDataForSeoUsageMock,
 }));
 
 const productPage: GrowthAuditPage = {
@@ -55,6 +60,15 @@ const productPage: GrowthAuditPage = {
 
 describe("GrowthAuditPageKeywordIntelligencePanel", () => {
   it("shows cost warning and custom select controls", () => {
+    useDataForSeoUsageMock.mockReturnValue({
+      data: {
+        averageCostByOperation: {
+          search_volume_batch: 0.09,
+          keyword_ideas: 0.09,
+          serp: 0.002,
+        },
+      },
+    });
     const html = renderToStaticMarkup(
       <GrowthAuditPageKeywordIntelligencePanel
         projectId="proj-1"
@@ -63,11 +77,27 @@ describe("GrowthAuditPageKeywordIntelligencePanel", () => {
       />,
     );
     expect(html).toContain("credito DataForSEO");
+    expect(html).toContain("$0.1860");
+    expect(html).toContain("costi osservati");
     expect(html).toContain("gcr-select");
     expect(html).toContain("Max seed query");
   });
 
+  it("shows fallback note without observed usage data", () => {
+    useDataForSeoUsageMock.mockReturnValue({ data: undefined });
+    const html = renderToStaticMarkup(
+      <GrowthAuditPageKeywordIntelligencePanel
+        projectId="proj-1"
+        runId="run-1"
+        page={productPage}
+      />,
+    );
+    expect(html).toContain("$0.1860");
+    expect(html).toContain("fallback finché non ci sono costi osservati");
+  });
+
   it("renders metadata tables and competitors", () => {
+    useDataForSeoUsageMock.mockReturnValue({ data: undefined });
     const html = renderToStaticMarkup(
       <GrowthAuditPageKeywordIntelligencePanel
         projectId="proj-1"

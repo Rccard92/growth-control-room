@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 from uuid import UUID
 
@@ -10,12 +11,136 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.services.dataforseo.constants import (
     ESTIMATE_MODE_PRESETS,
+    SEARCH_VOLUME_BATCH_MAX_KEYWORDS,
     UNIT_COST_ESTIMATES,
 )
 from app.services.dataforseo.dataforseo_growth_audit_context import (
     load_run_product_context,
 )
-from app.services.dataforseo.dataforseo_usage_service import observed_unit_costs
+from app.services.dataforseo.dataforseo_usage_service import (
+    average_cost_by_operation,
+    observed_unit_costs,
+)
+
+KEYWORD_INTELLIGENCE_FALLBACK_COSTS: dict[str, float] = {
+    "search_volume_batch": 0.09,
+    "keyword_ideas": 0.09,
+    "serp": 0.002,
+}
+
+
+def _first_observed_cost(
+    observed: dict[str, float],
+    *operations: str,
+) -> float | None:
+    for operation in operations:
+        value = observed.get(operation)
+        if value is not None and value > 0:
+            return float(value)
+    return None
+
+
+async def resolve_keyword_intelligence_unit_costs(
+    session: AsyncSession,
+    project_id: UUID,
+) -> tuple[dict[str, float], bool]:
+    observed = await average_cost_by_operation(session, project_id)
+
+    resolved = {
+        "search_volume_batch": _first_observed_cost(
+            observed,
+            "search_volume_batch",
+            "keyword_intelligence_search_volume",
+        )
+        or KEYWORD_INTELLIGENCE_FALLBACK_COSTS["search_volume_batch"],
+        "keyword_ideas": _first_observed_cost(
+            observed,
+            "keyword_ideas",
+            "keyword_intelligence_keyword_ideas",
+        )
+        or KEYWORD_INTELLIGENCE_FALLBACK_COSTS["keyword_ideas"],
+        "serp": _first_observed_cost(
+            observed,
+            "serp",
+            "keyword_intelligence_serp",
+        )
+        or KEYWORD_INTELLIGENCE_FALLBACK_COSTS["serp"],
+    }
+
+    has_observed = any(
+        _first_observed_cost(observed, *ops) is not None
+        for ops in (
+            ("search_volume_batch", "keyword_intelligence_search_volume"),
+            ("keyword_ideas", "keyword_intelligence_keyword_ideas"),
+            ("serp", "keyword_intelligence_serp"),
+        )
+    )
+    return resolved, has_observed
+
+
+def compute_search_volume_batch_cost_usd(
+    *,
+    seed_queries: int,
+    batch_unit_cost: float,
+) -> tuple[int, float]:
+    if seed_queries <= 0:
+        return 0, 0.0
+    batches = math.ceil(seed_queries / SEARCH_VOLUME_BATCH_MAX_KEYWORDS)
+    return batches, round(batches * batch_unit_cost, 4)
+
+
+def compute_keyword_intelligence_cost(
+    *,
+    seed_queries: int,
+    keyword_ideas_seeds: int,
+    serp_keywords: int,
+    unit_costs: dict[str, float],
+    estimate_source: str,
+) -> dict[str, Any]:
+    batches, search_volume_cost = compute_search_volume_batch_cost_usd(
+        seed_queries=seed_queries,
+        batch_unit_cost=unit_costs["search_volume_batch"],
+    )
+    keyword_ideas_cost = round(keyword_ideas_seeds * unit_costs["keyword_ideas"], 4)
+    serp_cost = round(serp_keywords * unit_costs["serp"], 4)
+    total_usd = round(search_volume_cost + keyword_ideas_cost + serp_cost, 4)
+
+    return {
+        "totalUsd": total_usd,
+        "estimateSource": estimate_source,
+        "breakdown": {
+            "searchVolumeUsd": search_volume_cost,
+            "keywordIdeasUsd": keyword_ideas_cost,
+            "serpUsd": serp_cost,
+            "searchVolumeBatches": batches,
+        },
+        "unitCosts": {
+            "searchVolumeBatch": unit_costs["search_volume_batch"],
+            "keywordIdeas": unit_costs["keyword_ideas"],
+            "serp": unit_costs["serp"],
+        },
+    }
+
+
+async def estimate_keyword_intelligence_page_cost(
+    session: AsyncSession,
+    project_id: UUID,
+    *,
+    seed_queries: int,
+    keyword_ideas_seeds: int,
+    serp_keywords: int,
+) -> dict[str, Any]:
+    unit_costs, has_observed = await resolve_keyword_intelligence_unit_costs(
+        session,
+        project_id,
+    )
+    return compute_keyword_intelligence_cost(
+        seed_queries=seed_queries,
+        keyword_ideas_seeds=keyword_ideas_seeds,
+        serp_keywords=serp_keywords,
+        unit_costs=unit_costs,
+        estimate_source="observed" if has_observed else "fallback",
+    )
 
 
 def _resolve_estimate_params(

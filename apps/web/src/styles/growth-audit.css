@@ -1093,6 +1093,12 @@
   background: color-mix(in srgb, var(--gcr-danger) 12%, transparent);
 }
 
+.growth-audit-keyword-intelligence__estimate-note {
+  margin: -0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--gcr-text-muted);
+}
+
 .growth-audit-keyword-intelligence__fresh-banner {
   padding: 0.75rem 1rem;
   border-radius: var(--gcr-radius-md);

@@ -32,8 +32,9 @@ from app.services.dataforseo.dataforseo_client import (
     safe_test_keyword_search_volume_batch,
     safe_test_serp,
 )
-from app.services.dataforseo.dataforseo_sandbox_service import estimate_search_volume_batch_cost
-from app.services.dataforseo.dataforseo_usage_service import observed_unit_costs
+from app.services.dataforseo.dataforseo_cost_estimator import (
+    estimate_keyword_intelligence_page_cost,
+)
 from app.services.dataforseo.exceptions import DataForSeoApiError
 from app.services.dataforseo.keyword_utils import resolve_search_volume_keywords
 from app.services.growth_audit.exceptions import (
@@ -60,8 +61,6 @@ logger = logging.getLogger(__name__)
 KEYWORD_INTELLIGENCE_RESULT_TYPE = "keyword_intelligence"
 KEYWORD_INTELLIGENCE_SKILL_KEY = "growth_audit_keyword_intelligence"
 CACHE_DAYS = 7
-DEFAULT_SERP_COST_USD = 0.002
-DEFAULT_IDEAS_COST_USD = 0.09
 
 
 def _utcnow() -> datetime:
@@ -101,16 +100,14 @@ async def estimate_keyword_intelligence_cost(
     keyword_ideas_seeds: int,
     serp_keywords: int,
 ) -> float:
-    observed = await observed_unit_costs(session, project_id)
-    sv_cost = await estimate_search_volume_batch_cost(session, project_id, seed_count)
-    ideas_unit = observed.get("keyword_ideas") or DEFAULT_IDEAS_COST_USD
-    serp_unit = observed.get("serp") or DEFAULT_SERP_COST_USD
-    total = sv_cost
-    if keyword_ideas_seeds > 0:
-        total += float(ideas_unit) * keyword_ideas_seeds
-    if serp_keywords > 0:
-        total += float(serp_unit) * serp_keywords
-    return round(total, 4)
+    estimate = await estimate_keyword_intelligence_page_cost(
+        session,
+        project_id,
+        seed_queries=seed_count,
+        keyword_ideas_seeds=keyword_ideas_seeds,
+        serp_keywords=serp_keywords,
+    )
+    return float(estimate["totalUsd"])
 
 
 def _update_run_keyword_intelligence_summary(
