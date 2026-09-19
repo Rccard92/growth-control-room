@@ -25,6 +25,8 @@ from app.services.growth_audit.analytics_analysis import (
 )
 from app.services.growth_audit.exceptions import GrowthAuditValidationError
 
+from tests.support import TEST_USER
+
 
 def _build_run(project_id, run_id=None) -> GrowthAuditRun:
     run_id = run_id or uuid4()
@@ -157,7 +159,7 @@ def test_analyze_analytics_requires_property() -> None:
                 new=AsyncMock(return_value=audit_run),
             ),
             patch(
-                "app.services.growth_audit.analytics_analysis.get_project_in_default_workspace",
+                "app.services.growth_audit.analytics_analysis.get_project_by_id",
                 new=AsyncMock(return_value=project),
             ),
             pytest.raises(GrowthAuditValidationError, match="Seleziona prima"),
@@ -193,7 +195,7 @@ def test_analyze_analytics_updates_page_metadata_and_summary() -> None:
                 new=AsyncMock(return_value=audit_run),
             ),
             patch(
-                "app.services.growth_audit.analytics_analysis.get_project_in_default_workspace",
+                "app.services.growth_audit.analytics_analysis.get_project_by_id",
                 new=AsyncMock(return_value=project),
             ),
             patch(
@@ -250,7 +252,7 @@ def test_analytics_route_returns_503_when_not_connected() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -269,6 +271,7 @@ def test_analytics_route_returns_503_when_not_connected() -> None:
                 run_id,
                 GrowthAuditAnalyticsAnalysisRequest(days=28),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 503
@@ -285,7 +288,7 @@ def test_analytics_route_returns_200_with_mock() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -305,6 +308,7 @@ def test_analytics_route_returns_200_with_mock() -> None:
                 run_id,
                 GrowthAuditAnalyticsAnalysisRequest(),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.summary["totalSessions"] == 120

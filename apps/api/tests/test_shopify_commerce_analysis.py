@@ -29,6 +29,8 @@ from app.services.shopify.exceptions import (
 )
 from app.services.shopify.shopify_commerce_client import _aggregate_line_items
 
+from tests.support import TEST_USER
+
 
 def _build_run(project_id, run_id=None) -> GrowthAuditRun:
     run_id = run_id or uuid4()
@@ -542,7 +544,7 @@ def test_shopify_commerce_route_returns_503_when_not_connected() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -560,6 +562,7 @@ def test_shopify_commerce_route_returns_503_when_not_connected() -> None:
                 run_id,
                 GrowthAuditShopifyCommerceAnalysisRequest(days=30),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 503
@@ -575,7 +578,7 @@ def test_shopify_commerce_route_returns_403_when_scopes_missing() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -594,6 +597,7 @@ def test_shopify_commerce_route_returns_403_when_scopes_missing() -> None:
                 run_id,
                 GrowthAuditShopifyCommerceAnalysisRequest(days=30),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 403
@@ -610,7 +614,7 @@ def test_shopify_commerce_route_returns_200_with_mock() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -635,6 +639,7 @@ def test_shopify_commerce_route_returns_200_with_mock() -> None:
                 run_id,
                 GrowthAuditShopifyCommerceAnalysisRequest(),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.summary["totalSales"] == 250.0

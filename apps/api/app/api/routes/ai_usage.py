@@ -8,7 +8,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.ai_usage import (
     AiBudgetStatusResponse,
     AiRoutingInsights,
@@ -26,7 +28,7 @@ from app.services.ai.usage_service import (
     get_usage_summary,
     list_usage_logs,
 )
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 
 router = APIRouter(prefix="/projects", tags=["ai-usage"])
 global_router = APIRouter(tags=["ai-usage"])
@@ -131,8 +133,9 @@ async def project_ai_usage_summary(
     model_tier: str | None = Query(default=None, alias="modelTier"),
     operation_key: str | None = Query(default=None, alias="operationKey"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiUsageSummaryResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await get_usage_summary(
         session,
         project_id,
@@ -165,8 +168,9 @@ async def project_ai_usage_logs(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiUsageLogListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows, total = await list_usage_logs(
         session,
         project_id,
@@ -198,8 +202,9 @@ async def project_ai_usage_log_detail(
     project_id: UUID,
     log_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiUsageLogRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_usage_log(session, project_id, log_id)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Log AI non trovato.")
@@ -214,8 +219,9 @@ async def project_ai_usage_log_detail(
 async def project_ai_budget_status(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiBudgetStatusResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await get_budget_status(session, project_id)
     return AiBudgetStatusResponse(
         daily_spent=data["dailySpent"],
@@ -237,8 +243,9 @@ async def project_ai_usage_estimate(
     operation: str = Query(...),
     count: int = Query(default=1, ge=1, le=500),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiUsageEstimateResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await estimate_operation_cost(session, project_id, operation=operation, count=count)
     return AiUsageEstimateResponse(
         operation=data["operation"],
@@ -259,9 +266,11 @@ async def global_ai_usage_summary(
     start_date: date | None = Query(default=None, alias="startDate"),
     end_date: date | None = Query(default=None, alias="endDate"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiUsageSummaryResponse:
     data = await get_global_usage_summary(
         session,
+        current_user,
         start_date=start_date,
         end_date=end_date,
     )

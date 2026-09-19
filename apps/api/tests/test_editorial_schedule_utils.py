@@ -1,6 +1,22 @@
 """Tests for editorial PED schedule helpers."""
 
-from datetime import date
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+ROME = ZoneInfo("Europe/Rome")
+
+
+def _future_date(days: int = 30) -> date:
+    """A date that is always in the future, whenever the suite runs.
+
+    Hardcoded dates here used to silently rot: once the date passed, the helper
+    correctly returned "draft" and the test failed for no product reason.
+    """
+    return datetime.now(ROME).date() + timedelta(days=days)
+
+
+def _iso_at_nine(day: date) -> str:
+    return datetime.combine(day, datetime.min.time(), tzinfo=ROME).replace(hour=9).isoformat()
 
 from app.schemas.content_seo_editorial import EditorialPublishingPayload
 from app.services.content.editorial_schedule_utils import (
@@ -30,15 +46,16 @@ def test_build_scheduled_publish_at_europe_rome_summer() -> None:
 
 
 def test_apply_ped_schedule_defaults_future_sets_schedule_mode() -> None:
+    planned = _future_date()
     publishing = EditorialPublishingPayload(title="Titolo", body_html="<p>Ok</p>")
     updated = apply_ped_schedule_defaults(
         publishing,
-        planned_date=date(2026, 7, 5),
+        planned_date=planned,
         timezone_name="Europe/Rome",
     )
     assert updated.mode == "schedule"
     assert updated.scheduled_publish_source == "ped_planned_date"
-    assert updated.scheduled_publish_at == "2026-07-05T09:00:00+02:00"
+    assert updated.scheduled_publish_at == _iso_at_nine(planned)
     assert updated.is_published is False
 
 
@@ -59,23 +76,26 @@ def test_apply_ped_schedule_defaults_past_sets_draft_mode() -> None:
 
 
 def test_apply_ped_schedule_defaults_respects_manual_source() -> None:
+    manual = _iso_at_nine(_future_date(60))
     publishing = EditorialPublishingPayload(
         title="Titolo",
         body_html="<p>Ok</p>",
         mode="draft",
         scheduled_publish_source="manual",
-        scheduled_publish_at="2026-08-01T10:00:00+02:00",
+        scheduled_publish_at=manual,
     )
     updated = apply_ped_schedule_defaults(
         publishing,
-        planned_date=date(2026, 7, 5),
+        planned_date=_future_date(),
         timezone_name="Europe/Rome",
     )
-    assert updated.scheduled_publish_at == "2026-08-01T10:00:00+02:00"
+    assert updated.scheduled_publish_at == manual
     assert updated.mode == "draft"
 
 
 def test_sync_ped_schedule_on_planned_date_change_updates_payload() -> None:
+    original_day = _future_date(30)
+    new_day = _future_date(35)
     payload = {
         "title": "Titolo",
         "bodyHtml": "<p>Ok</p>",
@@ -83,16 +103,16 @@ def test_sync_ped_schedule_on_planned_date_change_updates_payload() -> None:
         "scheduledPublishSource": "ped_planned_date",
         "scheduledPublishTimezone": "Europe/Rome",
         "scheduledPublishTime": "09:00",
-        "sourcePlannedDate": "2026-07-05",
-        "scheduledPublishAt": "2026-07-05T09:00:00+02:00",
+        "sourcePlannedDate": original_day.isoformat(),
+        "scheduledPublishAt": _iso_at_nine(original_day),
     }
     updated = sync_ped_schedule_on_planned_date_change(
         payload,
-        planned_date=date(2026, 7, 10),
+        planned_date=new_day,
         timezone_name="Europe/Rome",
     )
     assert updated is not None
-    assert updated["scheduledPublishAt"] == "2026-07-10T09:00:00+02:00"
+    assert updated["scheduledPublishAt"] == _iso_at_nine(new_day)
 
 
 def test_build_article_create_input_schedule_has_publish_date_and_metafields() -> None:

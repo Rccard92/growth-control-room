@@ -7,6 +7,16 @@ from typing import Any
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 
 
+def _apply_handle(input_data: dict[str, Any], handle: Any) -> None:
+    """Set a new handle and always ask Shopify for the 301 from the old one.
+
+    Without `redirectNewHandle` the previous URL starts returning 404 and the
+    page loses its rankings and backlinks -- the opposite of what this tool is for.
+    """
+    input_data["handle"] = handle
+    input_data["redirectNewHandle"] = True
+
+
 def _get_delta(delta: dict[str, Any], *keys: str) -> Any:
     for key in keys:
         if key in delta and delta[key] is not None:
@@ -25,7 +35,7 @@ def build_product_update_input(entity_gid: str, delta: dict[str, Any]) -> dict[s
 
     handle = _get_delta(delta, "handle", "proposed_handle")
     if handle is not None:
-        input_data["handle"] = handle
+        _apply_handle(input_data, handle)
         has_scalar = True
 
     seo_block: dict[str, str] = {}
@@ -61,7 +71,7 @@ def build_collection_update_input(entity_gid: str, delta: dict[str, Any]) -> dic
 
     handle = _get_delta(delta, "handle", "proposed_handle")
     if handle is not None:
-        input_data["handle"] = handle
+        _apply_handle(input_data, handle)
         has_scalar = True
 
     desc_html = _get_delta(delta, "description_html", "proposed_description", "proposed_description_html")

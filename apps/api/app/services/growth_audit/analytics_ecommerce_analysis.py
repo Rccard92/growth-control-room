@@ -30,7 +30,7 @@ from app.services.growth_audit.run_service import (
     get_growth_audit_run,
     list_growth_audit_pages,
 )
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_by_id
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
 
@@ -768,7 +768,7 @@ async def analyze_growth_audit_analytics_ecommerce(
             "Impossibile sincronizzare GA4 Ecommerce mentre il run è ancora in corso."
         )
 
-    project = await get_project_in_default_workspace(project_id, session)
+    project = await get_project_by_id(project_id, session)
     property_id = (project.google_analytics_property_id or "").strip()
     if not property_id:
         raise GrowthAuditValidationError(

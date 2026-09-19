@@ -10,7 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.ai_model_settings import (
     AiAvailableModelItem,
     AiAvailableModelsResponse,
@@ -34,7 +36,7 @@ from app.services.ai.model_settings_service import (
     validate_model_for_operation,
 )
 from app.services.ai.operation_registry import get_operation, tier_cost_profile_label
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -233,8 +235,9 @@ def _to_list_response(data: dict) -> AiModelSettingsListResponse:
 async def get_project_ai_model_settings(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiModelSettingsListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await list_settings_for_project(session, project_id)
     return _to_list_response(data)
 
@@ -249,8 +252,9 @@ async def update_project_ai_model_setting(
     operation_key: str,
     body: AiModelSettingUpdateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiModelSettingMutationResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         row = await update_project_setting(
             session,
@@ -287,8 +291,9 @@ async def reset_project_ai_model_setting(
     project_id: UUID,
     operation_key: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiModelSettingMutationResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         await reset_project_setting(session, project_id, operation_key)
         await session.commit()
@@ -315,8 +320,9 @@ async def reset_project_ai_model_setting(
 async def apply_project_gcr_recommendations(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiBulkActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     updated = await apply_gcr_recommendations(session, project_id)
     await session.commit()
     return AiBulkActionResponse(
@@ -333,8 +339,9 @@ async def apply_project_gcr_recommendations(
 async def reset_project_models_from_railway(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiBulkActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     updated = await reset_all_to_railway(session, project_id)
     await session.commit()
     return AiBulkActionResponse(
@@ -352,8 +359,9 @@ async def validate_project_ai_model(
     project_id: UUID,
     body: AiModelValidateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AiModelValidateResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         data = await validate_model_for_operation(
             session,
@@ -374,8 +382,9 @@ async def validate_project_ai_model(
 async def seed_project_ai_model_defaults(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     global_created = await seed_default_settings(session, project_id=None, source="env_seed")
     project_created = await seed_default_settings(session, project_id=project_id, source="env_seed")
     await session.commit()

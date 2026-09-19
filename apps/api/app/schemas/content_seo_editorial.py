@@ -646,7 +646,7 @@ class EditorialArticlePayload(BaseModel):
 
 def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
     """Sanitize AI or client article JSON into a typed payload."""
-    from app.utils.html_sanitize import sanitize_editorial_article_html
+    from app.utils.html_sanitize import sanitize_editorial_article_html_with_warnings
 
     data = dict(raw)
     list_fields = {
@@ -712,8 +712,11 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
             data["safe_claim_flags"] = []
     data.setdefault("status", "draft")
     payload = EditorialArticlePayload.model_validate(data)
-    sanitized_html = sanitize_editorial_article_html(payload.body_html)
-    return payload.model_copy(update={"body_html": sanitized_html})
+    sanitized = sanitize_editorial_article_html_with_warnings(payload.body_html)
+    warnings = list(dict.fromkeys([*payload.warnings, *sanitized.warnings]))
+    return payload.model_copy(
+        update={"body_html": sanitized.html, "warnings": warnings}
+    )
 
 
 class EditorialArticleUpdateRequest(BaseModel):

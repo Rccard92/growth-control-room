@@ -76,7 +76,8 @@ def test_get_editorial_item_ai_usage_with_brief_log() -> None:
     brief_log = _make_log()
 
     async def run() -> None:
-        fetch_mock = AsyncMock(side_effect=[brief_log, None])
+        # brief, article, image -- the service looks up all three operation groups
+        fetch_mock = AsyncMock(side_effect=[brief_log, None, None])
         with patch(
             "app.services.content.editorial_ai_usage_service._fetch_latest_log",
             new=fetch_mock,
@@ -92,5 +93,6 @@ def test_get_editorial_item_ai_usage_with_brief_log() -> None:
             assert result.brief.operation_key == "blog_brief_generation"
             assert result.brief.estimated_total_cost == 0.012
             assert result.article is None
+            assert result.image is None
 
     asyncio.run(run())

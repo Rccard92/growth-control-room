@@ -19,6 +19,8 @@ from app.services.growth_audit.page_ai_analysis import (
 )
 from app.services.growth_audit.page_ai_prompts import build_system_prompt
 
+from tests.support import TEST_USER
+
 
 def _mock_ai_output() -> dict:
     return {
@@ -457,7 +459,7 @@ def test_ai_analysis_route_returns_200() -> None:
         session = AsyncMock()
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -471,6 +473,7 @@ def test_ai_analysis_route_returns_200() -> None:
                 page_id,
                 GrowthAuditPageAiAnalysisRequest.model_validate({"provider": "openai"}),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.result.status == "completed"
@@ -551,7 +554,7 @@ def test_list_page_results_route() -> None:
         session = AsyncMock()
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -565,6 +568,7 @@ def test_list_page_results_route() -> None:
                 page_id,
                 AI_RESULT_TYPE,
                 session,
+                current_user=TEST_USER,
             )
 
         assert len(response.results) == 1

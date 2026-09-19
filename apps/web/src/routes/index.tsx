@@ -1,5 +1,6 @@
 ﻿import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { RequireAuth } from "../components/RequireAuth";
 import { AiBriefPage } from "../pages/AiBriefPage";
 import { AiUsagePage } from "../pages/AiUsagePage";
 import { BrandIntelligencePage } from "../pages/BrandIntelligencePage";
@@ -23,25 +24,27 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
-      <Route element={<AppShell showSidebar={false} />}>
-        <Route index element={<Navigate to="/projects" replace />} />
-        <Route path="projects" element={<ProjectsPage />} />
-        <Route path="projects/new" element={<NewProjectPage />} />
-      </Route>
+      <Route element={<RequireAuth />}>
+        <Route element={<AppShell showSidebar={false} />}>
+          <Route index element={<Navigate to="/projects" replace />} />
+          <Route path="projects" element={<ProjectsPage />} />
+          <Route path="projects/new" element={<NewProjectPage />} />
+        </Route>
 
-      <Route path="projects/:id" element={<AppShell showSidebar />}>
-        <Route index element={<ProjectOverviewPage />} />
-        <Route path="audit" element={<GrowthAuditPage />} />
-        <Route path="audit/runs/:runId/pages/:pageId" element={<GrowthAuditPageDetailPage />} />
-        <Route path="brand-intelligence" element={<BrandIntelligencePage />} />
-        <Route path="integrations" element={<IntegrationsPage />} />
-        <Route path="integrations/dataforseo" element={<DataForSeoCostSandboxPage />} />
-        <Route path="shopify" element={<ShopifyPage />} />
-        <Route path="shopify/connect" element={<ShopifyConnectPage />} />
-        <Route path="content" element={<ContentPage />} />
-        <Route path="changelog" element={<ChangelogPage />} />
-        <Route path="ai-brief" element={<AiBriefPage />} />
-        <Route path="ai-costs" element={<AiUsagePage />} />
+        <Route path="projects/:id" element={<AppShell showSidebar />}>
+          <Route index element={<ProjectOverviewPage />} />
+          <Route path="audit" element={<GrowthAuditPage />} />
+          <Route path="audit/runs/:runId/pages/:pageId" element={<GrowthAuditPageDetailPage />} />
+          <Route path="brand-intelligence" element={<BrandIntelligencePage />} />
+          <Route path="integrations" element={<IntegrationsPage />} />
+          <Route path="integrations/dataforseo" element={<DataForSeoCostSandboxPage />} />
+          <Route path="shopify" element={<ShopifyPage />} />
+          <Route path="shopify/connect" element={<ShopifyConnectPage />} />
+          <Route path="content" element={<ContentPage />} />
+          <Route path="changelog" element={<ChangelogPage />} />
+          <Route path="ai-brief" element={<AiBriefPage />} />
+          <Route path="ai-costs" element={<AiUsagePage />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/projects" replace />} />

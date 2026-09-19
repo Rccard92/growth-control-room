@@ -14,12 +14,16 @@ class Settings(BaseSettings):
     )
 
     database_url: str | None = None
+    secrets_encryption_key: str | None = None
+    initial_admin_email: str | None = None
+    initial_admin_password: str | None = None
     cors_origins: str = "*"
     app_env: str = "production"
     shopify_client_id: str | None = None
     shopify_client_secret: str | None = None
     shopify_scopes: str = (
-        "read_products,read_orders,read_content,write_content,read_reports,read_files,write_files"
+        "read_products,write_products,read_orders,read_content,write_content,"
+        "read_reports,read_files,write_files"
     )
     shopify_redirect_uri: str | None = None
     frontend_url: str | None = None
@@ -64,6 +68,25 @@ class Settings(BaseSettings):
     dataforseo_single_run_limit_usd: float = 0.20
     dataforseo_daily_budget_usd: float = 1.00
     dataforseo_monthly_budget_usd: float = 10.00
+
+    @model_validator(mode="after")
+    def require_secrets_encryption_key(self) -> "Settings":
+        if self.app_env != "development" and not (self.secrets_encryption_key or "").strip():
+            raise ValueError(
+                "SECRETS_ENCRYPTION_KEY environment variable is required: integration "
+                "tokens must not be stored unencrypted. Generate one with: python -c "
+                "\"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+        return self
+
+    @model_validator(mode="after")
+    def reject_wildcard_cors_in_production(self) -> "Settings":
+        if self.app_env != "development" and self.cors_origins.strip() in ("", "*"):
+            raise ValueError(
+                "CORS_ORIGINS must list the allowed frontend origins in production "
+                "(wildcard '*' is not accepted). Example: https://web.example.com"
+            )
+        return self
 
     @model_validator(mode="after")
     def require_database_url(self) -> "Settings":

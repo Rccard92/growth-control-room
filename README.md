@@ -137,10 +137,12 @@ Connessione store tramite OAuth Shopify. L'utente inserisce solo il dominio shop
    `https://api-production-1077.up.railway.app/api/integrations/shopify/oauth/callback`
 4. Configura gli **Admin API scopes**:
    - `read_products`
+   - `write_products` (apply proposte SEO su prodotti e collection)
    - `read_orders`
    - `read_content`
-   - `write_content`
+   - `write_content` (pubblicazione articoli blog)
    - `read_reports` (ShopifyQL / Analytics ufficiali)
+   - `read_files`, `write_files` (immagini hero editoriali su Shopify Files)
 5. Copia **Client ID** e **Client secret** dall'app
 
 ### Variabili Railway (servizio API)
@@ -149,11 +151,15 @@ Connessione store tramite OAuth Shopify. L'utente inserisce solo il dominio shop
 |-----------|----------------|
 | `SHOPIFY_CLIENT_ID` | da Shopify App settings |
 | `SHOPIFY_CLIENT_SECRET` | da Shopify App settings |
-| `SHOPIFY_SCOPES` | `read_products,read_orders,read_content,write_content,read_reports` |
+| `SHOPIFY_SCOPES` | `read_products,write_products,read_orders,read_content,write_content,read_reports,read_files,write_files` |
 | `SHOPIFY_REDIRECT_URI` | `https://api-production-1077.up.railway.app/api/integrations/shopify/oauth/callback` |
 | `FRONTEND_URL` | `https://web-production-77355.up.railway.app` |
 
 Assicurati che `CORS_ORIGINS` includa il dominio WEB.
+
+Dopo ogni modifica agli scope serve **riconnettere Shopify**: i token OAuth gia'
+emessi non ereditano i nuovi permessi. Verifica con
+`GET /api/projects/{id}/shopify/scopes`.
 
 ### Flusso utente
 

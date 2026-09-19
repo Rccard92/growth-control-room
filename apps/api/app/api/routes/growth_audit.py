@@ -4,7 +4,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.growth_audit import (
     GrowthAuditEventRead,
     GrowthAuditEventsListResponse,
@@ -100,7 +102,7 @@ from app.services.growth_audit.run_service import (
     rescan_growth_audit_page,
     start_growth_audit_run,
 )
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -203,8 +205,9 @@ async def create_growth_audit_run_endpoint(
     project_id: UUID,
     request: GrowthAuditRunCreateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditStartResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         run = await start_growth_audit_run(session, project_id, request)
     except Exception as exc:
@@ -220,8 +223,9 @@ async def list_growth_audit_runs_endpoint(
     project_id: UUID,
     limit: int = Query(default=20, ge=1, le=100),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditRunsListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         runs = await list_growth_audit_runs(session, project_id, limit=limit)
     except Exception as exc:
@@ -239,8 +243,9 @@ async def get_growth_audit_run_endpoint(
     project_id: UUID,
     run_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditRunDetailResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         run, findings_count, tasks_count = await get_growth_audit_run_detail(
             session,
@@ -272,8 +277,9 @@ async def list_growth_audit_pages_endpoint(
     project_id: UUID,
     run_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditPagesListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         pages = await list_growth_audit_pages(session, project_id, run_id)
     except Exception as exc:
@@ -295,8 +301,9 @@ async def list_growth_audit_events_endpoint(
     project_id: UUID,
     run_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditEventsListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         events = await list_growth_audit_events(session, project_id, run_id)
     except Exception as exc:
@@ -322,8 +329,9 @@ async def list_growth_audit_findings_endpoint(
     category: str | None = Query(default=None),
     status: str | None = Query(default=None),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditFindingsListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         findings = await list_growth_audit_findings(
             session,
@@ -357,8 +365,9 @@ async def list_growth_audit_tasks_endpoint(
     owner_type: str | None = Query(default=None, alias="ownerType"),
     status: str | None = Query(default=None),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditTasksListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         tasks = await list_growth_audit_tasks(
             session,
@@ -391,8 +400,9 @@ async def rescan_growth_audit_page_endpoint(
     page_id: UUID,
     request: GrowthAuditPageRescanRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditPageRescanResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         run, page, findings_count, tasks_count = await rescan_growth_audit_page(
             session,
@@ -434,8 +444,9 @@ async def analyze_growth_audit_page_ai_endpoint(
     page_id: UUID,
     request: GrowthAuditPageAiAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditPageAiAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         run, page, result, findings_count, tasks_count = await analyze_growth_audit_page_with_ai(
             session,
@@ -483,8 +494,9 @@ async def analyze_growth_audit_page_performance_endpoint(
     page_id: UUID,
     request: GrowthAuditPagePerformanceAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditPagePerformanceAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         run, page, result, findings_count, tasks_count = await analyze_growth_audit_page_performance(
             session,
@@ -527,8 +539,9 @@ async def analyze_growth_audit_page_keyword_intelligence_endpoint(
     page_id: UUID,
     request: GrowthAuditKeywordIntelligenceAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditKeywordIntelligenceAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         run, page, summary, cached, findings_count, tasks_count = (
             await analyze_growth_audit_page_keyword_intelligence(
@@ -594,8 +607,9 @@ async def analyze_growth_audit_search_console_endpoint(
     run_id: UUID,
     request: GrowthAuditSearchConsoleAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditSearchConsoleAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         result = await analyze_growth_audit_search_console(
             session,
@@ -628,8 +642,9 @@ async def analyze_growth_audit_analytics_endpoint(
     run_id: UUID,
     request: GrowthAuditAnalyticsAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditAnalyticsAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         result = await analyze_growth_audit_analytics(
             session,
@@ -662,8 +677,9 @@ async def analyze_growth_audit_shopify_commerce_endpoint(
     run_id: UUID,
     request: GrowthAuditShopifyCommerceAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditShopifyCommerceAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         result = await analyze_growth_audit_shopify_commerce(
             session,
@@ -696,8 +712,9 @@ async def analyze_growth_audit_analytics_ecommerce_endpoint(
     run_id: UUID,
     request: GrowthAuditGa4EcommerceAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditGa4EcommerceAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         result = await analyze_growth_audit_analytics_ecommerce(
             session,
@@ -730,8 +747,9 @@ async def analyze_growth_audit_merchant_center_endpoint(
     run_id: UUID,
     request: GrowthAuditMerchantCenterAnalysisRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditMerchantCenterAnalysisResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         result = await analyze_growth_audit_merchant_center(
             session,
@@ -763,8 +781,9 @@ async def list_growth_audit_page_results_endpoint(
     page_id: UUID,
     result_type: str | None = Query(default=None, alias="resultType"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GrowthAuditPageResultsListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         results = await list_growth_audit_page_results(
             session,

@@ -2,7 +2,8 @@
 
 import asyncio
 import os
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
@@ -11,6 +12,17 @@ import pytest
 from fastapi import HTTPException
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
+
+_ROME = ZoneInfo("Europe/Rome")
+
+
+def _future_day(days: int = 30) -> date:
+    """Always a future date: a scheduled publish in the past is rejected by design."""
+    return datetime.now(_ROME).date() + timedelta(days=days)
+
+
+def _iso_at_nine(day: date) -> str:
+    return datetime.combine(day, datetime.min.time(), tzinfo=_ROME).replace(hour=9).isoformat()
 
 from app.schemas.content_seo_editorial import EditorialPublishShopifyRequest
 from app.schemas.content_seo_editorial import (
@@ -941,19 +953,20 @@ def test_publish_schedule_success_sets_scheduled_status() -> None:
     item_id = uuid4()
     blog_id = uuid4()
     _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
+    _scheduled_day = _future_day()
     publishing_payload = {
         **publishing_payload,
         "mode": "schedule",
         "scheduledPublishSource": "ped_planned_date",
         "scheduledPublishTimezone": "Europe/Rome",
         "scheduledPublishTime": "09:00",
-        "sourcePlannedDate": "2026-07-05",
-        "scheduledPublishAt": "2026-07-05T09:00:00+02:00",
+        "sourcePlannedDate": _scheduled_day.isoformat(),
+        "scheduledPublishAt": _iso_at_nine(_scheduled_day),
         "isPublished": False,
-        "publishDate": "2026-07-05T09:00:00+02:00",
+        "publishDate": _iso_at_nine(_scheduled_day),
     }
     row = _sample_row(publishing_payload=publishing_payload)
-    row.planned_date = date(2026, 7, 5)
+    row.planned_date = _scheduled_day
     store = SimpleNamespace(
         id=uuid4(),
         shop_domain="shop.myshopify.com",
@@ -1017,7 +1030,7 @@ def test_publish_schedule_success_sets_scheduled_status() -> None:
                             )
                         create_input = mock_client.create_article.await_args.args[0]
                         assert create_input["isPublished"] is False
-                        assert create_input["publishDate"] == "2026-07-05T09:00:00+02:00"
+                        assert create_input["publishDate"] == _iso_at_nine(_scheduled_day)
                         assert "metafields" in create_input
                         assert row.publish_status == "scheduled"
                         assert row.publishing_payload["isPublished"] is False

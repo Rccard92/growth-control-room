@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.dataforseo import (
     DataForSeoEstimateRequest,
     DataForSeoEstimateResponse,
@@ -36,7 +38,7 @@ from app.services.dataforseo.exceptions import (
     DataForSeoNotConfiguredError,
     DataForSeoRealCallsDisabledError,
 )
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 
 router = APIRouter(prefix="/projects", tags=["dataforseo"])
 
@@ -64,8 +66,9 @@ def _log_to_read(row) -> DataForSeoUsageLogRead:
 async def get_dataforseo_status(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DataForSeoStatusResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
 
     account = None
     if settings.dataforseo_configured:
@@ -100,8 +103,9 @@ async def estimate_dataforseo_cost_endpoint(
     project_id: UUID,
     request: DataForSeoEstimateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DataForSeoEstimateResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
 
     try:
         result = await estimate_dataforseo_cost(
@@ -143,8 +147,9 @@ async def run_dataforseo_test_endpoint(
     project_id: UUID,
     request: DataForSeoTestRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DataForSeoTestResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
 
     try:
         result = await run_dataforseo_sandbox_test(
@@ -196,8 +201,9 @@ async def run_dataforseo_test_endpoint(
 async def get_dataforseo_usage_endpoint(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DataForSeoUsageResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
 
     logs = await list_recent_dataforseo_logs(session, project_id, limit=50)
     usage_today = await get_dataforseo_usage_today(session, project_id)

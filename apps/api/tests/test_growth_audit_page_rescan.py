@@ -17,6 +17,8 @@ from app.services.growth_audit.exceptions import (
 )
 from app.services.growth_audit.run_service import rescan_growth_audit_page
 
+from tests.support import TEST_USER
+
 
 def _mock_scan_result(url: str = "https://example.com/products/a", *, score: int = 88) -> dict:
     return {
@@ -377,7 +379,7 @@ def test_rescan_route_returns_200() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -392,6 +394,7 @@ def test_rescan_route_returns_200() -> None:
                 page_id,
                 GrowthAuditPageRescanRequest(clearPreviousOpenItems=True),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.run.id == run_id

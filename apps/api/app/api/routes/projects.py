@@ -6,14 +6,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants.integrations import INTEGRATION_PROVIDERS
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.models.enums import IntegrationStatus
 from app.models.integration import Integration
 from app.models.project import Project
 from app.schemas.integration import IntegrationRead
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
-from app.services.projects import get_project_in_default_workspace
-from app.services.workspace import get_default_workspace
+from app.services.projects import get_project_for_user
+from app.services.workspace import get_workspace_for_user
 from app.utils.slug import unique_project_slug
 
 logger = logging.getLogger(__name__)
@@ -37,9 +39,10 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 async def create_project(
     body: ProjectCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Project:
     try:
-        workspace = await get_default_workspace(session)
+        workspace = await get_workspace_for_user(session, current_user)
         slug = await unique_project_slug(session, workspace.id, body.name)
         project = Project(
             workspace_id=workspace.id,
@@ -69,8 +72,9 @@ async def create_project(
 @router.get("", response_model=list[ProjectRead], response_model_by_alias=True)
 async def list_projects(
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[Project]:
-    workspace = await get_default_workspace(session)
+    workspace = await get_workspace_for_user(session, current_user)
     result = await session.execute(
         select(Project)
         .where(Project.workspace_id == workspace.id)
@@ -83,8 +87,9 @@ async def list_projects(
 async def get_project(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Project:
-    return await get_project_in_default_workspace(project_id, session)
+    return await get_project_for_user(project_id, session, current_user)
 
 
 @router.patch("/{project_id}", response_model=ProjectRead, response_model_by_alias=True)
@@ -92,9 +97,10 @@ async def update_project(
     project_id: UUID,
     body: ProjectUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Project:
     try:
-        project = await get_project_in_default_workspace(project_id, session)
+        project = await get_project_for_user(project_id, session, current_user)
         updates = body.model_dump(exclude_unset=True)
         for field, value in updates.items():
             setattr(project, field, value)
@@ -123,8 +129,9 @@ async def update_project(
 async def list_project_integrations(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[IntegrationRead]:
-    project = await get_project_in_default_workspace(project_id, session)
+    project = await get_project_for_user(project_id, session, current_user)
     result = await session.execute(
         select(Integration).where(Integration.project_id == project.id)
     )

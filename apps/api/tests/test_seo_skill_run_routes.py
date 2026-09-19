@@ -24,6 +24,8 @@ from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
 from app.schemas.seo_skills import SeoSkillRunCreateRequest, SeoSkillCatalogCounts
 from app.services.seo_skills.exceptions import SeoSkillRunValidationError
 
+from tests.support import TEST_USER
+
 
 def _request(**overrides: object) -> SeoSkillRunCreateRequest:
     base = {
@@ -83,7 +85,7 @@ def test_create_project_seo_skill_run_returns_run() -> None:
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ) as mock_project,
             patch(
@@ -100,9 +102,10 @@ def test_create_project_seo_skill_run_returns_run() -> None:
                 project_id,
                 _request(),
                 session=session,
+                current_user=TEST_USER,
             )
 
-        mock_project.assert_awaited_once_with(project_id, session)
+        mock_project.assert_awaited_once_with(project_id, session, TEST_USER)
         mock_start.assert_awaited_once_with(session, project_id, _request())
         assert response.run.id == created.id
         assert response.run.target_type == "url"
@@ -119,7 +122,7 @@ def test_create_project_seo_skill_run_claude_not_configured_returns_503() -> Non
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -136,6 +139,7 @@ def test_create_project_seo_skill_run_claude_not_configured_returns_503() -> Non
                     project_id,
                     _request(provider="claude"),
                     session=session,
+                    current_user=TEST_USER,
                 )
 
         assert exc.value.status_code == 503
@@ -152,7 +156,7 @@ def test_create_project_seo_skill_run_validation_error_returns_422() -> None:
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -172,6 +176,7 @@ def test_create_project_seo_skill_run_validation_error_returns_422() -> None:
                     project_id,
                     _request(selectedSkills=[]),
                     session=session,
+                    current_user=TEST_USER,
                 )
 
         assert exc.value.status_code == 422
@@ -187,7 +192,7 @@ def test_list_project_seo_skill_runs_returns_project_runs() -> None:
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ) as mock_project,
             patch(
@@ -200,9 +205,10 @@ def test_list_project_seo_skill_runs_returns_project_runs() -> None:
                 project_id,
                 session=session,
                 limit=20,
+                current_user=TEST_USER,
             )
 
-        mock_project.assert_awaited_once_with(project_id, session)
+        mock_project.assert_awaited_once_with(project_id, session, TEST_USER)
         mock_list.assert_awaited_once_with(session, project_id, limit=20)
         assert len(response) == 1
         assert response[0].project_id == project_id
@@ -219,7 +225,7 @@ def test_get_project_seo_skill_run_returns_run_and_results() -> None:
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -232,6 +238,7 @@ def test_get_project_seo_skill_run_returns_run_and_results() -> None:
                 project_id,
                 run_id,
                 session=session,
+                current_user=TEST_USER,
             )
 
         mock_get.assert_awaited_once_with(session, project_id, run_id)
@@ -250,7 +257,7 @@ def test_get_project_seo_skill_run_not_found_returns_404() -> None:
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -264,6 +271,7 @@ def test_get_project_seo_skill_run_not_found_returns_404() -> None:
                     project_id,
                     run_id,
                     session=session,
+                    current_user=TEST_USER,
                 )
 
         assert exc.value.status_code == 404
@@ -280,7 +288,7 @@ def test_get_project_seo_skill_run_results_returns_only_results() -> None:
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -293,6 +301,7 @@ def test_get_project_seo_skill_run_results_returns_only_results() -> None:
                 project_id,
                 run_id,
                 session=session,
+                current_user=TEST_USER,
             )
 
         assert len(response) == 1
@@ -309,7 +318,7 @@ def test_get_seo_skill_catalog_still_works() -> None:
 
         with (
             patch(
-                "app.api.routes.seo_skills.get_project_in_default_workspace",
+                "app.api.routes.seo_skills.get_project_for_user",
                 new_callable=AsyncMock,
             ) as mock_project,
             patch(
@@ -327,9 +336,9 @@ def test_get_seo_skill_catalog_still_works() -> None:
                 ),
             ),
         ):
-            response = await get_seo_skill_catalog(project_id, session=session)
+            response = await get_seo_skill_catalog(project_id, session=session, current_user=TEST_USER)
 
-        mock_project.assert_awaited_once_with(project_id, session)
+        mock_project.assert_awaited_once_with(project_id, session, TEST_USER)
         assert response.skills == []
 
     asyncio.run(run())

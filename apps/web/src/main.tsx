@@ -14,13 +14,16 @@ import "./styles/brand-intelligence.css";
 import "./styles/date-range-selector.css";
 import "./styles/ai-usage.css";
 import { App } from "./App";
+import { AuthProvider } from "./components/AuthProvider";
 import { queryClient } from "./lib/queryClient";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

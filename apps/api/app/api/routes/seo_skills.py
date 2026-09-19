@@ -4,7 +4,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.seo_skills import (
     SeoSkillCatalogResponse,
     SeoSkillRunCreateRequest,
@@ -15,7 +17,7 @@ from app.schemas.seo_skills import (
 )
 from app.services.ai.claude_client import is_claude_configured
 from app.services.ai.openai_client import is_openai_configured
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 from app.services.seo_skills.catalog_loader import (
     _build_counts,
     load_seo_skill_catalog,
@@ -102,8 +104,9 @@ def _map_run_service_error(
 async def get_seo_skill_catalog(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoSkillCatalogResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     skills = load_seo_skill_catalog()
     return SeoSkillCatalogResponse(skills=skills, counts=_build_counts(skills))
 
@@ -118,8 +121,9 @@ async def create_project_seo_skill_run(
     project_id: UUID,
     request: SeoSkillRunCreateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoSkillRunStartResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     _ensure_provider_configured(request.provider)
 
     try:
@@ -140,9 +144,10 @@ async def create_project_seo_skill_run(
 async def list_project_seo_skill_runs(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> list[SeoSkillRunRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     runs = await list_seo_skill_runs(session, project_id, limit=limit)
     return [SeoSkillRunRead.model_validate(run) for run in runs]
 
@@ -156,8 +161,9 @@ async def get_project_seo_skill_run(
     project_id: UUID,
     run_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoSkillRunDetailResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     run = await get_seo_skill_run(session, project_id, run_id)
     if run is None:
         raise HTTPException(
@@ -179,8 +185,9 @@ async def get_project_seo_skill_run_results(
     project_id: UUID,
     run_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[SeoSkillRunResultRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     run = await get_seo_skill_run(session, project_id, run_id)
     if run is None:
         raise HTTPException(

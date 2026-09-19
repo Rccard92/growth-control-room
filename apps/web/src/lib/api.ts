@@ -1,7 +1,31 @@
-const RAW_API_BASE = import.meta.env.VITE_API_URL ?? "";
+import { getStoredToken, setStoredToken } from "./auth-api";
+
+/** Raised on 401 so callers can send the user back to the login screen. */
+export class UnauthorizedError extends Error {
+  constructor(message = "Sessione scaduta. Accedi di nuovo.") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+function withAuthHeaders(init?: RequestInit): RequestInit {
+  const token = getStoredToken();
+  if (!token) return init ?? {};
+  return {
+    ...init,
+    headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+  };
+}
+
+function handleUnauthorized(): never {
+  // The token is gone or expired: drop it so the app shows the login screen.
+  setStoredToken(null);
+  throw new UnauthorizedError();
+}
 
 export function getApiBase(): string {
-  let base = RAW_API_BASE.trim();
+  // Read at call time, not at module load, so tests can stub the env.
+  let base = (import.meta.env.VITE_API_URL ?? "").trim();
   if (!base) {
     return "";
   }
@@ -152,7 +176,10 @@ export async function apiFetch<T>(
     );
   }
 
-  const response = await fetch(apiUrl(path), init);
+  const response = await fetch(apiUrl(path), withAuthHeaders(init));
+  if (response.status === 401 && !path.includes("/auth/login")) {
+    handleUnauthorized();
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw buildFetchError(path, response.status, text);
@@ -168,10 +195,13 @@ export async function apiUploadForm<T>(path: string, formData: FormData): Promis
     );
   }
 
-  const response = await fetch(apiUrl(path), {
-    method: "POST",
-    body: formData,
-  });
+  const response = await fetch(
+    apiUrl(path),
+    withAuthHeaders({ method: "POST", body: formData }),
+  );
+  if (response.status === 401) {
+    handleUnauthorized();
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw buildFetchError(path, response.status, text);

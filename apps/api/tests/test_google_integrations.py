@@ -46,9 +46,12 @@ from app.models.integration import Integration
 from app.models.integration_credential import IntegrationCredential
 from app.models.project import Project
 from app.services.google.exceptions import (
+
     GoogleIntegrationNotConnectedError,
     GoogleIntegrationReconnectRequiredError,
 )
+
+from tests.support import TEST_USER
 
 
 def _make_persist_session(
@@ -143,7 +146,7 @@ def test_get_google_status_does_not_expose_secrets() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -165,7 +168,7 @@ def test_get_google_status_does_not_expose_secrets() -> None:
                     },
                 }
             )
-            response = await get_google_status(project_id, session)
+            response = await get_google_status(project_id, session, current_user=TEST_USER)
             payload = response.model_dump(by_alias=True)
 
         assert "access_token" not in json.dumps(payload)
@@ -182,7 +185,7 @@ def test_start_google_oauth_returns_authorization_url() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -193,7 +196,7 @@ def test_start_google_oauth_returns_authorization_url() -> None:
                 return_value="https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
             ),
         ):
-            response = await start_google_oauth(project_id, GoogleOAuthStartRequest(), session)
+            response = await start_google_oauth(project_id, GoogleOAuthStartRequest(), session, current_user=TEST_USER)
 
         assert response.authorization_url.startswith("https://accounts.google.com/")
 
@@ -207,7 +210,7 @@ def test_start_google_oauth_missing_env_returns_503() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -216,7 +219,7 @@ def test_start_google_oauth_missing_env_returns_503() -> None:
             ),
             pytest.raises(HTTPException) as exc,
         ):
-            await start_google_oauth(project_id, GoogleOAuthStartRequest(), session)
+            await start_google_oauth(project_id, GoogleOAuthStartRequest(), session, current_user=TEST_USER)
 
         assert exc.value.status_code == 503
 
@@ -233,7 +236,7 @@ def test_google_oauth_callback_error_redirect() -> None:
             "app.api.routes.google_integrations.verify_google_oauth_state",
             return_value=None,
         ):
-            response = await google_oauth_callback(request, session)
+            response = await google_oauth_callback(request, session, current_user=TEST_USER)
 
         assert response.status_code == 302
         assert "google_error=access_denied" in response.headers["location"]
@@ -251,7 +254,7 @@ def test_google_oauth_callback_invalid_state_redirect() -> None:
             "app.api.routes.google_integrations.verify_google_oauth_state",
             return_value=None,
         ):
-            response = await google_oauth_callback(request, session)
+            response = await google_oauth_callback(request, session, current_user=TEST_USER)
 
         assert response.status_code == 302
         assert "google_error=invalid_state" in response.headers["location"]
@@ -272,7 +275,7 @@ def test_google_oauth_callback_success_redirect() -> None:
                 return_value=GoogleOAuthState(project_id=project_id),
             ),
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -295,7 +298,7 @@ def test_google_oauth_callback_success_redirect() -> None:
                 side_effect=lambda path: f"https://app.example.com{path}",
             ),
         ):
-            response = await google_oauth_callback(request, session)
+            response = await google_oauth_callback(request, session, current_user=TEST_USER)
 
         persist_mock.assert_awaited_once_with(
             session,
@@ -533,7 +536,7 @@ def test_list_search_console_sites_returns_sites() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -549,7 +552,7 @@ def test_list_search_console_sites_returns_sites() -> None:
                 ],
             ),
         ):
-            response = await list_search_console_sites(project_id, session)
+            response = await list_search_console_sites(project_id, session, current_user=TEST_USER)
 
         assert response.sites[0].site_url == "https://example.com/"
         assert response.sites[0].permission_level == "siteOwner"
@@ -564,7 +567,7 @@ def test_list_search_console_sites_returns_503_when_not_connected() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -577,7 +580,7 @@ def test_list_search_console_sites_returns_503_when_not_connected() -> None:
             ),
             pytest.raises(HTTPException) as exc,
         ):
-            await list_search_console_sites(project_id, session)
+            await list_search_console_sites(project_id, session, current_user=TEST_USER)
 
         assert exc.value.status_code == 503
 
@@ -603,7 +606,7 @@ def test_select_search_console_site_saves_property() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
                 return_value=project,
             ),
@@ -624,6 +627,7 @@ def test_select_search_console_site_saves_property() -> None:
                 project_id,
                 SelectSearchConsoleSiteRequest(site_url="https://example.com/"),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.site_url == "https://example.com/"
@@ -650,7 +654,7 @@ def test_select_search_console_site_returns_422_for_unknown_property() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
                 return_value=project,
             ),
@@ -672,6 +676,7 @@ def test_select_search_console_site_returns_422_for_unknown_property() -> None:
                 project_id,
                 SelectSearchConsoleSiteRequest(site_url="https://other.com/"),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 422
@@ -686,7 +691,7 @@ def test_list_google_analytics_properties_returns_properties() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -707,7 +712,7 @@ def test_list_google_analytics_properties_returns_properties() -> None:
                 ],
             ),
         ):
-            response = await list_google_analytics_properties(project_id, session)
+            response = await list_google_analytics_properties(project_id, session, current_user=TEST_USER)
 
         assert response.properties[0].property_id == "123456789"
         assert response.properties[0].display_name == "Example GA4"
@@ -722,7 +727,7 @@ def test_list_google_analytics_properties_returns_503_when_not_connected() -> No
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -735,7 +740,7 @@ def test_list_google_analytics_properties_returns_503_when_not_connected() -> No
             ),
             pytest.raises(HTTPException) as exc,
         ):
-            await list_google_analytics_properties(project_id, session)
+            await list_google_analytics_properties(project_id, session, current_user=TEST_USER)
 
         assert exc.value.status_code == 503
 
@@ -762,7 +767,7 @@ def test_select_google_analytics_property_saves_property() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
                 return_value=project,
             ),
@@ -792,6 +797,7 @@ def test_select_google_analytics_property_saves_property() -> None:
                     display_name="Example GA4",
                 ),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.property_id == "123456789"
@@ -820,7 +826,7 @@ def test_select_google_analytics_property_returns_422_for_unknown_property() -> 
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
                 return_value=project,
             ),
@@ -851,6 +857,7 @@ def test_select_google_analytics_property_returns_422_for_unknown_property() -> 
                     display_name="Other GA4",
                 ),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 422
@@ -865,7 +872,7 @@ def test_list_merchant_accounts_returns_accounts() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -891,7 +898,7 @@ def test_list_merchant_accounts_returns_accounts() -> None:
                 ],
             ),
         ):
-            response = await list_merchant_accounts(project_id, session)
+            response = await list_merchant_accounts(project_id, session, current_user=TEST_USER)
 
         assert len(response.accounts) == 1
         assert response.accounts[0].account_id == "123456"
@@ -918,7 +925,7 @@ def test_select_merchant_account_saves_account() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
                 return_value=project,
             ),
@@ -946,6 +953,7 @@ def test_select_merchant_account_saves_account() -> None:
                     account_name="Example Merchant",
                 ),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.account_id == "123456"
@@ -963,7 +971,7 @@ def test_start_google_oauth_merchant_add_scope_requests_content_scope() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -978,6 +986,7 @@ def test_start_google_oauth_merchant_add_scope_requests_content_scope() -> None:
                 project_id,
                 GoogleOAuthStartRequest(provider="merchant_center", mode="add_scope"),
                 session,
+                current_user=TEST_USER,
             )
 
         build_mock.assert_called_once()
@@ -1197,7 +1206,7 @@ def test_list_merchant_accounts_returns_409_when_reconnect_required() -> None:
 
         with (
             patch(
-                "app.api.routes.google_integrations.get_project_in_default_workspace",
+                "app.api.routes.google_integrations.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -1210,7 +1219,7 @@ def test_list_merchant_accounts_returns_409_when_reconnect_required() -> None:
             ),
             pytest.raises(HTTPException) as exc,
         ):
-            await list_merchant_accounts(project_id, session)
+            await list_merchant_accounts(project_id, session, current_user=TEST_USER)
 
         assert exc.value.status_code == 409
         assert exc.value.detail["error"] == "google_reconnect_required"

@@ -23,7 +23,7 @@ from app.services.growth_audit.run_service import (
     list_growth_audit_pages,
 )
 from app.services.growth_audit.url_utils import normalize_url
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +315,7 @@ async def analyze_growth_audit_search_console(
             "Impossibile sincronizzare Search Console mentre il run è ancora in corso."
         )
 
-    project = await get_project_in_default_workspace(project_id, session)
+    project = await get_project_by_id(project_id, session)
     site_url = (project.search_console_site_url or "").strip()
     if not site_url:
         raise GrowthAuditValidationError(

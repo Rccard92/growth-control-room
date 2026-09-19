@@ -109,7 +109,7 @@ def test_camel_case_request_hits_409_not_422() -> None:
             }
         )
         with patch(
-            "app.api.routes.dataforseo.get_project_in_default_workspace",
+            "app.api.routes.dataforseo.get_project_for_user",
             new=AsyncMock(),
         ), patch(
             "app.api.routes.dataforseo.run_dataforseo_sandbox_test",

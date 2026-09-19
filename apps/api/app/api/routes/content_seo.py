@@ -7,7 +7,9 @@ from fastapi.responses import Response
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.content_seo import (
     ContentSeoAnalyzeResponse,
     ContentSeoDashboardResponse,
@@ -131,7 +133,7 @@ from app.services.content.seo_proposal_engine import generate_seo_proposal
 from app.services.content.seo_proposal_field_engine import generate_seo_proposal_field
 from app.services.content.seo_proposal_read import proposal_to_read_dict
 from app.services.content.seo_proposal_diff import proposal_changed_fields
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 from app.services.shopify.client import ShopifyAPIError
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
 from app.services.shopify.content_sync import sync_shopify_collections_only
@@ -170,8 +172,9 @@ def _require_connected_store(store):
 async def content_seo_dashboard(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoDashboardResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
     if store is None:
         raise HTTPException(
@@ -191,8 +194,9 @@ async def content_seo_dashboard(
 async def content_seo_sync_shopify(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoOptimizerSyncResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
 
     products_synced = 0
@@ -243,8 +247,9 @@ async def content_seo_sync_shopify(
 async def content_seo_analyze_legacy(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoAnalyzeResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     result = await run_content_seo_analyze(store, session)
     return ContentSeoAnalyzeResponse(
@@ -263,8 +268,9 @@ async def content_seo_analyze_legacy(
 async def analyze_products(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoAnalyzeCountResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     result = await analyze_products_for_store(store, session)
     return SeoAnalyzeCountResponse(
@@ -283,8 +289,9 @@ async def analyze_products(
 async def analyze_collections(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoAnalyzeCountResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     result = await analyze_collections_for_store(store, session)
     return SeoAnalyzeCountResponse(
@@ -304,8 +311,9 @@ async def analyze_collections(
 async def content_seo_debug(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoContentDebugResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     data = await build_content_seo_debug(store, session)
     return SeoContentDebugResponse.model_validate(data)
@@ -319,8 +327,9 @@ async def content_seo_debug(
 async def list_products_seo(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProductListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     items = await list_product_seo_items(store, session)
     scope_info = await resolve_shopify_scopes(store, session)
@@ -339,8 +348,9 @@ async def list_products_seo(
 async def list_collections_seo(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoCollectionListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     items = await list_collection_seo_items(store, session)
     scope_info = await resolve_shopify_scopes(store, session)
@@ -428,8 +438,9 @@ async def get_product_seo_detail_route(
     project_id: UUID,
     product_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProductDetailResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     data = await get_product_seo_detail(store, session, product_id)
     if data is None:
@@ -446,8 +457,9 @@ async def get_collection_seo_detail_route(
     project_id: UUID,
     collection_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoCollectionDetailResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     data = await get_collection_seo_detail(store, session, collection_id)
     if data is None:
@@ -464,8 +476,9 @@ async def sync_product_seo_from_shopify(
     project_id: UUID,
     product_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoEntitySyncResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     try:
         client = await get_shopify_client_for_store(store)
@@ -491,8 +504,9 @@ async def sync_collection_seo_from_shopify(
     project_id: UUID,
     collection_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoEntitySyncResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     try:
         client = await get_shopify_client_for_store(store)
@@ -518,8 +532,9 @@ async def get_product_analysis(
     project_id: UUID,
     entity_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoEntityAnalysisRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     analysis = await get_analysis_detail(store, session, "product", entity_id)
     if analysis is None:
@@ -536,8 +551,9 @@ async def get_collection_analysis(
     project_id: UUID,
     entity_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoEntityAnalysisRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     analysis = await get_analysis_detail(store, session, "collection", entity_id)
     if analysis is None:
@@ -554,8 +570,9 @@ async def list_seo_proposals(
     project_id: UUID,
     status_filter: str | None = Query(default=None, alias="status"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposals = await list_proposals(store, session, status=status_filter)
     return SeoProposalListResponse(
@@ -572,8 +589,9 @@ async def generate_proposal(
     project_id: UUID,
     body: SeoProposalGenerateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
 
     if body.use_ai and not is_openai_configured():
@@ -612,8 +630,9 @@ async def generate_proposal_field(
     project_id: UUID,
     body: SeoProposalGenerateFieldRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalGenerateFieldResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
 
     if body.use_ai and not is_openai_configured():
@@ -683,8 +702,9 @@ async def generate_proposal_field(
 async def sync_metafield_definitions_route(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoMetafieldDefinitionsSyncResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     try:
         client = await get_shopify_client_for_store(store)
@@ -706,8 +726,9 @@ async def create_manual_seo_proposal(
     project_id: UUID,
     body: SeoProposalManualRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     try:
         proposal = await create_manual_proposal(
@@ -732,8 +753,9 @@ async def preview_seo_proposal(
     project_id: UUID,
     proposal_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalPreviewResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposal = await get_proposal_for_store(store, session, proposal_id)
     if proposal is None:
@@ -751,8 +773,9 @@ async def get_proposal(
     project_id: UUID,
     proposal_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposal = await get_proposal_for_store(store, session, proposal_id)
     if proposal is None:
@@ -769,8 +792,9 @@ async def approve_seo_proposal(
     project_id: UUID,
     proposal_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposal = await get_proposal_for_store(store, session, proposal_id)
     if proposal is None:
@@ -791,8 +815,9 @@ async def reject_seo_proposal(
     project_id: UUID,
     proposal_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoProposalRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposal = await get_proposal_for_store(store, session, proposal_id)
     if proposal is None:
@@ -813,8 +838,9 @@ async def apply_seo_proposal(
     project_id: UUID,
     proposal_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoApplyResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposal = await get_proposal_for_store(store, session, proposal_id)
     if proposal is None:
@@ -838,8 +864,9 @@ async def apply_seo_entity_fields(
     project_id: UUID,
     body: SeoApplyFieldsRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SeoApplyFieldsResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
 
     try:
@@ -867,11 +894,12 @@ async def apply_seo_entity_fields(
 async def list_content_seo_editorial_items(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
     status: str | None = Query(default=None),
     content_type: str | None = Query(default=None, alias="contentType"),
 ) -> ContentSeoEditorialItemListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await list_editorial_items(
         session,
         project_id,
@@ -895,8 +923,9 @@ async def create_content_seo_editorial_item(
     project_id: UUID,
     payload: ContentSeoEditorialItemCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await create_editorial_item(session, project_id, payload)
     return ContentSeoEditorialItemRead.model_validate(row)
 
@@ -910,8 +939,9 @@ async def get_content_seo_editorial_item(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_editorial_item(session, project_id, item_id)
     return ContentSeoEditorialItemRead.model_validate(row)
 
@@ -926,8 +956,9 @@ async def update_content_seo_editorial_item(
     item_id: UUID,
     payload: ContentSeoEditorialItemUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await update_editorial_item(session, project_id, item_id, payload)
     return ContentSeoEditorialItemRead.model_validate(row)
 
@@ -942,8 +973,9 @@ async def reschedule_content_seo_editorial_item(
     item_id: UUID,
     payload: EditorialItemRescheduleRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialItemRescheduleResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows, delta_days, warning = await reschedule_editorial_item(
         session, project_id, item_id, payload
     )
@@ -962,8 +994,9 @@ async def delete_content_seo_editorial_item(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await delete_editorial_item(session, project_id, item_id)
 
 
@@ -976,9 +1009,10 @@ async def generate_content_seo_editorial_calendar(
     project_id: UUID,
     payload: EditorialPlanGenerateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     dry_run: bool = Query(default=False, alias="dryRun"),
 ) -> EditorialPlanGenerateResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         rows = await generate_editorial_calendar(
             session, project_id, payload, dry_run=dry_run
@@ -1006,8 +1040,9 @@ async def generate_content_seo_editorial_brief(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await generate_editorial_brief(session, project_id, item_id)
     return ContentSeoEditorialItemRead.model_validate(row)
 
@@ -1022,8 +1057,9 @@ async def update_content_seo_editorial_brief(
     item_id: UUID,
     payload: EditorialBriefUpdateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         row = await update_editorial_brief(session, project_id, item_id, payload)
     except ValueError as exc:
@@ -1040,8 +1076,9 @@ async def generate_content_seo_editorial_article(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await generate_editorial_article(session, project_id, item_id)
     return await get_editorial_item_read(session, project_id, item_id)
 
@@ -1056,8 +1093,9 @@ async def update_content_seo_editorial_article(
     item_id: UUID,
     payload: EditorialArticleUpdateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         await update_editorial_article(session, project_id, item_id, payload)
     except ValueError as exc:
@@ -1074,8 +1112,9 @@ async def generate_content_seo_editorial_image(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialImageActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await generate_editorial_image(session, project_id, item_id)
 
 
@@ -1089,8 +1128,9 @@ async def edit_content_seo_editorial_image(
     item_id: UUID,
     payload: EditorialImageEditRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialImageActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await edit_editorial_image(
         session,
         project_id,
@@ -1108,8 +1148,9 @@ async def approve_content_seo_editorial_image(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialImageActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await approve_editorial_image(session, project_id, item_id)
 
 
@@ -1122,8 +1163,9 @@ async def retry_content_seo_editorial_image_upload(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialImageActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await retry_editorial_image_upload(session, project_id, item_id)
 
 
@@ -1136,8 +1178,9 @@ async def remove_content_seo_editorial_image(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialImageActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await remove_editorial_image(session, project_id, item_id)
 
 
@@ -1150,8 +1193,9 @@ async def sync_content_seo_editorial_image_from_title(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialImageActionResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await sync_editorial_image_from_title(session, project_id, item_id)
 
 
@@ -1184,8 +1228,9 @@ async def get_content_seo_editorial_item_ai_usage(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialItemAiUsageResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await get_editorial_item(session, project_id, item_id)
     return await get_editorial_item_ai_usage(session, project_id, item_id)
 
@@ -1198,8 +1243,9 @@ async def get_content_seo_editorial_item_ai_usage(
 async def list_content_seo_shopify_blogs(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyBlogsListResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await list_shopify_blogs_for_project(session, project_id)
 
 
@@ -1213,8 +1259,9 @@ async def update_content_seo_editorial_publishing(
     item_id: UUID,
     payload: EditorialPublishingUpdateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await update_editorial_publishing(session, project_id, item_id, payload)
     await session.commit()
     return await get_editorial_item_read(session, project_id, item_id)
@@ -1229,8 +1276,9 @@ async def sync_content_seo_editorial_publishing_from_article(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await sync_publishing_from_article(session, project_id, item_id)
     await session.commit()
     return await get_editorial_item_read(session, project_id, item_id)
@@ -1245,8 +1293,9 @@ async def disconnect_content_seo_editorial_shopify(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContentSeoEditorialItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await disconnect_editorial_shopify_article(session, project_id, item_id)
     await session.commit()
     return await get_editorial_item_read(session, project_id, item_id)
@@ -1262,8 +1311,9 @@ async def publish_content_seo_editorial_shopify(
     item_id: UUID,
     payload: EditorialPublishShopifyRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialPublishShopifyResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await publish_editorial_to_shopify(session, project_id, item_id, payload)
 
 
@@ -1276,8 +1326,9 @@ async def generate_content_seo_editorial_briefs_batch(
     project_id: UUID,
     payload: EditorialBriefBatchStartRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialBriefBatchJobResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await start_brief_batch_job(session, project_id, payload)
 
 
@@ -1290,7 +1341,8 @@ async def get_content_seo_editorial_brief_batch_job(
     project_id: UUID,
     job_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> EditorialBriefBatchJobResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     job = await get_brief_batch_job(session, project_id, job_id)
     return job_to_response(job)

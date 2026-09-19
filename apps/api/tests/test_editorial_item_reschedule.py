@@ -60,7 +60,9 @@ def test_reschedule_cascade_false_only_current_item() -> None:
         assert warning is None
         assert len(updated) == 1
         assert row.planned_date == date(2026, 6, 15)
-        mock_session.execute.assert_not_called()
+        # Without cascade nothing else is rescheduled: the only query the service
+        # runs is the store lookup that resolves the publishing timezone.
+        assert mock_session.execute.await_count == 1
 
     asyncio.run(run())
 

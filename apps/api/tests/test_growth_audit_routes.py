@@ -26,6 +26,8 @@ from app.models.growth_audit import GrowthAuditEvent, GrowthAuditFinding, Growth
 from app.schemas.growth_audit import GrowthAuditRunCreateRequest
 from app.services.growth_audit.exceptions import GrowthAuditRunNotFoundError
 
+from tests.support import TEST_USER
+
 
 def _request(**overrides: object) -> GrowthAuditRunCreateRequest:
     base = {
@@ -113,7 +115,7 @@ def test_create_growth_audit_run_returns_201_payload() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -126,6 +128,7 @@ def test_create_growth_audit_run_returns_201_payload() -> None:
                 project_id,
                 _request(),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.run.id == created.id
@@ -142,7 +145,7 @@ def test_list_growth_audit_runs_endpoint() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -151,7 +154,7 @@ def test_list_growth_audit_runs_endpoint() -> None:
                 return_value=[created],
             ),
         ):
-            response = await list_growth_audit_runs_endpoint(project_id, 20, session)
+            response = await list_growth_audit_runs_endpoint(project_id, 20, session, current_user=TEST_USER)
 
         assert len(response.runs) == 1
 
@@ -167,7 +170,7 @@ def test_get_growth_audit_run_detail_endpoint() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -176,7 +179,7 @@ def test_get_growth_audit_run_detail_endpoint() -> None:
                 return_value=(created, 0, 0),
             ),
         ):
-            response = await get_growth_audit_run_endpoint(project_id, run_id, session)
+            response = await get_growth_audit_run_endpoint(project_id, run_id, session, current_user=TEST_USER)
 
         assert response.run.id == run_id
         assert len(response.pages) == 1
@@ -194,7 +197,7 @@ def test_list_pages_and_events_endpoints() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -212,11 +215,13 @@ def test_list_pages_and_events_endpoints() -> None:
                 project_id,
                 run_id,
                 session,
+                current_user=TEST_USER,
             )
             events_response = await list_growth_audit_events_endpoint(
                 project_id,
                 run_id,
                 session,
+                current_user=TEST_USER,
             )
 
         assert len(pages_response.pages) == 1
@@ -233,7 +238,7 @@ def test_get_growth_audit_run_wrong_project_returns_404() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -243,7 +248,7 @@ def test_get_growth_audit_run_wrong_project_returns_404() -> None:
             ),
         ):
             with pytest.raises(HTTPException) as exc_info:
-                await get_growth_audit_run_endpoint(project_id, run_id, session)
+                await get_growth_audit_run_endpoint(project_id, run_id, session, current_user=TEST_USER)
 
         assert exc_info.value.status_code == 404
 
@@ -285,7 +290,7 @@ def test_list_findings_and_tasks_endpoints() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -307,6 +312,7 @@ def test_list_findings_and_tasks_endpoints() -> None:
                 None,
                 None,
                 session,
+                current_user=TEST_USER,
             )
             tasks_response = await list_growth_audit_tasks_endpoint(
                 project_id,
@@ -316,6 +322,7 @@ def test_list_findings_and_tasks_endpoints() -> None:
                 None,
                 None,
                 session,
+                current_user=TEST_USER,
             )
 
         assert len(findings_response.findings) == 1

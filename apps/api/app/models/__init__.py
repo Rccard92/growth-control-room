@@ -61,6 +61,7 @@ from app.models.shopify import (
 )
 from app.models.shopify_oauth_state import ShopifyOAuthState
 from app.models.user import User
+from app.models.user_session import UserSession
 from app.models.workspace import Workspace
 
 __all__ = [
@@ -122,5 +123,6 @@ __all__ = [
     "ShopifyStore",
     "ShopifyOAuthState",
     "User",
+    "UserSession",
     "Workspace",
 ]

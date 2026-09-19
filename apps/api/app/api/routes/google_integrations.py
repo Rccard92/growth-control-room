@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.google_integration import (
     GoogleAnalyticsPropertiesResponse,
     GoogleAnalyticsProperty,
@@ -56,7 +58,7 @@ from app.services.google.google_tokens import get_valid_google_access_token
 from app.services.google.analytics_client import fetch_ga4_account_summaries
 from app.services.google.merchant_client import fetch_merchant_accounts
 from app.services.google.search_console_client import fetch_search_console_sites
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +121,9 @@ def _map_google_integration_error(exc: Exception) -> HTTPException:
 async def list_search_console_sites(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GoogleSearchConsoleSitesResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         access_token = await get_valid_google_access_token(
             session,
@@ -151,8 +154,9 @@ async def select_search_console_site(
     project_id: UUID,
     body: SelectSearchConsoleSiteRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SelectSearchConsoleSiteResponse:
-    project = await get_project_in_default_workspace(project_id, session)
+    project = await get_project_for_user(project_id, session, current_user)
     site_url = body.site_url.strip()
     if not site_url:
         raise HTTPException(
@@ -197,8 +201,9 @@ async def select_search_console_site(
 async def list_google_analytics_properties(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GoogleAnalyticsPropertiesResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         access_token = await get_valid_google_access_token(
             session,
@@ -231,8 +236,9 @@ async def select_google_analytics_property(
     project_id: UUID,
     body: SelectGoogleAnalyticsPropertyRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SelectGoogleAnalyticsPropertyResponse:
-    project = await get_project_in_default_workspace(project_id, session)
+    project = await get_project_for_user(project_id, session, current_user)
     property_id = body.property_id.strip()
     property_name = body.property_name.strip()
     display_name = body.display_name.strip()
@@ -282,8 +288,9 @@ async def select_google_analytics_property(
 async def list_merchant_accounts(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GoogleMerchantAccountsResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         await ensure_google_provider_credential_from_existing_scope(
             session,
@@ -322,8 +329,9 @@ async def select_merchant_account(
     project_id: UUID,
     body: SelectGoogleMerchantAccountRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SelectGoogleMerchantAccountResponse:
-    project = await get_project_in_default_workspace(project_id, session)
+    project = await get_project_for_user(project_id, session, current_user)
     account_id = body.account_id.strip()
     account_name = body.account_name.strip()
     if not account_id or not account_name:
@@ -370,8 +378,9 @@ async def select_merchant_account(
 async def get_google_status(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GoogleIntegrationStatusResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await get_google_integration_status(session, project_id)
 
 
@@ -384,8 +393,9 @@ async def start_google_oauth(
     project_id: UUID,
     body: GoogleOAuthStartRequest | None = None,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GoogleOAuthStartResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     ensure_google_oauth_configured()
 
     request_body = body or GoogleOAuthStartRequest()
@@ -410,6 +420,7 @@ async def start_google_oauth(
 async def google_oauth_callback(
     request: Request,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> RedirectResponse:
     query_params = dict(request.query_params)
     error = query_params.get("error")
@@ -431,7 +442,7 @@ async def google_oauth_callback(
         return _redirect_error(project_id, "invalid_state")
 
     try:
-        await get_project_in_default_workspace(project_id, session)
+        await get_project_for_user(project_id, session, current_user)
         token_data = await exchange_google_oauth_code(code)
         await persist_google_oauth_tokens(
             session,

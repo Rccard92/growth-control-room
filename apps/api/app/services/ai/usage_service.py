@@ -22,7 +22,8 @@ from app.core.datetime import (
 from app.models.ai_usage_log import AiUsageLog
 from app.models.project import Project
 from app.services.ai.model_policy import CHEAP_CONTEXT_PROFILES, AiModelTier, tier_to_model_name
-from app.services.workspace import get_default_workspace
+from app.models.user import User
+from app.services.workspace import get_workspace_for_user
 
 PREVIEW_MAX_LEN = 500
 
@@ -524,11 +525,12 @@ async def estimate_operation_cost(
 
 async def get_global_usage_summary(
     session: AsyncSession,
+    user: User,
     *,
     start_date: date | None = None,
     end_date: date | None = None,
 ) -> dict[str, Any]:
-    workspace = await get_default_workspace(session)
+    workspace = await get_workspace_for_user(session, user)
     project_ids = (
         await session.execute(select(Project.id).where(Project.workspace_id == workspace.id))
     ).scalars().all()

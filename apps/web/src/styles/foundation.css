@@ -645,6 +645,70 @@
   margin: 0 0 2rem;
 }
 
+.gcr-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  text-align: left;
+  margin-bottom: 0.5rem;
+}
+
+.gcr-login__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--gcr-text-muted);
+}
+
+.gcr-login__label + .gcr-login__input {
+  margin-bottom: 0.75rem;
+}
+
+.gcr-login__input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--gcr-text);
+  background: var(--gcr-surface);
+  border: 1px solid var(--gcr-border);
+  border-radius: 8px;
+}
+
+.gcr-login__input:focus {
+  outline: none;
+  border-color: var(--gcr-accent, #8b5cf6);
+}
+
+.gcr-login__error {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--gcr-danger, #f87171);
+}
+
+.gcr-login__submit {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9375rem;
+  margin-top: 0.5rem;
+}
+
+.gcr-auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  color: var(--gcr-text-muted);
+  font-size: 0.9375rem;
+}
+
+.gcr-topbar__user {
+  font-size: 0.8125rem;
+  color: var(--gcr-text-muted);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Legal pages */
 .gcr-legal {
   max-width: 720px;

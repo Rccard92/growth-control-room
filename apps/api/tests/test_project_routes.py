@@ -16,6 +16,8 @@ from app.api.routes.projects import create_project, update_project
 from app.models.project import Project
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate, normalize_public_site_url
 
+from tests.support import TEST_USER
+
 
 def test_normalize_public_site_url_adds_https_and_strips_trailing_slash() -> None:
     assert normalize_public_site_url("solmielato.it") == "https://solmielato.it"
@@ -86,7 +88,7 @@ def test_update_project_persists_public_site_url() -> None:
         session.refresh.side_effect = refresh_side_effect
 
         with patch(
-            "app.api.routes.projects.get_project_in_default_workspace",
+            "app.api.routes.projects.get_project_for_user",
             new_callable=AsyncMock,
             return_value=project,
         ):
@@ -94,6 +96,7 @@ def test_update_project_persists_public_site_url() -> None:
                 project_id,
                 ProjectUpdate.model_validate({"publicSiteUrl": "https://solmielato.it"}),
                 session,
+                current_user=TEST_USER,
             )
 
         assert result.public_site_url == "https://solmielato.it"
@@ -128,7 +131,7 @@ def test_update_project_clears_public_site_url_with_empty_string() -> None:
         session.refresh.side_effect = refresh_side_effect
 
         with patch(
-            "app.api.routes.projects.get_project_in_default_workspace",
+            "app.api.routes.projects.get_project_for_user",
             new_callable=AsyncMock,
             return_value=project,
         ):
@@ -136,6 +139,7 @@ def test_update_project_clears_public_site_url_with_empty_string() -> None:
                 project_id,
                 ProjectUpdate.model_validate({"publicSiteUrl": ""}),
                 session,
+                current_user=TEST_USER,
             )
 
         assert result.public_site_url is None
@@ -153,7 +157,7 @@ def test_create_project_passes_public_site_url_to_model() -> None:
 
         with (
             patch(
-                "app.api.routes.projects.get_default_workspace",
+                "app.api.routes.projects.get_workspace_for_user",
                 new_callable=AsyncMock,
                 return_value=workspace,
             ),
@@ -169,7 +173,7 @@ def test_create_project_passes_public_site_url_to_model() -> None:
                     "publicSiteUrl": "solmielato.it",
                 }
             )
-            created = await create_project(body, session)
+            created = await create_project(body, session, current_user=TEST_USER)
 
         assert created.public_site_url == "https://solmielato.it"
 

@@ -38,6 +38,7 @@ def _sample_row() -> SimpleNamespace:
         brief_payload=None,
         article_payload={"title": "Guida"},
         publishing_payload={"title": "Guida", "bodyHtml": "<p>Ok</p>"},
+        image_payload=None,
         shopify_blog_id="10",
         shopify_article_id=None,
         shopify_article_gid=None,

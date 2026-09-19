@@ -26,8 +26,11 @@ from app.services.growth_audit.keyword_intelligence_findings import (
     build_keyword_intelligence_findings,
 )
 from app.services.growth_audit.keyword_intelligence_selection import (
+
     select_keyword_intelligence_seed_queries,
 )
+
+from tests.support import TEST_USER
 
 
 def _build_run(project_id, run_id=None) -> GrowthAuditRun:
@@ -224,7 +227,7 @@ def test_endpoint_blocks_real_calls_disabled() -> None:
             {"maxSeedQueries": 5, "force": True}
         )
         with patch(
-            "app.api.routes.growth_audit.get_project_in_default_workspace",
+            "app.api.routes.growth_audit.get_project_for_user",
             new=AsyncMock(),
         ), patch(
             "app.api.routes.growth_audit.analyze_growth_audit_page_keyword_intelligence",
@@ -239,6 +242,7 @@ def test_endpoint_blocks_real_calls_disabled() -> None:
                     page_id,
                     request,
                     session,
+                    current_user=TEST_USER,
                 )
         assert exc.value.status_code == 409
 

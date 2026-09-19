@@ -24,6 +24,8 @@ from app.services.growth_audit.page_performance_analysis import (
 )
 from app.services.growth_audit.performance_analysis import normalize_pagespeed_result
 
+from tests.support import TEST_USER
+
 
 def _pagespeed_raw() -> dict:
     return {
@@ -324,7 +326,7 @@ def test_performance_route_returns_200_with_mock() -> None:
         session = AsyncMock()
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -338,6 +340,7 @@ def test_performance_route_returns_200_with_mock() -> None:
                 page_id,
                 GrowthAuditPagePerformanceAnalysisRequest(strategy="mobile"),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.result.score == 72
@@ -355,7 +358,7 @@ def test_performance_route_missing_api_key_returns_503() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -375,6 +378,7 @@ def test_performance_route_missing_api_key_returns_503() -> None:
                 page_id,
                 GrowthAuditPagePerformanceAnalysisRequest(),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 503

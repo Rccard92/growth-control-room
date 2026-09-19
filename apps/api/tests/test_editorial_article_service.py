@@ -360,6 +360,7 @@ def test_update_editorial_article_ready_to_publish() -> None:
         project_id=project_id,
         status="draft_review",
         article_payload=None,
+        image_payload=None,
     )
     mock_session = AsyncMock()
     mock_session.commit = AsyncMock()

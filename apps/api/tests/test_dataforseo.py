@@ -50,7 +50,7 @@ def test_status_configured_false_without_env() -> None:
         project_id = uuid4()
         session = AsyncMock()
         with patch(
-            "app.api.routes.dataforseo.get_project_in_default_workspace",
+            "app.api.routes.dataforseo.get_project_for_user",
             new=AsyncMock(),
         ), patch(
             "app.api.routes.dataforseo.get_dataforseo_usage_today",
@@ -82,7 +82,7 @@ def test_test_endpoint_blocks_when_real_calls_disabled() -> None:
             language_code="it",
         )
         with patch(
-            "app.api.routes.dataforseo.get_project_in_default_workspace",
+            "app.api.routes.dataforseo.get_project_for_user",
             new=AsyncMock(),
         ), patch(
             "app.api.routes.dataforseo.run_dataforseo_sandbox_test",

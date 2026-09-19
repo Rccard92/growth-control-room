@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.models.shopify import ShopifyOrder, ShopifyProduct
 from app.schemas.shopify import (
     ShopifyConnectRequest,
@@ -21,7 +23,7 @@ from app.schemas.shopify import (
     ShopifyStatusResponse,
     ShopifySyncResponse,
 )
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 from app.services.shopify.client import ShopifyAPIError, normalize_shop_domain
 from app.services.shopify.connect import connect_shopify, get_shopify_client_for_store, get_shopify_store_for_project
 from app.services.shopify.oauth import (
@@ -57,9 +59,10 @@ async def shopify_oauth_start(
     project_id: UUID,
     shop: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyOAuthStartResponse:
     ensure_shopify_oauth_configured()
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         shop_domain = normalize_shop_domain(shop)
     except ShopifyAPIError as exc:
@@ -79,8 +82,9 @@ async def shopify_connect(
     project_id: UUID,
     body: ShopifyConnectRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyConnectResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     try:
         store = await connect_shopify(
             project_id,
@@ -107,8 +111,9 @@ async def shopify_connect(
 async def shopify_status(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyStatusResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None or store.connection_status != "connected":
@@ -133,8 +138,9 @@ async def shopify_status(
 async def shopify_scopes(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyScopesResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None or store.connection_status != "connected":
@@ -155,8 +161,9 @@ async def shopify_scopes(
 async def shopify_sync(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifySyncResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None or store.connection_status != "connected":
@@ -194,8 +201,9 @@ async def shopify_dashboard(
     start_date: date | None = Query(None, alias="start_date"),
     end_date: date | None = Query(None, alias="end_date"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyDashboardResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None:
@@ -220,8 +228,9 @@ async def shopify_reconciliation(
     start_date: date | None = Query(None, alias="start_date"),
     end_date: date | None = Query(None, alias="end_date"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyReconciliationDebugResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None:
@@ -243,8 +252,9 @@ async def shopify_reconciliation(
 async def shopify_shopifyql_probe(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyShopifyqlProbeResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None:
@@ -287,8 +297,9 @@ async def shopify_official_analytics(
     start_date: date | None = Query(None, alias="start_date"),
     end_date: date | None = Query(None, alias="end_date"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ShopifyOfficialAnalyticsResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None:
@@ -328,8 +339,9 @@ async def shopify_official_analytics(
 async def shopify_products(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[ShopifyProduct]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None:
@@ -354,8 +366,9 @@ async def shopify_products(
 async def shopify_orders(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[ShopifyOrder]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     store = await get_shopify_store_for_project(project_id, session)
 
     if store is None:

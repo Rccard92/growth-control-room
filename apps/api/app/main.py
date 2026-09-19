@@ -1,12 +1,14 @@
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.router import api_router
-from app.api.routes import debug, google_integrations, projects
+from app.api.deps import require_user
+from app.api.router import api_router, public_api_router
+from app.api.routes import google_integrations, projects
 from app.api.validation_helpers import is_json_string_body_validation_error
 from app.core.config import settings
 from app.db.session import close_db, init_db
@@ -17,11 +19,29 @@ from app.services.dataforseo.exceptions import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
+    await _bootstrap_initial_admin()
     yield
     await close_db()
+
+
+async def _bootstrap_initial_admin() -> None:
+    """Create the first admin account if one was configured and none exists yet."""
+    if not (settings.initial_admin_email and settings.initial_admin_password):
+        return
+    from app.db.session import get_session_factory
+    from app.services.auth.bootstrap import ensure_initial_admin
+
+    try:
+        async with get_session_factory()() as session:
+            await ensure_initial_admin(session)
+    except Exception:
+        logger.exception("Bootstrap account amministratore non riuscito")
 
 
 app = FastAPI(
@@ -39,9 +59,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(projects.router, prefix="/api")
-app.include_router(google_integrations.router, prefix="/api")
-app.include_router(debug.router, prefix="/api")
+app.include_router(public_api_router, prefix="/api")
+app.include_router(projects.router, prefix="/api", dependencies=[Depends(require_user)])
+app.include_router(
+    google_integrations.router, prefix="/api", dependencies=[Depends(require_user)]
+)
 app.include_router(api_router, prefix="/api")
 
 

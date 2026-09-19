@@ -29,6 +29,8 @@ from app.services.ai.model_settings_service import (
 from app.services.ai.operation_registry import get_operation, tier_cost_profile_label
 from app.services.ai.pricing import estimate_usage_cost
 
+from tests.support import TEST_USER
+
 
 def _sample_snake_item(**overrides: object) -> dict:
     base = {
@@ -402,7 +404,7 @@ def test_put_ai_model_setting_object_returns_200() -> None:
 
         with (
             patch(
-                "app.api.routes.ai_model_settings.get_project_in_default_workspace",
+                "app.api.routes.ai_model_settings.get_project_for_user",
                 new_callable=AsyncMock,
             ),
             patch(
@@ -416,6 +418,7 @@ def test_put_ai_model_setting_object_returns_200() -> None:
                 "product_image_alt",
                 AiModelSettingUpdateRequest(model="gpt-5.4-mini"),
                 session=session,
+                current_user=TEST_USER,
             )
 
         assert result.model == "gpt-5.4-mini"

@@ -19,11 +19,14 @@ from app.schemas.growth_audit import GrowthAuditSearchConsoleAnalysisRequest
 from app.services.google.exceptions import GoogleIntegrationNotConnectedError
 from app.services.growth_audit.exceptions import GrowthAuditValidationError
 from app.services.growth_audit.search_console_analysis import (
+
     _build_gsc_findings,
     _build_page_metrics_lookup,
     _compute_run_gsc_summary,
     analyze_growth_audit_search_console,
 )
+
+from tests.support import TEST_USER
 
 
 def _build_run(project_id, run_id=None) -> GrowthAuditRun:
@@ -158,7 +161,7 @@ def test_analyze_search_console_requires_property() -> None:
                 new=AsyncMock(return_value=audit_run),
             ),
             patch(
-                "app.services.growth_audit.search_console_analysis.get_project_in_default_workspace",
+                "app.services.growth_audit.search_console_analysis.get_project_by_id",
                 new=AsyncMock(return_value=project),
             ),
             pytest.raises(GrowthAuditValidationError, match="Seleziona prima"),
@@ -193,7 +196,7 @@ def test_analyze_search_console_updates_page_metadata_and_summary() -> None:
                 new=AsyncMock(return_value=audit_run),
             ),
             patch(
-                "app.services.growth_audit.search_console_analysis.get_project_in_default_workspace",
+                "app.services.growth_audit.search_console_analysis.get_project_by_id",
                 new=AsyncMock(return_value=project),
             ),
             patch(
@@ -260,7 +263,7 @@ def test_search_console_route_returns_503_when_not_connected() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -279,6 +282,7 @@ def test_search_console_route_returns_503_when_not_connected() -> None:
                 run_id,
                 GrowthAuditSearchConsoleAnalysisRequest(days=28),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 503
@@ -295,7 +299,7 @@ def test_search_console_route_returns_200_with_mock() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -315,6 +319,7 @@ def test_search_console_route_returns_200_with_mock() -> None:
                 run_id,
                 GrowthAuditSearchConsoleAnalysisRequest(),
                 session,
+                current_user=TEST_USER,
             )
 
         assert response.summary["totalClicks"] == 10

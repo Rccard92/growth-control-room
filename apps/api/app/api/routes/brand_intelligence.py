@@ -3,7 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.brand_brief import (
     BrandIntelligenceBriefListItem,
     BrandIntelligenceBriefRead,
@@ -203,7 +205,7 @@ from app.services.brand_intelligence.visual_identity_service import (
     upsert_visual_identity,
 )
 from app.services.brand_intelligence.synthesis import synthesize_batch
-from app.services.projects import get_project_in_default_workspace
+from app.services.projects import get_project_for_user
 
 router = APIRouter(prefix="/projects", tags=["brand-intelligence"])
 
@@ -216,8 +218,9 @@ router = APIRouter(prefix="/projects", tags=["brand-intelligence"])
 async def get_brand_intelligence_overview(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIntelligenceOverviewResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await bi_service.build_overview(session, project_id)
 
 
@@ -229,8 +232,9 @@ async def get_brand_intelligence_overview(
 async def get_brand_knowledge_score(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandKnowledgeScoreResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await bi_service.get_knowledge_score(session, project_id)
 
 
@@ -246,9 +250,10 @@ async def get_brand_context(
         description="format=prompt restituisce lo stesso bundle con promptContext.previewText",
     ),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandContextBundleResponse:
     """Contesto brand machine-ready. Con format=prompt, stessa response (preview in promptContext)."""
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     del format
     return await bi_service.get_context_bundle(session, project_id)
 
@@ -261,8 +266,9 @@ async def get_brand_context(
 async def get_brand_profile(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProfileRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.get_profile(session, project_id)
     return BrandProfileRead.model_validate(row)
 
@@ -276,8 +282,9 @@ async def update_brand_profile(
     project_id: UUID,
     payload: BrandProfileUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProfileRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.upsert_profile(session, project_id, payload)
     return BrandProfileRead.model_validate(row)
 
@@ -291,8 +298,9 @@ async def enrich_profile(
     project_id: UUID,
     payload: BrandProfileEnrichRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProfileEnrichResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await enrich_brand_profile(session, project_id, payload)
 
 
@@ -305,8 +313,9 @@ async def apply_profile_proposal(
     project_id: UUID,
     payload: BrandProfileApplyProposalRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProfileRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await apply_brand_profile_proposal(session, project_id, payload)
     return BrandProfileRead.model_validate(row)
 
@@ -319,8 +328,9 @@ async def apply_profile_proposal(
 async def get_brand_identity(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIdentityRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_identity(session, project_id)
     return BrandIdentityRead.model_validate(row)
 
@@ -334,8 +344,9 @@ async def update_brand_identity(
     project_id: UUID,
     payload: BrandIdentityUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIdentityRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await upsert_identity(session, project_id, payload)
     return BrandIdentityRead.model_validate(row)
 
@@ -349,8 +360,9 @@ async def import_brand_identity_file(
     project_id: UUID,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIdentityImportResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await file.read()
     return await import_identity_from_file(
         session,
@@ -370,8 +382,9 @@ async def apply_brand_identity_proposal(
     project_id: UUID,
     payload: BrandIdentityApplyProposalRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIdentityApplyProposalResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await apply_identity_proposal(session, project_id, payload.proposal)
     return BrandIdentityApplyProposalResponse(
         brand_identity=BrandIdentityRead.model_validate(row),
@@ -387,8 +400,9 @@ async def apply_brand_identity_proposal(
 async def get_brand_visual_identity(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandVisualIdentityRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_visual_identity(session, project_id)
     return BrandVisualIdentityRead.model_validate(row)
 
@@ -402,8 +416,9 @@ async def update_brand_visual_identity(
     project_id: UUID,
     payload: BrandVisualIdentityUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandVisualIdentityRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await upsert_visual_identity(session, project_id, payload)
     return BrandVisualIdentityRead.model_validate(row)
 
@@ -417,8 +432,9 @@ async def extract_visual_identity_from_website(
     project_id: UUID,
     payload: VisualExtractRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> VisualExtractResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await extract_visual_from_website(payload.website_url)
 
 
@@ -431,8 +447,9 @@ async def apply_visual_identity_proposal(
     project_id: UUID,
     payload: VisualApplyProposalRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> VisualApplyProposalResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await apply_visual_proposal(session, project_id, payload.proposal)
     return VisualApplyProposalResponse(
         visual_identity=BrandVisualIdentityRead.model_validate(row),
@@ -448,8 +465,9 @@ async def apply_visual_identity_proposal(
 async def get_brand_safe_claims(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSafeClaimsRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_safe_claims(session, project_id)
     return BrandSafeClaimsRead.model_validate(row)
 
@@ -463,8 +481,9 @@ async def update_brand_safe_claims(
     project_id: UUID,
     payload: BrandSafeClaimsUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSafeClaimsRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await upsert_safe_claims(session, project_id, payload)
     return BrandSafeClaimsRead.model_validate(row)
 
@@ -478,8 +497,9 @@ async def import_brand_safe_claims_file(
     project_id: UUID,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSafeClaimsImportResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await file.read()
     return await import_safe_claims_from_file(
         session,
@@ -499,8 +519,9 @@ async def apply_brand_safe_claims_proposal(
     project_id: UUID,
     payload: BrandSafeClaimsApplyProposalRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSafeClaimsApplyProposalResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await apply_safe_claims_proposal(session, project_id, payload.proposal)
     return BrandSafeClaimsApplyProposalResponse(
         safe_claims=BrandSafeClaimsRead.model_validate(row),
@@ -516,8 +537,9 @@ async def apply_brand_safe_claims_proposal(
 async def get_brand_faq_objections(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandFaqObjectionsRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_faq_objections(session, project_id)
     return BrandFaqObjectionsRead.model_validate(row)
 
@@ -531,8 +553,9 @@ async def update_brand_faq_objections(
     project_id: UUID,
     payload: BrandFaqObjectionsUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandFaqObjectionsRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await upsert_faq_objections(session, project_id, payload)
     return BrandFaqObjectionsRead.model_validate(row)
 
@@ -546,8 +569,9 @@ async def import_brand_faq_objections_file(
     project_id: UUID,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandFaqObjectionsImportResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await file.read()
     return await import_faq_objections_from_file(
         session,
@@ -567,8 +591,9 @@ async def apply_brand_faq_objections_proposal(
     project_id: UUID,
     payload: BrandFaqObjectionsApplyProposalRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandFaqObjectionsApplyProposalResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await apply_faq_objections_proposal(session, project_id, payload.proposal)
     return BrandFaqObjectionsApplyProposalResponse(
         faq_objections=BrandFaqObjectionsRead.model_validate(row),
@@ -584,8 +609,9 @@ async def apply_brand_faq_objections_proposal(
 async def get_brand_editorial_guidelines(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandEditorialGuidelinesRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_editorial_guidelines(session, project_id)
     return BrandEditorialGuidelinesRead.model_validate(row)
 
@@ -599,8 +625,9 @@ async def update_brand_editorial_guidelines(
     project_id: UUID,
     payload: BrandEditorialGuidelinesUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandEditorialGuidelinesRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await upsert_editorial_guidelines(session, project_id, payload)
     return BrandEditorialGuidelinesRead.model_validate(row)
 
@@ -613,8 +640,9 @@ async def update_brand_editorial_guidelines(
 async def get_product_knowledge_general(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeGeneralRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_general(session, project_id)
     return BrandProductKnowledgeGeneralRead.model_validate(row)
 
@@ -628,8 +656,9 @@ async def update_product_knowledge_general(
     project_id: UUID,
     payload: BrandProductKnowledgeGeneralUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeGeneralRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await upsert_general(session, project_id, payload)
     return BrandProductKnowledgeGeneralRead.model_validate(row)
 
@@ -643,8 +672,9 @@ async def import_product_knowledge_general_file(
     project_id: UUID,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeGeneralImportResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await file.read()
     return await import_general_from_file(
         session,
@@ -664,8 +694,9 @@ async def apply_product_knowledge_general_proposal(
     project_id: UUID,
     payload: BrandProductKnowledgeGeneralApplyProposalRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeGeneralApplyProposalResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await apply_general_proposal(session, project_id, payload.proposal)
     return BrandProductKnowledgeGeneralApplyProposalResponse(
         general=BrandProductKnowledgeGeneralRead.model_validate(row),
@@ -681,8 +712,9 @@ async def apply_product_knowledge_general_proposal(
 async def list_product_knowledge_shopify_products(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeShopifyProductsResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     connected, products = await list_shopify_products_for_picker(session, project_id)
     if not connected:
         return BrandProductKnowledgeShopifyProductsResponse(
@@ -717,8 +749,9 @@ async def list_product_knowledge_shopify_products(
 async def list_product_knowledge_items(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandProductKnowledgeItemRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await list_items(session, project_id)
     result: list[BrandProductKnowledgeItemRead] = []
     for row in rows:
@@ -737,8 +770,9 @@ async def import_product_knowledge_items_file(
     project_id: UUID,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeItemsImportResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     data = await file.read()
     return await import_items_from_file(
         session,
@@ -758,8 +792,9 @@ async def apply_product_knowledge_items_import_proposal(
     project_id: UUID,
     payload: BrandProductKnowledgeItemsApplyImportRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeItemsApplyImportResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await apply_items_import_proposal(session, project_id, payload.items)
 
 
@@ -772,8 +807,9 @@ async def create_product_knowledge_item_from_shopify(
     project_id: UUID,
     payload: BrandProductKnowledgeItemFromShopifyRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await create_item_from_shopify(session, project_id, payload.shopify_product_id)
     read = BrandProductKnowledgeItemRead.model_validate(row)
     read.completion_status = item_completion(row)
@@ -789,8 +825,9 @@ async def get_product_knowledge_item(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_item(session, project_id, item_id)
     read = BrandProductKnowledgeItemRead.model_validate(row)
     read.completion_status = item_completion(row)
@@ -807,8 +844,9 @@ async def update_product_knowledge_item(
     item_id: UUID,
     payload: BrandProductKnowledgeItemUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeItemRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await update_item(session, project_id, item_id, payload)
     read = BrandProductKnowledgeItemRead.model_validate(row)
     read.completion_status = item_completion(row)
@@ -823,8 +861,9 @@ async def delete_product_knowledge_item(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await delete_item(session, project_id, item_id)
 
 
@@ -837,8 +876,9 @@ async def delete_product_knowledge_item(
 async def get_brand_voice(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandVoiceRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.get_voice(session, project_id)
     return BrandVoiceRead.model_validate(row)
 
@@ -853,8 +893,9 @@ async def update_brand_voice(
     project_id: UUID,
     payload: BrandVoiceUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandVoiceRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.upsert_voice(session, project_id, payload)
     return BrandVoiceRead.model_validate(row)
 
@@ -868,8 +909,9 @@ async def update_brand_voice(
 async def list_brand_products(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandProductKnowledgeRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await bi_service.list_products(session, project_id)
     return [BrandProductKnowledgeRead.model_validate(r) for r in rows]
 
@@ -885,8 +927,9 @@ async def create_brand_product(
     project_id: UUID,
     payload: BrandProductKnowledgeCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.create_product(session, project_id, payload)
     return BrandProductKnowledgeRead.model_validate(row)
 
@@ -902,8 +945,9 @@ async def update_brand_product(
     item_id: UUID,
     payload: BrandProductKnowledgeUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandProductKnowledgeRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.update_product(session, project_id, item_id, payload)
     return BrandProductKnowledgeRead.model_validate(row)
 
@@ -917,8 +961,9 @@ async def delete_brand_product(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await bi_service.delete_product(session, project_id, item_id)
 
 
@@ -931,8 +976,9 @@ async def delete_brand_product(
 async def list_brand_audience(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandAudienceInsightRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await bi_service.list_audience(session, project_id)
     return [BrandAudienceInsightRead.model_validate(r) for r in rows]
 
@@ -948,8 +994,9 @@ async def create_brand_audience(
     project_id: UUID,
     payload: BrandAudienceInsightCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandAudienceInsightRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.create_audience(session, project_id, payload)
     return BrandAudienceInsightRead.model_validate(row)
 
@@ -965,8 +1012,9 @@ async def update_brand_audience(
     item_id: UUID,
     payload: BrandAudienceInsightUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandAudienceInsightRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.update_audience(session, project_id, item_id, payload)
     return BrandAudienceInsightRead.model_validate(row)
 
@@ -980,8 +1028,9 @@ async def delete_brand_audience(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await bi_service.delete_audience(session, project_id, item_id)
 
 
@@ -994,8 +1043,9 @@ async def delete_brand_audience(
 async def list_brand_claims(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandClaimRuleRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await bi_service.list_claims(session, project_id)
     return [BrandClaimRuleRead.model_validate(r) for r in rows]
 
@@ -1011,8 +1061,9 @@ async def create_brand_claim(
     project_id: UUID,
     payload: BrandClaimRuleCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandClaimRuleRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.create_claim(session, project_id, payload)
     return BrandClaimRuleRead.model_validate(row)
 
@@ -1028,8 +1079,9 @@ async def update_brand_claim(
     item_id: UUID,
     payload: BrandClaimRuleUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandClaimRuleRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.update_claim(session, project_id, item_id, payload)
     return BrandClaimRuleRead.model_validate(row)
 
@@ -1043,8 +1095,9 @@ async def delete_brand_claim(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await bi_service.delete_claim(session, project_id, item_id)
 
 
@@ -1057,8 +1110,9 @@ async def delete_brand_claim(
 async def get_brand_seo_strategy(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSeoStrategyRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.get_seo_strategy(session, project_id)
     return BrandSeoStrategyRead.model_validate(row)
 
@@ -1073,8 +1127,9 @@ async def update_brand_seo_strategy(
     project_id: UUID,
     payload: BrandSeoStrategyUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSeoStrategyRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.upsert_seo_strategy(session, project_id, payload)
     return BrandSeoStrategyRead.model_validate(row)
 
@@ -1088,8 +1143,9 @@ async def update_brand_seo_strategy(
 async def list_brand_pillars(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandContentPillarRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await bi_service.list_pillars(session, project_id)
     return [BrandContentPillarRead.model_validate(r) for r in rows]
 
@@ -1105,8 +1161,9 @@ async def create_brand_pillar(
     project_id: UUID,
     payload: BrandContentPillarCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandContentPillarRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.create_pillar(session, project_id, payload)
     return BrandContentPillarRead.model_validate(row)
 
@@ -1122,8 +1179,9 @@ async def update_brand_pillar(
     item_id: UUID,
     payload: BrandContentPillarUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandContentPillarRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.update_pillar(session, project_id, item_id, payload)
     return BrandContentPillarRead.model_validate(row)
 
@@ -1137,8 +1195,9 @@ async def delete_brand_pillar(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await bi_service.delete_pillar(session, project_id, item_id)
 
 
@@ -1151,8 +1210,9 @@ async def delete_brand_pillar(
 async def list_brand_guardrails(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandAiGuardrailRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await bi_service.list_guardrails(session, project_id)
     return [BrandAiGuardrailRead.model_validate(r) for r in rows]
 
@@ -1168,8 +1228,9 @@ async def create_brand_guardrail(
     project_id: UUID,
     payload: BrandAiGuardrailCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandAiGuardrailRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.create_guardrail(session, project_id, payload)
     return BrandAiGuardrailRead.model_validate(row)
 
@@ -1185,8 +1246,9 @@ async def update_brand_guardrail(
     item_id: UUID,
     payload: BrandAiGuardrailUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandAiGuardrailRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.update_guardrail(session, project_id, item_id, payload)
     return BrandAiGuardrailRead.model_validate(row)
 
@@ -1200,8 +1262,9 @@ async def delete_brand_guardrail(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await bi_service.delete_guardrail(session, project_id, item_id)
 
 
@@ -1214,8 +1277,9 @@ async def delete_brand_guardrail(
 async def list_brand_assets(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandAssetRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await bi_service.list_assets(session, project_id)
     return [BrandAssetRead.model_validate(r) for r in rows]
 
@@ -1231,8 +1295,9 @@ async def create_brand_asset(
     project_id: UUID,
     payload: BrandAssetCreate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandAssetRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.create_asset(session, project_id, payload)
     return BrandAssetRead.model_validate(row)
 
@@ -1248,8 +1313,9 @@ async def update_brand_asset(
     item_id: UUID,
     payload: BrandAssetUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandAssetRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await bi_service.update_asset(session, project_id, item_id, payload)
     return BrandAssetRead.model_validate(row)
 
@@ -1263,8 +1329,9 @@ async def delete_brand_asset(
     project_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await bi_service.delete_asset(session, project_id, item_id)
 
 
@@ -1278,8 +1345,9 @@ async def create_brand_import_batch(
     project_id: UUID,
     body: BrandImportBatchCreateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandImportBatchCreateResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await create_import_batch_with_sources(
         session,
         project_id,
@@ -1307,8 +1375,9 @@ async def upload_brand_source_documents(
     sources: str | None = Form(default=None),
     batch_id: UUID | None = Form(default=None, alias="batchId"),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSourceDocumentsUploadResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     parsed_sources = parse_sources_json(sources)
     return await sources_service.upload_source_documents(
         session,
@@ -1334,8 +1403,9 @@ async def start_brand_import_batch(
     project_id: UUID,
     batch_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandImportBatchStartResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     batch = await mark_batch_started(session, project_id, batch_id)
     schedule_batch_processing(batch_id)
     return BrandImportBatchStartResponse(batch_id=batch.id, status=batch.status)
@@ -1351,8 +1421,9 @@ async def get_brand_import_batch_status(
     project_id: UUID,
     batch_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandImportBatchStatusResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await get_batch_status(session, project_id, batch_id)
 
 
@@ -1365,8 +1436,9 @@ async def get_brand_import_batch_status(
 async def list_brand_import_batches(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandImportBatchListItem]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await list_batches(session, project_id)
 
 
@@ -1380,8 +1452,9 @@ async def list_batch_external_sources(
     project_id: UUID,
     batch_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandExternalSourceRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await list_external_sources_for_batch(session, project_id, batch_id)
     return [BrandExternalSourceRead.model_validate(r) for r in rows]
 
@@ -1397,8 +1470,9 @@ async def add_batch_external_sources(
     batch_id: UUID,
     body: BrandExternalSourcesAddRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandExternalSourceRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await add_external_sources_to_batch(
         session, project_id, batch_id, body.sources
     )
@@ -1414,8 +1488,9 @@ async def fetch_batch_external_sources_route(
     project_id: UUID,
     batch_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandExternalSourcesFetchResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await get_batch_status(session, project_id, batch_id)
     warnings, fetched_count = await fetch_batch_external_sources(
         session, batch_id, refetch_failed=True
@@ -1437,8 +1512,9 @@ async def update_import_batch_sources(
     batch_id: UUID,
     body: BrandImportBatchSourcesUpdateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandImportBatchSourcesUpdateResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await upsert_batch_sources(
         session,
         project_id,
@@ -1460,8 +1536,9 @@ async def refresh_import_batch_context(
     batch_id: UUID,
     body: BrandImportBatchRefreshContextRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandImportBatchRefreshContextResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     await get_batch_status(session, project_id, batch_id)
     schedule_refresh_context(
         batch_id,
@@ -1485,8 +1562,9 @@ async def refresh_import_batch_context(
 async def list_brand_source_documents(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandSourceDocumentRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await sources_service.list_source_documents(session, project_id)
     return [BrandSourceDocumentRead.model_validate(r) for r in rows]
 
@@ -1501,8 +1579,9 @@ async def extract_brand_source_document(
     project_id: UUID,
     document_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandExtractedFactRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     facts = await run_ai_extraction(session, project_id, document_id)
     return [BrandExtractedFactRead.model_validate(f) for f in facts]
 
@@ -1512,9 +1591,10 @@ async def extract_brand_source_batch(
     project_id: UUID,
     payload: BrandExtractBatchRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """Deprecato: preferire import-batches/{id}/start + polling status."""
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await sources_service.extract_document_batch(
         session, project_id, payload.document_ids
     )
@@ -1529,12 +1609,13 @@ async def extract_brand_source_batch(
 async def list_brand_extracted_facts(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     status: str | None = Query(default=None),
     target_section: str | None = Query(default=None, alias="targetSection"),
     source_document_id: UUID | None = Query(default=None, alias="sourceDocumentId"),
     batch_id: UUID | None = Query(default=None, alias="batchId"),
 ) -> list[BrandExtractedFactRead]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await sources_service.list_extracted_facts(
         session,
         project_id,
@@ -1557,8 +1638,9 @@ async def patch_brand_extracted_fact(
     fact_id: UUID,
     payload: BrandExtractedFactUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandExtractedFactRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await sources_service.patch_extracted_fact(session, project_id, fact_id, payload)
     return BrandExtractedFactRead.model_validate(row)
 
@@ -1573,8 +1655,9 @@ async def apply_brand_extracted_facts(
     project_id: UUID,
     payload: BrandApplyFactsRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandApplyFactsResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await sources_service.apply_facts(
         session, project_id, payload.fact_ids, batch_id=payload.batch_id
     )
@@ -1590,8 +1673,9 @@ async def synthesize_brand_import_batch(
     project_id: UUID,
     batch_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSectionDraftSynthesizeResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await synthesize_batch(session, project_id, batch_id)
 
 
@@ -1604,12 +1688,13 @@ async def synthesize_brand_import_batch(
 async def list_brand_section_drafts(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     batch_id: UUID | None = Query(default=None, alias="batchId"),
     status: str | None = Query(default=None),
     section_key: str | None = Query(default=None, alias="sectionKey"),
     latest_only: bool = Query(default=True, alias="latestOnly"),
 ) -> list[BrandSectionDraftListItem]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await list_section_drafts(
         session,
         project_id,
@@ -1631,8 +1716,9 @@ async def get_brand_section_draft(
     project_id: UUID,
     draft_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSectionDraftRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_section_draft(session, project_id, draft_id)
     return BrandSectionDraftRead.model_validate(row)
 
@@ -1648,8 +1734,9 @@ async def patch_brand_section_draft(
     draft_id: UUID,
     payload: BrandSectionDraftUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSectionDraftRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await patch_section_draft(session, project_id, draft_id, payload)
     return BrandSectionDraftRead.model_validate(row)
 
@@ -1664,8 +1751,9 @@ async def apply_brand_section_draft(
     project_id: UUID,
     draft_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSectionDraftApplyResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await apply_section_draft(session, project_id, draft_id)
 
 
@@ -1679,8 +1767,9 @@ async def apply_brand_section_drafts_batch(
     project_id: UUID,
     payload: BrandSectionDraftApplyBatchRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSectionDraftApplyResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     return await apply_section_drafts_batch(session, project_id, payload.draft_ids)
 
 
@@ -1695,8 +1784,9 @@ async def regenerate_brand_section_draft(
     draft_id: UUID,
     payload: BrandSectionDraftRegenerateRequest | None = None,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandSectionDraftRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     body = payload or BrandSectionDraftRegenerateRequest()
     row = await regenerate_section_draft(
         session,
@@ -1718,8 +1808,9 @@ async def generate_brand_intelligence_brief(
     project_id: UUID,
     batch_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GenerateBriefResponse:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     brief = await generate_brief_from_batch(session, project_id, batch_id)
     return GenerateBriefResponse(
         brief_id=brief.id,
@@ -1738,8 +1829,9 @@ async def generate_brand_intelligence_brief(
 async def list_brand_intelligence_briefs(
     project_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[BrandIntelligenceBriefListItem]:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     rows = await list_briefs(session, project_id)
     return [BrandIntelligenceBriefListItem.model_validate(r) for r in rows]
 
@@ -1754,8 +1846,9 @@ async def get_brand_intelligence_brief(
     project_id: UUID,
     brief_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIntelligenceBriefRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await get_brief(session, project_id, brief_id)
     return build_brand_intelligence_brief_read(row)
 
@@ -1771,8 +1864,9 @@ async def patch_brand_intelligence_brief(
     brief_id: UUID,
     body: BrandIntelligenceBriefUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIntelligenceBriefRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await patch_brief(session, project_id, brief_id, body)
     return build_brand_intelligence_brief_read(row)
 
@@ -1787,8 +1881,9 @@ async def approve_brand_intelligence_brief(
     project_id: UUID,
     brief_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIntelligenceBriefRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await approve_brief(session, project_id, brief_id)
     return build_brand_intelligence_brief_read(row)
 
@@ -1803,8 +1898,9 @@ async def archive_brand_intelligence_brief(
     project_id: UUID,
     brief_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BrandIntelligenceBriefRead:
-    await get_project_in_default_workspace(project_id, session)
+    await get_project_for_user(project_id, session, current_user)
     row = await archive_brief(session, project_id, brief_id)
     return build_brand_intelligence_brief_read(row)
 

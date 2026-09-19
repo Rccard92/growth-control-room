@@ -32,6 +32,7 @@ from app.services.growth_audit.ga4_item_product_matching import (
 )
 from app.services.google.exceptions import GoogleApiRequestError
 from app.services.google.analytics_client import (
+
     ITEM_ECOMMERCE_BASE_DIMENSIONS,
     ITEM_ECOMMERCE_BASE_METRICS,
     ITEM_ECOMMERCE_CHECKOUT_METRICS,
@@ -40,6 +41,8 @@ from app.services.google.analytics_client import (
     _parse_item_report_rows,
     fetch_ga4_item_ecommerce_report,
 )
+
+from tests.support import TEST_USER
 
 
 def _build_run(project_id, run_id=None) -> GrowthAuditRun:
@@ -585,7 +588,7 @@ def test_analyze_requires_ga4_property() -> None:
                 new=AsyncMock(return_value=audit_run),
             ),
             patch(
-                "app.services.growth_audit.analytics_ecommerce_analysis.get_project_in_default_workspace",
+                "app.services.growth_audit.analytics_ecommerce_analysis.get_project_by_id",
                 new=AsyncMock(return_value=project),
             ),
             pytest.raises(GrowthAuditValidationError, match="Seleziona prima"),
@@ -623,7 +626,7 @@ def test_analyze_updates_page_metadata_and_summary() -> None:
                 new=AsyncMock(return_value=audit_run),
             ),
             patch(
-                "app.services.growth_audit.analytics_ecommerce_analysis.get_project_in_default_workspace",
+                "app.services.growth_audit.analytics_ecommerce_analysis.get_project_by_id",
                 new=AsyncMock(return_value=project),
             ),
             patch(
@@ -1003,7 +1006,7 @@ def test_analyze_updates_zero_metadata_when_rows_empty() -> None:
                 new=AsyncMock(return_value=audit_run),
             ),
             patch(
-                "app.services.growth_audit.analytics_ecommerce_analysis.get_project_in_default_workspace",
+                "app.services.growth_audit.analytics_ecommerce_analysis.get_project_by_id",
                 new=AsyncMock(return_value=project),
             ),
             patch(
@@ -1052,7 +1055,7 @@ def test_ga4_ecommerce_route_returns_422_without_property() -> None:
 
         with (
             patch(
-                "app.api.routes.growth_audit.get_project_in_default_workspace",
+                "app.api.routes.growth_audit.get_project_for_user",
                 new=AsyncMock(),
             ),
             patch(
@@ -1070,6 +1073,7 @@ def test_ga4_ecommerce_route_returns_422_without_property() -> None:
                 run_id,
                 GrowthAuditGa4EcommerceAnalysisRequest(days=30),
                 session,
+                current_user=TEST_USER,
             )
 
         assert exc.value.status_code == 422
