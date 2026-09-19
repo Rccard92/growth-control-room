@@ -69,7 +69,7 @@ def _fernet() -> MultiFernet:
         except (ValueError, TypeError) as exc:
             raise SecretsKeyMissingError(
                 "SECRETS_ENCRYPTION_KEY is not a valid Fernet key. Generate one with: "
-                "python -c \"from cryptography.fernet import Fernet; "
+                'python -c "from cryptography.fernet import Fernet; '
                 'print(Fernet.generate_key().decode())"'
             ) from exc
         _cached_keys = cache_key

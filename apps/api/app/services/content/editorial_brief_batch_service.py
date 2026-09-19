@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -93,7 +93,9 @@ async def get_brief_batch_job(
         )
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Job di generazione brief non trovato.")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail="Job di generazione brief non trovato."
+        )
     return row
 
 
@@ -161,7 +163,7 @@ async def process_brief_batch_job(job_id: UUID) -> None:
 
         if not job.month:
             job.status = "failed"
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = datetime.now(UTC)
             await session.commit()
             return
 
@@ -219,7 +221,7 @@ async def process_brief_batch_job(job_id: UUID) -> None:
                 )
                 job.errors = errors
                 await session.commit()
-            except Exception as exc:
+            except Exception:
                 logger.exception("Unexpected batch brief error for %s", item.id)
                 job.failed_items += 1
                 errors.append(
@@ -234,7 +236,7 @@ async def process_brief_batch_job(job_id: UUID) -> None:
 
         job.current_item_id = None
         job.current_item_title = None
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
 
         if job.failed_items == 0:
             job.status = "completed"

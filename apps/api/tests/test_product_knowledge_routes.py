@@ -15,16 +15,10 @@ def test_product_knowledge_routes_registered() -> None:
     )
     assert "/projects/{project_id}/brand-intelligence/product-knowledge/shopify-products" in paths
     assert "/projects/{project_id}/brand-intelligence/product-knowledge/items" in paths
-    assert (
-        "/projects/{project_id}/brand-intelligence/product-knowledge/items/import-file" in paths
-    )
+    assert "/projects/{project_id}/brand-intelligence/product-knowledge/items/import-file" in paths
     assert (
         "/projects/{project_id}/brand-intelligence/product-knowledge/items/apply-import-proposal"
         in paths
     )
-    assert (
-        "/projects/{project_id}/brand-intelligence/product-knowledge/items/from-shopify" in paths
-    )
-    assert (
-        "/projects/{project_id}/brand-intelligence/product-knowledge/items/{item_id}" in paths
-    )
+    assert "/projects/{project_id}/brand-intelligence/product-knowledge/items/from-shopify" in paths
+    assert "/projects/{project_id}/brand-intelligence/product-knowledge/items/{item_id}" in paths

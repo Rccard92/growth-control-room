@@ -136,9 +136,7 @@ def scan_editorial_safe_claims(
 ) -> list[EditorialSafeClaimFlag]:
     """Return structured Safe Claims flags with exact phrase, severity and suggestion."""
     plain = " ".join(
-        part.strip()
-        for part in (_strip_html(body_html), excerpt, title)
-        if part and part.strip()
+        part.strip() for part in (_strip_html(body_html), excerpt, title) if part and part.strip()
     )
     if not plain:
         return []

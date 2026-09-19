@@ -16,9 +16,19 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:
 from app.api.routes.growth_audit import analyze_growth_audit_analytics_ecommerce_endpoint
 from app.models.growth_audit import GrowthAuditPage, GrowthAuditRun
 from app.schemas.growth_audit import GrowthAuditGa4EcommerceAnalysisRequest
+from app.services.google.analytics_client import (
+    ITEM_ECOMMERCE_BASE_DIMENSIONS,
+    ITEM_ECOMMERCE_BASE_METRICS,
+    ITEM_ECOMMERCE_CHECKOUT_METRICS,
+    ITEM_ECOMMERCE_ID_ONLY_DIMENSIONS,
+    ITEM_ECOMMERCE_NAME_ONLY_DIMENSIONS,
+    _parse_item_report_rows,
+    fetch_ga4_item_ecommerce_report,
+)
+from app.services.google.exceptions import GoogleApiRequestError
 from app.services.growth_audit.analytics_ecommerce_analysis import (
-    _build_page_ga4_ecommerce_metadata,
     _build_ga4_ecommerce_findings,
+    _build_page_ga4_ecommerce_metadata,
     _build_variant_breakdown,
     _compute_run_ga4_ecommerce_summary,
     analyze_growth_audit_analytics_ecommerce,
@@ -30,18 +40,6 @@ from app.services.growth_audit.ga4_item_product_matching import (
     get_variant_legacy_id_from_ga4_item_id,
     match_ga4_rows_to_pages,
 )
-from app.services.google.exceptions import GoogleApiRequestError
-from app.services.google.analytics_client import (
-
-    ITEM_ECOMMERCE_BASE_DIMENSIONS,
-    ITEM_ECOMMERCE_BASE_METRICS,
-    ITEM_ECOMMERCE_CHECKOUT_METRICS,
-    ITEM_ECOMMERCE_ID_ONLY_DIMENSIONS,
-    ITEM_ECOMMERCE_NAME_ONLY_DIMENSIONS,
-    _parse_item_report_rows,
-    fetch_ga4_item_ecommerce_report,
-)
-
 from tests.support import TEST_USER
 
 
@@ -159,9 +157,7 @@ def test_match_by_variant_id() -> None:
 
 
 def test_parse_shopify_composite_item_id_valid() -> None:
-    parsed = _parse_shopify_composite_item_id(
-        "shopify_IT_14916300964188_54906504773980"
-    )
+    parsed = _parse_shopify_composite_item_id("shopify_IT_14916300964188_54906504773980")
     assert parsed == {
         "productLegacyId": "14916300964188",
         "variantLegacyId": "54906504773980",
@@ -379,7 +375,9 @@ def test_ambiguous_item_name_does_not_assign() -> None:
     project_id = uuid4()
     run_id = uuid4()
     pages = [
-        _build_product_page(project_id=project_id, run_id=run_id, page_id=uuid4(), title="Miele Bio"),
+        _build_product_page(
+            project_id=project_id, run_id=run_id, page_id=uuid4(), title="Miele Bio"
+        ),
         _build_product_page(
             project_id=project_id,
             run_id=run_id,
@@ -557,8 +555,7 @@ def test_compute_run_summary_aggregates() -> None:
 
 def test_build_ga4_ecommerce_findings_limited_to_ten() -> None:
     pages = [
-        _build_product_page(project_id=uuid4(), run_id=uuid4(), page_id=uuid4())
-        for _ in range(12)
+        _build_product_page(project_id=uuid4(), run_id=uuid4(), page_id=uuid4()) for _ in range(12)
     ]
     for page in pages:
         page.page_metadata = {
@@ -909,7 +906,13 @@ def test_fetch_ga4_item_ecommerce_report_empty_rows_success() -> None:
 
         with patch(
             "app.services.google.analytics_client._run_ga4_item_report",
-            new=AsyncMock(side_effect=[empty_payload, checkout_payload, {"_metric_incompatible": True, "error": {}}]),
+            new=AsyncMock(
+                side_effect=[
+                    empty_payload,
+                    checkout_payload,
+                    {"_metric_incompatible": True, "error": {}},
+                ]
+            ),
         ):
             result = await fetch_ga4_item_ecommerce_report(
                 "access-token",
@@ -1226,9 +1229,7 @@ def test_three_composite_rows_create_three_variant_breakdown() -> None:
         },
     ]
     metadata = _build_metadata_from_match(page, rows, variant_data)
-    matched_rows = [
-        row for row in metadata["variantBreakdown"] if row["matchedBy"] != "none"
-    ]
+    matched_rows = [row for row in metadata["variantBreakdown"] if row["matchedBy"] != "none"]
     assert len(matched_rows) == 3
 
 
@@ -1258,15 +1259,11 @@ def test_product_aggregate_equals_sum_of_variants() -> None:
         },
     ]
     metadata = _build_metadata_from_match(page, rows, variant_data)
-    matched_rows = [
-        row for row in metadata["variantBreakdown"] if row["matchedBy"] != "none"
-    ]
+    matched_rows = [row for row in metadata["variantBreakdown"] if row["matchedBy"] != "none"]
     assert metadata["itemViews"] == sum(row["itemViews"] for row in matched_rows)
     assert metadata["itemsAddedToCart"] == sum(row["itemsAddedToCart"] for row in matched_rows)
     assert metadata["itemsPurchased"] == sum(row["itemsPurchased"] for row in matched_rows)
-    assert metadata["itemRevenue"] == round(
-        sum(row["itemRevenue"] for row in matched_rows), 2
-    )
+    assert metadata["itemRevenue"] == round(sum(row["itemRevenue"] for row in matched_rows), 2)
 
 
 def test_product_only_match_goes_to_unknown_variant_bucket() -> None:
@@ -1521,7 +1518,9 @@ def test_polline_three_variant_real_case_totals() -> None:
         _build_polline_variant_data(),
     )
     matched_rows = [
-        row for row in metadata["variantBreakdown"] if row["matchedBy"] == "shopify_composite_item_id"
+        row
+        for row in metadata["variantBreakdown"]
+        if row["matchedBy"] == "shopify_composite_item_id"
     ]
     assert len(matched_rows) == 3
     assert metadata["itemViews"] == 10089

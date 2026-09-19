@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile, status
@@ -15,12 +15,16 @@ from app.schemas.brand_intelligence import (
     BrandApplyFactsResponse,
     BrandApplyFactsResultItem,
     BrandExtractedFactUpdate,
-    BrandSourceDocumentRead,
 )
-from app.services.brand_intelligence.batch_service import update_batch_after_apply, upload_files_to_batch
+from app.services.brand_intelligence.batch_service import (
+    update_batch_after_apply,
+    upload_files_to_batch,
+)
 from app.services.brand_intelligence.document_extraction import run_ai_extraction_batch
 from app.services.brand_intelligence.fact_apply import apply_approved_facts
-from app.services.brand_intelligence.text_extraction import MAX_BATCH_FILES  # noqa: F401 — re-export for tests
+from app.services.brand_intelligence.text_extraction import (
+    MAX_BATCH_FILES,  # noqa: F401 — re-export for tests
+)
 
 
 async def list_source_documents(
@@ -33,7 +37,9 @@ async def list_source_documents(
                 .where(BrandSourceDocument.project_id == project_id)
                 .order_by(BrandSourceDocument.uploaded_at.desc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -107,7 +113,7 @@ async def patch_extracted_fact(
     for key, value in data.items():
         setattr(row, key, value)
     if payload.status in ("approved", "rejected", "needs_review"):
-        row.reviewed_at = datetime.now(timezone.utc)
+        row.reviewed_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(row)
     return row
@@ -183,5 +189,7 @@ async def extract_document_batch(
     document_ids: list[UUID],
 ) -> dict:
     if not document_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun documento selezionato.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun documento selezionato."
+        )
     return await run_ai_extraction_batch(session, project_id, document_ids)

@@ -11,7 +11,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage
 from app.services.google.analytics_client import fetch_ga4_item_ecommerce_report
 from app.services.google.google_tokens import get_valid_google_access_token
 from app.services.growth_audit.exceptions import (
@@ -79,9 +79,7 @@ def _is_product_page(page: GrowthAuditPage) -> bool:
 
 def _filter_product_pages(pages: list[GrowthAuditPage]) -> list[GrowthAuditPage]:
     return [
-        page
-        for page in pages
-        if _is_product_page(page) and (page.source_entity_gid or "").strip()
+        page for page in pages if _is_product_page(page) and (page.source_entity_gid or "").strip()
     ]
 
 
@@ -171,7 +169,9 @@ async def _fetch_shopify_variant_match_data(
                         "sku": str(sku) if sku else None,
                         "price": price,
                         "stock": stock,
-                        "selectedOptions": selected_options if isinstance(selected_options, list) else None,
+                        "selectedOptions": selected_options
+                        if isinstance(selected_options, list)
+                        else None,
                     }
                 )
             variant_data_by_gid[product_gid] = {
@@ -219,29 +219,35 @@ def _page_has_open_critical_findings(
 def _has_funnel_signal(aggregate: dict[str, Any] | None) -> bool:
     if not aggregate:
         return False
-    return any(
-        int(aggregate.get(key) or 0) > 0
-        for key in (
-            "itemViews",
-            "itemViewEvents",
-            "itemsAddedToCart",
-            "itemsCheckedOut",
-            "itemsPurchased",
+    return (
+        any(
+            int(aggregate.get(key) or 0) > 0
+            for key in (
+                "itemViews",
+                "itemViewEvents",
+                "itemsAddedToCart",
+                "itemsCheckedOut",
+                "itemsPurchased",
+            )
         )
-    ) or _safe_float(aggregate.get("itemRevenue")) > 0
+        or _safe_float(aggregate.get("itemRevenue")) > 0
+    )
 
 
 def _has_variant_funnel_signal(variant_row: dict[str, Any]) -> bool:
-    return any(
-        int(variant_row.get(key) or 0) > 0
-        for key in (
-            "itemViews",
-            "itemViewEvents",
-            "itemsAddedToCart",
-            "itemsCheckedOut",
-            "itemsPurchased",
+    return (
+        any(
+            int(variant_row.get(key) or 0) > 0
+            for key in (
+                "itemViews",
+                "itemViewEvents",
+                "itemsAddedToCart",
+                "itemsCheckedOut",
+                "itemsPurchased",
+            )
         )
-    ) or _safe_float(variant_row.get("itemRevenue")) > 0
+        or _safe_float(variant_row.get("itemRevenue")) > 0
+    )
 
 
 def _serialize_variant_bucket_row(
@@ -284,8 +290,12 @@ def _serialize_variant_bucket_row(
         "variantGid": catalog_variant.get("variantGid") or metrics.get("variantGid"),
         "variantTitle": variant_title,
         "sku": catalog_variant.get("sku") or metrics.get("sku"),
-        "price": catalog_variant.get("price") if catalog_variant.get("price") is not None else metrics.get("price"),
-        "stock": catalog_variant.get("stock") if catalog_variant.get("stock") is not None else metrics.get("stock"),
+        "price": catalog_variant.get("price")
+        if catalog_variant.get("price") is not None
+        else metrics.get("price"),
+        "stock": catalog_variant.get("stock")
+        if catalog_variant.get("stock") is not None
+        else metrics.get("stock"),
         "itemIds": item_ids,
         "itemNames": item_names,
         "itemViews": item_views,
@@ -369,7 +379,9 @@ def _build_variant_breakdown(
         "variantsCount": catalog_count,
         "variantsWithFunnelData": variants_with_funnel_data,
         "bestVariantByRevenue": best_by_revenue.get("variantLegacyId") if best_by_revenue else None,
-        "bestVariantByPurchase": best_by_purchase.get("variantLegacyId") if best_by_purchase else None,
+        "bestVariantByPurchase": best_by_purchase.get("variantLegacyId")
+        if best_by_purchase
+        else None,
         "variantMatchingMode": "strict",
     }
 
@@ -518,7 +530,9 @@ def _compute_run_ga4_ecommerce_summary(
                 if not isinstance(variant_row, dict):
                     continue
                 variant_matched_by = variant_row.get("matchedBy") or "none"
-                variant_views = int(variant_row.get("itemViews") or variant_row.get("itemViewEvents") or 0)
+                variant_views = int(
+                    variant_row.get("itemViews") or variant_row.get("itemViewEvents") or 0
+                )
                 variant_revenue = _safe_float(variant_row.get("itemRevenue"))
                 variant_has_data = variant_matched_by != "none" and (
                     variant_views > 0
@@ -552,9 +566,7 @@ def _compute_run_ga4_ecommerce_summary(
     top_candidates.sort(key=lambda item: item[0], reverse=True)
     top_variant_candidates.sort(key=lambda item: item[0], reverse=True)
     average_view_to_cart = (
-        round(sum(view_to_cart_rates) / len(view_to_cart_rates), 4)
-        if view_to_cart_rates
-        else 0.0
+        round(sum(view_to_cart_rates) / len(view_to_cart_rates), 4) if view_to_cart_rates else 0.0
     )
     average_cart_to_purchase = (
         round(sum(cart_to_purchase_rates) / len(cart_to_purchase_rates), 4)
@@ -621,7 +633,7 @@ def _build_ga4_ecommerce_findings(
 
         item_views = int(funnel.get("itemViews") or funnel.get("itemViewEvents") or 0)
         items_added_to_cart = int(funnel.get("itemsAddedToCart") or 0)
-        items_checked_out = int(funnel.get("itemsCheckedOut") or 0)
+        int(funnel.get("itemsCheckedOut") or 0)
         items_purchased = int(funnel.get("itemsPurchased") or 0)
         item_revenue = _safe_float(funnel.get("itemRevenue"))
         matched_by = funnel.get("matchedBy") or "none"
@@ -641,8 +653,7 @@ def _build_ga4_ecommerce_findings(
                         "priority": "high",
                         "title": "Molte view item ma pochi add to cart",
                         "description": (
-                            f"GA4 mostra {item_views} view item ma zero add to cart "
-                            f"nel periodo."
+                            f"GA4 mostra {item_views} view item ma zero add to cart nel periodo."
                         ),
                         "recommendation": (
                             "Migliora offerta, immagini, prezzo, trust e CTA sulla pagina prodotto."
@@ -819,7 +830,9 @@ async def analyze_growth_audit_analytics_ecommerce(
     if store is not None and store.connection_status == "connected":
         try:
             client = await get_shopify_client_for_store(store)
-            product_gids = [page.source_entity_gid for page in product_pages if page.source_entity_gid]
+            product_gids = [
+                page.source_entity_gid for page in product_pages if page.source_entity_gid
+            ]
             variant_data_by_gid = await _fetch_shopify_variant_match_data(
                 shop_domain=client.shop_domain,
                 access_token=client.access_token,

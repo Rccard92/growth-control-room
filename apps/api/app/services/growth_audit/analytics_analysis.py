@@ -10,7 +10,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage
 from app.services.google.analytics_client import fetch_ga4_landing_pages_report
 from app.services.google.google_tokens import get_valid_google_access_token
 from app.services.growth_audit.exceptions import (
@@ -23,7 +23,7 @@ from app.services.growth_audit.run_service import (
     get_growth_audit_run,
     list_growth_audit_pages,
 )
-from app.services.growth_audit.url_utils import get_url_path, normalize_url
+from app.services.growth_audit.url_utils import normalize_url
 from app.services.projects import get_project_by_id
 
 logger = logging.getLogger(__name__)
@@ -177,8 +177,7 @@ def _compute_run_analytics_summary(
     high_traffic_low_conversion_pages = sum(
         1
         for item in page_metrics.values()
-        if item["sessions"] >= LOW_CONVERSION_SESSIONS_THRESHOLD
-        and item["conversions"] == 0
+        if item["sessions"] >= LOW_CONVERSION_SESSIONS_THRESHOLD and item["conversions"] == 0
     )
 
     return {
@@ -216,7 +215,10 @@ def _build_ga4_findings(
         revenue = metrics["revenue"]
         page_type = (page.page_type or "").lower()
 
-        if sessions >= HIGH_TRAFFIC_SESSIONS_THRESHOLD and engagement_rate < LOW_ENGAGEMENT_RATE_THRESHOLD:
+        if (
+            sessions >= HIGH_TRAFFIC_SESSIONS_THRESHOLD
+            and engagement_rate < LOW_ENGAGEMENT_RATE_THRESHOLD
+        ):
             candidates.append(
                 (
                     sessions,
@@ -247,9 +249,15 @@ def _build_ga4_findings(
                     sessions,
                     {
                         "page_id": page.id,
-                        "category": "cro" if page_type in ("product", "landing", "landing_page") else "analytics",
-                        "severity": "high" if sessions >= HIGH_TRAFFIC_SESSIONS_THRESHOLD else "medium",
-                        "priority": "high" if sessions >= HIGH_TRAFFIC_SESSIONS_THRESHOLD else "medium",
+                        "category": "cro"
+                        if page_type in ("product", "landing", "landing_page")
+                        else "analytics",
+                        "severity": "high"
+                        if sessions >= HIGH_TRAFFIC_SESSIONS_THRESHOLD
+                        else "medium",
+                        "priority": "high"
+                        if sessions >= HIGH_TRAFFIC_SESSIONS_THRESHOLD
+                        else "medium",
                         "title": "Traffico GA4 senza conversioni",
                         "description": (
                             f"La pagina registra {sessions} sessioni ma nessuna conversione GA4."

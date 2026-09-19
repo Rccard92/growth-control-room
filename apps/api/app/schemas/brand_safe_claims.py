@@ -18,9 +18,7 @@ class BrandSafeClaimsRead(BaseModel):
     health_claim_rules: list[str] | None = Field(
         default=None, serialization_alias="healthClaimRules"
     )
-    competitor_rules: list[str] | None = Field(
-        default=None, serialization_alias="competitorRules"
-    )
+    competitor_rules: list[str] | None = Field(default=None, serialization_alias="competitorRules")
     process_secrets: list[str] | None = Field(default=None, serialization_alias="processSecrets")
     tone_red_flags: list[str] | None = Field(default=None, serialization_alias="toneRedFlags")
     notes: str | None = None

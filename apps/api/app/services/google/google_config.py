@@ -14,9 +14,7 @@ def is_google_oauth_configured() -> bool:
 
 
 def is_google_ads_developer_token_configured() -> bool:
-    return bool(
-        settings.google_ads_developer_token and settings.google_ads_developer_token.strip()
-    )
+    return bool(settings.google_ads_developer_token and settings.google_ads_developer_token.strip())
 
 
 def get_google_config_status() -> dict[str, dict[str, bool]]:

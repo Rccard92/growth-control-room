@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -215,11 +214,7 @@ async def analyze_growth_audit_page_keyword_intelligence(
 
     metadata = page.page_metadata or {}
     existing_ki = metadata.get("keywordIntelligence")
-    if (
-        not force
-        and isinstance(existing_ki, dict)
-        and _is_fresh(existing_ki)
-    ):
+    if not force and isinstance(existing_ki, dict) and _is_fresh(existing_ki):
         _update_run_keyword_intelligence_summary(
             run,
             page=page,
@@ -489,8 +484,7 @@ async def analyze_growth_audit_page_keyword_intelligence(
         },
         "dataQuality": {
             "hasGscQueries": bool(
-                isinstance(search_console_meta, dict)
-                and search_console_meta.get("topQueries")
+                isinstance(search_console_meta, dict) and search_console_meta.get("topQueries")
             ),
             "hasSearchVolume": bool(search_volume_results),
             "hasKeywordIdeas": bool(keyword_ideas_payload and keyword_ideas_payload.get("items")),
@@ -557,8 +551,7 @@ async def analyze_growth_audit_page_keyword_intelligence(
                 category=finding_data.get("category", "seo"),
                 severity=finding_data.get("severity", "medium"),
                 priority=finding_data.get("priority", "medium"),
-                title=_stringify_finding_text(finding_data.get("title"))
-                or "Opportunità keyword",
+                title=_stringify_finding_text(finding_data.get("title")) or "Opportunità keyword",
                 description=_stringify_finding_text(finding_data.get("description")),
                 evidence=_stringify_finding_text(finding_data.get("evidence")),
                 recommendation=_stringify_finding_text(finding_data.get("recommendation")),

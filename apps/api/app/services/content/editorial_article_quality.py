@@ -123,7 +123,9 @@ def _check_strong_usage(html: str) -> list[str]:
             "Pochi grassetti strategici — punta a 6–9 evidenze mirate per migliorare la scanability."
         )
     elif strong_count > 12:
-        warnings.append("Troppi grassetti — riduci a 6–9 per evitare effetto 'documento evidenziato'.")
+        warnings.append(
+            "Troppi grassetti — riduci a 6–9 per evitare effetto 'documento evidenziato'."
+        )
     elif strong_count > 10:
         warnings.append(
             f"Grassetti leggermente eccessivi ({strong_count}) — target consigliato 6–9."
@@ -146,11 +148,11 @@ def _check_strong_usage(html: str) -> list[str]:
 
 def validate_editorial_article_quality(
     body_html: str,
-    payload: "EditorialArticlePayload",
-    brief: "EditorialBriefPayload",
+    payload: EditorialArticlePayload,
+    brief: EditorialBriefPayload,
     content_type: str,
     *,
-    safe_claims: "BrandSafeClaims | None" = None,
+    safe_claims: BrandSafeClaims | None = None,
     has_verified_link_targets: bool = False,
 ) -> tuple[list[str], EditorialQualityMetrics, list[EditorialSafeClaimFlag]]:
     html = body_html or ""
@@ -206,14 +208,16 @@ def validate_editorial_article_quality(
             "CTA generata senza link perché nessuna collection/prodotto verificato disponibile."
         )
 
-    box_expected_types = frozenset({"recipe", "product_guide", "educational_article", "faq_objection_article"})
+    box_expected_types = frozenset(
+        {"recipe", "product_guide", "educational_article", "faq_objection_article"}
+    )
     if content_type in box_expected_types and box_count < 1:
-        warnings.append(
-            "Articolo leggibile ma migliorabile: pochi elementi di evidenza visiva."
-        )
+        warnings.append("Articolo leggibile ma migliorabile: pochi elementi di evidenza visiva.")
 
     if _COLD_TITLE_PATTERNS.search(payload.title or ""):
-        warnings.append("Titolo potenzialmente freddo/documentale — preferisci un titolo più editoriale.")
+        warnings.append(
+            "Titolo potenzialmente freddo/documentale — preferisci un titolo più editoriale."
+        )
 
     seo_title = (payload.seo_title or "").strip()
     meta_description = (payload.meta_description or "").strip()

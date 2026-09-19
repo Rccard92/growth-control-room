@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Literal
 from uuid import UUID
@@ -33,7 +32,10 @@ from app.services.brand_intelligence.faq_objections_normalize import (
     format_social_block,
     serialize_unknown_object,
 )
-from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
+from app.services.brand_intelligence.text_extraction import (
+    TextExtractionError,
+    extract_text_from_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -404,9 +406,7 @@ def _build_warnings(
     ]
     for label, entries in faq_groups:
         for question in _faq_strings_missing_answer(entries):
-            warnings.append(
-                f"Risposta non presente nel documento per ({label}): {question}"
-            )
+            warnings.append(f"Risposta non presente nel documento per ({label}): {question}")
 
     has_any = (
         _has_nonempty_strings(proposal.general_faq)

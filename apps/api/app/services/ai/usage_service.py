@@ -21,8 +21,8 @@ from app.core.datetime import (
 )
 from app.models.ai_usage_log import AiUsageLog
 from app.models.project import Project
-from app.services.ai.model_policy import CHEAP_CONTEXT_PROFILES, AiModelTier, tier_to_model_name
 from app.models.user import User
+from app.services.ai.model_policy import CHEAP_CONTEXT_PROFILES, AiModelTier, tier_to_model_name
 from app.services.workspace import get_workspace_for_user
 
 PREVIEW_MAX_LEN = 500
@@ -148,15 +148,16 @@ async def sum_project_spend(
     return Decimal(str(value)) if value is not None else Decimal("0")
 
 
-from app.services.ai.exceptions import AiBudgetExceededError, AiSingleRequestBlockedError
+from app.services.ai.exceptions import (  # noqa: E402  (deferred: avoids a circular import)
+    AiBudgetExceededError,
+    AiSingleRequestBlockedError,
+)
 
 
 async def check_budget_before_request(session: AsyncSession, project_id: UUID) -> None:
     today = utc_now_naive().date()
     if settings.ai_daily_budget_usd and settings.ai_daily_budget_usd > 0:
-        daily_spent = await sum_project_spend(
-            session, project_id, since=day_start_utc_naive(today)
-        )
+        daily_spent = await sum_project_spend(session, project_id, since=day_start_utc_naive(today))
         if daily_spent >= Decimal(str(settings.ai_daily_budget_usd)):
             raise AiBudgetExceededError(
                 f"Budget AI giornaliero superato ({settings.ai_daily_budget_usd} USD). "
@@ -180,8 +181,7 @@ def check_single_request_cost(estimated_total: Decimal | None) -> None:
     block = settings.ai_single_request_block_usd
     if block and block > 0 and estimated_total >= Decimal(str(block)):
         raise AiSingleRequestBlockedError(
-            f"Costo stimato richiesta ({estimated_total:.4f} USD) supera il limite "
-            f"({block} USD)."
+            f"Costo stimato richiesta ({estimated_total:.4f} USD) supera il limite ({block} USD)."
         )
 
 
@@ -225,7 +225,9 @@ def _apply_log_filters(
     return stmt
 
 
-def _compute_routing_insights(rows: list[AiUsageLog], by_tier: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _compute_routing_insights(
+    rows: list[AiUsageLog], by_tier: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     cost_by_tier = {key: item["estimatedCost"] for key, item in by_tier.items()}
     requests_by_tier = {key: item["requests"] for key, item in by_tier.items()}
     premium_on_cheap = sum(
@@ -234,12 +236,8 @@ def _compute_routing_insights(rows: list[AiUsageLog], by_tier: dict[str, dict[st
         if row.model_tier == AiModelTier.PREMIUM.value
         and row.context_profile in CHEAP_CONTEXT_PROFILES
     )
-    explicit_override = sum(
-        1 for row in rows if row.model_policy_source == "explicit_override"
-    )
-    schema_fallback = sum(
-        1 for row in rows if row.model_policy_source == "schema_fallback_retry"
-    )
+    explicit_override = sum(1 for row in rows if row.model_policy_source == "explicit_override")
+    schema_fallback = sum(1 for row in rows if row.model_policy_source == "schema_fallback_retry")
     unconfigured: list[str] = []
     for tier in (
         AiModelTier.CHEAP,
@@ -362,7 +360,9 @@ async def get_usage_summary(
         "totalOutputTokens": total_output,
         "totalCachedInputTokens": total_cached,
         "byModule": sorted(by_module.values(), key=lambda x: x["estimatedCost"], reverse=True),
-        "byOperation": sorted(by_operation.values(), key=lambda x: x["estimatedCost"], reverse=True),
+        "byOperation": sorted(
+            by_operation.values(), key=lambda x: x["estimatedCost"], reverse=True
+        ),
         "byModel": sorted(by_model.values(), key=lambda x: x["estimatedCost"], reverse=True),
         "byTier": sorted(by_tier.values(), key=lambda x: x["estimatedCost"], reverse=True),
         "byOperationKey": sorted(
@@ -424,10 +424,14 @@ async def list_usage_logs(
     total = int((await session.execute(count_stmt)).scalar_one())
 
     rows = (
-        await session.execute(
-            filtered.order_by(AiUsageLog.created_at.desc()).limit(limit).offset(offset)
+        (
+            await session.execute(
+                filtered.order_by(AiUsageLog.created_at.desc()).limit(limit).offset(offset)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows), total
 
 
@@ -485,18 +489,15 @@ async def estimate_operation_cost(
     count: int = 1,
 ) -> dict[str, Any]:
     since = utc_now_naive() - timedelta(days=7)
-    stmt = (
-        select(
-            func.count(AiUsageLog.id),
-            func.avg(AiUsageLog.estimated_total_cost),
-        )
-        .where(
-            AiUsageLog.project_id == project_id,
-            AiUsageLog.operation == operation,
-            AiUsageLog.status == "success",
-            AiUsageLog.created_at >= since,
-            AiUsageLog.estimated_total_cost.isnot(None),
-        )
+    stmt = select(
+        func.count(AiUsageLog.id),
+        func.avg(AiUsageLog.estimated_total_cost),
+    ).where(
+        AiUsageLog.project_id == project_id,
+        AiUsageLog.operation == operation,
+        AiUsageLog.status == "success",
+        AiUsageLog.created_at >= since,
+        AiUsageLog.estimated_total_cost.isnot(None),
     )
     row = (await session.execute(stmt)).one()
     request_count = int(row[0] or 0)
@@ -532,8 +533,10 @@ async def get_global_usage_summary(
 ) -> dict[str, Any]:
     workspace = await get_workspace_for_user(session, user)
     project_ids = (
-        await session.execute(select(Project.id).where(Project.workspace_id == workspace.id))
-    ).scalars().all()
+        (await session.execute(select(Project.id).where(Project.workspace_id == workspace.id)))
+        .scalars()
+        .all()
+    )
 
     merged: dict[str, Any] = {
         "totalEstimatedCost": 0.0,
@@ -561,9 +564,7 @@ async def get_global_usage_summary(
     }
 
     for pid in project_ids:
-        summary = await get_usage_summary(
-            session, pid, start_date=start_date, end_date=end_date
-        )
+        summary = await get_usage_summary(session, pid, start_date=start_date, end_date=end_date)
         merged["totalEstimatedCost"] += summary["totalEstimatedCost"]
         merged["totalRequests"] += summary["totalRequests"]
         merged["successfulRequests"] += summary["successfulRequests"]
@@ -589,12 +590,16 @@ async def get_global_usage_summary(
                     bucket[key]["requests"] += item["requests"]
                     bucket[key]["estimatedCost"] += item["estimatedCost"]
                     if "inputTokens" in item:
-                        bucket[key]["inputTokens"] = bucket[key].get("inputTokens", 0) + item["inputTokens"]
+                        bucket[key]["inputTokens"] = (
+                            bucket[key].get("inputTokens", 0) + item["inputTokens"]
+                        )
 
         insights = summary.get("routingInsights") or {}
         merged_insights = merged["routingInsights"]
         for tier, cost in (insights.get("cost_by_tier") or {}).items():
-            merged_insights["cost_by_tier"][tier] = merged_insights["cost_by_tier"].get(tier, 0.0) + cost
+            merged_insights["cost_by_tier"][tier] = (
+                merged_insights["cost_by_tier"].get(tier, 0.0) + cost
+            )
         for tier, count in (insights.get("requests_by_tier") or {}).items():
             merged_insights["requests_by_tier"][tier] = (
                 merged_insights["requests_by_tier"].get(tier, 0) + count

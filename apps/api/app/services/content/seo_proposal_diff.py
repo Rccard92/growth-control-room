@@ -76,9 +76,7 @@ def _diff_media_images(
         return None
     from app.services.content.seo_image_utils import merge_media_image_alts
 
-    alt_by_id = {
-        str(item["image_id"]): str(item["proposed_alt"]) for item in changed_image_alts
-    }
+    alt_by_id = {str(item["image_id"]): str(item["proposed_alt"]) for item in changed_image_alts}
     source_media = proposed.get("media_images") or proposed.get("mediaImages")
     existing = current.get("media_images") or []
     merged = merge_media_image_alts(

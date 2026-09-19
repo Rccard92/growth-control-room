@@ -35,9 +35,7 @@ MAX_REDIRECTS = 5
 _BLOCKED_SCHEMES = frozenset({"file", "ftp", "data", "javascript"})
 _SKIP_TAGS = frozenset({"script", "style", "noscript"})
 
-SUPPORTED_TARGET_TYPES = frozenset(
-    {"url", "shopify_product", "shopify_collection", "domain"}
-)
+SUPPORTED_TARGET_TYPES = frozenset({"url", "shopify_product", "shopify_collection", "domain"})
 
 
 def is_private_or_blocked_host(hostname: str) -> bool:
@@ -60,8 +58,7 @@ def is_private_or_blocked_host(hostname: str) -> bool:
     if ip.is_reserved or ip.is_multicast:
         return True
     if isinstance(ip, ipaddress.IPv6Address) and (
-        ip in ipaddress.IPv6Network("fc00::/7")
-        or ip in ipaddress.IPv6Network("fe80::/10")
+        ip in ipaddress.IPv6Network("fc00::/7") or ip in ipaddress.IPv6Network("fe80::/10")
     ):
         return True
     return False
@@ -419,9 +416,7 @@ async def _collect_shopify_product(
         if product_url:
             payload["url"] = product_url
     else:
-        payload["warnings"].append(
-            "Could not build product URL: missing handle or shop domain."
-        )
+        payload["warnings"].append("Could not build product URL: missing handle or shop domain.")
 
     shopify_data: dict[str, Any] = {"product": _product_payload(product)}
 
@@ -496,9 +491,7 @@ async def _collect_shopify_collection(
         if collection_url:
             payload["url"] = collection_url
     else:
-        payload["warnings"].append(
-            "Could not build collection URL: missing handle or shop domain."
-        )
+        payload["warnings"].append("Could not build collection URL: missing handle or shop domain.")
 
     shopify_data: dict[str, Any] = {"collection": _collection_payload(collection)}
 
@@ -553,17 +546,13 @@ async def _collect_url(
 
     html, status_code, final_url = await _fetch_url_html(validated_url)
     if len(html) > MAX_HTML_CHARS:
-        payload["warnings"].append(
-            f"Fetched HTML truncated to {MAX_HTML_CHARS} characters."
-        )
+        payload["warnings"].append(f"Fetched HTML truncated to {MAX_HTML_CHARS} characters.")
         html = truncate_value(html, MAX_HTML_CHARS)
 
     page_meta = extract_page_metadata(html)
     text = extract_text_from_html(html)
     if len(text) > MAX_TEXT_CHARS:
-        payload["warnings"].append(
-            f"Extracted page text truncated to {MAX_TEXT_CHARS} characters."
-        )
+        payload["warnings"].append(f"Extracted page text truncated to {MAX_TEXT_CHARS} characters.")
         text = truncate_value(text, MAX_TEXT_CHARS)
 
     payload["title"] = page_meta.get("title") or ""
@@ -626,17 +615,13 @@ async def _attach_brand_context(
         )
     except Exception:
         brand_context = None
-        payload["warnings"].append(
-            "Brand context not available for this project."
-        )
+        payload["warnings"].append("Brand context not available for this project.")
         return payload
 
     if brand_context:
         payload["brandContext"] = brand_context
     else:
-        payload["warnings"].append(
-            "Brand context not available for this project."
-        )
+        payload["warnings"].append("Brand context not available for this project.")
     return payload
 
 
@@ -650,9 +635,7 @@ async def collect_skill_input(
 ) -> dict[str, Any]:
     normalized_type = (target_type or "").strip().lower()
     if normalized_type not in SUPPORTED_TARGET_TYPES:
-        raise UnsupportedSkillTargetError(
-            f"Unsupported target_type: {target_type}"
-        )
+        raise UnsupportedSkillTargetError(f"Unsupported target_type: {target_type}")
 
     if normalized_type == "shopify_product":
         if target_id is None:
@@ -660,9 +643,7 @@ async def collect_skill_input(
         payload = await _collect_shopify_product(session, project_id, target_id)
     elif normalized_type == "shopify_collection":
         if target_id is None:
-            raise SkillInputCollectionError(
-                "target_id is required for shopify_collection"
-            )
+            raise SkillInputCollectionError("target_id is required for shopify_collection")
         payload = await _collect_shopify_collection(session, project_id, target_id)
     elif normalized_type == "url":
         if not url or not url.strip():

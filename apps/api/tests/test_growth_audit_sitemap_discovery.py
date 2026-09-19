@@ -10,7 +10,6 @@ from app.services.growth_audit.sitemap_discovery import (
     discover_sitemap_urls,
 )
 
-
 URLSET_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://example.com/</loc></url>
@@ -49,8 +48,7 @@ def test_discover_sitemap_urls_respects_max_urls() -> None:
         async def fake_fetch(_client, url):
             if url.endswith("sitemap.xml"):
                 many = "\n".join(
-                    f"<url><loc>https://example.com/page-{index}</loc></url>"
-                    for index in range(10)
+                    f"<url><loc>https://example.com/page-{index}</loc></url>" for index in range(10)
                 )
                 content = f"""<?xml version="1.0"?><urlset>{many}</urlset>""".encode()
                 return content, None

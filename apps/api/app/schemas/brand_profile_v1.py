@@ -26,7 +26,9 @@ class BrandProfileEnrichRequest(BaseModel):
 class BrandProfileProposal(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    brand_name: str | None = Field(default=None, validation_alias="brandName", serialization_alias="brandName")
+    brand_name: str | None = Field(
+        default=None, validation_alias="brandName", serialization_alias="brandName"
+    )
     short_description: str | None = Field(
         default=None, validation_alias="shortDescription", serialization_alias="shortDescription"
     )

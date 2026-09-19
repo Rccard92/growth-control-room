@@ -1,6 +1,5 @@
-from uuid import UUID
-
 import logging
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -13,17 +12,16 @@ from app.models.user import User
 from app.schemas.content_seo import (
     ContentSeoAnalyzeResponse,
     ContentSeoDashboardResponse,
-    ContentSeoSyncResponse,
 )
 from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemCreate,
     ContentSeoEditorialItemListResponse,
     ContentSeoEditorialItemRead,
     ContentSeoEditorialItemUpdate,
-    EditorialBriefUpdateRequest,
+    EditorialArticleUpdateRequest,
     EditorialBriefBatchJobResponse,
     EditorialBriefBatchStartRequest,
-    EditorialArticleUpdateRequest,
+    EditorialBriefUpdateRequest,
     EditorialImageActionResponse,
     EditorialImageEditRequest,
     EditorialItemAiUsageResponse,
@@ -59,29 +57,23 @@ from app.schemas.seo_optimizer import (
     SeoProposalRead,
 )
 from app.services.ai.openai_client import is_openai_configured
-from app.services.content.editorial_item_service import (
-    create_editorial_item,
-    delete_editorial_item,
-    get_editorial_item,
-    get_editorial_item_read,
-    list_editorial_items,
-    reschedule_editorial_item,
-    update_editorial_item,
-)
-from app.services.content.editorial_brief_service import (
-    generate_editorial_brief,
-    update_editorial_brief,
+from app.services.content.analyze import run_content_seo_analyze
+from app.services.content.collection_seo_analyzer import analyze_collections_for_store
+from app.services.content.dashboard import build_content_seo_dashboard
+from app.services.content.editorial_ai_usage_service import get_editorial_item_ai_usage
+from app.services.content.editorial_article_service import (
+    generate_editorial_article,
+    update_editorial_article,
 )
 from app.services.content.editorial_brief_batch_service import (
     get_brief_batch_job,
     job_to_response,
     start_brief_batch_job,
 )
-from app.services.content.editorial_article_service import (
-    generate_editorial_article,
-    update_editorial_article,
+from app.services.content.editorial_brief_service import (
+    generate_editorial_brief,
+    update_editorial_brief,
 )
-from app.services.content.editorial_ai_usage_service import get_editorial_item_ai_usage
 from app.services.content.editorial_image_service import (
     approve_editorial_image,
     edit_editorial_image,
@@ -91,6 +83,15 @@ from app.services.content.editorial_image_service import (
     retry_editorial_image_upload,
     sync_editorial_image_from_title,
 )
+from app.services.content.editorial_item_service import (
+    create_editorial_item,
+    delete_editorial_item,
+    get_editorial_item,
+    get_editorial_item_read,
+    list_editorial_items,
+    reschedule_editorial_item,
+    update_editorial_item,
+)
 from app.services.content.editorial_plan_service import generate_editorial_calendar
 from app.services.content.editorial_publishing_service import (
     disconnect_editorial_shopify_article,
@@ -99,17 +100,16 @@ from app.services.content.editorial_publishing_service import (
 )
 from app.services.content.editorial_shopify_blogs_service import list_shopify_blogs_for_project
 from app.services.content.editorial_shopify_publish_service import publish_editorial_to_shopify
-from app.services.content.analyze import run_content_seo_analyze
-from app.services.content.collection_seo_analyzer import analyze_collections_for_store
-from app.services.content.dashboard import build_content_seo_dashboard
 from app.services.content.product_seo_analyzer import analyze_products_for_store
+from app.services.content.seo_apply_drift import SeoApplyDriftError
+from app.services.content.seo_apply_fields_service import apply_entity_fields
 from app.services.content.seo_apply_service import (
     apply_proposal,
     approve_proposal,
     get_proposal_for_store,
     reject_proposal,
 )
-from app.services.content.seo_apply_fields_service import apply_entity_fields
+from app.services.content.seo_content_debug_service import build_content_seo_debug
 from app.services.content.seo_entity_detail_service import (
     get_collection_seo_detail,
     get_product_seo_detail,
@@ -125,14 +125,13 @@ from app.services.content.seo_optimizer_list import (
     list_product_seo_items,
     list_proposals,
 )
-from app.services.content.seo_content_debug_service import build_content_seo_debug
-from app.services.content.seo_proposal_manual_service import create_manual_proposal
-from app.services.content.seo_skill_loader import skill_meta_for_detail_response
-from app.services.content.seo_proposal_preview_service import build_proposal_preview
+from app.services.content.seo_proposal_diff import proposal_changed_fields
 from app.services.content.seo_proposal_engine import generate_seo_proposal
 from app.services.content.seo_proposal_field_engine import generate_seo_proposal_field
+from app.services.content.seo_proposal_manual_service import create_manual_proposal
+from app.services.content.seo_proposal_preview_service import build_proposal_preview
 from app.services.content.seo_proposal_read import proposal_to_read_dict
-from app.services.content.seo_proposal_diff import proposal_changed_fields
+from app.services.content.seo_skill_loader import skill_meta_for_detail_response
 from app.services.projects import get_project_for_user
 from app.services.shopify.client import ShopifyAPIError
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
@@ -273,11 +272,18 @@ async def analyze_products(
     await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     result = await analyze_products_for_store(store, session)
+    skipped = result.products_skipped_not_active
     return SeoAnalyzeCountResponse(
         products_analyzed=result.products_analyzed,
         critical=result.critical,
         warnings=result.warnings,
         opportunities=result.opportunities,
+        skipped_not_active=skipped,
+        message=(
+            f"{skipped} prodotti non attivi (bozza o archiviati) non sono stati analizzati."
+            if skipped
+            else None
+        ),
     )
 
 
@@ -575,9 +581,7 @@ async def list_seo_proposals(
     await get_project_for_user(project_id, session, current_user)
     store = _require_connected_store(await get_shopify_store_for_project(project_id, session))
     proposals = await list_proposals(store, session, status=status_filter)
-    return SeoProposalListResponse(
-        items=[_proposal_read(p) for p in proposals]
-    )
+    return SeoProposalListResponse(items=[_proposal_read(p) for p in proposals])
 
 
 @router.post(
@@ -739,6 +743,15 @@ async def create_manual_seo_proposal(
             proposed_values=body.proposed_values,
             changed_fields=body.changed_fields,
         )
+    except SeoApplyDriftError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "upstream_drift",
+                "message": str(exc),
+                "fields": exc.fields,
+            },
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _proposal_read(proposal)
@@ -849,6 +862,15 @@ async def apply_seo_proposal(
     try:
         client = await get_shopify_client_for_store(store)
         result = await apply_proposal(store, client, proposal, session)
+    except SeoApplyDriftError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "upstream_drift",
+                "message": str(exc),
+                "fields": exc.fields,
+            },
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1014,9 +1036,7 @@ async def generate_content_seo_editorial_calendar(
 ) -> EditorialPlanGenerateResponse:
     await get_project_for_user(project_id, session, current_user)
     try:
-        rows = await generate_editorial_calendar(
-            session, project_id, payload, dry_run=dry_run
-        )
+        rows = await generate_editorial_calendar(session, project_id, payload, dry_run=dry_run)
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     message = (

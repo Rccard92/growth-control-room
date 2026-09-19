@@ -93,7 +93,7 @@ def merge_media_image_alts(
 ) -> list[dict[str, Any]]:
     """Merge alt updates into full media_images array (never return partial subset)."""
     base_rows: list[dict[str, Any]] = []
-    for index, item in enumerate(existing or []):
+    for item in existing or []:
         if isinstance(item, dict):
             base_rows.append(dict(item))
 
@@ -106,7 +106,7 @@ def merge_media_image_alts(
         if proposed_by_id:
             merged: list[dict[str, Any]] = []
             seen: set[str] = set()
-            for index, row in enumerate(base_rows):
+            for row in base_rows:
                 image_id = str(row.get("id") or row.get("image_id") or "")
                 if image_id in proposed_by_id:
                     merged.append({**row, **proposed_by_id[image_id]})
@@ -150,7 +150,9 @@ def extract_shopify_media_alts(shopify_response: dict[str, Any] | None) -> list[
     return [item for item in media if isinstance(item, dict)]
 
 
-def collection_image_applicable(collection_image_url: str | None, collection_gid: str | None) -> tuple[bool, str | None]:
+def collection_image_applicable(
+    collection_image_url: str | None, collection_gid: str | None
+) -> tuple[bool, str | None]:
     if not collection_gid:
         return False, "missing_collection"
     if not collection_image_url or not str(collection_image_url).strip():

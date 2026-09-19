@@ -42,8 +42,7 @@ def ensure_google_oauth_configured() -> None:
         detail={
             "error": "google_oauth_not_configured",
             "message": (
-                "Google OAuth non configurato. Imposta le variabili d'ambiente: "
-                f"{missing}"
+                f"Google OAuth non configurato. Imposta le variabili d'ambiente: {missing}"
             ),
             "missing_vars": settings.google_oauth_missing_vars,
         },

@@ -4,19 +4,30 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 
 from app.db.session import get_session_factory
 from app.models.brand_intelligence import (
-    BrandExtractedFact,
     BrandExternalSource,
+    BrandExtractedFact,
     BrandImportBatch,
     BrandSourceDocument,
 )
-from app.services.brand_intelligence.batch_service import finalize_batch_counts, update_batch_progress
+from app.services.ai.context_profiles import brand_import_metadata
+from app.services.ai.openai_client import (
+    AiRequestMetadata,
+    OpenAINotConfiguredError,
+    OpenAIRequestError,
+    generate_structured_json,
+    is_openai_configured,
+)
+from app.services.brand_intelligence.batch_service import (
+    finalize_batch_counts,
+    update_batch_progress,
+)
 from app.services.brand_intelligence.conflict_detection import (
     apply_conflict_detection_to_batch,
     build_bi_summary,
@@ -29,14 +40,6 @@ from app.services.brand_intelligence.document_extraction import (
 )
 from app.services.brand_intelligence.external_sources_service import fetch_batch_external_sources
 from app.services.brand_intelligence.source_fetcher import format_external_source_for_prompt
-from app.services.ai.context_profiles import brand_import_metadata
-from app.services.ai.openai_client import (
-    AiRequestMetadata,
-    OpenAINotConfiguredError,
-    OpenAIRequestError,
-    generate_structured_json,
-    is_openai_configured,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -148,9 +151,7 @@ async def process_batch(batch_id: UUID) -> None:
     session_factory = get_session_factory()
     async with session_factory() as session:
         batch = (
-            await session.execute(
-                select(BrandImportBatch).where(BrandImportBatch.id == batch_id)
-            )
+            await session.execute(select(BrandImportBatch).where(BrandImportBatch.id == batch_id))
         ).scalar_one_or_none()
         if not batch:
             logger.error("Batch %s non trovato", batch_id)
@@ -164,7 +165,9 @@ async def process_batch(batch_id: UUID) -> None:
                     .where(BrandSourceDocument.batch_id == batch_id)
                     .order_by(BrandSourceDocument.processing_order.asc())
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         total_docs = max(len(docs), 1)
         warnings: list[str] = []
@@ -183,7 +186,7 @@ async def process_batch(batch_id: UUID) -> None:
                 batch.status = "failed"
                 batch.error_message = "OPENAI_API_KEY non configurata."
                 batch.current_step = "Elaborazione fallita"
-                batch.completed_at = datetime.now(timezone.utc)
+                batch.completed_at = datetime.now(UTC)
                 await session.commit()
                 return
 
@@ -214,11 +217,11 @@ async def process_batch(batch_id: UUID) -> None:
             external_sources = list(
                 (
                     await session.execute(
-                        select(BrandExternalSource).where(
-                            BrandExternalSource.batch_id == batch_id
-                        )
+                        select(BrandExternalSource).where(BrandExternalSource.batch_id == batch_id)
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
             external_block = _format_external_sources_block(external_sources)
 
@@ -239,7 +242,9 @@ async def process_batch(batch_id: UUID) -> None:
                             BrandExtractedFact.status.in_(("suggested", "needs_review")),
                         )
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
             for fact in existing_facts:
                 await session.delete(fact)
@@ -309,7 +314,7 @@ async def process_batch(batch_id: UUID) -> None:
                             if isinstance(w, str) and w.strip():
                                 warnings.append(w.strip())
 
-                    now = datetime.now(timezone.utc)
+                    now = datetime.now(UTC)
                     created_count = _persist_facts_from_parsed(
                         session,
                         project_id=project_id,
@@ -388,7 +393,7 @@ async def process_batch(batch_id: UUID) -> None:
                             metadata=metadata,
                         )
                         raw_facts = parsed.get("facts") or []
-                        now = datetime.now(timezone.utc)
+                        now = datetime.now(UTC)
                         _persist_facts_from_parsed(
                             session,
                             project_id=project_id,
@@ -444,7 +449,9 @@ async def process_batch(batch_id: UUID) -> None:
                 batch,
                 status=final_status,
                 progress_percent=100,
-                current_step="Pronto per generare Brand Brief" if final_status != "failed" else "Elaborazione fallita",
+                current_step="Pronto per generare Brand Brief"
+                if final_status != "failed"
+                else "Elaborazione fallita",
                 commit=True,
             )
 
@@ -459,5 +466,5 @@ async def process_batch(batch_id: UUID) -> None:
                 batch.status = "failed"
                 batch.error_message = str(exc)
                 batch.current_step = "Elaborazione fallita"
-                batch.completed_at = datetime.now(timezone.utc)
+                batch.completed_at = datetime.now(UTC)
                 await session.commit()

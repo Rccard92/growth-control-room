@@ -14,7 +14,6 @@ from sqlalchemy.orm import selectinload
 
 from app.models.content_seo import (
     ShopifyArticle,
-    ShopifyBlog,
     ShopifyCollection,
     ShopifyPage,
 )
@@ -95,9 +94,7 @@ def extract_shopify_handle_from_path(path: str, page_type: str = "") -> dict[str
 
 def _entity_synced_at(entity: Any, entity_type: str) -> datetime | None:
     if entity_type == "shopify_product":
-        return getattr(entity, "updated_at_shopify", None) or getattr(
-            entity, "updated_at", None
-        )
+        return getattr(entity, "updated_at_shopify", None) or getattr(entity, "updated_at", None)
     return getattr(entity, "updated_at", None)
 
 

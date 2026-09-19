@@ -8,7 +8,10 @@ from urllib.parse import urlparse
 import httpx
 
 from app.core.config import settings
-from app.services.google.exceptions import GoogleApiRequestError, GoogleIntegrationNotConfiguredError
+from app.services.google.exceptions import (
+    GoogleApiRequestError,
+    GoogleIntegrationNotConfiguredError,
+)
 
 CRUX_API_URL = "https://chromeuxreport.googleapis.com/v1/records:queryRecord"
 REQUEST_TIMEOUT_SECONDS = 60.0

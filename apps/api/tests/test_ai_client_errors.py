@@ -6,8 +6,8 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from openai import BadRequestError
 import pytest
+from openai import BadRequestError
 
 from app.services.ai.ai_client import (
     AiRequestMetadata,
@@ -102,8 +102,8 @@ def test_bad_request_error_message_is_readable() -> None:
 
 def test_empty_openai_response_maps_to_user_message() -> None:
     from app.services.ai.ai_client import (
-        _SchemaParseError,
         _parse_json_object_response,
+        _SchemaParseError,
         _user_message_for_parse_error,
     )
     from app.services.seo_skills.error_messages import OPENAI_EMPTY_RESPONSE_USER_MESSAGE
@@ -134,9 +134,7 @@ def test_parse_json_object_response_accepts_json_code_fence() -> None:
     response = MagicMock()
     response.choices = [
         MagicMock(
-            message=MagicMock(
-                content='```json\n{"skillKey": "seo_page", "summary": "ok"}\n```'
-            )
+            message=MagicMock(content='```json\n{"skillKey": "seo_page", "summary": "ok"}\n```')
         )
     ]
     parsed, _content = _parse_json_object_response(response)
@@ -160,8 +158,8 @@ def test_parse_json_object_response_extracts_embedded_json_object() -> None:
 
 def test_parse_json_object_response_invalid_json_maps_to_user_message() -> None:
     from app.services.ai.ai_client import (
-        _SchemaParseError,
         _parse_json_object_response,
+        _SchemaParseError,
         _user_message_for_parse_error,
     )
     from app.services.seo_skills.error_messages import OPENAI_INVALID_JSON_USER_MESSAGE
@@ -185,9 +183,9 @@ def test_parse_json_object_response_invalid_json_maps_to_user_message() -> None:
 
 def test_parse_json_object_response_truncated_output_maps_to_truncation_message() -> None:
     from app.services.ai.ai_client import (
-        _SchemaParseError,
         _parse_error_code,
         _parse_json_object_response,
+        _SchemaParseError,
         _user_message_for_parse_error,
     )
     from app.services.seo_skills.error_messages import OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE

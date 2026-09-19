@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.brand_intelligence import BrandProductKnowledgeGeneral, BrandProductKnowledgeItem
 from app.schemas.brand_product_knowledge import (
     BrandProductKnowledgeContext,
-    BrandProductKnowledgeGeneralRulesContext,
     BrandProductKnowledgeGeneralRead,
+    BrandProductKnowledgeGeneralRulesContext,
     BrandProductKnowledgeItemRead,
     BrandProductKnowledgeSpecificProductContext,
 )

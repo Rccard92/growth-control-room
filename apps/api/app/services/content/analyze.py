@@ -30,19 +30,37 @@ async def _load_content_entities(
     store_id: UUID,
 ) -> tuple[list[ShopifyProduct], list[ShopifyCollection], list[ShopifyPage], list[ShopifyArticle]]:
     products = (
-        await session.execute(select(ShopifyProduct).where(ShopifyProduct.shopify_store_id == store_id))
-    ).scalars().all()
-    collections = (
-        await session.execute(
-            select(ShopifyCollection).where(ShopifyCollection.shopify_store_id == store_id)
+        (
+            await session.execute(
+                select(ShopifyProduct).where(ShopifyProduct.shopify_store_id == store_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
+    collections = (
+        (
+            await session.execute(
+                select(ShopifyCollection).where(ShopifyCollection.shopify_store_id == store_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
     pages = (
-        await session.execute(select(ShopifyPage).where(ShopifyPage.shopify_store_id == store_id))
-    ).scalars().all()
+        (await session.execute(select(ShopifyPage).where(ShopifyPage.shopify_store_id == store_id)))
+        .scalars()
+        .all()
+    )
     articles = (
-        await session.execute(select(ShopifyArticle).where(ShopifyArticle.shopify_store_id == store_id))
-    ).scalars().all()
+        (
+            await session.execute(
+                select(ShopifyArticle).where(ShopifyArticle.shopify_store_id == store_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return list(products), list(collections), list(pages), list(articles)
 
 

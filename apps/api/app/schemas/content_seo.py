@@ -21,9 +21,7 @@ class ContentSeoAnalyzeResponse(BaseModel):
     issues_created: int = Field(serialization_alias="issuesCreated")
     opportunities_created: int = Field(serialization_alias="opportunitiesCreated")
     critical_issues: int = Field(serialization_alias="criticalIssues")
-    high_priority_opportunities: int = Field(
-        serialization_alias="highPriorityOpportunities"
-    )
+    high_priority_opportunities: int = Field(serialization_alias="highPriorityOpportunities")
 
 
 class SeoAuditIssueRead(BaseModel):
@@ -49,9 +47,7 @@ class ContentOpportunityRead(BaseModel):
     priority: str
     title: str
     description: str
-    target_entity_type: str | None = Field(
-        default=None, serialization_alias="targetEntityType"
-    )
+    target_entity_type: str | None = Field(default=None, serialization_alias="targetEntityType")
     target_entity_id: str | None = Field(default=None, serialization_alias="targetEntityId")
     suggested_keyword: str | None = Field(default=None, serialization_alias="suggestedKeyword")
     search_intent: str | None = Field(default=None, serialization_alias="searchIntent")

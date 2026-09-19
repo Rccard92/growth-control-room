@@ -82,15 +82,13 @@ def _has_string_list(value: object | None) -> bool:
     return bool(normalize_to_string_list(value))
 
 
-def _any_faq_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
+def _any_faq_populated(row: BrandFaqObjections | BrandFaqObjectionsRead | None) -> bool:
     if not row:
         return False
-    return any(
-        _has_string_list(getattr(row, field, None)) for field in _FAQ_FIELDS
-    )
+    return any(_has_string_list(getattr(row, field, None)) for field in _FAQ_FIELDS)
 
 
-def _any_content_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
+def _any_content_populated(row: BrandFaqObjections | BrandFaqObjectionsRead | None) -> bool:
     if not row:
         return False
     if _any_faq_populated(row):
@@ -102,12 +100,12 @@ def _any_content_populated(row: BrandFaqObjections | "BrandFaqObjectionsRead" | 
     return has_text(getattr(row, "notes", None))
 
 
-def faq_objections_has_content(row: BrandFaqObjections | "BrandFaqObjectionsRead" | None) -> bool:
+def faq_objections_has_content(row: BrandFaqObjections | BrandFaqObjectionsRead | None) -> bool:
     return _any_content_populated(row)
 
 
 def faq_objections_missing_fields(
-    row: BrandFaqObjections | "BrandFaqObjectionsRead" | None,
+    row: BrandFaqObjections | BrandFaqObjectionsRead | None,
 ) -> list[str]:
     if not row:
         return ["general_faq", "objections", "recommended_answers"]
@@ -122,7 +120,7 @@ def faq_objections_missing_fields(
 
 
 def faq_objections_completion(
-    row: BrandFaqObjections | "BrandFaqObjectionsRead" | None,
+    row: BrandFaqObjections | BrandFaqObjectionsRead | None,
 ) -> CompletionStatus:
     if not row:
         return "empty"
@@ -138,7 +136,7 @@ def faq_objections_completion(
 
 
 def faq_objections_missing_context(
-    row: BrandFaqObjections | "BrandFaqObjectionsRead" | None,
+    row: BrandFaqObjections | BrandFaqObjectionsRead | None,
 ) -> list[str]:
     if faq_objections_completion(row) == "empty":
         return [
@@ -234,7 +232,9 @@ async def apply_faq_objections_proposal(
     _apply_string_field(row, "notes", proposal.notes)
     _apply_string_list_field(row, "general_faq", proposal.general_faq)
     _apply_string_list_field(row, "product_process_questions", proposal.product_process_questions)
-    _apply_string_list_field(row, "purchase_shipping_questions", proposal.purchase_shipping_questions)
+    _apply_string_list_field(
+        row, "purchase_shipping_questions", proposal.purchase_shipping_questions
+    )
     _apply_string_list_field(row, "objections", proposal.objections)
     _apply_string_list_field(row, "myths_misconceptions", proposal.myths_misconceptions)
     _apply_string_list_field(row, "recommended_answers", proposal.recommended_answers)

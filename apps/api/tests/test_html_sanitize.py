@@ -42,8 +42,8 @@ def test_compliant_article_is_left_untouched() -> None:
 
 def test_tables_survive_sanitization() -> None:
     html = (
-        "<table><thead><tr><th scope=\"col\">Ingrediente</th><th>Quantita</th></tr></thead>"
-        "<tbody><tr><td>Farina</td><td colspan=\"2\">200g</td></tr></tbody></table>"
+        '<table><thead><tr><th scope="col">Ingrediente</th><th>Quantita</th></tr></thead>'
+        '<tbody><tr><td>Farina</td><td colspan="2">200g</td></tr></tbody></table>'
     )
     assert sanitize_editorial_article_html(html) == html
 

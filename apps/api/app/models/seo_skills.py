@@ -14,9 +14,7 @@ if TYPE_CHECKING:
 
 class SeoSkillRun(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "seo_skill_runs"
-    __table_args__ = (
-        Index("ix_seo_skill_runs_target_type_target_id", "target_type", "target_id"),
-    )
+    __table_args__ = (Index("ix_seo_skill_runs_target_type_target_id", "target_type", "target_id"),)
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

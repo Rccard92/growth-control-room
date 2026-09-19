@@ -10,7 +10,10 @@ from uuid import uuid4
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
 from app.schemas.content_seo_editorial import ContentSeoEditorialItemRead, EditorialArticlePayload
-from app.services.content.editorial_item_service import get_editorial_item_read, serialize_editorial_item_read
+from app.services.content.editorial_item_service import (
+    get_editorial_item_read,
+    serialize_editorial_item_read,
+)
 from app.services.content.editorial_publishing_utils import enrich_article_with_hash
 
 

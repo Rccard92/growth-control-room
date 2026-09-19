@@ -18,7 +18,10 @@ from app.models.growth_audit import (
     GrowthAuditTask,
 )
 from app.services.google.crux_client import fetch_crux_record
-from app.services.google.exceptions import GoogleApiRequestError, GoogleIntegrationNotConfiguredError
+from app.services.google.exceptions import (
+    GoogleApiRequestError,
+    GoogleIntegrationNotConfiguredError,
+)
 from app.services.google.google_config import is_crux_configured, is_pagespeed_configured
 from app.services.google.pagespeed_client import fetch_pagespeed_insights
 from app.services.growth_audit.exceptions import (
@@ -238,7 +241,9 @@ async def analyze_growth_audit_page_performance(
         raise GrowthAuditValidationError(f"Pagina {page_id} non trovata nel run.")
 
     if not page.url or not page.url.strip():
-        raise GrowthAuditValidationError("La pagina non ha un URL valido per l'analisi performance.")
+        raise GrowthAuditValidationError(
+            "La pagina non ha un URL valido per l'analisi performance."
+        )
 
     started_at = _utcnow()
     await create_growth_audit_event(

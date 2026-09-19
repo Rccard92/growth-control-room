@@ -18,7 +18,6 @@ from app.services.dataforseo.exceptions import (
     DataForSeoRealCallsDisabledError,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -61,9 +60,7 @@ app.add_middleware(
 
 app.include_router(public_api_router, prefix="/api")
 app.include_router(projects.router, prefix="/api", dependencies=[Depends(require_user)])
-app.include_router(
-    google_integrations.router, prefix="/api", dependencies=[Depends(require_user)]
-)
+app.include_router(google_integrations.router, prefix="/api", dependencies=[Depends(require_user)])
 app.include_router(api_router, prefix="/api")
 
 

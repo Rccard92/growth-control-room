@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -25,13 +25,19 @@ from app.schemas.brand_intelligence import (
     BrandVoiceUpdate,
 )
 from app.services.brand_intelligence import service as bi_service
-from app.services.brand_intelligence.conflict_detection import _is_empty, _values_equal, load_official_snapshot
+from app.services.brand_intelligence.conflict_detection import (
+    _is_empty,
+    _values_equal,
+    load_official_snapshot,
+)
 from app.services.brand_intelligence.fact_apply import _as_str
 
 APPLY_RESULT = BrandSectionDraftApplyResultItem
 
 
-def _item(draft_id: UUID, section_key: str, status: str, message: str) -> BrandSectionDraftApplyResultItem:
+def _item(
+    draft_id: UUID, section_key: str, status: str, message: str
+) -> BrandSectionDraftApplyResultItem:
     return BrandSectionDraftApplyResultItem(
         draft_id=draft_id,
         section_key=section_key,
@@ -83,7 +89,6 @@ async def apply_section_draft(
     payload = draft.draft_payload or {}
     section = draft.section_key
     snapshot = await load_official_snapshot(session, project_id)
-    conflicts: list[BrandSectionDraftApplyResultItem] = []
     applied: list[BrandSectionDraftApplyResultItem] = []
 
     try:
@@ -147,7 +152,9 @@ async def apply_section_draft(
                 schema=BrandSeoStrategyUpdate,
             )
         elif section == "products_categories":
-            result, conflict_msgs = await _apply_products_categories(session, project_id, payload, snapshot)
+            result, conflict_msgs = await _apply_products_categories(
+                session, project_id, payload, snapshot
+            )
         elif section == "audience":
             result, conflict_msgs = await _apply_audience(session, project_id, payload, snapshot)
         elif section == "claims_compliance":
@@ -171,13 +178,11 @@ async def apply_section_draft(
         draft.status = "needs_review"
         await session.commit()
         return BrandSectionDraftApplyResponse(
-            conflicts=[
-                _item(draft.id, section, "conflict", msg) for msg in conflict_msgs
-            ],
+            conflicts=[_item(draft.id, section, "conflict", msg) for msg in conflict_msgs],
         )
 
     draft.status = "applied"
-    draft.applied_at = datetime.now(timezone.utc)
+    draft.applied_at = datetime.now(UTC)
     await session.commit()
     applied.append(_item(draft.id, section, "applied", result))
     return BrandSectionDraftApplyResponse(applied=applied)
@@ -189,7 +194,9 @@ async def apply_section_drafts_batch(
     draft_ids: list[UUID],
 ) -> BrandSectionDraftApplyResponse:
     if not draft_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun draft da applicare.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun draft da applicare."
+        )
 
     merged = BrandSectionDraftApplyResponse()
     for draft_id in draft_ids:
@@ -312,7 +319,11 @@ async def _apply_audience(
         if not name:
             continue
         existing = next(
-            (a for a in snapshot.audience if a.segment_name and a.segment_name.lower() == name.lower()),
+            (
+                a
+                for a in snapshot.audience
+                if a.segment_name and a.segment_name.lower() == name.lower()
+            ),
             None,
         )
         if existing:
@@ -321,7 +332,9 @@ async def _apply_audience(
         await bi_service.create_audience(
             session,
             project_id,
-            BrandAudienceInsightCreate(segment_name=name, description=_as_str(item.get("description"))),
+            BrandAudienceInsightCreate(
+                segment_name=name, description=_as_str(item.get("description"))
+            ),
         )
         created += 1
     if conflicts and created == 0:
@@ -466,7 +479,9 @@ async def _apply_assets(
             BrandAssetCreate(
                 name=name,
                 value=_as_str(item.get("value")) or name,
-                asset_type=at if at in ("logo", "color", "font", "image", "video", "document", "other") else "other",
+                asset_type=at
+                if at in ("logo", "color", "font", "image", "video", "document", "other")
+                else "other",
             ),
         )
         existing.add(name.lower())

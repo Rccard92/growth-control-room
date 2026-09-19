@@ -27,8 +27,7 @@ def ensure_shopify_oauth_configured() -> None:
         detail={
             "error": "oauth_not_configured",
             "message": (
-                "Shopify OAuth non configurato. Imposta le variabili d'ambiente: "
-                f"{missing}"
+                f"Shopify OAuth non configurato. Imposta le variabili d'ambiente: {missing}"
             ),
             "missing_vars": settings.shopify_oauth_missing_vars,
         },

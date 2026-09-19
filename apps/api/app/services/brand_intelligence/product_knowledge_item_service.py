@@ -17,8 +17,8 @@ from app.schemas.brand_product_knowledge import (
     BrandProductKnowledgeItemProposal,
     BrandProductKnowledgeItemRead,
     BrandProductKnowledgeItemsApplyImportResponse,
-    BrandProductKnowledgeSkippedItem,
     BrandProductKnowledgeItemUpdate,
+    BrandProductKnowledgeSkippedItem,
 )
 from app.services.brand_intelligence.product_knowledge_shopify_match import (
     normalize_product_label,
@@ -82,7 +82,9 @@ async def get_item(
         )
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheda prodotto non trovata.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Scheda prodotto non trovata."
+        )
     return row
 
 
@@ -174,7 +176,9 @@ async def list_shopify_products_for_picker(
                 .where(ShopifyProduct.shopify_store_id == store.id)
                 .order_by(ShopifyProduct.title.asc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     linked_ids = set(
@@ -185,7 +189,9 @@ async def list_shopify_products_for_picker(
                     BrandProductKnowledgeItem.shopify_product_id.isnot(None),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     return True, [(p, p.id in linked_ids) for p in products]

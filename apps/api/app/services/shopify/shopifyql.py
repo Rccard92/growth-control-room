@@ -63,10 +63,14 @@ def _to_float(value: Any) -> float | None:
     return float(dec)
 
 
-def parse_scalar_row(rows: list[Any], column: str, parsed_rows: list[dict[str, Any]] | None = None) -> Any:
+def parse_scalar_row(
+    rows: list[Any], column: str, parsed_rows: list[dict[str, Any]] | None = None
+) -> Any:
     data = parsed_rows if parsed_rows is not None else []
     if not data and rows:
-        data = [{"value": rows[0][0] if isinstance(rows[0], (list, tuple)) and rows[0] else rows[0]}]
+        data = [
+            {"value": rows[0][0] if isinstance(rows[0], (list, tuple)) and rows[0] else rows[0]}
+        ]
         column = "value"
     if not data:
         return None
@@ -106,7 +110,11 @@ def classify_shopifyql_error(
                 "message": "Errore di sintassi ShopifyQL: " + "; ".join(messages[:2]),
             }
 
-    if status_code in {401, 403} or "read_reports" in message_blob or "access denied" in message_blob:
+    if (
+        status_code in {401, 403}
+        or "read_reports" in message_blob
+        or "access denied" in message_blob
+    ):
         return {
             "available": False,
             "requires_reconnect": True,
@@ -117,7 +125,9 @@ def classify_shopifyql_error(
             ),
         }
 
-    if "shopifyql" in message_blob and ("not authorized" in message_blob or "permission" in message_blob):
+    if "shopifyql" in message_blob and (
+        "not authorized" in message_blob or "permission" in message_blob
+    ):
         return {
             "available": False,
             "requires_reconnect": True,
@@ -255,9 +265,7 @@ def _build_kpis(
         if rate is not None:
             conversion_rates.append(rate)
 
-    avg_conversion = (
-        sum(conversion_rates) / len(conversion_rates) if conversion_rates else None
-    )
+    avg_conversion = sum(conversion_rates) / len(conversion_rates) if conversion_rates else None
 
     return {
         "total_sales": _to_decimal(executive.get("total_sales")),
@@ -302,14 +310,16 @@ async def fetch_official_analytics(
                 warnings.append(
                     f"Query {key} non disponibile: "
                     + "; ".join(
-                        err.get("message", str(err))
-                        if isinstance(err, dict)
-                        else str(err)
+                        err.get("message", str(err)) if isinstance(err, dict) else str(err)
                         for err in response.get("parse_errors") or []
                     )[:200]
                 )
                 data_quality_status = "limited"
-                results[key] = {"columns": [], "rows": [], "parse_errors": response.get("parse_errors")}
+                results[key] = {
+                    "columns": [],
+                    "rows": [],
+                    "parse_errors": response.get("parse_errors"),
+                }
                 continue
             results[key] = response
         except ShopifyAPIError as exc:
@@ -333,7 +343,10 @@ async def fetch_official_analytics(
             }
         )
 
-    kpis = _build_kpis(executive_rows, sessions_ts_rows if results.get("sessions_timeseries", {}).get("rows") else None)
+    kpis = _build_kpis(
+        executive_rows,
+        sessions_ts_rows if results.get("sessions_timeseries", {}).get("rows") else None,
+    )
     if kpis.get("sessions") is None and "sessions_timeseries" in results:
         warnings.append("Sessions/conversion rate non disponibili per questo periodo.")
         data_quality_status = "limited"
@@ -385,9 +398,7 @@ def build_analytics_reconciliation(
     )
     official_kpis = official_analytics.get("kpis") or {}
     official_total_raw = official_kpis.get("total_sales")
-    official_total = (
-        Decimal(str(official_total_raw)) if official_total_raw is not None else None
-    )
+    official_total = Decimal(str(official_total_raw)) if official_total_raw is not None else None
 
     if not official_analytics.get("available") or official_total is None:
         return {
@@ -409,9 +420,7 @@ def build_analytics_reconciliation(
         delta_percent = round(float((delta / local_total) * 100), 1)
 
     if abs(delta) <= Decimal("0.01"):
-        message = (
-            "I total sales ShopifyQL e locali sono allineati per il periodo selezionato."
-        )
+        message = "I total sales ShopifyQL e locali sono allineati per il periodo selezionato."
     elif delta > 0:
         message = (
             "ShopifyQL riporta total sales superiori al calcolo locale. "

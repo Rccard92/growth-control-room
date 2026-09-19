@@ -20,6 +20,12 @@ from app.schemas.content_seo_editorial import (
     EditorialBriefUpdateRequest,
     normalize_editorial_brief_payload,
 )
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
+    build_prompt_cache_key,
+    enrich_ai_metadata,
+)
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -27,39 +33,30 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-from app.services.ai.context_profiles import (
-    AiContextProfile,
-    build_context_for_profile,
-    build_prompt_cache_key,
-    enrich_ai_metadata,
-)
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
-from app.services.brand_intelligence.faq_objections_service import faq_objections_completion
 from app.services.brand_intelligence.editorial_guidelines_service import (
     editorial_guidelines_completion,
 )
+from app.services.brand_intelligence.faq_objections_service import faq_objections_completion
 from app.services.brand_intelligence.identity_service import identity_has_minimum
-from app.services.brand_intelligence.product_knowledge_context import (
-    get_product_knowledge_prompt_for_entity,
-)
 from app.services.brand_intelligence.safe_claims_service import safe_claims_has_minimum
 from app.services.brand_intelligence.score import profile_has_minimum
-from app.services.content.editorial_item_service import get_editorial_item
 from app.services.content.editorial_ai_usage_service import (
     BRIEF_OPERATION_KEYS,
     build_ai_generation_snapshot_from_log,
     fetch_latest_editorial_ai_log,
 )
-from app.services.content.editorial_structure_profiles import (
-    default_avoid_repetitions,
-    resolve_structure_profile,
-)
-from app.services.content.editorial_structure_utils import count_h2_h3, trim_structure
+from app.services.content.editorial_item_service import get_editorial_item
 from app.services.content.editorial_link_context_service import (
     build_editorial_link_context,
     format_editorial_link_context_for_prompt,
 )
 from app.services.content.editorial_skill_loader import load_editorial_skill_context
+from app.services.content.editorial_structure_profiles import (
+    default_avoid_repetitions,
+    resolve_structure_profile,
+)
+from app.services.content.editorial_structure_utils import count_h2_h3, trim_structure
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 logger = logging.getLogger(__name__)
@@ -71,6 +68,7 @@ class BriefGenerationError(Exception):
     def __init__(self, message: str, *, ai_not_configured: bool = False) -> None:
         super().__init__(message)
         self.ai_not_configured = ai_not_configured
+
 
 _CONTENT_TYPE_INSTRUCTIONS: dict[str, str] = {
     "educational_article": (
@@ -267,19 +265,19 @@ def build_brand_context_used(
         used.append("Brand Profile")
     if identity_has_minimum(bundle.brand_identity):
         used.append("Brand Identity")
-    if bundle.safe_claims and safe_claims_has_minimum(bundle.safe_claims):
-        used.append("Safe Claims")
-    elif bundle.prompt_context and bundle.prompt_context.safe_claims:
+    if (
+        bundle.safe_claims
+        and safe_claims_has_minimum(bundle.safe_claims)
+        or bundle.prompt_context
+        and bundle.prompt_context.safe_claims
+    ):
         used.append("Safe Claims")
     if bundle.product_knowledge or product_pk_appended:
         used.append("Product Knowledge")
     if bundle.faq_objections and faq_objections_completion(bundle.faq_objections) != "empty":
         used.append("FAQ & Objections")
     editorial_guidelines = getattr(bundle, "editorial_guidelines", None)
-    if (
-        editorial_guidelines
-        and editorial_guidelines_completion(editorial_guidelines) != "empty"
-    ):
+    if editorial_guidelines and editorial_guidelines_completion(editorial_guidelines) != "empty":
         used.append("Editorial Guidelines")
     return used
 
@@ -400,9 +398,7 @@ async def generate_editorial_brief_core(
         skill.content_brief_rules,
         editorial_skill.as_brief_prompt_context(),
     )
-    user_prompt = _build_user_prompt(
-        item, type_instruction, link_context_block=link_context_block
-    )
+    user_prompt = _build_user_prompt(item, type_instruction, link_context_block=link_context_block)
 
     try:
         parsed = await generate_structured_json(

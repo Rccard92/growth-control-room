@@ -21,9 +21,7 @@ logger = logging.getLogger(__name__)
 
 def _entity_synced_at(entity: Any, *, is_product: bool = False) -> datetime | None:
     if is_product:
-        return getattr(entity, "updated_at_shopify", None) or getattr(
-            entity, "updated_at", None
-        )
+        return getattr(entity, "updated_at_shopify", None) or getattr(entity, "updated_at", None)
     return getattr(entity, "updated_at", None)
 
 
@@ -116,7 +114,9 @@ async def discover_shopify_urls(
                     .order_by(ShopifyProduct.updated_at.desc())
                     .limit(remaining)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         for product in products:
             if not product.handle:
@@ -149,7 +149,9 @@ async def discover_shopify_urls(
                     .order_by(ShopifyCollection.updated_at.desc())
                     .limit(remaining)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         for collection in collections:
             if not collection.handle:
@@ -181,7 +183,9 @@ async def discover_shopify_urls(
                     .order_by(ShopifyPage.updated_at.desc())
                     .limit(remaining)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         for page in pages:
             if not page.handle:
@@ -213,7 +217,9 @@ async def discover_shopify_urls(
                     .order_by(ShopifyBlog.updated_at.desc())
                     .limit(remaining)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         for blog in blogs:
             if not blog.handle:
@@ -247,7 +253,9 @@ async def discover_shopify_urls(
                     .order_by(ShopifyArticle.updated_at.desc())
                     .limit(remaining)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         for article in articles:
             if not article.handle:

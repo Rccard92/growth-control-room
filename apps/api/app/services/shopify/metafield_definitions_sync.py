@@ -68,7 +68,9 @@ async def sync_metafield_definitions(
                     ShopifyMetafieldDefinition.owner_type == owner_type,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     by_ns_key = {(r.namespace, r.key): r for r in existing}
     seen_ns_keys: set[tuple[str, str]] = set()
@@ -100,16 +102,10 @@ async def sync_metafield_definitions(
             row.raw_payload = parsed["raw_payload"]
         synced += 1
 
-    stale_ids = [
-        r.id
-        for (ns, k), r in by_ns_key.items()
-        if (ns, k) not in seen_ns_keys
-    ]
+    stale_ids = [r.id for (ns, k), r in by_ns_key.items() if (ns, k) not in seen_ns_keys]
     if stale_ids:
         await session.execute(
-            delete(ShopifyMetafieldDefinition).where(
-                ShopifyMetafieldDefinition.id.in_(stale_ids)
-            )
+            delete(ShopifyMetafieldDefinition).where(ShopifyMetafieldDefinition.id.in_(stale_ids))
         )
 
     await session.flush()

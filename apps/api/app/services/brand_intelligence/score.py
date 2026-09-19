@@ -16,13 +16,13 @@ from app.models.brand_intelligence import (
     BrandSafeClaims,
     BrandVisualIdentity,
 )
-from app.services.brand_intelligence.faq_objections_service import (
-    faq_objections_completion,
-    faq_objections_missing_fields,
-)
 from app.services.brand_intelligence.editorial_guidelines_service import (
     editorial_guidelines_completion,
     editorial_guidelines_missing_fields,
+)
+from app.services.brand_intelligence.faq_objections_service import (
+    faq_objections_completion,
+    faq_objections_missing_fields,
 )
 from app.services.brand_intelligence.identity_service import (
     identity_completion,
@@ -213,9 +213,9 @@ async def compute_brand_knowledge_score(
     ).scalar_one_or_none()
     pk_items_count = (
         await session.execute(
-            select(func.count()).select_from(BrandProductKnowledgeItem).where(
-                BrandProductKnowledgeItem.project_id == project_id
-            )
+            select(func.count())
+            .select_from(BrandProductKnowledgeItem)
+            .where(BrandProductKnowledgeItem.project_id == project_id)
         )
     ).scalar_one()
     faq_objections = (

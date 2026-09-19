@@ -7,7 +7,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -46,11 +46,23 @@ PREMIUM_CONTEXT_PROFILES = frozenset({"article_draft"})
 PROFILE_PARAMS: dict[str, dict[str, object]] = {
     "image_alt": {"tier": AiModelTier.CHEAP, "max_output_tokens": 120, "temperature": 0.3},
     "product_seo_field": {"tier": AiModelTier.CHEAP, "max_output_tokens": 400, "temperature": 0.35},
-    "collection_seo_field": {"tier": AiModelTier.CHEAP, "max_output_tokens": 400, "temperature": 0.35},
+    "collection_seo_field": {
+        "tier": AiModelTier.CHEAP,
+        "max_output_tokens": 400,
+        "temperature": 0.35,
+    },
     "minimal": {"tier": AiModelTier.CHEAP, "max_output_tokens": 500, "temperature": 0.3},
     "social_response": {"tier": AiModelTier.CHEAP, "max_output_tokens": 600, "temperature": 0.4},
-    "product_seo_full": {"tier": AiModelTier.STANDARD, "max_output_tokens": 2500, "temperature": 0.45},
-    "collection_seo_full": {"tier": AiModelTier.STANDARD, "max_output_tokens": 2500, "temperature": 0.45},
+    "product_seo_full": {
+        "tier": AiModelTier.STANDARD,
+        "max_output_tokens": 2500,
+        "temperature": 0.45,
+    },
+    "collection_seo_full": {
+        "tier": AiModelTier.STANDARD,
+        "max_output_tokens": 2500,
+        "temperature": 0.45,
+    },
     "blog_brief": {"tier": AiModelTier.STANDARD, "max_output_tokens": 3000, "temperature": 0.5},
     "brand_import": {"tier": AiModelTier.STANDARD, "max_output_tokens": 4500, "temperature": 0.4},
     "generic": {"tier": AiModelTier.STANDARD, "max_output_tokens": 2000, "temperature": 0.45},
@@ -106,7 +118,11 @@ def tier_to_model_name(tier: AiModelTier) -> str | None:
     elif tier == AiModelTier.REASONING:
         raw = settings.openai_model_reasoning
     else:
-        raw = settings.openai_model_fallback or settings.openai_model_standard or settings.openai_model
+        raw = (
+            settings.openai_model_fallback
+            or settings.openai_model_standard
+            or settings.openai_model
+        )
     if raw and str(raw).strip():
         return str(raw).strip()
     return None
@@ -119,8 +135,15 @@ def infer_tier_from_model(model_name: str) -> AiModelTier:
     premium = (settings.openai_model_premium or "gpt-4o").strip().lower()
     reasoning = (settings.openai_model_reasoning or "").strip().lower()
     fallback = (
-        settings.openai_model_fallback or settings.openai_model_standard or settings.openai_model or ""
-    ).strip().lower()
+        (
+            settings.openai_model_fallback
+            or settings.openai_model_standard
+            or settings.openai_model
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     if premium and normalized == premium:
         return AiModelTier.PREMIUM
     if reasoning and normalized == reasoning:
@@ -342,13 +365,8 @@ async def resolve_ai_model(
                 model_name=registry_resolved.model,
             )
             warnings.extend(guardrails)
-            if (
-                resolved_key.startswith("claude_seo_")
-                and not registry_resolved.reasoning_effort
-            ):
-                registry_resolved = registry_resolved.model_copy(
-                    update={"reasoning_effort": "low"}
-                )
+            if resolved_key.startswith("claude_seo_") and not registry_resolved.reasoning_effort:
+                registry_resolved = registry_resolved.model_copy(update={"reasoning_effort": "low"})
             registry_resolved.warning = "; ".join(warnings) if warnings else None
             return registry_resolved
 
@@ -365,7 +383,9 @@ async def resolve_ai_model(
         )
 
     op = get_operation(resolved_key) if resolved_key else None
-    guardrails = compute_guardrail_warnings(op, model_tier=tier.value, model_name=model) if op else []
+    guardrails = (
+        compute_guardrail_warnings(op, model_tier=tier.value, model_name=model) if op else []
+    )
     warnings.extend(guardrails)
 
     return AiResolvedModel(

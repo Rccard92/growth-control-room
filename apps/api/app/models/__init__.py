@@ -8,10 +8,10 @@ from app.models.brand_intelligence import (
     BrandAudienceInsight,
     BrandClaimRule,
     BrandContentPillar,
-    BrandExtractedFact,
-    BrandExternalSource,
-    BrandFaqObjections,
     BrandEditorialGuidelines,
+    BrandExternalSource,
+    BrandExtractedFact,
+    BrandFaqObjections,
     BrandIdentity,
     BrandImportBatch,
     BrandIntelligenceBrief,
@@ -26,22 +26,6 @@ from app.models.brand_intelligence import (
     BrandVisualIdentity,
     BrandVoice,
 )
-from app.models.integration import Integration
-from app.models.integration_credential import IntegrationCredential
-from app.models.project import Project
-from app.models.seo_optimizer import SeoChangeLog, SeoEntityAnalysis, SeoOptimizationProposal
-from app.models.growth_audit import (
-    GrowthAuditEvent,
-    GrowthAuditFinding,
-    GrowthAuditPage,
-    GrowthAuditPageResult,
-    GrowthAuditRun,
-    GrowthAuditTask,
-)
-from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
-from app.models.content_seo_editorial import ContentSeoEditorialItem
-from app.models.content_seo_brief_job import ContentSeoBriefGenerationJob
-from app.models.data_provider_usage_log import DataProviderUsageLog
 from app.models.content_seo import (
     ContentBrief,
     ContentOpportunity,
@@ -51,6 +35,22 @@ from app.models.content_seo import (
     ShopifyCollection,
     ShopifyPage,
 )
+from app.models.content_seo_brief_job import ContentSeoBriefGenerationJob
+from app.models.content_seo_editorial import ContentSeoEditorialItem
+from app.models.data_provider_usage_log import DataProviderUsageLog
+from app.models.growth_audit import (
+    GrowthAuditEvent,
+    GrowthAuditFinding,
+    GrowthAuditPage,
+    GrowthAuditPageResult,
+    GrowthAuditRun,
+    GrowthAuditTask,
+)
+from app.models.integration import Integration
+from app.models.integration_credential import IntegrationCredential
+from app.models.project import Project
+from app.models.seo_optimizer import SeoChangeLog, SeoEntityAnalysis, SeoOptimizationProposal
+from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
 from app.models.shopify import (
     ShopifyDailyMetric,
     ShopifyOrder,

@@ -61,9 +61,7 @@ async def login(
         logger.info("Login fallito per %s", body.email)
         raise _INVALID_CREDENTIALS
 
-    token, row = await create_session(
-        session, user, user_agent=request.headers.get("user-agent")
-    )
+    token, row = await create_session(session, user, user_agent=request.headers.get("user-agent"))
     await touch_last_login(session, user.id)
     await session.commit()
     await session.refresh(user)

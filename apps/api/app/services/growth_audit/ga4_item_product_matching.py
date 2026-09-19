@@ -308,9 +308,7 @@ def build_page_match_debug(
         "shopifyKeys": shopify_keys,
         "matchedBy": "none",
         "matchStatus": "no_reliable_match",
-        "reason": (
-            "Nessuna riga GA4 ha itemId/SKU/title uguale alle chiavi Shopify del prodotto."
-        ),
+        "reason": ("Nessuna riga GA4 ha itemId/SKU/title uguale alle chiavi Shopify del prodotto."),
         "candidateItems": find_potential_unmatched_candidates_for_profile(
             profile,
             rows,
@@ -448,9 +446,12 @@ def _find_profiles_by_item_name(
 
     matches: list[ProductMatchProfile] = []
     for profile in profiles:
-        if profile.title_normalized and profile.title_normalized == normalized_name:
-            matches.append(profile)
-        elif profile.handle_normalized and profile.handle_normalized == normalized_name:
+        if (
+            profile.title_normalized
+            and profile.title_normalized == normalized_name
+            or profile.handle_normalized
+            and profile.handle_normalized == normalized_name
+        ):
             matches.append(profile)
     return matches
 
@@ -477,8 +478,7 @@ def _resolve_match_type(
 
     normalized_name = _normalize_match_text(item_name)
     if normalized_name and (
-        profile.title_normalized == normalized_name
-        or profile.handle_normalized == normalized_name
+        profile.title_normalized == normalized_name or profile.handle_normalized == normalized_name
     ):
         return "item_name"
     return None
@@ -511,11 +511,14 @@ def match_ga4_rows_to_pages(
         id_matches = _find_profiles_by_item_id(profiles, item_id)
         if len(id_matches) == 1:
             matched_profiles = id_matches
-            matched_by = _resolve_match_type(
-                id_matches[0],
-                item_id=item_id,
-                item_name=item_name,
-            ) or "item_id"
+            matched_by = (
+                _resolve_match_type(
+                    id_matches[0],
+                    item_id=item_id,
+                    item_name=item_name,
+                )
+                or "item_id"
+            )
         elif len(id_matches) > 1:
             unmatched_items += 1
             ambiguous_items += 1

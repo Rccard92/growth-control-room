@@ -136,7 +136,9 @@ async def load_official_snapshot(session: AsyncSession, project_id: UUID) -> Off
                     BrandProductKnowledge.entity_type == "product",
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     categories = list(
         (
@@ -146,42 +148,50 @@ async def load_official_snapshot(session: AsyncSession, project_id: UUID) -> Off
                     BrandProductKnowledge.entity_type == "category",
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     audience = list(
         (
             await session.execute(
                 select(BrandAudienceInsight).where(BrandAudienceInsight.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     claims = list(
         (
             await session.execute(
                 select(BrandClaimRule).where(BrandClaimRule.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     pillars = list(
         (
             await session.execute(
                 select(BrandContentPillar).where(BrandContentPillar.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     guardrails = list(
         (
             await session.execute(
                 select(BrandAiGuardrail).where(BrandAiGuardrail.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     assets = list(
-        (
-            await session.execute(
-                select(BrandAsset).where(BrandAsset.project_id == project_id)
-            )
-        ).scalars().all()
+        (await session.execute(select(BrandAsset).where(BrandAsset.project_id == project_id)))
+        .scalars()
+        .all()
     )
     return OfficialSnapshot(
         profile=profile,
@@ -393,6 +403,8 @@ async def apply_conflict_detection_to_batch(
                     BrandExtractedFact.batch_id == batch_id,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     return await apply_conflict_detection_to_facts(session, project_id, facts)

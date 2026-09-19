@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.seo_skills import SeoSkillCatalogItem
 from app.services.ai.ai_client import AiRequestMetadata
 from app.services.ai.context_profiles import build_prompt_cache_key
-from app.services.ai.exceptions import ClaudeNotConfiguredError, ClaudeRequestError, OpenAIRequestError
+from app.services.ai.exceptions import (
+    ClaudeNotConfiguredError,
+    ClaudeRequestError,
+    OpenAIRequestError,
+)
 from app.services.ai.operation_registry import get_operation_key_for_seo_skill
 from app.services.ai.provider_router import generate_structured_json_with_provider
 from app.services.seo_skills.catalog_loader import get_seo_skill_by_key
@@ -68,9 +72,7 @@ def _validate_skill(skill_key: str) -> SeoSkillCatalogItem:
         )
 
     if skill.runtime != "prompt_only":
-        raise SeoSkillNotAvailableError(
-            f"SEO skill runtime is not supported yet: {skill_key}"
-        )
+        raise SeoSkillNotAvailableError(f"SEO skill runtime is not supported yet: {skill_key}")
 
     return skill
 
@@ -78,9 +80,7 @@ def _validate_skill(skill_key: str) -> SeoSkillCatalogItem:
 def _validate_provider(provider: str) -> str:
     normalized = (provider or "").strip().lower()
     if normalized not in SUPPORTED_PROVIDERS:
-        raise SeoSkillProviderError(
-            f"Unsupported AI provider for SEO skill: {provider}"
-        )
+        raise SeoSkillProviderError(f"Unsupported AI provider for SEO skill: {provider}")
     return normalized
 
 

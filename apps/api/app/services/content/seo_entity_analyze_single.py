@@ -36,9 +36,7 @@ async def analyze_single_product(
         return None
 
     products_by_gid = product_lookup([product])
-    best_sellers = await compute_best_sellers(
-        session, store.id, products_by_gid, limit=20
-    )
+    best_sellers = await compute_best_sellers(session, store.id, products_by_gid, limit=20)
     best_titles = {item.get("product_title") for item in best_sellers}
 
     load_seo_skill_context()

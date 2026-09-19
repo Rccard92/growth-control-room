@@ -22,9 +22,10 @@ def test_normalize_objections_as_objects_splits_recommended() -> None:
     )
     assert normalized["objections"] == ["Costa troppo"]
     assert "Obiezione: Costa troppo" in (normalized["recommended_answers"] or [])[0]
-    assert "Risposta consigliata: Spiega il valore artigianale" in (
-        normalized["recommended_answers"] or []
-    )[0]
+    assert (
+        "Risposta consigliata: Spiega il valore artigianale"
+        in (normalized["recommended_answers"] or [])[0]
+    )
 
 
 def test_normalize_general_faq_as_object() -> None:

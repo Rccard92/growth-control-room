@@ -15,9 +15,7 @@ DEFAULT_EDITORIAL_TIMEZONE = "Europe/Rome"
 PlannedDateClass = Literal["future", "today", "past"]
 ScheduledPublishSource = Literal["ped_planned_date", "manual"]
 
-PED_PAST_DATE_WARNING = (
-    "La data PED è passata. Crea bozza o scegli una nuova data."
-)
+PED_PAST_DATE_WARNING = "La data PED è passata. Crea bozza o scegli una nuova data."
 
 
 def resolve_editorial_timezone(store: ShopifyStore | None) -> str:

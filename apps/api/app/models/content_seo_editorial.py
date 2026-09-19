@@ -63,4 +63,4 @@ class ContentSeoEditorialItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_publish_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    project: Mapped["Project"] = relationship(back_populates="content_seo_editorial_items")
+    project: Mapped[Project] = relationship(back_populates="content_seo_editorial_items")

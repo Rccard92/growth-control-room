@@ -25,6 +25,9 @@ from app.api.routes.google_integrations import (
     select_search_console_site,
     start_google_oauth,
 )
+from app.models.integration import Integration
+from app.models.integration_credential import IntegrationCredential
+from app.models.project import Project
 from app.schemas.google_integration import (
     GoogleOAuthStartRequest,
     SelectGoogleAnalyticsPropertyRequest,
@@ -32,9 +35,11 @@ from app.schemas.google_integration import (
     SelectSearchConsoleSiteRequest,
 )
 from app.services.encryption import decrypt_secret, encrypt_secret
+from app.services.google.exceptions import (
+    GoogleIntegrationNotConnectedError,
+    GoogleIntegrationReconnectRequiredError,
+)
 from app.services.google.google_config import get_google_config_status
-from app.services.google.google_oauth import GoogleOAuthState
-from app.services.google.google_scope_utils import CONTENT_SCOPE, GOOGLE_OAUTH_SCOPES
 from app.services.google.google_integrations import (
     GOOGLE_OAUTH_PROVIDERS,
     credential_has_refresh_token,
@@ -42,15 +47,8 @@ from app.services.google.google_integrations import (
     get_google_integration_status,
     persist_google_oauth_tokens,
 )
-from app.models.integration import Integration
-from app.models.integration_credential import IntegrationCredential
-from app.models.project import Project
-from app.services.google.exceptions import (
-
-    GoogleIntegrationNotConnectedError,
-    GoogleIntegrationReconnectRequiredError,
-)
-
+from app.services.google.google_oauth import GoogleOAuthState
+from app.services.google.google_scope_utils import CONTENT_SCOPE, GOOGLE_OAUTH_SCOPES
 from tests.support import TEST_USER
 
 
@@ -114,8 +112,12 @@ def _token_data(
 
 
 def test_get_google_config_status_with_env(monkeypatch) -> None:
-    monkeypatch.setattr("app.services.google.google_config.settings.google_pagespeed_api_key", "ps-key")
-    monkeypatch.setattr("app.services.google.google_config.settings.google_crux_api_key", "crux-key")
+    monkeypatch.setattr(
+        "app.services.google.google_config.settings.google_pagespeed_api_key", "ps-key"
+    )
+    monkeypatch.setattr(
+        "app.services.google.google_config.settings.google_crux_api_key", "crux-key"
+    )
     monkeypatch.setattr(
         "app.services.google.google_config.settings.google_oauth_client_id",
         "client-id",
@@ -128,8 +130,12 @@ def test_get_google_config_status_with_env(monkeypatch) -> None:
         "app.services.google.google_config.settings.google_oauth_redirect_uri",
         "https://api.example.com/google/oauth/callback",
     )
-    monkeypatch.setattr("app.services.google.google_config.settings.frontend_url", "https://app.example.com")
-    monkeypatch.setattr("app.services.google.google_config.settings.google_ads_developer_token", None)
+    monkeypatch.setattr(
+        "app.services.google.google_config.settings.frontend_url", "https://app.example.com"
+    )
+    monkeypatch.setattr(
+        "app.services.google.google_config.settings.google_ads_developer_token", None
+    )
 
     status = get_google_config_status()
     assert status["pagespeed"]["configured"] is True
@@ -142,7 +148,9 @@ def test_get_google_status_does_not_expose_secrets() -> None:
     async def run() -> None:
         project_id = uuid4()
         session = AsyncMock()
-        session.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=iter([]))))
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalars=MagicMock(return_value=iter([])))
+        )
 
         with (
             patch(
@@ -196,7 +204,9 @@ def test_start_google_oauth_returns_authorization_url() -> None:
                 return_value="https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
             ),
         ):
-            response = await start_google_oauth(project_id, GoogleOAuthStartRequest(), session, current_user=TEST_USER)
+            response = await start_google_oauth(
+                project_id, GoogleOAuthStartRequest(), session, current_user=TEST_USER
+            )
 
         assert response.authorization_url.startswith("https://accounts.google.com/")
 
@@ -215,11 +225,15 @@ def test_start_google_oauth_missing_env_returns_503() -> None:
             ),
             patch(
                 "app.api.routes.google_integrations.ensure_google_oauth_configured",
-                side_effect=HTTPException(status_code=503, detail={"error": "google_oauth_not_configured"}),
+                side_effect=HTTPException(
+                    status_code=503, detail={"error": "google_oauth_not_configured"}
+                ),
             ),
             pytest.raises(HTTPException) as exc,
         ):
-            await start_google_oauth(project_id, GoogleOAuthStartRequest(), session, current_user=TEST_USER)
+            await start_google_oauth(
+                project_id, GoogleOAuthStartRequest(), session, current_user=TEST_USER
+            )
 
         assert exc.value.status_code == 503
 
@@ -326,9 +340,7 @@ def test_google_ads_setup_incomplete_without_developer_token(monkeypatch) -> Non
         integration_id = uuid4()
         encrypted = __import__(
             "app.services.encryption", fromlist=["encrypt_secret"]
-        ).encrypt_secret(
-            json.dumps({"refresh_token": "refresh-456", "access_token": "access-123"})
-        )
+        ).encrypt_secret(json.dumps({"refresh_token": "refresh-456", "access_token": "access-123"}))
         integration = Integration(
             id=integration_id,
             project_id=project_id,
@@ -712,7 +724,9 @@ def test_list_google_analytics_properties_returns_properties() -> None:
                 ],
             ),
         ):
-            response = await list_google_analytics_properties(project_id, session, current_user=TEST_USER)
+            response = await list_google_analytics_properties(
+                project_id, session, current_user=TEST_USER
+            )
 
         assert response.properties[0].property_id == "123456789"
         assert response.properties[0].display_name == "Example GA4"

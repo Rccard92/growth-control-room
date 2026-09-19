@@ -44,9 +44,7 @@ async def ensure_initial_admin(session: AsyncSession) -> bool:
         logger.error("INITIAL_ADMIN_PASSWORD rifiutata: %s", exc)
         return False
 
-    user = (
-        await session.execute(select(User).where(User.email == email))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if user is None:
         user = User(email=email, name=email.split("@")[0], is_active=True)
         session.add(user)
@@ -57,13 +55,13 @@ async def ensure_initial_admin(session: AsyncSession) -> bool:
 
     # Attach the account to a workspace so project queries have somewhere to land.
     owned = (
-        await session.execute(select(Workspace).where(Workspace.owner_user_id == user.id))
-    ).scalars().first()
+        (await session.execute(select(Workspace).where(Workspace.owner_user_id == user.id)))
+        .scalars()
+        .first()
+    )
     if owned is None:
         orphan = (
-            await session.execute(
-                select(Workspace).where(Workspace.name == DEFAULT_WORKSPACE_NAME)
-            )
+            await session.execute(select(Workspace).where(Workspace.name == DEFAULT_WORKSPACE_NAME))
         ).scalar_one_or_none()
         if orphan is not None:
             orphan.owner_user_id = user.id

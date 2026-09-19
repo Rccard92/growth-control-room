@@ -16,6 +16,9 @@ _R = 8
 _P = 1
 _DKLEN = 64
 _SALT_BYTES = 16
+# n=2**15, r=8 needs ~32 MiB; OpenSSL's default cap is exactly 32 MiB and refuses
+# the call, so raise it explicitly. Passed on verify too, or old hashes stop matching.
+_MAXMEM = 128 * 1024 * 1024
 _PREFIX = "scrypt"
 
 MIN_PASSWORD_LENGTH = 12
@@ -27,9 +30,7 @@ class WeakPasswordError(ValueError):
 
 def validate_password_strength(password: str) -> None:
     if len(password) < MIN_PASSWORD_LENGTH:
-        raise WeakPasswordError(
-            f"La password deve avere almeno {MIN_PASSWORD_LENGTH} caratteri."
-        )
+        raise WeakPasswordError(f"La password deve avere almeno {MIN_PASSWORD_LENGTH} caratteri.")
     if password.strip() != password:
         raise WeakPasswordError("La password non può iniziare o finire con spazi.")
     if password.lower() in {"password1234", "growthcontrolroom", "changeme1234"}:
@@ -43,7 +44,7 @@ def _b64(raw: bytes) -> str:
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(_SALT_BYTES)
     derived = hashlib.scrypt(
-        password.encode("utf-8"), salt=salt, n=_N, r=_R, p=_P, dklen=_DKLEN
+        password.encode("utf-8"), salt=salt, n=_N, r=_R, p=_P, dklen=_DKLEN, maxmem=_MAXMEM
     )
     return f"{_PREFIX}${_N}${_R}${_P}${_b64(salt)}${_b64(derived)}"
 
@@ -62,6 +63,7 @@ def verify_password(password: str, stored: str | None) -> bool:
             r=int(r_raw),
             p=int(p_raw),
             dklen=len(base64.b64decode(hash_b64)),
+            maxmem=_MAXMEM,
         )
     except (ValueError, TypeError):
         return False

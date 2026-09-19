@@ -22,9 +22,7 @@ class BrandProductKnowledgeGeneralRead(BaseModel):
     general_principles: list[str] | None = Field(
         default=None, serialization_alias="generalPrinciples"
     )
-    common_strengths: list[str] | None = Field(
-        default=None, serialization_alias="commonStrengths"
-    )
+    common_strengths: list[str] | None = Field(default=None, serialization_alias="commonStrengths")
     common_quality_rules: list[str] | None = Field(
         default=None, serialization_alias="commonQualityRules"
     )
@@ -55,9 +53,7 @@ class BrandProductKnowledgeGeneralRead(BaseModel):
 class BrandProductKnowledgeGeneralUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    general_principles: list[str] | None = Field(
-        default=None, validation_alias="generalPrinciples"
-    )
+    general_principles: list[str] | None = Field(default=None, validation_alias="generalPrinciples")
     common_strengths: list[str] | None = Field(default=None, validation_alias="commonStrengths")
     common_quality_rules: list[str] | None = Field(
         default=None, validation_alias="commonQualityRules"
@@ -87,7 +83,9 @@ class BrandProductKnowledgeGeneralProposal(BaseModel):
         default=None, validation_alias="commonStrengths", serialization_alias="commonStrengths"
     )
     common_quality_rules: list[str] | None = Field(
-        default=None, validation_alias="commonQualityRules", serialization_alias="commonQualityRules"
+        default=None,
+        validation_alias="commonQualityRules",
+        serialization_alias="commonQualityRules",
     )
     common_production_notes: list[str] | None = Field(
         default=None,
@@ -104,7 +102,9 @@ class BrandProductKnowledgeGeneralProposal(BaseModel):
         default=None, validation_alias="commonFaq", serialization_alias="commonFaq"
     )
     communication_rules: list[str] | None = Field(
-        default=None, validation_alias="communicationRules", serialization_alias="communicationRules"
+        default=None,
+        validation_alias="communicationRules",
+        serialization_alias="communicationRules",
     )
     product_storytelling_rules: list[str] | None = Field(
         default=None,
@@ -184,9 +184,7 @@ class BrandProductKnowledgeItemUpdate(BaseModel):
     product_name: str | None = Field(default=None, validation_alias="productName")
     product_line: str | None = Field(default=None, validation_alias="productLine")
     priority: str | None = None
-    strategic_description: str | None = Field(
-        default=None, validation_alias="strategicDescription"
-    )
+    strategic_description: str | None = Field(default=None, validation_alias="strategicDescription")
     origin: str | None = None
     ingredients: str | None = None
     production_process: str | None = Field(default=None, validation_alias="productionProcess")
@@ -290,18 +288,26 @@ class BrandProductKnowledgeItemProposal(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     product_name: str = Field(validation_alias="productName", serialization_alias="productName")
-    product_line: str | None = Field(default=None, validation_alias="productLine", serialization_alias="productLine")
+    product_line: str | None = Field(
+        default=None, validation_alias="productLine", serialization_alias="productLine"
+    )
     priority: str | None = None
     strategic_description: str | None = Field(
-        default=None, validation_alias="strategicDescription", serialization_alias="strategicDescription"
+        default=None,
+        validation_alias="strategicDescription",
+        serialization_alias="strategicDescription",
     )
     origin: str | None = None
     ingredients: str | None = None
     production_process: str | None = Field(
         default=None, validation_alias="productionProcess", serialization_alias="productionProcess"
     )
-    taste_notes: str | None = Field(default=None, validation_alias="tasteNotes", serialization_alias="tasteNotes")
-    color_notes: str | None = Field(default=None, validation_alias="colorNotes", serialization_alias="colorNotes")
+    taste_notes: str | None = Field(
+        default=None, validation_alias="tasteNotes", serialization_alias="tasteNotes"
+    )
+    color_notes: str | None = Field(
+        default=None, validation_alias="colorNotes", serialization_alias="colorNotes"
+    )
     texture_notes: str | None = Field(
         default=None, validation_alias="textureNotes", serialization_alias="textureNotes"
     )
@@ -320,7 +326,9 @@ class BrandProductKnowledgeItemProposal(BaseModel):
     forbidden_claims: list[str] | None = Field(
         default=None, validation_alias="forbiddenClaims", serialization_alias="forbiddenClaims"
     )
-    seo_notes: str | None = Field(default=None, validation_alias="seoNotes", serialization_alias="seoNotes")
+    seo_notes: str | None = Field(
+        default=None, validation_alias="seoNotes", serialization_alias="seoNotes"
+    )
     ads_social_notes: str | None = Field(
         default=None, validation_alias="adsSocialNotes", serialization_alias="adsSocialNotes"
     )
@@ -355,7 +363,9 @@ class BrandProductKnowledgeItemProposal(BaseModel):
     shopify_product_id: UUID | None = Field(
         default=None, validation_alias="shopifyProductId", serialization_alias="shopifyProductId"
     )
-    client_key: str | None = Field(default=None, validation_alias="clientKey", serialization_alias="clientKey")
+    client_key: str | None = Field(
+        default=None, validation_alias="clientKey", serialization_alias="clientKey"
+    )
 
 
 class BrandProductKnowledgeItemsProposal(BaseModel):

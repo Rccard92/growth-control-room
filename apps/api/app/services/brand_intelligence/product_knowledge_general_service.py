@@ -43,7 +43,9 @@ def _has_faq(value: list | None) -> bool:
     return bool(value and len(value) > 0)
 
 
-def general_has_content(row: BrandProductKnowledgeGeneral | "BrandProductKnowledgeGeneralRead" | None) -> bool:
+def general_has_content(
+    row: BrandProductKnowledgeGeneral | BrandProductKnowledgeGeneralRead | None,
+) -> bool:
     if not row:
         return False
     if _has_text(row.notes):
@@ -54,7 +56,7 @@ def general_has_content(row: BrandProductKnowledgeGeneral | "BrandProductKnowled
 
 
 def general_missing_fields(
-    row: BrandProductKnowledgeGeneral | "BrandProductKnowledgeGeneralRead" | None,
+    row: BrandProductKnowledgeGeneral | BrandProductKnowledgeGeneralRead | None,
 ) -> list[str]:
     if not general_has_content(row):
         return ["general_knowledge"]
@@ -62,15 +64,11 @@ def general_missing_fields(
 
 
 def general_completion(
-    row: BrandProductKnowledgeGeneral | "BrandProductKnowledgeGeneralRead" | None,
+    row: BrandProductKnowledgeGeneral | BrandProductKnowledgeGeneralRead | None,
 ) -> CompletionStatus:
     if not row or not general_has_content(row):
         return "empty"
-    populated = sum(
-        1
-        for field in _LIST_FIELDS
-        if _has_list(getattr(row, field))
-    )
+    populated = sum(1 for field in _LIST_FIELDS if _has_list(getattr(row, field)))
     if _has_faq(row.common_faq):
         populated += 1
     if _has_text(row.notes):
@@ -92,7 +90,7 @@ def _apply_list_field(row: BrandProductKnowledgeGeneral, attr: str, value: list 
 
 def _apply_faq_field(row: BrandProductKnowledgeGeneral, value: list | None) -> None:
     if _has_faq(value):
-        setattr(row, "common_faq", value)
+        row.common_faq = value
 
 
 async def _get_or_create_general(

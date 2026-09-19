@@ -58,9 +58,7 @@ async def upload_editorial_image_to_shopify_files(
     ready_node = await client.wait_until_file_ready(media_gid)
     cdn_url = extract_shopify_cdn_url(ready_node)
     if not cdn_url:
-        raise ShopifyAPIError(
-            "File Shopify pronto ma URL CDN non disponibile. Riprova l'upload."
-        )
+        raise ShopifyAPIError("File Shopify pronto ma URL CDN non disponibile. Riprova l'upload.")
 
     image_block = ready_node.get("image") or {}
     width = image_block.get("width")

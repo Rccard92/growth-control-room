@@ -31,7 +31,9 @@ async def build_product_metafields_merged(
                 )
                 .order_by(ShopifyMetafieldDefinition.namespace, ShopifyMetafieldDefinition.key)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     value_rows = list(
         (
@@ -43,7 +45,9 @@ async def build_product_metafields_merged(
                 )
                 .order_by(ShopifyProductMetafield.namespace, ShopifyProductMetafield.key)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     values_by_ns_key: dict[tuple[str, str], ShopifyProductMetafield] = {

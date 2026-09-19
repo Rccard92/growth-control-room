@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from html.parser import HTMLParser
 from html import escape
+from html.parser import HTMLParser
 
 _ALLOWED_TAGS = frozenset(
     {

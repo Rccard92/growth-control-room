@@ -16,7 +16,6 @@ from app.schemas.content_seo_editorial import (
 from app.services.content.editorial_schedule_utils import (
     apply_ped_schedule_defaults,
     is_scheduled_publish_in_future,
-    parse_scheduled_publish_at,
     resolve_scheduled_publish_at_from_payload,
 )
 
@@ -43,7 +42,9 @@ ARTICLE_SEO_TITLE_TYPE = "single_line_text_field"
 ARTICLE_SEO_DESCRIPTION_TYPE = "multi_line_text_field"
 
 
-def _payload_is_present(payload: dict | EditorialArticlePayload | EditorialPublishingPayload | None) -> bool:
+def _payload_is_present(
+    payload: dict | EditorialArticlePayload | EditorialPublishingPayload | None,
+) -> bool:
     if payload is None:
         return False
     if isinstance(payload, (EditorialArticlePayload, EditorialPublishingPayload)):
@@ -332,11 +333,7 @@ def merge_article_into_publishing(
     shop_name: str | None = None,
     brand_name: str | None = None,
 ) -> EditorialPublishingPayload:
-    base = (
-        normalize_publishing_payload(existing)
-        if isinstance(existing, dict)
-        else existing
-    )
+    base = normalize_publishing_payload(existing) if isinstance(existing, dict) else existing
     built = build_publishing_payload_from_article(
         article,
         shop_name=shop_name,
@@ -406,11 +403,7 @@ def validate_publishing_seo(
     *,
     for_publish: bool = False,
 ) -> tuple[list[str], list[str]]:
-    normalized = (
-        normalize_publishing_payload(payload)
-        if isinstance(payload, dict)
-        else payload
-    )
+    normalized = normalize_publishing_payload(payload) if isinstance(payload, dict) else payload
     errors: list[str] = []
     warnings: list[str] = []
     seo_title = normalized.seo_title.strip()
@@ -440,11 +433,7 @@ def validate_publishing_payload(
     for_publish: bool = False,
     scheduled_publish_at: datetime | None = None,
 ) -> list[str]:
-    normalized = (
-        normalize_publishing_payload(payload)
-        if isinstance(payload, dict)
-        else payload
-    )
+    normalized = normalize_publishing_payload(payload) if isinstance(payload, dict) else payload
     errors: list[str] = []
     if not normalized.title.strip():
         errors.append("Il titolo è obbligatorio.")

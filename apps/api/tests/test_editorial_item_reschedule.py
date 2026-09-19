@@ -199,9 +199,7 @@ def test_reschedule_item_not_found() -> None:
                 {"plannedDate": "2026-06-15", "cascade": False}
             )
             with pytest.raises(HTTPException) as exc:
-                await reschedule_editorial_item(
-                    mock_session, project_id, item_id, request
-                )
+                await reschedule_editorial_item(mock_session, project_id, item_id, request)
             assert exc.value.status_code == 404
 
     asyncio.run(run())

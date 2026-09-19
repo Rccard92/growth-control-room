@@ -11,8 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
-    BrandExtractedFact,
     BrandExternalSource,
+    BrandExtractedFact,
     BrandImportBatch,
     BrandIntelligenceBrief,
     BrandSourceDocument,
@@ -183,21 +183,27 @@ async def generate_brief_from_batch(
                     BrandExtractedFact.batch_id == batch_id,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     docs = list(
         (
             await session.execute(
                 select(BrandSourceDocument).where(BrandSourceDocument.batch_id == batch_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     external = list(
         (
             await session.execute(
                 select(BrandExternalSource).where(BrandExternalSource.batch_id == batch_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     active_facts = [f for f in facts if f.status != "rejected"]

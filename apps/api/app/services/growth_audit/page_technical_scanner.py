@@ -124,9 +124,12 @@ class _TechnicalPageParser(HTMLParser):
             href = (attr_map.get("href") or "").strip()
             if not href or href.startswith("#") or href.lower().startswith("javascript:"):
                 return
-            if href.startswith("/") or href.startswith("./") or href.startswith("../"):
-                self.links_internal += 1
-            elif _same_domain(href, self._root_domain):
+            if (
+                href.startswith("/")
+                or href.startswith("./")
+                or href.startswith("../")
+                or _same_domain(href, self._root_domain)
+            ):
                 self.links_internal += 1
             elif href.startswith("http://") or href.startswith("https://"):
                 self.links_external += 1
@@ -278,7 +281,9 @@ def _build_checks(
     }
 
 
-def _empty_scan(url: str, *, fetch_error: str | None = None, http_status: int | None = None) -> dict:
+def _empty_scan(
+    url: str, *, fetch_error: str | None = None, http_status: int | None = None
+) -> dict:
     return {
         "url": url,
         "finalUrl": url,

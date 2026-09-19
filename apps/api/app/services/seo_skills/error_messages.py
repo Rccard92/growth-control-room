@@ -14,13 +14,11 @@ OPENAI_EMPTY_RESPONSE_RUN_MESSAGE = (
 )
 
 OPENAI_INVALID_JSON_USER_MESSAGE = (
-    "Il modello AI non ha restituito un JSON valido. "
-    "Riprova o usa un modello più stabile."
+    "Il modello AI non ha restituito un JSON valido. Riprova o usa un modello più stabile."
 )
 
 OPENAI_INVALID_JSON_RUN_MESSAGE = (
-    "OpenAI non ha restituito un JSON valido. "
-    "Riprova l'analisi o usa un modello più stabile."
+    "OpenAI non ha restituito un JSON valido. Riprova l'analisi o usa un modello più stabile."
 )
 
 OPENAI_OUTPUT_TRUNCATED_USER_MESSAGE = (

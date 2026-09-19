@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile, status
@@ -10,8 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
-    BrandExtractedFact,
     BrandExternalSource,
+    BrandExtractedFact,
     BrandImportBatch,
     BrandSourceDocument,
 )
@@ -22,8 +22,8 @@ from app.schemas.brand_intelligence import (
     BrandImportBatchDocumentStatus,
     BrandImportBatchListItem,
     BrandImportBatchStatusResponse,
-    BrandSourceDocumentUploadItem,
     BrandSourceDocumentsUploadResponse,
+    BrandSourceDocumentUploadItem,
 )
 from app.services.brand_intelligence.external_sources_service import (
     build_sources_from_form,
@@ -80,7 +80,7 @@ async def update_batch_progress(
     if status is not None:
         batch.status = status
         if status in TERMINAL_BATCH_STATUSES and batch.completed_at is None:
-            batch.completed_at = datetime.now(timezone.utc)
+            batch.completed_at = datetime.now(UTC)
     if error_message is not None:
         batch.error_message = error_message
     if warnings is not None:
@@ -96,26 +96,26 @@ async def finalize_batch_counts(session: AsyncSession, batch_id: UUID) -> BrandI
             await session.execute(
                 select(BrandSourceDocument).where(BrandSourceDocument.batch_id == batch_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     facts = list(
         (
             await session.execute(
                 select(BrandExtractedFact).where(BrandExtractedFact.batch_id == batch_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     batch.total_files = len(docs)
-    batch.processed_files = sum(
-        1 for d in docs if d.extraction_status in ("extracted", "failed")
-    )
+    batch.processed_files = sum(1 for d in docs if d.extraction_status in ("extracted", "failed"))
     batch.total_facts = len(facts)
     batch.approved_facts = sum(1 for f in facts if f.status == "approved")
     batch.rejected_facts = sum(1 for f in facts if f.status == "rejected")
-    batch.needs_review_facts = sum(
-        1 for f in facts if f.status in ("suggested", "needs_review")
-    )
+    batch.needs_review_facts = sum(1 for f in facts if f.status in ("suggested", "needs_review"))
 
     for doc in docs:
         doc_facts = [f for f in facts if f.source_document_id == doc.id]
@@ -155,7 +155,7 @@ async def create_import_batch_with_sources(
     batch = await create_batch(
         session,
         project_id,
-        name=batch_name or f"Import {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
+        name=batch_name or f"Import {datetime.now(UTC).strftime('%Y-%m-%d %H:%M')}",
         source_type=source_type,
     )
     batch.declared_brand_name = brand_name.strip() if brand_name and brand_name.strip() else None
@@ -164,11 +164,9 @@ async def create_import_batch_with_sources(
     )
     batch.status = "pending"
     batch.current_step = "Batch creato"
-    batch.started_at = datetime.now(timezone.utc)
+    batch.started_at = datetime.now(UTC)
 
-    ext_rows = await create_external_sources_for_batch(
-        session, project_id, batch.id, merged
-    )
+    ext_rows = await create_external_sources_for_batch(session, project_id, batch.id, merged)
     await session.commit()
     await session.refresh(batch)
 
@@ -214,7 +212,7 @@ async def upload_files_to_batch(
         batch = await create_batch(
             session,
             project_id,
-            name=batch_name or f"Import {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
+            name=batch_name or f"Import {datetime.now(UTC).strftime('%Y-%m-%d %H:%M')}",
             source_type=source_type if merged_sources else source_type,
             notes=notes,
         )
@@ -231,19 +229,15 @@ async def upload_files_to_batch(
     batch.current_step = "Caricamento file"
     batch.total_files = len(files)
     if not batch.started_at:
-        batch.started_at = datetime.now(timezone.utc)
+        batch.started_at = datetime.now(UTC)
 
     ext_rows: list[BrandExternalSource] = []
-    if merged_sources and not batch_id:
-        ext_rows = await create_external_sources_for_batch(
-            session, project_id, batch.id, merged_sources
-        )
-    elif merged_sources and batch_id:
+    if merged_sources and not batch_id or merged_sources and batch_id:
         ext_rows = await create_external_sources_for_batch(
             session, project_id, batch.id, merged_sources
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     uploaded: list[BrandSourceDocumentUploadItem] = []
 
     for order, upload in enumerate(files, start=1):
@@ -293,11 +287,11 @@ async def upload_files_to_batch(
         ext_rows = list(
             (
                 await session.execute(
-                    select(BrandExternalSource).where(
-                        BrandExternalSource.batch_id == batch.id
-                    )
+                    select(BrandExternalSource).where(BrandExternalSource.batch_id == batch.id)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
 
     return BrandSourceDocumentsUploadResponse(
@@ -321,7 +315,9 @@ async def get_batch_status(
                 .where(BrandSourceDocument.batch_id == batch_id)
                 .order_by(BrandSourceDocument.processing_order.asc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     warnings = batch.warnings or []
     ext_sources = list(
@@ -331,7 +327,9 @@ async def get_batch_status(
                 .where(BrandExternalSource.batch_id == batch_id)
                 .order_by(BrandExternalSource.created_at.asc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     return BrandImportBatchStatusResponse(
         id=batch.id,
@@ -383,7 +381,9 @@ async def list_batches(
                 .where(BrandImportBatch.project_id == project_id)
                 .order_by(BrandImportBatch.created_at.desc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     return [BrandImportBatchListItem.model_validate(r) for r in rows]
 
@@ -398,7 +398,7 @@ async def mark_batch_started(
             detail=f"Batch già terminato con status {batch.status}.",
         )
     batch.status = "extracting"
-    batch.started_at = batch.started_at or datetime.now(timezone.utc)
+    batch.started_at = batch.started_at or datetime.now(UTC)
     batch.current_step = "Avvio elaborazione"
     await session.commit()
     await session.refresh(batch)
@@ -428,7 +428,7 @@ async def update_batch_after_apply(
         batch.status = "completed"
         batch.progress_percent = 100
         batch.current_step = "Import completato"
-        batch.completed_at = datetime.now(timezone.utc)
+        batch.completed_at = datetime.now(UTC)
         await session.commit()
 
 

@@ -112,7 +112,5 @@ def api_labels_for_snake_fields(entity_type: str, snake_fields: list[str]) -> li
         "image_alt": "Alt immagine",
         "metafields": "Metafield",
     }
-    reverse = (
-        SNAKE_TO_API_PRODUCT if entity_type == "product" else SNAKE_TO_API_COLLECTION
-    )
+    reverse = SNAKE_TO_API_PRODUCT if entity_type == "product" else SNAKE_TO_API_COLLECTION
     return [labels.get(f, reverse.get(f, f)) for f in snake_fields]

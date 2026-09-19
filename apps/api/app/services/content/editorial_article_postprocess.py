@@ -50,7 +50,9 @@ def _count_phrase_occurrences(text: str, phrase: str) -> int:
     return len(re.findall(pattern, text, flags=re.IGNORECASE))
 
 
-def _reduce_phrase_repetitions(text: str, phrase: str, max_occurrences: int = 2) -> tuple[str, bool]:
+def _reduce_phrase_repetitions(
+    text: str, phrase: str, max_occurrences: int = 2
+) -> tuple[str, bool]:
     if not phrase.strip():
         return text, False
     count = _count_phrase_occurrences(text, phrase)
@@ -86,7 +88,7 @@ def _count_faq_items(body_html: str) -> int:
 def postprocess_editorial_article_html(
     body_html: str,
     excerpt: str,
-    brief: "EditorialBriefPayload",
+    brief: EditorialBriefPayload,
 ) -> tuple[str, list[str]]:
     """Apply light anti-repetition and structure validation to generated HTML."""
     warnings: list[str] = []

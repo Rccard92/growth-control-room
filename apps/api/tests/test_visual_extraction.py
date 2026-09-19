@@ -8,7 +8,6 @@ from app.services.brand_intelligence.visual_extraction import (
     _VisualHTMLParser,
 )
 
-
 SAMPLE_HTML = """
 <!DOCTYPE html>
 <html>

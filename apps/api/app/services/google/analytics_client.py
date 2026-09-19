@@ -12,7 +12,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-from app.services.google.exceptions import (
+from app.services.google.exceptions import (  # noqa: E402  (deferred: avoids a circular import)
     GoogleAnalyticsPropertyError,
     GoogleApiRequestError,
     GoogleIntegrationPermissionError,
@@ -250,17 +250,11 @@ def _parse_report_rows(payload: dict[str, Any], metrics: list[str]) -> list[dict
             if not isinstance(metric_entry, dict):
                 continue
             raw_value = metric_entry.get("value")
-            if metric_name in ("engagementRate",):
-                try:
-                    metrics_map[metric_name] = float(raw_value or 0)
-                except (TypeError, ValueError):
-                    metrics_map[metric_name] = 0.0
-            elif metric_name == "averageSessionDuration":
-                try:
-                    metrics_map[metric_name] = float(raw_value or 0)
-                except (TypeError, ValueError):
-                    metrics_map[metric_name] = 0.0
-            elif metric_name == "totalRevenue":
+            if (
+                metric_name in ("engagementRate",)
+                or metric_name == "averageSessionDuration"
+                or metric_name == "totalRevenue"
+            ):
                 try:
                     metrics_map[metric_name] = float(raw_value or 0)
                 except (TypeError, ValueError):
@@ -436,7 +430,9 @@ def _merge_item_rows(target: dict[str, Any], source: dict[str, Any]) -> None:
         if source_value in (None, "", 0, 0.0):
             continue
         if metric == "itemRevenue":
-            target[metric] = round(_safe_item_float(target.get(metric)) + _safe_item_float(source_value), 2)
+            target[metric] = round(
+                _safe_item_float(target.get(metric)) + _safe_item_float(source_value), 2
+            )
         else:
             target[metric] = int(target.get(metric) or 0) + int(source_value or 0)
 
@@ -463,7 +459,9 @@ def _normalize_item_rows(
                 "itemVariant": str(row.get("itemVariant") or ""),
                 "itemsViewed": int(row.get("itemsViewed") or 0),
                 "itemsAddedToCart": int(row.get("itemsAddedToCart") or 0),
-                "itemsCheckedOut": 0 if "itemsCheckedOut" in missing else int(row.get("itemsCheckedOut") or 0),
+                "itemsCheckedOut": 0
+                if "itemsCheckedOut" in missing
+                else int(row.get("itemsCheckedOut") or 0),
                 "itemsPurchased": int(row.get("itemsPurchased") or 0),
                 "itemRevenue": round(_safe_item_float(row.get("itemRevenue")), 2),
             }

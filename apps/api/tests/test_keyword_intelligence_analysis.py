@@ -26,10 +26,8 @@ from app.services.growth_audit.keyword_intelligence_findings import (
     build_keyword_intelligence_findings,
 )
 from app.services.growth_audit.keyword_intelligence_selection import (
-
     select_keyword_intelligence_seed_queries,
 )
-
 from tests.support import TEST_USER
 
 
@@ -226,24 +224,27 @@ def test_endpoint_blocks_real_calls_disabled() -> None:
         request = GrowthAuditKeywordIntelligenceAnalysisRequest.model_validate(
             {"maxSeedQueries": 5, "force": True}
         )
-        with patch(
-            "app.api.routes.growth_audit.get_project_for_user",
-            new=AsyncMock(),
-        ), patch(
-            "app.api.routes.growth_audit.analyze_growth_audit_page_keyword_intelligence",
-            new=AsyncMock(
-                side_effect=DataForSeoRealCallsDisabledError("DataForSEO real calls disabled.")
+        with (
+            patch(
+                "app.api.routes.growth_audit.get_project_for_user",
+                new=AsyncMock(),
             ),
+            patch(
+                "app.api.routes.growth_audit.analyze_growth_audit_page_keyword_intelligence",
+                new=AsyncMock(
+                    side_effect=DataForSeoRealCallsDisabledError("DataForSEO real calls disabled.")
+                ),
+            ),
+            pytest.raises(HTTPException) as exc,
         ):
-            with pytest.raises(HTTPException) as exc:
-                await analyze_growth_audit_page_keyword_intelligence_endpoint(
-                    project_id,
-                    run_id,
-                    page_id,
-                    request,
-                    session,
-                    current_user=TEST_USER,
-                )
+            await analyze_growth_audit_page_keyword_intelligence_endpoint(
+                project_id,
+                run_id,
+                page_id,
+                request,
+                session,
+                current_user=TEST_USER,
+            )
         assert exc.value.status_code == 409
 
     asyncio.run(run())
@@ -420,17 +421,22 @@ def test_analysis_updates_metadata_and_calls_dfs() -> None:
                 new=AsyncMock(return_value=(1, 1)),
             ),
         ):
-            run_obj, page_obj, summary, cached, _, _ = (
-                await analyze_growth_audit_page_keyword_intelligence(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                    max_seed_queries=10,
-                    keyword_ideas_seeds=1,
-                    serp_keywords=1,
-                    force=True,
-                )
+            (
+                run_obj,
+                page_obj,
+                summary,
+                cached,
+                _,
+                _,
+            ) = await analyze_growth_audit_page_keyword_intelligence(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+                max_seed_queries=10,
+                keyword_ideas_seeds=1,
+                serp_keywords=1,
+                force=True,
             )
 
         assert cached is False
@@ -458,7 +464,12 @@ def test_stale_cache_triggers_refresh() -> None:
                 "keywordIntelligence": {"syncedAt": stale_sync, "competitors": [], "cost": {}},
                 "searchConsole": {
                     "topQueries": [
-                        {"query": "polline biologico", "impressions": 100, "ctr": 0.01, "position": 8}
+                        {
+                            "query": "polline biologico",
+                            "impressions": 100,
+                            "ctr": 0.01,
+                            "position": 8,
+                        }
                     ]
                 },
             },
@@ -498,7 +509,9 @@ def test_stale_cache_triggers_refresh() -> None:
                 new=AsyncMock(
                     return_value={
                         "cost_usd": 0.09,
-                        "summary": {"results": [{"keyword": "polline biologico", "searchVolume": 10}]},
+                        "summary": {
+                            "results": [{"keyword": "polline biologico", "searchVolume": 10}]
+                        },
                     }
                 ),
             ) as sv_mock,

@@ -178,7 +178,9 @@ async def generate_claude_structured_json(
                 prompt_hash=prompt_hash,
                 prompt_preview=prompt_preview,
                 output_chars=len(content),
-                output_preview=truncate_preview(content) if settings.ai_log_prompt_preview else None,
+                output_preview=truncate_preview(content)
+                if settings.ai_log_prompt_preview
+                else None,
                 operation_key=metadata.operation_key,
                 response_id=getattr(response, "id", None) if response else None,
                 error_type=type(exc).__name__,

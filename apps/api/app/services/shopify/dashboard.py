@@ -13,31 +13,34 @@ from app.models.shopify import (
 )
 from app.services.shopify.analytics import (
     LOW_STOCK_THRESHOLD,
+    _product_to_dict,
     compute_best_sellers,
     compute_high_stock_low_sales,
     compute_products_without_sales,
     compute_qty_by_product_gid,
     compute_sold_product_gids,
     product_lookup,
-    _product_to_dict,
+)
+from app.services.shopify.attribution import (
+    build_attribution_alerts,
+    build_marketing_report_availability,
+    compute_attribution_intelligence,
 )
 from app.services.shopify.comparison import (
     build_period_comparison,
     build_trend_diagnosis,
     compute_period_snapshot,
 )
-from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
-from app.services.shopify.reconciliation import build_reconciliation_diagnosis, compute_reconciliation
 from app.services.shopify.connect import get_shopify_client_for_store
+from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
+from app.services.shopify.reconciliation import (
+    build_reconciliation_diagnosis,
+    compute_reconciliation,
+)
 from app.services.shopify.shopifyql import (
     build_analytics_reconciliation,
     build_unavailable_official_analytics,
     fetch_official_analytics,
-)
-from app.services.shopify.attribution import (
-    build_attribution_alerts,
-    build_marketing_report_availability,
-    compute_attribution_intelligence,
 )
 
 SEO_MIN_LENGTH = 20
@@ -177,8 +180,7 @@ def _build_alerts(
                     "severity": "warning",
                     "title": "Ordine pending",
                     "description": (
-                        f"Ordine {order.order_name or order.shopify_gid} "
-                        "in attesa di pagamento."
+                        f"Ordine {order.order_name or order.shopify_gid} in attesa di pagamento."
                     ),
                     "entity_type": "order",
                     "entity_id": order.shopify_gid,
@@ -195,9 +197,7 @@ def _build_alerts(
                     "id": f"nosales-{product.shopify_gid}",
                     "severity": "opportunity",
                     "title": "Prodotto senza vendite",
-                    "description": (
-                        f"{product.title} non ha vendite {period_label}."
-                    ),
+                    "description": (f"{product.title} non ha vendite {period_label}."),
                     "entity_type": "product",
                     "entity_id": product.shopify_gid,
                     "action_label": "Valuta promozione",
@@ -207,17 +207,13 @@ def _build_alerts(
     for product in products:
         if not _is_active_status(product.status):
             continue
-        if not (product.seo_title or "").strip() or not (
-            product.seo_description or ""
-        ).strip():
+        if not (product.seo_title or "").strip() or not (product.seo_description or "").strip():
             alerts.append(
                 {
                     "id": f"seo-{product.shopify_gid}",
                     "severity": "opportunity",
                     "title": "SEO incompleto",
-                    "description": (
-                        f"{product.title} ha meta title o description mancanti."
-                    ),
+                    "description": (f"{product.title} ha meta title o description mancanti."),
                     "entity_type": "seo",
                     "entity_id": product.shopify_gid,
                     "action_label": "Completa SEO",
@@ -234,8 +230,7 @@ def _build_alerts(
                 "severity": "warning",
                 "title": "Sync non eseguito",
                 "description": (
-                    "Nessuna sincronizzazione registrata. "
-                    "Esegui un sync per aggiornare i dati."
+                    "Nessuna sincronizzazione registrata. Esegui un sync per aggiornare i dati."
                 ),
                 "entity_type": "sync",
                 "entity_id": None,
@@ -249,8 +244,7 @@ def _build_alerts(
                 "severity": "warning",
                 "title": "Dati non aggiornati",
                 "description": (
-                    "Ultimo sync oltre 24 ore fa. "
-                    "I dati potrebbero non essere aggiornati."
+                    "Ultimo sync oltre 24 ore fa. I dati potrebbero non essere aggiornati."
                 ),
                 "entity_type": "sync",
                 "entity_id": None,
@@ -265,8 +259,7 @@ def _build_alerts(
                 "severity": "info",
                 "title": "Line items non disponibili",
                 "description": (
-                    "Gli ordini sincronizzati non contengono line items. "
-                    "Esegui un nuovo sync."
+                    "Gli ordini sincronizzati non contengono line items. Esegui un nuovo sync."
                 ),
                 "entity_type": "sync",
                 "entity_id": None,
@@ -294,9 +287,7 @@ def _build_daily_diagnosis(
     diagnosis: list[dict[str, str]] = []
 
     if reconciliation:
-        diagnosis.extend(
-            build_reconciliation_diagnosis(reconciliation, last_sync_at=last_sync_at)
-        )
+        diagnosis.extend(build_reconciliation_diagnosis(reconciliation, last_sync_at=last_sync_at))
 
     if comparison:
         for item in build_trend_diagnosis(comparison):
@@ -318,9 +309,7 @@ def _build_daily_diagnosis(
     if no_sales > 0 and len(diagnosis) < 5:
         diagnosis.append(
             {
-                "message": (
-                    f"{no_sales} prodotti attivi non hanno vendite {period_label}."
-                ),
+                "message": (f"{no_sales} prodotti attivi non hanno vendite {period_label}."),
                 "severity": "opportunity",
             }
         )
@@ -347,10 +336,7 @@ def _build_daily_diagnosis(
     if low > 0 and len(diagnosis) < 5:
         diagnosis.append(
             {
-                "message": (
-                    f"{low} prodotti attivi hanno scorte basse "
-                    f"(≤{LOW_STOCK_THRESHOLD})."
-                ),
+                "message": (f"{low} prodotti attivi hanno scorte basse (≤{LOW_STOCK_THRESHOLD})."),
                 "severity": "warning",
             }
         )
@@ -383,9 +369,7 @@ def _build_attribution_placeholder() -> dict[str, Any]:
         "connected_sources": [],
         "channel_breakdown": [],
         "utm_coverage": None,
-        "message": (
-            "Collega GA4, Meta Ads, Google Ads e Klaviyo per analisi canali, UTM e ROAS."
-        ),
+        "message": ("Collega GA4, Meta Ads, Google Ads e Klaviyo per analisi canali, UTM e ROAS."),
     }
 
 
@@ -458,9 +442,7 @@ async def build_dashboard(
     draft_products = [p for p in products if (p.status or "").upper() == "DRAFT"]
 
     out_of_stock = [
-        p
-        for p in active_products
-        if p.total_inventory is not None and p.total_inventory == 0
+        p for p in active_products if p.total_inventory is not None and p.total_inventory == 0
     ]
     low_stock = [
         p
@@ -516,9 +498,7 @@ async def build_dashboard(
     }
 
     total_units = sum(
-        p.total_inventory or 0
-        for p in active_products
-        if p.total_inventory is not None
+        p.total_inventory or 0 for p in active_products if p.total_inventory is not None
     )
 
     inventory_risk = {
@@ -620,9 +600,7 @@ async def build_dashboard(
         period_label=period.label.lower(),
     )
 
-    summary["critical_alerts_count"] = sum(
-        1 for a in alerts if a["severity"] == "critical"
-    )
+    summary["critical_alerts_count"] = sum(1 for a in alerts if a["severity"] == "critical")
 
     current_snapshot = await compute_period_snapshot(session, store, period, products)
     previous_snapshot = await compute_period_snapshot(session, store, previous_period, products)

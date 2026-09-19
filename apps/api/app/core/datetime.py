@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 
 
 def utc_now_naive() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def to_utc_naive(value: datetime | date | None) -> datetime | None:
@@ -15,7 +15,7 @@ def to_utc_naive(value: datetime | date | None) -> datetime | None:
     if isinstance(value, date) and not isinstance(value, datetime):
         return datetime.combine(value, time.min)
     if value.tzinfo is not None:
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.astimezone(UTC).replace(tzinfo=None)
     return value
 
 

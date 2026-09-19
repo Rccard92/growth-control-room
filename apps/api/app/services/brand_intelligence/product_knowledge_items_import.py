@@ -13,6 +13,7 @@ from app.schemas.brand_product_knowledge import (
     BrandProductKnowledgeItemsImportResponse,
     BrandProductKnowledgeItemsProposal,
 )
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -20,10 +21,12 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-from app.services.ai.context_profiles import brand_import_metadata
 from app.services.brand_intelligence.product_knowledge_general_import import _load_safe_claims_block
 from app.services.brand_intelligence.product_knowledge_shopify_match import suggest_shopify_matches
-from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
+from app.services.brand_intelligence.text_extraction import (
+    TextExtractionError,
+    extract_text_from_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +129,9 @@ def _truncate_text(text: str, max_chars: int = 12000) -> str:
     return text[:max_chars] + "\n\n[... testo troncato ...]"
 
 
-def _normalize_proposal_item(item: BrandProductKnowledgeItemProposal) -> BrandProductKnowledgeItemProposal:
+def _normalize_proposal_item(
+    item: BrandProductKnowledgeItemProposal,
+) -> BrandProductKnowledgeItemProposal:
     data = item.model_dump()
     for key, value in list(data.items()):
         if isinstance(value, str) and not value.strip():
@@ -145,11 +150,13 @@ def compute_item_missing_fields(proposal: BrandProductKnowledgeItemProposal) -> 
     missing: list[str] = []
     for camel, snake in _STRATEGIC_FIELD_CHECKS:
         value = getattr(proposal, snake)
-        if value is None:
-            missing.append(camel)
-        elif isinstance(value, str) and not value.strip():
-            missing.append(camel)
-        elif isinstance(value, list) and len(value) == 0:
+        if (
+            value is None
+            or isinstance(value, str)
+            and not value.strip()
+            or isinstance(value, list)
+            and len(value) == 0
+        ):
             missing.append(camel)
     return missing
 
@@ -163,22 +170,27 @@ def _compute_item_confidence(proposal: BrandProductKnowledgeItemProposal) -> flo
     return round(min(0.95, max(0.1, score)), 2)
 
 
-def _build_global_warnings(items: list[BrandProductKnowledgeItemProposal], text_len: int) -> list[str]:
+def _build_global_warnings(
+    items: list[BrandProductKnowledgeItemProposal], text_len: int
+) -> list[str]:
     warnings: list[str] = []
     if text_len < 200:
         warnings.append("Documento breve: alcune schede potrebbero essere incomplete.")
     if len(items) > 15:
-        warnings.append(f"Individuati {len(items)} prodotti: verifica ogni scheda prima di salvare.")
+        warnings.append(
+            f"Individuati {len(items)} prodotti: verifica ogni scheda prima di salvare."
+        )
     low_conf = [i.product_name for i in items if i.confidence < 0.35]
     if low_conf:
         warnings.append(
-            f"Pochi dati per: {', '.join(low_conf[:5])}"
-            + ("…" if len(low_conf) > 5 else "")
+            f"Pochi dati per: {', '.join(low_conf[:5])}" + ("…" if len(low_conf) > 5 else "")
         )
     return warnings
 
 
-def _post_process_items(items: list[BrandProductKnowledgeItemProposal]) -> list[BrandProductKnowledgeItemProposal]:
+def _post_process_items(
+    items: list[BrandProductKnowledgeItemProposal],
+) -> list[BrandProductKnowledgeItemProposal]:
     processed: list[BrandProductKnowledgeItemProposal] = []
     seen_names: set[str] = set()
     for raw in items:

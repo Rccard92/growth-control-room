@@ -1,6 +1,6 @@
 """Tests for SEO skill run SQLAlchemy models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
@@ -60,7 +60,7 @@ def test_seo_skill_run_results_relationship_and_cascade() -> None:
         project_id=project_id,
         skill_key="seo_audit",
         status="completed",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
     second_result = SeoSkillRunResult(
         id=uuid4(),

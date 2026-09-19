@@ -1,7 +1,7 @@
 """Editorial brief generator service tests."""
 
 import asyncio
-from datetime import date, datetime, timezone
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -14,13 +14,13 @@ from app.schemas.content_seo_editorial import (
     EditorialBriefUpdateRequest,
     normalize_editorial_brief_payload,
 )
+from app.services.ai.openai_client import OpenAIRequestError
 from app.services.content.editorial_brief_service import (
     build_bi_warnings,
     enforce_brief_structure,
     generate_editorial_brief,
     update_editorial_brief,
 )
-from app.services.ai.openai_client import OpenAIRequestError
 
 
 def _sample_ai_brief() -> dict:
@@ -117,9 +117,7 @@ def test_enforce_brief_structure_trims_excess() -> None:
         {
             "proposedTitle": "Perché il miele cristallizza?",
             "primaryKeyword": "miele cristallizza",
-            "h2H3Structure": [
-                {"h2": f"Sezione {i}", "h3": []} for i in range(7)
-            ],
+            "h2H3Structure": [{"h2": f"Sezione {i}", "h3": []} for i in range(7)],
             "faqToInclude": ["Q1", "Q2", "Q3", "Q4", "Q5"],
         }
     )

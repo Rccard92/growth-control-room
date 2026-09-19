@@ -12,6 +12,7 @@ from app.schemas.brand_identity_visual import BrandIdentityProposal
 from app.services.brand_intelligence.identity_import import import_identity_from_file
 from app.services.brand_intelligence.identity_service import apply_identity_proposal
 
+
 def test_brand_identity_proposal_parses_camelcase() -> None:
     proposal = BrandIdentityProposal.model_validate(
         {

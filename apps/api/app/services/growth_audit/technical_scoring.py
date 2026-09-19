@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 
 def _clamp_score(score: int) -> int:
     return max(0, min(100, score))

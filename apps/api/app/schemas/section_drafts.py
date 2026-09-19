@@ -119,7 +119,9 @@ class AssetsDraftPayload(BaseModel):
 
 class SectionDraftWarnings(BaseModel):
     messages: list[str] = Field(default_factory=list)
-    missing_information: list[str] = Field(default_factory=list, validation_alias="missingInformation")
+    missing_information: list[str] = Field(
+        default_factory=list, validation_alias="missingInformation"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 

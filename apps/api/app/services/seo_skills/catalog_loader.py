@@ -13,9 +13,7 @@ def _build_counts(skills: list[SeoSkillCatalogItem]) -> SeoSkillCatalogCounts:
         total=len(skills),
         available=sum(1 for skill in skills if skill.status == "available"),
         needs_config=sum(1 for skill in skills if skill.status == "needs_config"),
-        external_required=sum(
-            1 for skill in skills if skill.status == "external_required"
-        ),
+        external_required=sum(1 for skill in skills if skill.status == "external_required"),
         planned=sum(1 for skill in skills if skill.status == "planned"),
     )
 
@@ -55,9 +53,7 @@ def get_seo_skill_by_key(key: str) -> SeoSkillCatalogItem | None:
 
 def list_available_seo_skills() -> list[SeoSkillCatalogItem]:
     return [
-        skill
-        for skill in load_seo_skill_catalog()
-        if skill.status == "available" and skill.enabled
+        skill for skill in load_seo_skill_catalog() if skill.status == "available" and skill.enabled
     ]
 
 

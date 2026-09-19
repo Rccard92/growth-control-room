@@ -71,9 +71,7 @@ async def get_google_oauth_credential(
         return None
 
     credential_result = await session.execute(
-        select(IntegrationCredential).where(
-            IntegrationCredential.integration_id == integration.id
-        )
+        select(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
     return credential_result.scalar_one_or_none()
 

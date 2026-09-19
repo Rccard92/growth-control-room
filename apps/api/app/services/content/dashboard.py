@@ -86,30 +86,38 @@ async def _build_content_seo_dashboard_inner(
     store_id = store.id
 
     issues = (
-        await session.execute(
-            select(SeoAuditIssue)
-            .where(
-                SeoAuditIssue.project_id == project_id,
-                SeoAuditIssue.shopify_store_id == store_id,
-                SeoAuditIssue.status == "open",
+        (
+            await session.execute(
+                select(SeoAuditIssue)
+                .where(
+                    SeoAuditIssue.project_id == project_id,
+                    SeoAuditIssue.shopify_store_id == store_id,
+                    SeoAuditIssue.status == "open",
+                )
+                .order_by(SeoAuditIssue.created_at.desc())
+                .limit(list_limit)
             )
-            .order_by(SeoAuditIssue.created_at.desc())
-            .limit(list_limit)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     opportunities = (
-        await session.execute(
-            select(ContentOpportunity)
-            .where(
-                ContentOpportunity.project_id == project_id,
-                ContentOpportunity.shopify_store_id == store_id,
-                ContentOpportunity.status == "new",
+        (
+            await session.execute(
+                select(ContentOpportunity)
+                .where(
+                    ContentOpportunity.project_id == project_id,
+                    ContentOpportunity.shopify_store_id == store_id,
+                    ContentOpportunity.status == "new",
+                )
+                .order_by(ContentOpportunity.created_at.desc())
+                .limit(list_limit)
             )
-            .order_by(ContentOpportunity.created_at.desc())
-            .limit(list_limit)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     total_issues = (
         await session.execute(
@@ -170,9 +178,7 @@ async def _build_content_seo_dashboard_inner(
                 SeoAuditIssue.shopify_store_id == store_id,
                 SeoAuditIssue.status == "open",
                 SeoAuditIssue.entity_type == "product",
-                SeoAuditIssue.issue_type.in_(
-                    ["missing_meta_title", "missing_meta_description"]
-                ),
+                SeoAuditIssue.issue_type.in_(["missing_meta_title", "missing_meta_description"]),
             )
         )
     ).scalar_one()
@@ -217,18 +223,14 @@ async def _build_content_seo_dashboard_inner(
     ][:list_limit]
 
     internal_linking_opportunities = [
-        _opportunity_to_dict(o)
-        for o in opportunities
-        if o.opportunity_type == "internal_linking"
+        _opportunity_to_dict(o) for o in opportunities if o.opportunity_type == "internal_linking"
     ][:list_limit]
 
     content_entities = 0
     for model in (ShopifyCollection, ShopifyPage, ShopifyBlog, ShopifyArticle):
         content_entities += (
             await session.execute(
-                select(func.count()).select_from(model).where(
-                    model.shopify_store_id == store_id
-                )
+                select(func.count()).select_from(model).where(model.shopify_store_id == store_id)
             )
         ).scalar_one()
 

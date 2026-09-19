@@ -5,10 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime, timezone
 from html.parser import HTMLParser
 from typing import Any, Literal
-from urllib.parse import urlparse
 
 import httpx
 
@@ -18,13 +16,9 @@ FETCH_TIMEOUT = 10.0
 MAX_TEXT_LENGTH = 8000
 MAX_SUMMARY_LENGTH = 1200
 
-USER_AGENT = (
-    "Mozilla/5.0 (compatible; GrowthControlRoom/1.0; +https://growthcontrolroom.com/bot)"
-)
+USER_AGENT = "Mozilla/5.0 (compatible; GrowthControlRoom/1.0; +https://growthcontrolroom.com/bot)"
 
-SOCIAL_TYPES = frozenset(
-    {"instagram", "facebook", "tiktok", "youtube", "linkedin"}
-)
+SOCIAL_TYPES = frozenset({"instagram", "facebook", "tiktok", "youtube", "linkedin"})
 REVIEW_TYPES = frozenset({"trustpilot", "google_business"})
 
 INACCESSIBLE_MESSAGE = (
@@ -196,7 +190,9 @@ def map_fetch_result_to_source_status(
     return "failed"
 
 
-def _infer_quality(source_type: str, parsed: dict[str, Any], raw_status: str) -> SourceQuality | None:
+def _infer_quality(
+    source_type: str, parsed: dict[str, Any], raw_status: str
+) -> SourceQuality | None:
     if raw_status != "fetched":
         return None
     text = parsed.get("text") or ""
@@ -343,9 +339,7 @@ async def fetch_url_content(source_type: str, url: str) -> dict[str, Any]:
 
 def _source_has_usable_content(result: dict[str, Any]) -> bool:
     return bool(
-        result.get("fetched_summary")
-        or result.get("fetched_text")
-        or result.get("fetched_title")
+        result.get("fetched_summary") or result.get("fetched_text") or result.get("fetched_title")
     )
 
 
@@ -370,9 +364,7 @@ async def fetch_profile_sources(
 
         status = raw.get("status", "failed")
         if status not in ("fetched", "blocked", "failed"):
-            status = map_fetch_result_to_source_status(
-                raw.get("http_code", 0), status
-            )
+            status = map_fetch_result_to_source_status(raw.get("http_code", 0), status)
 
         parsed = raw.get("parsed") or {}
         quality = _infer_quality(source_type, parsed, status if status == "fetched" else "failed")

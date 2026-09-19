@@ -7,14 +7,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.dataforseo import (
+    DataForSeoEstimatedCalls,
     DataForSeoEstimateRequest,
     DataForSeoEstimateResponse,
-    DataForSeoEstimatedCalls,
     DataForSeoStatusResponse,
     DataForSeoTestRequest,
     DataForSeoTestResponse,
@@ -164,9 +164,13 @@ async def run_dataforseo_test_endpoint(
     except DataForSeoRealCallsDisabledError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message) from exc
     except DataForSeoNotConfiguredError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.message) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.message
+        ) from exc
     except DataForSeoBudgetExceededError as exc:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.message) from exc
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.message
+        ) from exc
     except DataForSeoApiError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

@@ -1,6 +1,7 @@
 """Editorial publishing payload utils tests."""
 
 import os
+
 import pytest
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
@@ -15,8 +16,8 @@ from app.services.content.editorial_publishing_utils import (
     build_article_create_input,
     build_article_seo_metafields,
     build_article_update_input,
-    classify_shopify_publish_error_code,
     build_publishing_payload_from_article,
+    classify_shopify_publish_error_code,
     compute_editorial_article_hash,
     enrich_article_with_hash,
     format_handle_conflict_error,
@@ -79,8 +80,7 @@ def test_resolve_publishing_author_priority_chain() -> None:
         == "Solmielato"
     )
     assert (
-        resolve_publishing_author(EditorialPublishingPayload(author=""))
-        == DEFAULT_AUTHOR_FALLBACK
+        resolve_publishing_author(EditorialPublishingPayload(author="")) == DEFAULT_AUTHOR_FALLBACK
     )
 
 
@@ -185,10 +185,7 @@ def test_format_shopify_publish_error_author_message() -> None:
 
 
 def test_shopify_publish_http_status_graphql_is_422() -> None:
-    assert (
-        shopify_publish_http_status("Errore GraphQL Shopify: invalid value for author")
-        == 422
-    )
+    assert shopify_publish_http_status("Errore GraphQL Shopify: invalid value for author") == 422
     assert shopify_publish_http_status("Impossibile contattare Shopify.") == 502
 
 
@@ -253,9 +250,7 @@ def test_format_shopify_publish_error_schedule_is_published_conflict() -> None:
     raw = "Can't set isPublished to true and also set a future publish date."
     formatted = format_shopify_publish_error(raw)
     assert "modalità Programmato" in formatted
-    assert (
-        classify_shopify_publish_error_code(raw) == "shopify_schedule_is_published_conflict"
-    )
+    assert classify_shopify_publish_error_code(raw) == "shopify_schedule_is_published_conflict"
 
 
 def test_format_handle_conflict_error() -> None:

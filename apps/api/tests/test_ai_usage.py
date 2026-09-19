@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
 from app.core.datetime import (
     date_range_bounds_utc_naive,
@@ -18,6 +19,7 @@ from app.core.datetime import (
     to_utc_naive,
     utc_now_naive,
 )
+from app.models.ai_usage_log import AiUsageLog
 from app.services.ai.exceptions import AiBudgetExceededError
 from app.services.ai.pricing import estimate_usage_cost
 from app.services.ai.usage_service import (
@@ -31,9 +33,6 @@ from app.services.ai.usage_service import (
     record_usage_log,
     sum_project_spend,
 )
-from sqlalchemy import select
-
-from app.models.ai_usage_log import AiUsageLog
 
 
 def test_cost_estimate_configured() -> None:
@@ -246,9 +245,10 @@ def test_log_success_request_mock_openai() -> None:
 
 def test_log_failed_request() -> None:
     async def run() -> None:
+        from openai import OpenAIError
+
         from app.services.ai.ai_client import AiRequestMetadata, generate_structured_json
         from app.services.ai.exceptions import OpenAIRequestError
-        from openai import OpenAIError
 
         project_id = uuid4()
         session_factory = MagicMock()
@@ -304,7 +304,7 @@ def test_estimate_operation_cost() -> None:
 
 
 def test_to_utc_naive_strips_tzinfo() -> None:
-    aware = datetime(2026, 6, 13, 12, 0, 0, tzinfo=timezone.utc)
+    aware = datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC)
     naive = to_utc_naive(aware)
     assert naive is not None
     assert naive.tzinfo is None
@@ -360,10 +360,8 @@ def test_sum_project_spend_converts_aware_since() -> None:
     async def run() -> None:
         project_id = uuid4()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=MagicMock(scalar_one=MagicMock(return_value=0))
-        )
-        aware_since = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+        session.execute = AsyncMock(return_value=MagicMock(scalar_one=MagicMock(return_value=0)))
+        aware_since = datetime(2026, 6, 1, 0, 0, 0, tzinfo=UTC)
         await sum_project_spend(session, project_id, since=aware_since)
         session.execute.assert_awaited_once()
 

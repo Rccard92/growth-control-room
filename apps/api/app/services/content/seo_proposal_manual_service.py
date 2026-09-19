@@ -55,7 +55,9 @@ def _validate_proposed_values(entity_type: str, proposed: dict[str, Any]) -> dic
             for entry in entries:
                 if not isinstance(entry, dict):
                     continue
-                mid = str(entry.get("id") or entry.get("metafield_id") or entry.get("metafieldId") or "").strip()
+                mid = str(
+                    entry.get("id") or entry.get("metafield_id") or entry.get("metafieldId") or ""
+                ).strip()
                 definition_id = entry.get("definition_id") or entry.get("definitionId")
                 namespace = str(entry.get("namespace") or "").strip()
                 key = str(entry.get("key") or "").strip()
@@ -122,7 +124,9 @@ async def _product_current_with_metafields(
                         ShopifyProductMetafield.product_id == product.id,
                     )
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         current["metafields"] = metafields_current_snapshot(rows)
     return current
@@ -172,7 +176,11 @@ async def create_manual_proposal(
     )
     if changed_fields:
         whitelist = whitelist_changed_fields(entity_type, changed_fields)
-        cleaned = {k: v for k, v in cleaned.items() if k in whitelist or (k == "media_images" and "image_alts" in whitelist)}
+        cleaned = {
+            k: v
+            for k, v in cleaned.items()
+            if k in whitelist or (k == "media_images" and "image_alts" in whitelist)
+        }
     proposed_delta, computed_fields = compute_changed_proposed(current, cleaned)
     if not computed_fields:
         raise ValueError("Nessuna modifica da salvare")

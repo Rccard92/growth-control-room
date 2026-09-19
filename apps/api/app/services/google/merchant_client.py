@@ -54,7 +54,11 @@ def _map_http_error(
                 "Abilita Merchant API e completa registerGcp nel Merchant Center.",
                 integration="merchant_center",
             )
-        if "registergcp" in response_lower or "not registered" in response_lower or "developer registration" in response_lower:
+        if (
+            "registergcp" in response_lower
+            or "not registered" in response_lower
+            or "developer registration" in response_lower
+        ):
             return GoogleIntegrationNotConfiguredError(
                 "Merchant API non abilitata o progetto GCP non registrato. "
                 "Abilita Merchant API e completa registerGcp nel Merchant Center.",
@@ -130,7 +134,9 @@ def _normalize_account_entry(entry: dict[str, Any], *, relationship: str) -> dic
     if not account_id:
         return None
     account_name = entry.get("accountName")
-    display_name = account_name if isinstance(account_name, str) and account_name.strip() else account_id
+    display_name = (
+        account_name if isinstance(account_name, str) and account_name.strip() else account_id
+    )
     account_type = entry.get("accountType") or entry.get("type")
     return {
         "accountId": account_id,
@@ -225,7 +231,9 @@ def _parse_price_value(value: Any) -> tuple[float | None, str | None]:
         return None, currency if isinstance(currency, str) else None
 
 
-def _normalize_product_status(product_status: dict[str, Any] | None) -> tuple[str, list[dict], list[dict]]:
+def _normalize_product_status(
+    product_status: dict[str, Any] | None,
+) -> tuple[str, list[dict], list[dict]]:
     if not product_status:
         return "unknown", [], []
 
@@ -238,7 +246,8 @@ def _normalize_product_status(product_status: dict[str, Any] | None) -> tuple[st
             continue
         destination_statuses.append(
             {
-                "destination": destination.get("reportingContext") or destination.get("destination"),
+                "destination": destination.get("reportingContext")
+                or destination.get("destination"),
                 "status": destination.get("status"),
                 "approvedCountries": destination.get("approvedCountries"),
                 "pendingCountries": destination.get("pendingCountries"),
@@ -286,7 +295,9 @@ def _normalize_product_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         offer_id = name.split("/")[-1] if "/" in name else name
 
     attributes = entry.get("attributes") if isinstance(entry.get("attributes"), dict) else {}
-    product_status = entry.get("productStatus") if isinstance(entry.get("productStatus"), dict) else {}
+    product_status = (
+        entry.get("productStatus") if isinstance(entry.get("productStatus"), dict) else {}
+    )
     status, destination_statuses, issues = _normalize_product_status(product_status)
 
     price_value = attributes.get("price")

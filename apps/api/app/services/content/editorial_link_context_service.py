@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content_seo import ShopifyCollection
 from app.models.shopify import ShopifyProduct
-from app.schemas.content_seo_editorial import EditorialBriefPayload, normalize_editorial_brief_payload
+from app.schemas.content_seo_editorial import (
+    EditorialBriefPayload,
+    normalize_editorial_brief_payload,
+)
 from app.services.shopify.connect import get_shopify_store_for_project
 
 if TYPE_CHECKING:
@@ -62,7 +65,7 @@ def format_editorial_link_context_for_prompt(targets: list[EditorialLinkTarget])
 async def build_editorial_link_context(
     session: AsyncSession,
     project_id: UUID,
-    item: "ContentSeoEditorialItem",
+    item: ContentSeoEditorialItem,
     brief: EditorialBriefPayload | dict | None = None,
 ) -> list[EditorialLinkTarget]:
     """Resolve verified product/collection link targets from DB — never invent URLs."""

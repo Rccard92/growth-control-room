@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import unescape
 from typing import Any
 from uuid import UUID
@@ -12,6 +12,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
     EditorialAiGenerationSnapshot,
@@ -20,7 +21,14 @@ from app.schemas.content_seo_editorial import (
     EditorialImagePayload,
     normalize_editorial_article_payload,
 )
-from app.services.ai.ai_client import AiRequestMetadata, OpenAINotConfiguredError, OpenAIRequestError, generate_image, generate_structured_json, is_openai_configured
+from app.services.ai.ai_client import (
+    AiRequestMetadata,
+    OpenAINotConfiguredError,
+    OpenAIRequestError,
+    generate_image,
+    generate_structured_json,
+    is_openai_configured,
+)
 from app.services.ai.context_profiles import (
     AiContextProfile,
     build_context_for_profile,
@@ -32,7 +40,6 @@ from app.services.content.editorial_ai_usage_service import (
     fetch_latest_editorial_ai_log,
 )
 from app.services.content.editorial_image_filename import resolve_unique_editorial_image_filename
-from app.core.config import settings
 from app.services.content.editorial_image_processing import (
     EDITORIAL_IMAGE_PROVIDER_SIZE,
     normalize_editorial_image_bytes,
@@ -56,10 +63,6 @@ from app.services.content.editorial_image_storage import (
     resolve_preview_image_url,
     save_editorial_image,
 )
-from app.services.content.editorial_shopify_files_storage import (
-    ShopifyFileUploadResult,
-    upload_editorial_image_to_shopify_files,
-)
 from app.services.content.editorial_image_utils import (
     build_approved_image_backup,
     compute_shopify_image_ready,
@@ -72,6 +75,10 @@ from app.services.content.editorial_image_utils import (
 )
 from app.services.content.editorial_item_service import get_editorial_item, get_editorial_item_read
 from app.services.content.editorial_publishing_utils import normalize_publishing_payload
+from app.services.content.editorial_shopify_files_storage import (
+    ShopifyFileUploadResult,
+    upload_editorial_image_to_shopify_files,
+)
 from app.services.shopify.client import ShopifyAPIError
 from app.services.shopify.connect import get_shopify_client_for_store, get_shopify_store_for_project
 from app.services.shopify.scopes import can_upload_shopify_files
@@ -158,9 +165,7 @@ def _build_editorial_item_context(row: ContentSeoEditorialItem) -> dict[str, str
     brief_angle = ""
     if row.brief_payload and isinstance(row.brief_payload, dict):
         brief_angle = str(
-            row.brief_payload.get("contentAngle")
-            or row.brief_payload.get("content_angle")
-            or ""
+            row.brief_payload.get("contentAngle") or row.brief_payload.get("content_angle") or ""
         ).strip()
     return {
         "title": row.title,
@@ -194,9 +199,7 @@ def _build_prompt_context(
     brief = row.brief_payload if isinstance(row.brief_payload, dict) else None
     brief_angle = ""
     if brief:
-        brief_angle = str(
-            brief.get("contentAngle") or brief.get("content_angle") or ""
-        ).strip()
+        brief_angle = str(brief.get("contentAngle") or brief.get("content_angle") or "").strip()
     return EditorialImagePromptContext(
         content_type=row.content_type or "",
         article_title=article.title,
@@ -344,9 +347,12 @@ async def _try_upload_to_shopify_files(
     image_bytes: bytes,
     mime_type: str,
 ) -> tuple[ShopifyFileUploadResult | None, str | None]:
-    effective_provider, shopify_connected, can_upload_files, scope_message = (
-        await _resolve_shopify_upload_context(session, project_id)
-    )
+    (
+        effective_provider,
+        shopify_connected,
+        can_upload_files,
+        scope_message,
+    ) = await _resolve_shopify_upload_context(session, project_id)
     if effective_provider != "shopify_files":
         return None, None
     if not shopify_connected:
@@ -411,7 +417,7 @@ async def _persist_generated_image(
 
     provider_returned_size = read_image_dimensions(image_bytes)
     processed_bytes, meta = normalize_editorial_image_bytes(image_bytes)
-    version_hint = f"{item_id}:{image_prompt}:{datetime.now(timezone.utc).isoformat()}"
+    version_hint = f"{item_id}:{image_prompt}:{datetime.now(UTC).isoformat()}"
     filename = resolve_unique_editorial_image_filename(
         alt,
         existing_filenames=_collect_existing_filenames(existing, project_id),
@@ -423,7 +429,10 @@ async def _persist_generated_image(
         approved_backup = build_approved_image_backup(existing)
     elif existing.image_status == "approved" and approved_backup:
         pass
-    elif existing.image_status in ("generated", "uploaded", "upload_error") and existing.image_storage_path:
+    elif (
+        existing.image_status in ("generated", "uploaded", "upload_error")
+        and existing.image_storage_path
+    ):
         delete_editorial_image(existing.image_storage_path)
 
     storage_path, public_url, image_hash = save_editorial_image(
@@ -434,9 +443,12 @@ async def _persist_generated_image(
     )
     access_token = existing.access_token or generate_access_token()
 
-    effective_provider, shopify_connected, can_upload_files, _scope_message = (
-        await _resolve_shopify_upload_context(session, project_id)
-    )
+    (
+        effective_provider,
+        shopify_connected,
+        can_upload_files,
+        _scope_message,
+    ) = await _resolve_shopify_upload_context(session, project_id)
     upload_result, upload_error = await _try_upload_to_shopify_files(
         session,
         project_id,
@@ -485,7 +497,7 @@ async def _persist_generated_image(
         warnings.append(storage_warning)
 
     skill = load_editorial_image_skill_context()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     payload = EditorialImagePayload(
         image_status=image_status,
         image_prompt=image_prompt,
@@ -713,7 +725,10 @@ async def approve_editorial_image(
 
     if image_payload.approved_image_backup:
         backup = image_payload.approved_image_backup
-        if backup.image_storage_path and backup.image_storage_path != image_payload.image_storage_path:
+        if (
+            backup.image_storage_path
+            and backup.image_storage_path != image_payload.image_storage_path
+        ):
             delete_editorial_image(backup.image_storage_path)
 
     storage_warning = storage_warning_if_needed(
@@ -723,7 +738,7 @@ async def approve_editorial_image(
     if storage_warning:
         warnings.append(storage_warning)
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     image_payload = image_payload.model_copy(
         update={
             "image_status": "approved",
@@ -769,9 +784,12 @@ async def retry_editorial_image_upload(
     filename = image_payload.image_filename or "articolo-solmielato.jpg"
     mime_type = image_payload.image_mime_type or "image/jpeg"
 
-    effective_provider, shopify_connected, can_upload_files, scope_message = (
-        await _resolve_shopify_upload_context(session, project_id)
-    )
+    (
+        effective_provider,
+        shopify_connected,
+        can_upload_files,
+        scope_message,
+    ) = await _resolve_shopify_upload_context(session, project_id)
     if effective_provider != "shopify_files":
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -806,7 +824,7 @@ async def retry_editorial_image_upload(
         mime_type=mime_type,
     )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     if upload_result:
         shopify_ready = compute_shopify_image_ready(upload_result.cdn_url)
         image_payload = image_payload.model_copy(
@@ -877,7 +895,7 @@ async def sync_editorial_image_from_title(
             "Rigenera l'immagine per applicare il nuovo filename al file."
         )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     image_payload = image_payload.model_copy(
         update={
             "image_alt": alt,

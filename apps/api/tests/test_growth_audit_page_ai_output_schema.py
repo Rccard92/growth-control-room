@@ -5,9 +5,7 @@ from app.services.growth_audit.page_ai_output_schema import (
     normalize_growth_audit_page_ai_output,
 )
 
-ARTIFACT_KEYS = frozenset(
-    {"shopifyEditHints", "croChecklist", "geoChecklist", "adsReadinessNotes"}
-)
+ARTIFACT_KEYS = frozenset({"shopifyEditHints", "croChecklist", "geoChecklist", "adsReadinessNotes"})
 
 ROOT_REQUIRED_KEYS = frozenset(
     {

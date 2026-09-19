@@ -15,6 +15,7 @@ from app.services.dataforseo.constants import (
     TEST_COST_ESTIMATES,
 )
 from app.services.dataforseo.dataforseo_budget import assert_dataforseo_budget_allows
+from app.services.dataforseo.dataforseo_call_logging import record_dataforseo_call
 from app.services.dataforseo.dataforseo_client import (
     build_request_hash,
     safe_test_keyword_ideas,
@@ -22,7 +23,6 @@ from app.services.dataforseo.dataforseo_client import (
     safe_test_keyword_search_volume_batch,
     safe_test_serp,
 )
-from app.services.dataforseo.dataforseo_call_logging import record_dataforseo_call
 from app.services.dataforseo.dataforseo_cost_estimator import (
     compute_search_volume_batch_cost_usd,
     resolve_keyword_intelligence_unit_costs,

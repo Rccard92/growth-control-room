@@ -246,18 +246,14 @@ def _normalize_score(value: Any) -> int | None:
 def _normalize_finding(item: Any) -> dict[str, Any]:
     data = _as_dict(item)
     return {
-        "severity": _normalize_enum(
-            data.get("severity"), ALLOWED_SEVERITIES, DEFAULT_SEVERITY
-        ),
+        "severity": _normalize_enum(data.get("severity"), ALLOWED_SEVERITIES, DEFAULT_SEVERITY),
         "area": _as_string(data.get("area")),
         "title": _as_string(data.get("title")),
         "description": _as_string(data.get("description")),
         "evidence": _as_string(data.get("evidence")),
         "recommendation": _as_string(data.get("recommendation")),
         "howToValidate": _as_string(data.get("howToValidate")),
-        "priority": _normalize_enum(
-            data.get("priority"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY
-        ),
+        "priority": _normalize_enum(data.get("priority"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY),
     }
 
 
@@ -266,12 +262,8 @@ def _normalize_recommendation(item: Any) -> dict[str, Any]:
     return {
         "title": _as_string(data.get("title")),
         "description": _as_string(data.get("description")),
-        "priority": _normalize_enum(
-            data.get("priority"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY
-        ),
-        "impact": _normalize_enum(
-            data.get("impact"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY
-        ),
+        "priority": _normalize_enum(data.get("priority"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY),
+        "impact": _normalize_enum(data.get("impact"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY),
         "effort": _normalize_enum(data.get("effort"), ALLOWED_EFFORTS, DEFAULT_EFFORT),
     }
 
@@ -281,9 +273,7 @@ def _normalize_task(item: Any) -> dict[str, Any]:
     return {
         "title": _as_string(data.get("title")),
         "description": _as_string(data.get("description")),
-        "priority": _normalize_enum(
-            data.get("priority"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY
-        ),
+        "priority": _normalize_enum(data.get("priority"), ALLOWED_PRIORITIES, DEFAULT_PRIORITY),
         "ownerType": _normalize_enum(
             data.get("ownerType"),
             ALLOWED_OWNER_TYPES,
@@ -326,15 +316,10 @@ def normalize_skill_output(
         _normalize_finding(item) for item in _as_list(raw_output.get("findings"))
     ]
     normalized["recommendations"] = [
-        _normalize_recommendation(item)
-        for item in _as_list(raw_output.get("recommendations"))
+        _normalize_recommendation(item) for item in _as_list(raw_output.get("recommendations"))
     ]
-    normalized["tasks"] = [
-        _normalize_task(item) for item in _as_list(raw_output.get("tasks"))
-    ]
+    normalized["tasks"] = [_normalize_task(item) for item in _as_list(raw_output.get("tasks"))]
     normalized["artifacts"] = _normalize_artifacts(raw_output.get("artifacts"))
     warnings = raw_output.get("warnings")
-    normalized["warnings"] = [
-        _as_string(item) for item in _as_list(warnings) if _as_string(item)
-    ]
+    normalized["warnings"] = [_as_string(item) for item in _as_list(warnings) if _as_string(item)]
     return normalized

@@ -138,10 +138,14 @@ class BrandFaqObjectionsProposal(BaseModel):
     )
     objections: list[str] | None = None
     myths_misconceptions: list[str] | None = Field(
-        default=None, validation_alias="mythsMisconceptions", serialization_alias="mythsMisconceptions"
+        default=None,
+        validation_alias="mythsMisconceptions",
+        serialization_alias="mythsMisconceptions",
     )
     recommended_answers: list[str] | None = Field(
-        default=None, validation_alias="recommendedAnswers", serialization_alias="recommendedAnswers"
+        default=None,
+        validation_alias="recommendedAnswers",
+        serialization_alias="recommendedAnswers",
     )
     content_opportunities: list[str] | None = Field(
         default=None,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -117,21 +117,23 @@ def test_run_single_seo_skill_returns_normalized_output() -> None:
 def test_run_single_seo_skill_unknown_skill_raises() -> None:
     async def run() -> None:
         session = AsyncMock()
-        with patch(
-            "app.services.seo_skills.skill_runner.get_seo_skill_by_key",
-            return_value=None,
-        ):
-            with pytest.raises(
+        with (
+            patch(
+                "app.services.seo_skills.skill_runner.get_seo_skill_by_key",
+                return_value=None,
+            ),
+            pytest.raises(
                 SeoSkillNotAvailableError,
                 match="Unknown SEO skill: seo_unknown",
-            ):
-                await run_single_seo_skill(
-                    session,
-                    uuid4(),
-                    "seo_unknown",
-                    "url",
-                    url="https://example.com",
-                )
+            ),
+        ):
+            await run_single_seo_skill(
+                session,
+                uuid4(),
+                "seo_unknown",
+                "url",
+                url="https://example.com",
+            )
 
     asyncio.run(run())
 
@@ -161,15 +163,15 @@ def test_run_single_seo_skill_unavailable_status_does_not_call_provider(
                 "app.services.seo_skills.skill_runner.generate_structured_json_with_provider",
                 new=AsyncMock(),
             ) as mock_provider,
+            pytest.raises(SeoSkillNotAvailableError, match=expected_message),
         ):
-            with pytest.raises(SeoSkillNotAvailableError, match=expected_message):
-                await run_single_seo_skill(
-                    session,
-                    uuid4(),
-                    "seo_geo",
-                    "url",
-                    url="https://example.com",
-                )
+            await run_single_seo_skill(
+                session,
+                uuid4(),
+                "seo_geo",
+                "url",
+                url="https://example.com",
+            )
 
         mock_provider.assert_not_awaited()
 
@@ -190,18 +192,18 @@ def test_run_single_seo_skill_unsupported_runtime_does_not_call_provider() -> No
                 "app.services.seo_skills.skill_runner.generate_structured_json_with_provider",
                 new=AsyncMock(),
             ) as mock_provider,
-        ):
-            with pytest.raises(
+            pytest.raises(
                 SeoSkillNotAvailableError,
                 match="SEO skill runtime is not supported yet: seo_geo",
-            ):
-                await run_single_seo_skill(
-                    session,
-                    uuid4(),
-                    "seo_geo",
-                    "url",
-                    url="https://example.com",
-                )
+            ),
+        ):
+            await run_single_seo_skill(
+                session,
+                uuid4(),
+                "seo_geo",
+                "url",
+                url="https://example.com",
+            )
 
         mock_provider.assert_not_awaited()
 
@@ -222,19 +224,19 @@ def test_run_single_seo_skill_invalid_provider_does_not_call_provider() -> None:
                 "app.services.seo_skills.skill_runner.generate_structured_json_with_provider",
                 new=AsyncMock(),
             ) as mock_provider,
-        ):
-            with pytest.raises(
+            pytest.raises(
                 SeoSkillProviderError,
                 match="Unsupported AI provider for SEO skill: anthropic",
-            ):
-                await run_single_seo_skill(
-                    session,
-                    uuid4(),
-                    "seo_geo",
-                    "url",
-                    url="https://example.com",
-                    provider="anthropic",
-                )
+            ),
+        ):
+            await run_single_seo_skill(
+                session,
+                uuid4(),
+                "seo_geo",
+                "url",
+                url="https://example.com",
+                provider="anthropic",
+            )
 
         mock_provider.assert_not_awaited()
 
@@ -353,19 +355,19 @@ def test_run_single_seo_skill_provider_error_is_readable() -> None:
                 "app.services.seo_skills.skill_runner.generate_structured_json_with_provider",
                 new=AsyncMock(side_effect=ClaudeRequestError("timeout")),
             ),
-        ):
-            with pytest.raises(
+            pytest.raises(
                 SeoSkillProviderError,
                 match="Errore temporaneo del provider AI",
-            ):
-                await run_single_seo_skill(
-                    session,
-                    uuid4(),
-                    "seo_geo",
-                    "url",
-                    url="https://example.com",
-                    provider="claude",
-                )
+            ),
+        ):
+            await run_single_seo_skill(
+                session,
+                uuid4(),
+                "seo_geo",
+                "url",
+                url="https://example.com",
+                provider="claude",
+            )
 
     asyncio.run(run())
 

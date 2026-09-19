@@ -1,6 +1,6 @@
 """Tests for SEO skill run Pydantic schemas."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
@@ -30,7 +30,7 @@ def test_seo_skill_run_create_request_accepts_camel_case() -> None:
 def test_seo_skill_run_read_serializes_camel_case() -> None:
     project_id = uuid4()
     run_id = uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     run = SeoSkillRun(
         id=run_id,
         project_id=project_id,
@@ -61,7 +61,7 @@ def test_seo_skill_run_result_read_serializes_camel_case() -> None:
     project_id = uuid4()
     run_id = uuid4()
     result_id = uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = SeoSkillRunResult(
         id=result_id,
         run_id=run_id,
@@ -89,7 +89,7 @@ def test_seo_skill_run_result_read_serializes_camel_case() -> None:
 def test_seo_skill_run_detail_response_with_two_results() -> None:
     project_id = uuid4()
     run_id = uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     run = SeoSkillRun(
         id=run_id,
         project_id=project_id,

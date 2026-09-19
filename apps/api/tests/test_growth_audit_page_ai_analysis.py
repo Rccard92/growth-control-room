@@ -9,7 +9,12 @@ from uuid import uuid4
 
 import pytest
 
-from app.models.growth_audit import GrowthAuditEvent, GrowthAuditPage, GrowthAuditPageResult, GrowthAuditRun
+from app.models.growth_audit import (
+    GrowthAuditEvent,
+    GrowthAuditPage,
+    GrowthAuditPageResult,
+    GrowthAuditRun,
+)
 from app.schemas.growth_audit import GrowthAuditPageAiAnalysisRequest
 from app.services.growth_audit.exceptions import GrowthAuditValidationError
 from app.services.growth_audit.page_ai_analysis import (
@@ -18,7 +23,6 @@ from app.services.growth_audit.page_ai_analysis import (
     list_growth_audit_page_results,
 )
 from app.services.growth_audit.page_ai_prompts import build_system_prompt
-
 from tests.support import TEST_USER
 
 
@@ -89,7 +93,9 @@ def _build_completed_run(project_id, run_id=None) -> GrowthAuditRun:
     )
 
 
-def _build_analyzed_page(*, project_id, run_id, page_id=None, page_type: str = "product") -> GrowthAuditPage:
+def _build_analyzed_page(
+    *, project_id, run_id, page_id=None, page_type: str = "product"
+) -> GrowthAuditPage:
     page_id = page_id or uuid4()
     now = datetime.now(UTC)
     return GrowthAuditPage(
@@ -139,17 +145,19 @@ def test_analyze_ai_rejects_active_run() -> None:
         audit_run.status = "analyzing"
 
         session = AsyncMock()
-        with patch(
-            "app.services.growth_audit.page_ai_analysis.get_growth_audit_run",
-            new=AsyncMock(return_value=audit_run),
+        with (
+            patch(
+                "app.services.growth_audit.page_ai_analysis.get_growth_audit_run",
+                new=AsyncMock(return_value=audit_run),
+            ),
+            pytest.raises(GrowthAuditValidationError, match="ancora in corso"),
         ):
-            with pytest.raises(GrowthAuditValidationError, match="ancora in corso"):
-                await analyze_growth_audit_page_with_ai(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                )
+            await analyze_growth_audit_page_with_ai(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+            )
 
     asyncio.run(run())
 
@@ -219,13 +227,17 @@ def test_analyze_ai_happy_path() -> None:
                 new=AsyncMock(side_effect=track_event),
             ),
         ):
-            result_run, result_page, result, findings_count, tasks_count = (
-                await analyze_growth_audit_page_with_ai(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                )
+            (
+                result_run,
+                result_page,
+                result,
+                findings_count,
+                tasks_count,
+            ) = await analyze_growth_audit_page_with_ai(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
             )
 
         assert result.result_type == AI_RESULT_TYPE
@@ -328,14 +340,14 @@ def test_provider_error_creates_failed_result() -> None:
                 "app.services.growth_audit.page_ai_analysis.create_growth_audit_event",
                 new=AsyncMock(side_effect=track_event),
             ),
+            pytest.raises(GrowthAuditValidationError, match="non configurato"),
         ):
-            with pytest.raises(GrowthAuditValidationError, match="non configurato"):
-                await analyze_growth_audit_page_with_ai(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                )
+            await analyze_growth_audit_page_with_ai(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+            )
 
         assert "page_ai_analysis_started" in events
         assert "page_ai_analysis_failed" in events
@@ -411,14 +423,14 @@ def test_invalid_schema_error_returns_readable_message() -> None:
                 "app.services.growth_audit.page_ai_analysis.create_growth_audit_event",
                 new=AsyncMock(side_effect=track_event),
             ),
+            pytest.raises(GrowthAuditValidationError) as exc_info,
         ):
-            with pytest.raises(GrowthAuditValidationError) as exc_info:
-                await analyze_growth_audit_page_with_ai(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                )
+            await analyze_growth_audit_page_with_ai(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+            )
 
         assert exc_info.value.args[0] == (
             "Analisi AI non riuscita: configurazione output non valida. "
@@ -511,11 +523,13 @@ def test_list_page_results_filters_by_type() -> None:
 
         with patch(
             "app.services.growth_audit.page_ai_analysis._get_growth_audit_page",
-            new=AsyncMock(return_value=_build_analyzed_page(
-                project_id=project_id,
-                run_id=run_id,
-                page_id=page_id,
-            )),
+            new=AsyncMock(
+                return_value=_build_analyzed_page(
+                    project_id=project_id,
+                    run_id=run_id,
+                    page_id=page_id,
+                )
+            ),
         ):
             results = await list_growth_audit_page_results(
                 session,

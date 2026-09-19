@@ -89,10 +89,18 @@ def _log_to_read(row) -> AiUsageLogRead:
         total_tokens=row.total_tokens,
         cached_input_tokens=row.cached_input_tokens,
         reasoning_tokens=row.reasoning_tokens,
-        estimated_input_cost=float(row.estimated_input_cost) if row.estimated_input_cost is not None else None,
-        estimated_output_cost=float(row.estimated_output_cost) if row.estimated_output_cost is not None else None,
-        estimated_cached_cost=float(row.estimated_cached_cost) if row.estimated_cached_cost is not None else None,
-        estimated_total_cost=float(row.estimated_total_cost) if row.estimated_total_cost is not None else None,
+        estimated_input_cost=float(row.estimated_input_cost)
+        if row.estimated_input_cost is not None
+        else None,
+        estimated_output_cost=float(row.estimated_output_cost)
+        if row.estimated_output_cost is not None
+        else None,
+        estimated_cached_cost=float(row.estimated_cached_cost)
+        if row.estimated_cached_cost is not None
+        else None,
+        estimated_total_cost=float(row.estimated_total_cost)
+        if row.estimated_total_cost is not None
+        else None,
         duration_ms=row.duration_ms,
         prompt_chars=row.prompt_chars,
         output_chars=row.output_chars,

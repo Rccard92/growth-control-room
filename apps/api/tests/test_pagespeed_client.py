@@ -6,12 +6,14 @@ import asyncio
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
-from app.services.google.exceptions import GoogleApiRequestError, GoogleIntegrationNotConfiguredError
+from app.services.google.exceptions import (
+    GoogleApiRequestError,
+    GoogleIntegrationNotConfiguredError,
+)
 from app.services.google.pagespeed_client import fetch_pagespeed_insights
 
 

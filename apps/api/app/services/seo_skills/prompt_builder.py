@@ -152,12 +152,7 @@ def _build_target_summary(skill_input: dict[str, Any]) -> str:
     target_id = skill_input.get("targetId") or "—"
     url = skill_input.get("url") or "—"
     title = skill_input.get("title") or "—"
-    return (
-        f"Target type: {target_type}\n"
-        f"Target id: {target_id}\n"
-        f"URL: {url}\n"
-        f"Title: {title}"
-    )
+    return f"Target type: {target_type}\nTarget id: {target_id}\nURL: {url}\nTitle: {title}"
 
 
 def _format_json_block(label: str, value: Any, max_chars: int) -> str:

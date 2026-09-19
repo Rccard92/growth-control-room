@@ -134,7 +134,9 @@ def test_apply_skips_duplicate_product_name() -> None:
     async def run() -> None:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(
-            return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=lambda: [existing])))
+            return_value=MagicMock(
+                scalars=MagicMock(return_value=MagicMock(all=lambda: [existing]))
+            )
         )
         mock_session.add = MagicMock()
         mock_session.commit = AsyncMock()

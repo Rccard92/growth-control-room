@@ -10,9 +10,7 @@ from app.services.content.editorial_image_filename import (
 def test_slug_from_title_with_accents_and_punctuation() -> None:
     title = "Yogurt con frutta, noci e miele: una ricetta semplice per ogni giorno"
     filename = build_editorial_image_filename(title)
-    assert filename == (
-        "yogurt-con-frutta-noci-e-miele-una-ricetta-semplice-per-ogni-giorno.jpg"
-    )
+    assert filename == ("yogurt-con-frutta-noci-e-miele-una-ricetta-semplice-per-ogni-giorno.jpg")
 
 
 def test_fallback_filename_when_empty() -> None:

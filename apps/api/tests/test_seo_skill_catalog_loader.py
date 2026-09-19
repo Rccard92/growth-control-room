@@ -104,9 +104,7 @@ def test_build_counts() -> None:
     counts = _build_counts(skills)
     assert counts.total == len(skills)
     assert counts.available == sum(1 for skill in skills if skill.status == "available")
-    assert counts.needs_config == sum(
-        1 for skill in skills if skill.status == "needs_config"
-    )
+    assert counts.needs_config == sum(1 for skill in skills if skill.status == "needs_config")
     assert counts.external_required == sum(
         1 for skill in skills if skill.status == "external_required"
     )

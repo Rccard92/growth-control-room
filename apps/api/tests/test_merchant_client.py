@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 from app.services.google.exceptions import (
@@ -71,9 +70,7 @@ def test_fetch_merchant_products_maps_status_and_issues() -> None:
                         "gtin": "8001234567890",
                     },
                     "productStatus": {
-                        "destinationStatuses": [
-                            {"destination": "Shopping", "status": "APPROVED"}
-                        ],
+                        "destinationStatuses": [{"destination": "Shopping", "status": "APPROVED"}],
                         "itemLevelIssues": [
                             {
                                 "code": "image_link_broken",

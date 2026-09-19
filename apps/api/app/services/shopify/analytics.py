@@ -155,9 +155,9 @@ def compute_products_without_sales(
             continue
         if product.shopify_gid in sold_product_gids:
             continue
-        seo_issue = not (product.seo_title or "").strip() or not (
-            product.seo_description or ""
-        ).strip()
+        seo_issue = (
+            not (product.seo_title or "").strip() or not (product.seo_description or "").strip()
+        )
         result.append(
             {
                 "product_title": product.title,
@@ -192,10 +192,7 @@ def compute_high_stock_low_sales(
                 "product_title": product.title,
                 "current_inventory": inv,
                 "quantity_sold": sold,
-                "issue": (
-                    f"Stock alto ({inv} unità) con vendite basse "
-                    f"({sold} {period_suffix})"
-                ),
+                "issue": (f"Stock alto ({inv} unità) con vendite basse ({sold} {period_suffix})"),
             }
         )
     return result[:15]

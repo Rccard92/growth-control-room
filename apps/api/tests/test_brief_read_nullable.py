@@ -1,15 +1,15 @@
 """BrandIntelligenceBriefRead handles nullable JSON/list DB columns."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.models.brand_intelligence import BrandIntelligenceBrief
-from app.schemas.brand_brief import BrandIntelligenceBriefRead, DEFAULT_BRIEF_PAYLOAD
+from app.schemas.brand_brief import DEFAULT_BRIEF_PAYLOAD, BrandIntelligenceBriefRead
 from app.services.brand_intelligence.brief_service import build_brand_intelligence_brief_read
 
 
 def _make_brief_row(**overrides) -> BrandIntelligenceBrief:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     defaults = {
         "id": uuid.uuid4(),
         "project_id": uuid.uuid4(),
@@ -60,7 +60,7 @@ def test_schema_validate_row_with_null_lists() -> None:
 
 
 def test_schema_validate_dict_with_all_nulls() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = BrandIntelligenceBriefRead.model_validate(
         {
             "id": uuid.uuid4(),

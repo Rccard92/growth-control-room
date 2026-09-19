@@ -13,11 +13,11 @@ from app.core.datetime import (
     month_start_utc_naive,
     utc_now_naive,
 )
+from app.services.dataforseo.dataforseo_usage_service import sum_dataforseo_usage
 from app.services.dataforseo.exceptions import (
     DataForSeoBudgetExceededError,
     DataForSeoRealCallsDisabledError,
 )
-from app.services.dataforseo.dataforseo_usage_service import sum_dataforseo_usage
 
 
 async def get_dataforseo_usage_today(session: AsyncSession, project_id: UUID) -> Decimal:

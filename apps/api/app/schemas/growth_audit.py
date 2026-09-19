@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 GrowthAuditProvider = Literal["openai", "claude"]
 GrowthAuditMode = Literal["full_site_mvp"]
 GrowthAuditRunStatus = Literal[

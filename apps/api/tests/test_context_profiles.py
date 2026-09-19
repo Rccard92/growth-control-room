@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -27,7 +27,7 @@ from app.services.ai.context_profiles import (
 )
 from app.services.ai.usage_service import UsageLogInput, record_usage_log
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 _PID = uuid4()
 
 
@@ -105,9 +105,7 @@ def test_minimal_profile_excludes_long_sections(mock_build) -> None:
 
     async def run():
         session = AsyncMock()
-        result = await build_context_for_profile(
-            session, _PID, AiContextProfile.MINIMAL
-        )
+        result = await build_context_for_profile(session, _PID, AiContextProfile.MINIMAL)
         assert "EDITORIAL GUIDELINES" not in result.context_text
         assert "FAQ & OBJECTIONS" not in result.context_text
         assert result.profile == "minimal"
@@ -124,9 +122,7 @@ def test_image_alt_excludes_faq_and_editorial(mock_build) -> None:
 
     async def run():
         session = AsyncMock()
-        result = await build_context_for_profile(
-            session, _PID, AiContextProfile.IMAGE_ALT
-        )
+        result = await build_context_for_profile(session, _PID, AiContextProfile.IMAGE_ALT)
         assert "FAQ" not in result.context_text or "FAQ & OBJECTIONS" not in result.context_text
         assert "EDITORIAL GUIDELINES" not in result.context_text
         assert "SAFE CLAIMS" in result.context_text
@@ -240,9 +236,7 @@ def test_missing_sections_add_warnings_no_crash(mock_build) -> None:
 
     async def run():
         session = AsyncMock()
-        result = await build_context_for_profile(
-            session, _PID, AiContextProfile.PRODUCT_SEO_FIELD
-        )
+        result = await build_context_for_profile(session, _PID, AiContextProfile.PRODUCT_SEO_FIELD)
         assert "Safe Claims missing" in result.warnings
         assert result.context_hash
         assert result.estimated_chars > 0

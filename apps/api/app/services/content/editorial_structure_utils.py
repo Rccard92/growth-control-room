@@ -31,7 +31,7 @@ def _normalize_h3_list(items: object) -> list[str]:
     return out
 
 
-def coerce_h2_h3_structure(raw: object) -> list["BriefH2Section"]:
+def coerce_h2_h3_structure(raw: object) -> list[BriefH2Section]:
     """Accept legacy string[] or structured object[]; return canonical sections."""
     from app.schemas.content_seo_editorial import BriefH2Section
 
@@ -79,7 +79,7 @@ def coerce_h2_h3_structure(raw: object) -> list["BriefH2Section"]:
     return sections
 
 
-def count_h2_h3(sections: list["BriefH2Section"]) -> tuple[int, int]:
+def count_h2_h3(sections: list[BriefH2Section]) -> tuple[int, int]:
     h2_count = len(sections)
     h3_count = sum(len(section.h3) for section in sections)
     return h2_count, h3_count
@@ -98,11 +98,11 @@ def _h3_duplicates_h2(h2: str, h3: str) -> bool:
 
 
 def trim_structure(
-    sections: list["BriefH2Section"],
+    sections: list[BriefH2Section],
     *,
     max_h2: int,
     max_h3: int,
-) -> tuple[list["BriefH2Section"], bool]:
+) -> tuple[list[BriefH2Section], bool]:
     """Trim excess H2/H3; drop H3 that duplicate their H2 title."""
     from app.schemas.content_seo_editorial import BriefH2Section
 
@@ -113,9 +113,7 @@ def trim_structure(
         if len(cleaned) >= max_h2:
             trimmed = True
             break
-        filtered_h3 = [
-            h3 for h3 in section.h3 if not _h3_duplicates_h2(section.h2, h3)
-        ]
+        filtered_h3 = [h3 for h3 in section.h3 if not _h3_duplicates_h2(section.h2, h3)]
         if len(filtered_h3) < len(section.h3):
             trimmed = True
         remaining_h3_slots = max(0, max_h3 - total_h3)
@@ -129,7 +127,7 @@ def trim_structure(
     return cleaned, trimmed
 
 
-def format_h2_h3_for_prompt(sections: list["BriefH2Section"]) -> str:
+def format_h2_h3_for_prompt(sections: list[BriefH2Section]) -> str:
     if not sections:
         return "—"
     lines: list[str] = []
@@ -140,5 +138,5 @@ def format_h2_h3_for_prompt(sections: list["BriefH2Section"]) -> str:
     return "\n".join(lines)
 
 
-def sections_to_json(sections: list["BriefH2Section"]) -> list[dict[str, Any]]:
+def sections_to_json(sections: list[BriefH2Section]) -> list[dict[str, Any]]:
     return [{"h2": s.h2, "h3": list(s.h3)} for s in sections]

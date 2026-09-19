@@ -28,7 +28,6 @@ from app.services.google.google_scope_utils import (
     normalize_oauth_mode,
     normalize_oauth_provider,
     parse_scope_string,
-    providers_covered_by_scopes,
     resolve_persist_targets,
 )
 
@@ -240,9 +239,7 @@ async def _upsert_provider_credential(
         await session.flush()
 
     credential_result = await session.execute(
-        select(IntegrationCredential).where(
-            IntegrationCredential.integration_id == integration.id
-        )
+        select(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
     existing_credential = credential_result.scalar_one_or_none()
 
@@ -380,9 +377,7 @@ async def ensure_google_provider_credential_from_existing_scope(
         await session.flush()
 
     credential_result = await session.execute(
-        select(IntegrationCredential).where(
-            IntegrationCredential.integration_id == integration.id
-        )
+        select(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
     existing_credential = credential_result.scalar_one_or_none()
 

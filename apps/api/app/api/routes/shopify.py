@@ -1,5 +1,5 @@
-from uuid import UUID
 from datetime import date
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.user import User
 from app.models.shopify import ShopifyOrder, ShopifyProduct
+from app.models.user import User
 from app.schemas.shopify import (
     ShopifyConnectRequest,
     ShopifyConnectResponse,
@@ -25,13 +25,17 @@ from app.schemas.shopify import (
 )
 from app.services.projects import get_project_for_user
 from app.services.shopify.client import ShopifyAPIError, normalize_shop_domain
-from app.services.shopify.connect import connect_shopify, get_shopify_client_for_store, get_shopify_store_for_project
+from app.services.shopify.connect import (
+    connect_shopify,
+    get_shopify_client_for_store,
+    get_shopify_store_for_project,
+)
+from app.services.shopify.dashboard import build_dashboard
 from app.services.shopify.oauth import (
     build_authorization_url,
     create_oauth_state,
     ensure_shopify_oauth_configured,
 )
-from app.services.shopify.dashboard import build_dashboard
 from app.services.shopify.period import resolve_period_pair, resolve_shopify_period
 from app.services.shopify.reconciliation import build_reconciliation_debug
 from app.services.shopify.scopes import resolve_shopify_scopes
@@ -270,7 +274,9 @@ async def shopify_shopifyql_probe(
         data = {
             "available": False,
             "requires_reconnect": exc.status_code in {401, 403},
-            "error_code": "missing_read_reports" if exc.status_code in {401, 403} else "network_error",
+            "error_code": "missing_read_reports"
+            if exc.status_code in {401, 403}
+            else "network_error",
             "message": exc.message,
             "sample": None,
         }

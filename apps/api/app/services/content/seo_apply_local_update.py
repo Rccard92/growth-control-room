@@ -15,7 +15,6 @@ from app.models.shopify import (
     ShopifyMetafieldDefinition,
     ShopifyProduct,
     ShopifyProductMetafield,
-    ShopifyStore,
 )
 from app.services.content.seo_image_utils import (
     extract_shopify_media_alts,
@@ -50,9 +49,7 @@ def _apply_shopify_product_node(product: ShopifyProduct, node: dict[str, Any]) -
     product.handle = node.get("handle") or product.handle
     product.seo_title = seo.get("title") if seo.get("title") is not None else product.seo_title
     product.seo_description = (
-        seo.get("description")
-        if seo.get("description") is not None
-        else product.seo_description
+        seo.get("description") if seo.get("description") is not None else product.seo_description
     )
     if node.get("descriptionHtml") is not None:
         product.description_html = node.get("descriptionHtml")
@@ -72,11 +69,11 @@ def _apply_shopify_collection_node(collection: ShopifyCollection, node: dict[str
     seo = node.get("seo") or {}
     collection.title = node.get("title") or collection.title
     collection.handle = node.get("handle") or collection.handle
-    collection.seo_title = seo.get("title") if seo.get("title") is not None else collection.seo_title
+    collection.seo_title = (
+        seo.get("title") if seo.get("title") is not None else collection.seo_title
+    )
     collection.seo_description = (
-        seo.get("description")
-        if seo.get("description") is not None
-        else collection.seo_description
+        seo.get("description") if seo.get("description") is not None else collection.seo_description
     )
     if node.get("descriptionHtml") is not None:
         collection.description_html = node.get("descriptionHtml")

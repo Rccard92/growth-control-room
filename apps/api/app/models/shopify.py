@@ -3,7 +3,17 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,7 +28,9 @@ class ShopifyStore(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "shopify_stores"
     __table_args__ = (
         UniqueConstraint("integration_id", name="uq_shopify_stores_integration_id"),
-        UniqueConstraint("project_id", "shop_domain", name="uq_shopify_stores_project_id_shop_domain"),
+        UniqueConstraint(
+            "project_id", "shop_domain", name="uq_shopify_stores_project_id_shop_domain"
+        ),
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(

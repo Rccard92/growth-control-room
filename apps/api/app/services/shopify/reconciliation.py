@@ -123,7 +123,11 @@ def _classify_order_buckets(orders: list[ShopifyOrder]) -> dict[str, int]:
             pending += 1
         if status in CANCELLED_STATUSES:
             cancelled += 1
-        if status not in PAID_STATUSES and status not in PENDING_STATUSES and status not in CANCELLED_STATUSES:
+        if (
+            status not in PAID_STATUSES
+            and status not in PENDING_STATUSES
+            and status not in CANCELLED_STATUSES
+        ):
             unpaid += 1
 
     return {
@@ -337,8 +341,7 @@ def build_reconciliation_diagnosis(
         insights.append(
             {
                 "message": (
-                    f"Resi/rimborsi nel periodo per {sales_reversals:.2f} "
-                    "(sales reversals)."
+                    f"Resi/rimborsi nel periodo per {sales_reversals:.2f} (sales reversals)."
                 ),
                 "severity": "warning",
             }

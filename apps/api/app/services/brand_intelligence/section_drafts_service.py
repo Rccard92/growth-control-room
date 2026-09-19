@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -80,7 +80,7 @@ async def patch_section_draft(
     if payload.status is not None:
         draft.status = payload.status
         if payload.status == "approved":
-            draft.approved_at = datetime.now(timezone.utc)
+            draft.approved_at = datetime.now(UTC)
         if payload.status == "rejected":
             draft.approved_at = None
     if "warnings" in data:

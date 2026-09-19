@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +104,7 @@ def estimate_usage_cost(
 
 
 IMAGE_MODEL_PRICING_USD: dict[str, Decimal] = {
+    "gpt-image-2": Decimal("0.040"),
     "gpt-image-1": Decimal("0.040"),
     "dall-e-3": Decimal("0.080"),
     "dall-e-2": Decimal("0.020"),
@@ -117,6 +118,10 @@ def estimate_image_cost(model: str, *, size: str = "1536x1024") -> Decimal | Non
         for key, value in IMAGE_MODEL_PRICING_USD.items():
             if key in model:
                 return value
+        # "gpt-image-3" and friends: price them like the current generation
+        # rather than logging them as free.
+        if model.startswith("gpt-image"):
+            return IMAGE_MODEL_PRICING_USD["gpt-image-2"]
         logger.warning("image pricing not configured for %s", model)
         return None
     return price

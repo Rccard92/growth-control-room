@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import BrandProfile
+from app.schemas.brand_intelligence import BrandProfileUpdate
 from app.schemas.brand_profile_v1 import (
     BrandProfileApplyProposalRequest,
     BrandProfileEnrichRequest,
@@ -18,7 +19,6 @@ from app.schemas.brand_profile_v1 import (
     BrandProfileProposal,
     BrandProfileSourceResult,
 )
-from app.schemas.brand_intelligence import BrandProfileRead, BrandProfileUpdate
 from app.services.ai.context_profiles import minimal_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
@@ -146,7 +146,7 @@ async def _save_enrichment_metadata(
     row.google_business_url = request.google_business_url
     row.other_sources = request.other_sources or []
     row.source_status = [s.model_dump(by_alias=True) for s in sources]
-    row.last_enriched_at = datetime.now(timezone.utc)
+    row.last_enriched_at = datetime.now(UTC)
     row.enrichment_confidence = confidence
     row.enrichment_warnings = warnings
     await session.commit()
@@ -240,9 +240,7 @@ async def enrich_brand_profile(
     confidence = _compute_confidence(sources)
     warnings = _build_warnings(sources)
 
-    await _save_enrichment_metadata(
-        session, project_id, request, sources, confidence, warnings
-    )
+    await _save_enrichment_metadata(session, project_id, request, sources, confidence, warnings)
 
     return BrandProfileEnrichResponse(
         proposal=proposal,

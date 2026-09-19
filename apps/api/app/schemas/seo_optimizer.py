@@ -15,6 +15,7 @@ class SeoAnalyzeCountResponse(BaseModel):
     critical: int = 0
     warnings: int = 0
     opportunities: int = 0
+    skipped_not_active: int = Field(default=0, serialization_alias="skippedNotActive")
     message: str | None = None
 
 
@@ -81,9 +82,7 @@ class SeoProposalManualRequest(BaseModel):
     entity_type: str = Field(validation_alias="entityType")
     entity_id: UUID = Field(validation_alias="entityId")
     proposed_values: dict[str, Any] = Field(validation_alias="proposedValues")
-    changed_fields: list[str] | None = Field(
-        default=None, validation_alias="changedFields"
-    )
+    changed_fields: list[str] | None = Field(default=None, validation_alias="changedFields")
 
 
 class SeoProposalGenerateFieldRequest(BaseModel):
@@ -137,9 +136,7 @@ class SeoProposalRead(BaseModel):
     entity_gid: str = Field(serialization_alias="entityGid")
     status: str
     source: str
-    current_values: dict[str, Any] | None = Field(
-        default=None, serialization_alias="currentValues"
-    )
+    current_values: dict[str, Any] | None = Field(default=None, serialization_alias="currentValues")
     proposed_values: dict[str, Any] | None = Field(
         default=None, serialization_alias="proposedValues"
     )
@@ -148,9 +145,7 @@ class SeoProposalRead(BaseModel):
     approved_at: datetime | None = Field(default=None, serialization_alias="approvedAt")
     applied_at: datetime | None = Field(default=None, serialization_alias="appliedAt")
     created_at: datetime | None = Field(default=None, serialization_alias="createdAt")
-    changed_fields: list[str] = Field(
-        default_factory=list, serialization_alias="changedFields"
-    )
+    changed_fields: list[str] = Field(default_factory=list, serialization_alias="changedFields")
 
 
 class SeoProposalPreviewField(BaseModel):
@@ -176,9 +171,7 @@ class SeoProposalPreviewResponse(BaseModel):
     reasoning: list[Any] | None = None
     fields: list[SeoProposalPreviewField]
     changed_fields: list[str] = Field(serialization_alias="changedFields")
-    current_values: dict[str, Any] | None = Field(
-        default=None, serialization_alias="currentValues"
-    )
+    current_values: dict[str, Any] | None = Field(default=None, serialization_alias="currentValues")
     proposed_values: dict[str, Any] | None = Field(
         default=None, serialization_alias="proposedValues"
     )
@@ -217,9 +210,7 @@ class SeoSkillMetaRead(BaseModel):
         default_factory=list,
         serialization_alias="scoreRuleCategories",
     )
-    external_skills: list[str] = Field(
-        default_factory=list, serialization_alias="externalSkills"
-    )
+    external_skills: list[str] = Field(default_factory=list, serialization_alias="externalSkills")
 
 
 class SeoProductDetailResponse(BaseModel):
@@ -251,9 +242,7 @@ class SeoProductDetailResponse(BaseModel):
     change_logs: list[dict[str, Any]] = Field(
         default_factory=list, serialization_alias="changeLogs"
     )
-    skill_meta: SeoSkillMetaRead | None = Field(
-        default=None, serialization_alias="skillMeta"
-    )
+    skill_meta: SeoSkillMetaRead | None = Field(default=None, serialization_alias="skillMeta")
 
 
 class SeoCollectionDetailResponse(BaseModel):
@@ -275,9 +264,7 @@ class SeoCollectionDetailResponse(BaseModel):
     change_logs: list[dict[str, Any]] = Field(
         default_factory=list, serialization_alias="changeLogs"
     )
-    skill_meta: SeoSkillMetaRead | None = Field(
-        default=None, serialization_alias="skillMeta"
-    )
+    skill_meta: SeoSkillMetaRead | None = Field(default=None, serialization_alias="skillMeta")
 
 
 class SeoProposalListResponse(BaseModel):
@@ -295,9 +282,7 @@ class SeoApplyResponse(BaseModel):
     local_update_failed: bool = Field(default=False, serialization_alias="localUpdateFailed")
     entity_type: str | None = Field(default=None, serialization_alias="entityType")
     entity_id: str | None = Field(default=None, serialization_alias="entityId")
-    updated_entity: dict[str, Any] | None = Field(
-        default=None, serialization_alias="updatedEntity"
-    )
+    updated_entity: dict[str, Any] | None = Field(default=None, serialization_alias="updatedEntity")
     updated_analysis: dict[str, Any] | None = Field(
         default=None, serialization_alias="updatedAnalysis"
     )
@@ -373,7 +358,5 @@ class SeoContentDebugResponse(BaseModel):
     products_count: int = Field(serialization_alias="productsCount")
     collections_count: int = Field(serialization_alias="collectionsCount")
     collection_analyses_count: int = Field(serialization_alias="collectionAnalysesCount")
-    last_content_sync: datetime | None = Field(
-        default=None, serialization_alias="lastContentSync"
-    )
+    last_content_sync: datetime | None = Field(default=None, serialization_alias="lastContentSync")
     last_errors: list[str] = Field(default_factory=list, serialization_alias="lastErrors")

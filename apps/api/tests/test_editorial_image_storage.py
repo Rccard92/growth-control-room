@@ -53,12 +53,8 @@ def test_is_shopify_image_publishable_requires_cdn_url(monkeypatch) -> None:
         "app.services.content.editorial_image_storage.settings.editorial_image_public_base_url",
         "https://cdn.example.com/editorial",
     )
-    assert is_shopify_image_publishable(
-        "https://cdn.example.com/editorial/proj/editorial/test.jpg"
-    )
-    assert is_shopify_image_publishable(
-        "https://cdn.shopify.com/s/files/1/123/files/hero.jpg"
-    )
+    assert is_shopify_image_publishable("https://cdn.example.com/editorial/proj/editorial/test.jpg")
+    assert is_shopify_image_publishable("https://cdn.shopify.com/s/files/1/123/files/hero.jpg")
     assert is_shopify_image_publishable("https://cdn.shopifycdn.com/hero.jpg")
     assert not is_shopify_image_publishable(
         "https://api.example.com/projects/x/image-media?token=abc"

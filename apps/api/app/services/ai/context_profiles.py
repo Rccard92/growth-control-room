@@ -205,7 +205,9 @@ def _full_safe_claims(bundle: BrandContextBundleResponse) -> str | None:
     return BrandIntelligenceContextBuilder.format_safe_claims_for_prompt(bundle.safe_claims)
 
 
-def _compact_product_knowledge_general(bundle: BrandContextBundleResponse, *, max_lines: int = 12) -> str | None:
+def _compact_product_knowledge_general(
+    bundle: BrandContextBundleResponse, *, max_lines: int = 12
+) -> str | None:
     pc = bundle.prompt_context
     if pc and pc.product_knowledge:
         lines = [ln for ln in pc.product_knowledge.splitlines() if ln.strip()]
@@ -236,12 +238,12 @@ def _editorial_guidelines_block(bundle: BrandContextBundleResponse) -> str | Non
         return None
     if editorial_guidelines_completion(guidelines) == "empty":
         return None
-    return BrandIntelligenceContextBuilder.format_editorial_guidelines_for_prompt(
-        guidelines
-    )
+    return BrandIntelligenceContextBuilder.format_editorial_guidelines_for_prompt(guidelines)
 
 
-def _faq_block(bundle: BrandContextBundleResponse, *, filter_terms: list[str] | None = None) -> str | None:
+def _faq_block(
+    bundle: BrandContextBundleResponse, *, filter_terms: list[str] | None = None
+) -> str | None:
     if not bundle.faq_objections:
         return None
     if faq_objections_completion(bundle.faq_objections) == "empty":
@@ -707,7 +709,9 @@ async def _assemble_profile_blocks(
         )
         faq_filter: list[str] = []
         if isinstance(brief_payload, dict):
-            faq_filter = list(brief_payload.get("faqToInclude") or brief_payload.get("faq_to_include") or [])
+            faq_filter = list(
+                brief_payload.get("faqToInclude") or brief_payload.get("faq_to_include") or []
+            )
         faq = _faq_block(bundle, filter_terms=faq_filter if faq_filter else None)
         if faq and faq_filter:
             blocks.append(faq)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from uuid import UUID
 
 from app.utils.slug import slugify
 

@@ -11,7 +11,6 @@ from app.services.shopify.client import ShopifyAPIError, normalize_shop_domain
 from app.services.shopify.connect import persist_shopify_connection
 from app.services.shopify.oauth import (
     consume_oauth_state,
-    ensure_shopify_oauth_configured,
     exchange_code_for_access_token,
     frontend_redirect_url,
     verify_shopify_hmac,
@@ -30,9 +29,7 @@ def _redirect_error(project_id: UUID | None, error_code: str) -> RedirectRespons
             status_code=302,
         )
     return RedirectResponse(
-        url=frontend_redirect_url(
-            f"/projects/{project_id}/shopify?shopify_error={error_code}"
-        ),
+        url=frontend_redirect_url(f"/projects/{project_id}/shopify?shopify_error={error_code}"),
         status_code=302,
     )
 
@@ -48,7 +45,7 @@ async def shopify_oauth_callback(
             status_code=302,
         )
 
-    query_params = {key: value for key, value in request.query_params.multi_items()}
+    query_params = dict(request.query_params.multi_items())
     state_value = query_params.get("state")
     code = query_params.get("code")
     shop = query_params.get("shop")
@@ -108,8 +105,6 @@ async def shopify_oauth_callback(
         return _redirect_error(project_id, "connection_failed")
 
     return RedirectResponse(
-        url=frontend_redirect_url(
-            f"/projects/{project_id}/shopify?shopify_connected=1"
-        ),
+        url=frontend_redirect_url(f"/projects/{project_id}/shopify?shopify_connected=1"),
         status_code=302,
     )

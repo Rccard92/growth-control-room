@@ -79,11 +79,7 @@ def build_openai_request_params(
         kwargs["max_tokens"] = resolved.max_output_tokens
         kwargs["temperature"] = resolved.temperature
         reasoning_model = (settings.openai_model_reasoning or "").strip()
-        if (
-            resolved.reasoning_effort
-            and reasoning_model
-            and resolved.model == reasoning_model
-        ):
+        if resolved.reasoning_effort and reasoning_model and resolved.model == reasoning_model:
             kwargs["reasoning_effort"] = resolved.reasoning_effort
 
     if structured_json:

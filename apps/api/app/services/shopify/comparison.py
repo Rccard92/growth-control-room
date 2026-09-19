@@ -31,7 +31,9 @@ class PeriodSnapshot:
     best_sellers: list[dict[str, Any]]
 
 
-def compare_scalar(current: Decimal | int | float, previous: Decimal | int | float) -> dict[str, Any]:
+def compare_scalar(
+    current: Decimal | int | float, previous: Decimal | int | float
+) -> dict[str, Any]:
     cur = Decimal(str(current))
     prev = Decimal(str(previous))
     delta = cur - prev
@@ -242,12 +244,10 @@ def build_period_comparison(
     current_titles = set(current_snapshot.product_sales)
     previous_titles = set(previous_snapshot.product_sales)
     products_new = [
-        current_snapshot.product_sales[title]
-        for title in sorted(current_titles - previous_titles)
+        current_snapshot.product_sales[title] for title in sorted(current_titles - previous_titles)
     ][:10]
     products_stalled = [
-        previous_snapshot.product_sales[title]
-        for title in sorted(previous_titles - current_titles)
+        previous_snapshot.product_sales[title] for title in sorted(previous_titles - current_titles)
     ][:10]
 
     unknown_revenue_delta = compare_scalar(
@@ -360,8 +360,7 @@ def build_trend_diagnosis(comparison: dict[str, Any]) -> list[dict[str, str]]:
 
     new_products = products.get("products_new_in_current_period") or []
     best_seller_titles = {
-        row.get("product_title")
-        for row in (products.get("top_growing_products") or [])
+        row.get("product_title") for row in (products.get("top_growing_products") or [])
     }
     for product in new_products:
         title = product.get("product_title")

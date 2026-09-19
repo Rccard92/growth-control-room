@@ -5,13 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants.integrations import INTEGRATION_PROVIDERS
 from app.api.deps import get_current_user
+from app.constants.integrations import INTEGRATION_PROVIDERS
 from app.db.session import get_db
-from app.models.user import User
 from app.models.enums import IntegrationStatus
 from app.models.integration import Integration
 from app.models.project import Project
+from app.models.user import User
 from app.schemas.integration import IntegrationRead
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.services.projects import get_project_for_user
@@ -132,9 +132,7 @@ async def list_project_integrations(
     current_user: User = Depends(get_current_user),
 ) -> list[IntegrationRead]:
     project = await get_project_for_user(project_id, session, current_user)
-    result = await session.execute(
-        select(Integration).where(Integration.project_id == project.id)
-    )
+    result = await session.execute(select(Integration).where(Integration.project_id == project.id))
     stored = {integration.provider: integration for integration in result.scalars().all()}
 
     integrations: list[IntegrationRead] = []

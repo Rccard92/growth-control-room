@@ -102,9 +102,7 @@ def _normalize_available_model(item: dict[str, Any]) -> dict[str, Any]:
 def _normalize_available_models(data: dict[str, Any]) -> dict[str, Any]:
     normalized = _normalize_keys(data, _TOP_CAMEL_TO_SNAKE)
     if "models" in normalized:
-        normalized["models"] = [
-            _normalize_available_model(m) for m in normalized["models"]
-        ]
+        normalized["models"] = [_normalize_available_model(m) for m in normalized["models"]]
     return normalized
 
 

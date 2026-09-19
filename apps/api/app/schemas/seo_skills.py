@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 SeoSkillProvider = Literal["openai", "claude"]
 
 
@@ -20,16 +19,10 @@ class SeoSkillCatalogItem(BaseModel):
     status: Literal["available", "needs_config", "external_required", "planned"]
     default_provider: str = Field(default="claude", alias="defaultProvider")
     requires: list[str] = Field(default_factory=list)
-    optional_integrations: list[str] = Field(
-        default_factory=list, alias="optionalIntegrations"
-    )
-    required_integrations: list[str] = Field(
-        default_factory=list, alias="requiredIntegrations"
-    )
+    optional_integrations: list[str] = Field(default_factory=list, alias="optionalIntegrations")
+    required_integrations: list[str] = Field(default_factory=list, alias="requiredIntegrations")
     output_schema: str = Field(alias="outputSchema")
-    runtime: Literal[
-        "prompt_only", "connector_required", "external_api_required", "planned"
-    ]
+    runtime: Literal["prompt_only", "connector_required", "external_api_required", "planned"]
     risk_level: Literal["low", "medium", "high"] = Field(alias="riskLevel")
     enabled: bool = True
 

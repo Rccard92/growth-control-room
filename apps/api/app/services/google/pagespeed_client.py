@@ -7,7 +7,10 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.services.google.exceptions import GoogleApiRequestError, GoogleIntegrationNotConfiguredError
+from app.services.google.exceptions import (
+    GoogleApiRequestError,
+    GoogleIntegrationNotConfiguredError,
+)
 
 PAGESPEED_API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 DEFAULT_CATEGORIES = ("performance", "accessibility", "best-practices", "seo")

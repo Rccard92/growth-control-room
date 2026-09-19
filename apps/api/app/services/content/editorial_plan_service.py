@@ -6,7 +6,7 @@ Future Brief Generator will use BrandIntelligenceContextBuilder + Safe Claims.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -186,15 +186,19 @@ async def _load_products(
     if not product_ids:
         return []
     rows = (
-        await session.execute(
-            select(ShopifyProduct)
-            .join(ShopifyStore, ShopifyProduct.shopify_store_id == ShopifyStore.id)
-            .where(
-                ShopifyStore.project_id == project_id,
-                ShopifyProduct.id.in_(product_ids),
+        (
+            await session.execute(
+                select(ShopifyProduct)
+                .join(ShopifyStore, ShopifyProduct.shopify_store_id == ShopifyStore.id)
+                .where(
+                    ShopifyStore.project_id == project_id,
+                    ShopifyProduct.id.in_(product_ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -265,7 +269,7 @@ async def generate_editorial_calendar(
         built.append(row)
 
     if dry_run:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for row in built:
             row.id = uuid4()
             row.created_at = now

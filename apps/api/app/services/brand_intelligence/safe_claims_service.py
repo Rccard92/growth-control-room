@@ -42,13 +42,13 @@ def _any_list_populated(row: BrandSafeClaims | None) -> bool:
     return any(_has_list(getattr(row, field)) for field in _LIST_FIELDS)
 
 
-def safe_claims_has_minimum(row: BrandSafeClaims | "BrandSafeClaimsRead" | None) -> bool:
+def safe_claims_has_minimum(row: BrandSafeClaims | BrandSafeClaimsRead | None) -> bool:
     if not row:
         return False
     return _has_list(row.allowed_claims) and _has_list(row.forbidden_claims)
 
 
-def safe_claims_missing_fields(row: BrandSafeClaims | "BrandSafeClaimsRead" | None) -> list[str]:
+def safe_claims_missing_fields(row: BrandSafeClaims | BrandSafeClaimsRead | None) -> list[str]:
     if not row:
         return ["allowed_claims", "forbidden_claims"]
     missing: list[str] = []
@@ -61,7 +61,7 @@ def safe_claims_missing_fields(row: BrandSafeClaims | "BrandSafeClaimsRead" | No
     return missing
 
 
-def safe_claims_completion(row: BrandSafeClaims | "BrandSafeClaimsRead" | None) -> CompletionStatus:
+def safe_claims_completion(row: BrandSafeClaims | BrandSafeClaimsRead | None) -> CompletionStatus:
     if not row:
         return "empty"
     if (

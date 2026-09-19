@@ -27,8 +27,6 @@ def resolve_search_volume_keywords(
         raise ValueError("Inserisci almeno una keyword.")
 
     if len(resolved) > SEARCH_VOLUME_BATCH_MAX_KEYWORDS:
-        raise ValueError(
-            f"Massimo {SEARCH_VOLUME_BATCH_MAX_KEYWORDS} keyword per batch test."
-        )
+        raise ValueError(f"Massimo {SEARCH_VOLUME_BATCH_MAX_KEYWORDS} keyword per batch test.")
 
     return resolved

@@ -122,7 +122,7 @@ async def observed_unit_costs(
         .group_by(DataProviderUsageLog.operation)
     )
 
-    costs: dict[str, float | None] = {op: None for op in _OBSERVED_OPERATIONS}
+    costs: dict[str, float | None] = dict.fromkeys(_OBSERVED_OPERATIONS)
     for operation, avg_per_item, avg_total in result.all():
         op = str(operation)
         if avg_per_item is not None:
@@ -150,6 +150,5 @@ async def average_cost_by_operation(
         .group_by(DataProviderUsageLog.operation)
     )
     return {
-        str(operation): float(avg) if avg is not None else 0.0
-        for operation, avg in result.all()
+        str(operation): float(avg) if avg is not None else 0.0 for operation, avg in result.all()
     }

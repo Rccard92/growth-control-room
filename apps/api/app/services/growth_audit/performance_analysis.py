@@ -147,11 +147,17 @@ def normalize_crux_result(raw: dict[str, Any] | None) -> dict[str, Any]:
     metrics = record.get("metrics") or {}
     collection_period = record.get("collectionPeriod")
 
-    lcp_metric = metrics.get("largest_contentful_paint") or metrics.get("largest_contentful_paint_ms")
+    lcp_metric = metrics.get("largest_contentful_paint") or metrics.get(
+        "largest_contentful_paint_ms"
+    )
     cls_metric = metrics.get("cumulative_layout_shift")
-    inp_metric = metrics.get("interaction_to_next_paint") or metrics.get("experimental_interaction_to_next_paint")
+    inp_metric = metrics.get("interaction_to_next_paint") or metrics.get(
+        "experimental_interaction_to_next_paint"
+    )
     fcp_metric = metrics.get("first_contentful_paint") or metrics.get("first_contentful_paint_ms")
-    ttfb_metric = metrics.get("experimental_time_to_first_byte") or metrics.get("time_to_first_byte")
+    ttfb_metric = metrics.get("experimental_time_to_first_byte") or metrics.get(
+        "time_to_first_byte"
+    )
 
     cls_p75 = _crux_percentile(cls_metric)
     if cls_p75 is not None and cls_p75 > 1:
@@ -319,7 +325,9 @@ def build_performance_findings(
                 "severity": "medium",
                 "priority": "medium",
                 "title": audit_titles[audit_id],
-                "description": audit.get("description") or audit.get("title") or audit_titles[audit_id],
+                "description": audit.get("description")
+                or audit.get("title")
+                or audit_titles[audit_id],
                 "evidence": audit.get("displayValue"),
                 "recommendation": f"Risolvi l'audit Lighthouse: {audit.get('title') or audit_id}.",
                 "howToValidate": "Riesegui PageSpeed dopo la correzione.",
@@ -328,7 +336,10 @@ def build_performance_findings(
             }
         )
 
-    if normalized_pagespeed.get("performanceScore") is not None and normalized_pagespeed["performanceScore"] < 50:
+    if (
+        normalized_pagespeed.get("performanceScore") is not None
+        and normalized_pagespeed["performanceScore"] < 50
+    ):
         findings.append(
             {
                 "category": "performance",

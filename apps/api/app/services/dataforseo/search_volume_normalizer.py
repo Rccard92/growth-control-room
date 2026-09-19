@@ -66,7 +66,9 @@ def _compute_trend(monthly_searches: list[dict[str, Any]] | None) -> dict[str, A
     }
 
 
-def normalize_search_volume_result(raw_row: dict[str, Any], *, fallback_keyword: str = "") -> dict[str, Any]:
+def normalize_search_volume_result(
+    raw_row: dict[str, Any], *, fallback_keyword: str = ""
+) -> dict[str, Any]:
     monthly_searches = _normalize_monthly_searches(raw_row.get("monthly_searches"))
     return {
         "keyword": raw_row.get("keyword") or fallback_keyword,
@@ -126,9 +128,7 @@ def normalize_search_volume_batch_response(
     total_cost = result.get("cost_usd")
     keyword_count = len(keywords)
     average_cost = (
-        float(total_cost) / keyword_count
-        if total_cost is not None and keyword_count > 0
-        else None
+        float(total_cost) / keyword_count if total_cost is not None and keyword_count > 0 else None
     )
 
     return {

@@ -112,7 +112,9 @@ async def apply_approved_facts(
     fact_ids: list[UUID],
 ) -> ApplyResult:
     if not fact_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun fact da applicare.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Nessun fact da applicare."
+        )
 
     facts = list(
         (
@@ -122,10 +124,14 @@ async def apply_approved_facts(
                     BrandExtractedFact.id.in_(fact_ids),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     if len(facts) != len(fact_ids):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Uno o più facts non trovati.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Uno o più facts non trovati."
+        )
 
     result = ApplyResult()
     profile_updates: dict[str, Any] = {}
@@ -246,7 +252,9 @@ async def _apply_single_fact(
             text = _as_str(value)
             if text:
                 profile_updates["short_description"] = text
-                return ApplyResultItem(fact.id, section, "short_description", "Descrizione profilo aggiornata.")
+                return ApplyResultItem(
+                    fact.id, section, "short_description", "Descrizione profilo aggiornata."
+                )
         return None
 
     if section == "voice_tone":
@@ -287,7 +295,9 @@ async def _apply_single_fact(
             keywords = _as_list(value)
             if keywords:
                 seo_keyword_append.extend(keywords)
-                return ApplyResultItem(fact.id, section, "primary_keywords", "Keyword SEO aggiunte.")
+                return ApplyResultItem(
+                    fact.id, section, "primary_keywords", "Keyword SEO aggiunte."
+                )
         if field_name and field_name in SEO_FIELDS:
             if getattr(fact, "update_mode", "create") == "enrich":
                 seo_row = await bi_service.get_seo_strategy(session, project_id)
@@ -423,7 +433,9 @@ async def _apply_audience_fact(
         project_id,
         BrandAudienceInsightCreate(segment_name=segment_name, description=description),
     )
-    return ApplyResultItem(fact.id, fact.target_section, fact.field_name, f"Segmento audience creato: {segment_name}")
+    return ApplyResultItem(
+        fact.id, fact.target_section, fact.field_name, f"Segmento audience creato: {segment_name}"
+    )
 
 
 async def _apply_claim_fact(
@@ -435,7 +447,12 @@ async def _apply_claim_fact(
     title: str | None = None
     description: str | None = None
     rule_type = "caution"
-    if fact.field_name == "rule_type" and _as_str(value) in ("forbidden", "caution", "allowed", "disclaimer"):
+    if fact.field_name == "rule_type" and _as_str(value) in (
+        "forbidden",
+        "caution",
+        "allowed",
+        "disclaimer",
+    ):
         rule_type = _as_str(value) or "caution"
     if isinstance(value, dict):
         title = _as_str(value.get("title") or value.get("claim"))
@@ -483,7 +500,9 @@ async def _apply_pillar_fact(
         project_id,
         BrandContentPillarCreate(name=name, description=description),
     )
-    return ApplyResultItem(fact.id, fact.target_section, fact.field_name, f"Content pillar creato: {name}")
+    return ApplyResultItem(
+        fact.id, fact.target_section, fact.field_name, f"Content pillar creato: {name}"
+    )
 
 
 async def _apply_guardrail_fact(
@@ -512,7 +531,9 @@ async def _apply_guardrail_fact(
         project_id,
         BrandAiGuardrailCreate(title=title, description=description, rule_type=rule_type),
     )
-    return ApplyResultItem(fact.id, fact.target_section, fact.field_name, f"Guardrail creato: {title}")
+    return ApplyResultItem(
+        fact.id, fact.target_section, fact.field_name, f"Guardrail creato: {title}"
+    )
 
 
 async def _apply_asset_fact(

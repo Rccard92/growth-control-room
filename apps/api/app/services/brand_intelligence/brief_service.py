@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import BrandIntelligenceBrief
 from app.schemas.brand_brief import (
+    DEFAULT_BRIEF_PAYLOAD,
     BrandIntelligenceBriefRead,
     BrandIntelligenceBriefUpdate,
-    DEFAULT_BRIEF_PAYLOAD,
     build_markdown_summary,
     sanitize_brief_payload,
 )
@@ -31,7 +31,9 @@ def build_brand_intelligence_brief_read(row: BrandIntelligenceBrief) -> BrandInt
             "version": row.version,
             "status": row.status,
             "title": row.title,
-            "brief_payload": row.brief_payload if row.brief_payload is not None else DEFAULT_BRIEF_PAYLOAD,
+            "brief_payload": row.brief_payload
+            if row.brief_payload is not None
+            else DEFAULT_BRIEF_PAYLOAD,
             "markdown_summary": row.markdown_summary,
             "confidence": row.confidence,
             "warnings": row.warnings,
@@ -57,7 +59,9 @@ async def list_briefs(
                 .where(BrandIntelligenceBrief.project_id == project_id)
                 .order_by(BrandIntelligenceBrief.created_at.desc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     return rows
 
@@ -128,7 +132,11 @@ async def patch_brief(
         sanitized, warnings = sanitize_brief_payload(data["brief_payload"])
         brief.brief_payload = sanitized
         if warnings:
-            existing = (brief.warnings or {}).get("messages", []) if isinstance(brief.warnings, dict) else []
+            existing = (
+                (brief.warnings or {}).get("messages", [])
+                if isinstance(brief.warnings, dict)
+                else []
+            )
             brief.warnings = {"messages": list(existing) + warnings}
         if payload.markdown_summary is None:
             brief.markdown_summary = build_markdown_summary(sanitized)
@@ -156,7 +164,7 @@ async def approve_brief(
     if brief.status == "approved":
         return brief
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     previous = list(
         (
             await session.execute(
@@ -166,7 +174,9 @@ async def approve_brief(
                     BrandIntelligenceBrief.id != brief_id,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     for old in previous:
         old.status = "archived"
@@ -186,7 +196,7 @@ async def archive_brief(
     brief_id: UUID,
 ) -> BrandIntelligenceBrief:
     brief = await get_brief(session, project_id, brief_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     brief.status = "archived"
     brief.archived_at = now
     await session.commit()

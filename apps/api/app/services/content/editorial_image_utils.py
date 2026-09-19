@@ -17,6 +17,8 @@ from app.services.content.editorial_image_filename import (
 )
 from app.services.content.editorial_image_storage import (
     is_shopify_image_publishable,
+)
+from app.services.content.editorial_image_storage import (
     storage_warning_if_needed as resolve_editorial_storage_warning,
 )
 from app.utils.slug import slugify
@@ -84,14 +86,18 @@ def is_image_stale(
     if article_payload is None or not _payload_is_present(image_payload):
         return False
     source_hash = _read_str_field(
-        image_payload if isinstance(image_payload, dict) else image_payload.model_dump(by_alias=True),
+        image_payload
+        if isinstance(image_payload, dict)
+        else image_payload.model_dump(by_alias=True),
         "sourceArticleHash",
         "source_article_hash",
     )
     if isinstance(image_payload, EditorialImagePayload):
         source_hash = image_payload.source_article_hash or source_hash
     article_hash = _read_str_field(
-        article_payload if isinstance(article_payload, dict) else article_payload.model_dump(by_alias=True),
+        article_payload
+        if isinstance(article_payload, dict)
+        else article_payload.model_dump(by_alias=True),
         "articleHash",
         "article_hash",
     )
@@ -119,7 +125,10 @@ def is_image_filename_stale(
 
 
 def _effective_publishing_image(image_payload: EditorialImagePayload) -> EditorialImagePayload:
-    if image_payload.image_status in ("generated", "uploaded") and image_payload.approved_image_backup:
+    if (
+        image_payload.image_status in ("generated", "uploaded")
+        and image_payload.approved_image_backup
+    ):
         backup = image_payload.approved_image_backup
         return image_payload.model_copy(
             update={
@@ -166,7 +175,9 @@ def compute_shopify_image_ready(image_url: str | None) -> bool:
     return is_shopify_image_publishable(image_url)
 
 
-def build_approved_image_backup(image_payload: EditorialImagePayload) -> EditorialApprovedImageBackup:
+def build_approved_image_backup(
+    image_payload: EditorialImagePayload,
+) -> EditorialApprovedImageBackup:
     return EditorialApprovedImageBackup(
         image_url=image_payload.image_url,
         image_storage_path=image_payload.image_storage_path,
@@ -208,7 +219,11 @@ def is_image_publish_sync_stale(
         return False
     if publishing.image_url and publishing.image_url != image_payload.image_url:
         return True
-    if publishing.image_alt and image_payload.image_alt and publishing.image_alt != image_payload.image_alt:
+    if (
+        publishing.image_alt
+        and image_payload.image_alt
+        and publishing.image_alt != image_payload.image_alt
+    ):
         return True
     return False
 
@@ -240,7 +255,9 @@ def refresh_image_filename_from_title(
     alt = article_title.strip() or DEFAULT_IMAGE_ALT
     filename = build_editorial_image_filename(alt)
     if version_hint:
-        from app.services.content.editorial_image_filename import resolve_unique_editorial_image_filename
+        from app.services.content.editorial_image_filename import (
+            resolve_unique_editorial_image_filename,
+        )
 
         filename = resolve_unique_editorial_image_filename(
             alt,

@@ -181,19 +181,21 @@ def test_create_seo_skill_run_invalid_provider_raises() -> None:
 def test_create_seo_skill_run_unknown_skill_raises() -> None:
     async def run() -> None:
         session = AsyncMock()
-        with patch(
-            "app.services.seo_skills.run_service.get_seo_skill_by_key",
-            return_value=None,
-        ):
-            with pytest.raises(
+        with (
+            patch(
+                "app.services.seo_skills.run_service.get_seo_skill_by_key",
+                return_value=None,
+            ),
+            pytest.raises(
                 SeoSkillRunValidationError,
                 match="SEO skill is not runnable: seo_unknown",
-            ):
-                await create_seo_skill_run(
-                    session,
-                    uuid4(),
-                    _request(selectedSkills=["seo_unknown"]),
-                )
+            ),
+        ):
+            await create_seo_skill_run(
+                session,
+                uuid4(),
+                _request(selectedSkills=["seo_unknown"]),
+            )
 
     asyncio.run(run())
 
@@ -203,19 +205,21 @@ def test_create_seo_skill_run_non_available_skill_raises(status: str) -> None:
     async def run() -> None:
         session = AsyncMock()
         skill = _available_skill("seo_geo").model_copy(update={"status": status})
-        with patch(
-            "app.services.seo_skills.run_service.get_seo_skill_by_key",
-            return_value=skill,
-        ):
-            with pytest.raises(
+        with (
+            patch(
+                "app.services.seo_skills.run_service.get_seo_skill_by_key",
+                return_value=skill,
+            ),
+            pytest.raises(
                 SeoSkillRunValidationError,
                 match="SEO skill is not runnable: seo_geo",
-            ):
-                await create_seo_skill_run(
-                    session,
-                    uuid4(),
-                    _request(selectedSkills=["seo_geo"]),
-                )
+            ),
+        ):
+            await create_seo_skill_run(
+                session,
+                uuid4(),
+                _request(selectedSkills=["seo_geo"]),
+            )
 
     asyncio.run(run())
 
@@ -309,7 +313,7 @@ def test_process_seo_skill_run_completes_all_skills() -> None:
         assert run_row.progress_percent == 100
         assert run_row.current_skill is None
         assert all(result.status == "completed" for result in run_row.results)
-        session.commit.await_count >= 3
+        assert session.commit.await_count >= 3
 
     asyncio.run(run())
 

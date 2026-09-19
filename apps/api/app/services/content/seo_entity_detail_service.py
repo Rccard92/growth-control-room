@@ -228,9 +228,7 @@ async def get_product_seo_detail(
             missing_description=missing_description,
             missing_images=missing_images,
         ),
-        "score_breakdown": (
-            rebuild_score_breakdown_from_analysis(analysis) if analysis else None
-        ),
+        "score_breakdown": (rebuild_score_breakdown_from_analysis(analysis) if analysis else None),
         "current_values": current_values,
         "images": images,
         "metafields": metafields,
@@ -309,9 +307,7 @@ async def get_collection_seo_detail(
             missing_description=missing_description,
             missing_images=missing_images,
         ),
-        "score_breakdown": (
-            rebuild_score_breakdown_from_analysis(analysis) if analysis else None
-        ),
+        "score_breakdown": (rebuild_score_breakdown_from_analysis(analysis) if analysis else None),
         "current_values": collection_api_current_values(collection),
         "image": {
             "url": collection.image_url,

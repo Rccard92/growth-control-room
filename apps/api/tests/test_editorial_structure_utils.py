@@ -35,8 +35,7 @@ def test_coerce_h2_h3_structure_objects() -> None:
 
 def test_trim_structure_limits_h2_and_h3() -> None:
     sections = [
-        BriefH2Section(h2=f"Sezione {i}", h3=[f"Sotto {i}a", f"Sotto {i}b"])
-        for i in range(6)
+        BriefH2Section(h2=f"Sezione {i}", h3=[f"Sotto {i}a", f"Sotto {i}b"]) for i in range(6)
     ]
     trimmed, was_trimmed = trim_structure(sections, max_h2=5, max_h3=3)
     assert was_trimmed is True
@@ -46,7 +45,9 @@ def test_trim_structure_limits_h2_and_h3() -> None:
 
 
 def test_trim_structure_drops_duplicate_h3() -> None:
-    sections = [BriefH2Section(h2="Perché il miele cristallizza", h3=["Perché il miele cristallizza"])]
+    sections = [
+        BriefH2Section(h2="Perché il miele cristallizza", h3=["Perché il miele cristallizza"])
+    ]
     trimmed, was_trimmed = trim_structure(sections, max_h2=5, max_h3=3)
     assert was_trimmed is True
     assert trimmed[0].h3 == []
@@ -54,7 +55,10 @@ def test_trim_structure_drops_duplicate_h3() -> None:
 
 def test_is_simple_customer_doubt() -> None:
     assert is_simple_customer_doubt("Perché il miele cristallizza?") is True
-    assert is_simple_customer_doubt("Guida completa al mondo del miele artigianale e biologico") is False
+    assert (
+        is_simple_customer_doubt("Guida completa al mondo del miele artigianale e biologico")
+        is False
+    )
 
 
 def test_resolve_structure_profile_simple_title() -> None:

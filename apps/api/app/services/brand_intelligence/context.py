@@ -21,30 +21,30 @@ from app.models.brand_intelligence import (
     BrandSafeClaims,
     BrandVisualIdentity,
 )
-from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
 from app.schemas.brand_editorial_guidelines import BrandEditorialGuidelinesRead
+from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
-from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
     BrandContextBundleResponse,
     BrandKnowledgeScoreResponse,
     BrandProfileRead,
     BrandPromptContext,
 )
-from app.services.brand_intelligence.product_knowledge_context import (
-    build_product_knowledge_context,
-    format_product_knowledge_preview,
+from app.schemas.brand_safe_claims import BrandSafeClaimsRead
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    editorial_guidelines_completion,
+    editorial_guidelines_missing_context,
 )
-from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
 from app.services.brand_intelligence.faq_objections_normalize import normalize_to_string_list
 from app.services.brand_intelligence.faq_objections_service import (
     faq_objections_completion,
     faq_objections_missing_context,
 )
-from app.services.brand_intelligence.editorial_guidelines_service import (
-    editorial_guidelines_completion,
-    editorial_guidelines_missing_context,
+from app.services.brand_intelligence.product_knowledge_context import (
+    build_product_knowledge_context,
+    format_product_knowledge_preview,
 )
+from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
 from app.services.brand_intelligence.safe_claims_service import safe_claims_completion
 from app.services.brand_intelligence.score import (
     compute_brand_knowledge_score,
@@ -81,7 +81,9 @@ class BrandIntelligenceContextBuilder:
             await session.execute(select(BrandProfile).where(BrandProfile.project_id == project_id))
         ).scalar_one_or_none()
         identity = (
-            await session.execute(select(BrandIdentity).where(BrandIdentity.project_id == project_id))
+            await session.execute(
+                select(BrandIdentity).where(BrandIdentity.project_id == project_id)
+            )
         ).scalar_one_or_none()
         visual = (
             await session.execute(
@@ -107,7 +109,9 @@ class BrandIntelligenceContextBuilder:
                     .where(BrandProductKnowledgeItem.project_id == project_id)
                     .order_by(BrandProductKnowledgeItem.product_name.asc())
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         faq_objections = (
             await session.execute(
@@ -129,9 +133,7 @@ class BrandIntelligenceContextBuilder:
             + visual_missing_context(visual)
             + safe_claims_missing_context(safe_claims)
             + faq_objections_missing_context(
-                BrandFaqObjectionsRead.model_validate(faq_objections)
-                if faq_objections
-                else None
+                BrandFaqObjectionsRead.model_validate(faq_objections) if faq_objections else None
             )
             + editorial_guidelines_missing_context(
                 BrandEditorialGuidelinesRead.model_validate(editorial_guidelines)
@@ -140,9 +142,7 @@ class BrandIntelligenceContextBuilder:
             )
         )
         if safe_claims_completion(safe_claims) == "empty":
-            missing.append(
-                "Safe Claims non compilata: i moduli AI devono evitare claim sensibili."
-            )
+            missing.append("Safe Claims non compilata: i moduli AI devono evitare claim sensibili.")
         if not general_has_content(pk_general) and not pk_items:
             missing.append(
                 "Product Knowledge non compilata: i moduli AI useranno solo dati Shopify."
@@ -153,9 +153,7 @@ class BrandIntelligenceContextBuilder:
         profile_read = BrandProfileRead.model_validate(profile) if profile else None
         identity_read = BrandIdentityRead.model_validate(identity) if identity else None
         visual_read = BrandVisualIdentityRead.model_validate(visual) if visual else None
-        safe_claims_read = (
-            BrandSafeClaimsRead.model_validate(safe_claims) if safe_claims else None
-        )
+        safe_claims_read = BrandSafeClaimsRead.model_validate(safe_claims) if safe_claims else None
         faq_objections_read = (
             BrandFaqObjectionsRead.model_validate(faq_objections) if faq_objections else None
         )
@@ -223,13 +221,9 @@ class BrandIntelligenceContextBuilder:
         if identity.differentiators:
             parts.append(f"- Differenziatori: {', '.join(identity.differentiators[:6])}")
         if identity.production_principles:
-            parts.append(
-                f"- Principi produttivi: {', '.join(identity.production_principles[:5])}"
-            )
+            parts.append(f"- Principi produttivi: {', '.join(identity.production_principles[:5])}")
         if identity.quality_principles:
-            parts.append(
-                f"- Principi di qualità: {', '.join(identity.quality_principles[:5])}"
-            )
+            parts.append(f"- Principi di qualità: {', '.join(identity.quality_principles[:5])}")
         if identity.trust_elements:
             parts.append(f"- Elementi di fiducia: {', '.join(identity.trust_elements[:5])}")
         if identity.what_brand_is:
@@ -332,9 +326,7 @@ class BrandIntelligenceContextBuilder:
             return None
         parts: list[str] = ["FAQ & OBJECTIONS"]
         parts.extend(
-            BrandIntelligenceContextBuilder._format_string_list(
-                "FAQ generali", row.general_faq
-            )
+            BrandIntelligenceContextBuilder._format_string_list("FAQ generali", row.general_faq)
         )
         parts.extend(
             BrandIntelligenceContextBuilder._format_string_list(
@@ -358,7 +350,9 @@ class BrandIntelligenceContextBuilder:
         if recommended:
             parts.append("Risposte consigliate:")
             parts.extend(f"- {r}" for r in recommended[:20])
-        opportunities = BrandIntelligenceContextBuilder._normalized_strings(row.content_opportunities)
+        opportunities = BrandIntelligenceContextBuilder._normalized_strings(
+            row.content_opportunities
+        )
         if opportunities:
             parts.append("Opportunità contenuto:")
             parts.extend(f"- {c}" for c in opportunities[:15])
@@ -411,9 +405,7 @@ class BrandIntelligenceContextBuilder:
             )
         )
         parts.extend(
-            BrandIntelligenceContextBuilder._format_string_list(
-                "Cose da fare", row.article_dos
-            )
+            BrandIntelligenceContextBuilder._format_string_list("Cose da fare", row.article_dos)
         )
         parts.extend(
             BrandIntelligenceContextBuilder._format_string_list(
@@ -481,9 +473,7 @@ class BrandIntelligenceContextBuilder:
             faq_text = BrandIntelligenceContextBuilder.format_faq_objections_for_prompt(
                 bundle.faq_objections
             )
-            blocks.append(
-                faq_text if faq_text else f"FAQ & OBJECTIONS\n{_EMPTY_SECTION_LABEL}"
-            )
+            blocks.append(faq_text if faq_text else f"FAQ & OBJECTIONS\n{_EMPTY_SECTION_LABEL}")
         else:
             blocks.append(f"FAQ & OBJECTIONS\n{_EMPTY_SECTION_LABEL}")
 
@@ -491,9 +481,7 @@ class BrandIntelligenceContextBuilder:
             eg_text = BrandIntelligenceContextBuilder.format_editorial_guidelines_for_prompt(
                 bundle.editorial_guidelines
             )
-            blocks.append(
-                eg_text if eg_text else f"EDITORIAL GUIDELINES\n{_EMPTY_SECTION_LABEL}"
-            )
+            blocks.append(eg_text if eg_text else f"EDITORIAL GUIDELINES\n{_EMPTY_SECTION_LABEL}")
         else:
             blocks.append(f"EDITORIAL GUIDELINES\n{_EMPTY_SECTION_LABEL}")
 
@@ -625,7 +613,9 @@ class BrandIntelligenceContextBuilder:
             return bundle.prompt_context.full_text
         if bundle.primary_source == "minimal" or not bundle.profile:
             return None
-        blocks: list[str] = [BrandIntelligenceContextBuilder.format_profile_for_prompt(bundle.profile)]
+        blocks: list[str] = [
+            BrandIntelligenceContextBuilder.format_profile_for_prompt(bundle.profile)
+        ]
         if bundle.brand_identity:
             blocks.append(
                 BrandIntelligenceContextBuilder.format_identity_for_prompt(bundle.brand_identity)

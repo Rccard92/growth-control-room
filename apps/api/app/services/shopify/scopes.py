@@ -27,9 +27,7 @@ SCOPES_CACHE_TTL = timedelta(hours=1)
 
 
 def configured_scopes() -> list[str]:
-    return sorted(
-        {s.strip() for s in settings.shopify_scopes.split(",") if s.strip()}
-    )
+    return sorted({s.strip() for s in settings.shopify_scopes.split(",") if s.strip()})
 
 
 def parse_scope_string(scope_value: str | None) -> list[str]:
@@ -81,20 +79,22 @@ def build_scope_result(
     missing_apply = [s for s in REQUIRED_FOR_APPLY if s not in granted]
     missing_publish = [s for s in REQUIRED_FOR_PUBLISH if s not in granted]
     missing_image_upload = [
-        s for s in REQUIRED_FOR_IMAGE_UPLOAD if s not in granted and not _has_image_upload_scope(granted)
+        s
+        for s in REQUIRED_FOR_IMAGE_UPLOAD
+        if s not in granted and not _has_image_upload_scope(granted)
     ]
     can_write_products = "write_products" in granted and not verify_failed
     can_write_content = "write_content" in granted and not verify_failed
     can_write_files = _has_image_upload_scope(granted) and not verify_failed
-    requires_reconnect = (
-        not verify_failed
-        and (
-            ("write_products" in configured and "write_products" not in granted)
-            or ("write_content" in configured and "write_content" not in granted)
-            or (
-                any(scope in configured for scope in REQUIRED_FOR_IMAGE_UPLOAD + IMAGE_UPLOAD_FALLBACK_SCOPES)
-                and not _has_image_upload_scope(granted)
+    requires_reconnect = not verify_failed and (
+        ("write_products" in configured and "write_products" not in granted)
+        or ("write_content" in configured and "write_content" not in granted)
+        or (
+            any(
+                scope in configured
+                for scope in REQUIRED_FOR_IMAGE_UPLOAD + IMAGE_UPLOAD_FALLBACK_SCOPES
             )
+            and not _has_image_upload_scope(granted)
         )
     )
     message = _scope_message(
@@ -151,11 +151,7 @@ async def resolve_shopify_scopes(
     force_refresh: bool = False,
 ) -> dict[str, Any]:
     configured = configured_scopes()
-    if (
-        not force_refresh
-        and _cache_fresh(store)
-        and store.granted_scopes is not None
-    ):
+    if not force_refresh and _cache_fresh(store) and store.granted_scopes is not None:
         return build_scope_result(
             shop_domain=store.shop_domain,
             configured=configured,
@@ -219,8 +215,7 @@ async def can_publish_with_write_content(
         "requires_scope": "write_content",
         "requires_reconnect": result["requires_reconnect"],
         "message": (
-            "Serve il permesso Shopify write_content. "
-            "Riconnetti Shopify con gli scope aggiornati."
+            "Serve il permesso Shopify write_content. Riconnetti Shopify con gli scope aggiornati."
         ),
         **result,
     }

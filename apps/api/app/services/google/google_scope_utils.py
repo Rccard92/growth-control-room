@@ -12,9 +12,7 @@ GOOGLE_PROVIDER_SCOPES: dict[str, list[str]] = {
 CONTENT_SCOPE = "https://www.googleapis.com/auth/content"
 
 GOOGLE_OAUTH_SCOPES = [
-    scope
-    for provider_scopes in GOOGLE_PROVIDER_SCOPES.values()
-    for scope in provider_scopes
+    scope for provider_scopes in GOOGLE_PROVIDER_SCOPES.values() for scope in provider_scopes
 ]
 
 # Frontend / legacy service aliases → backend provider keys
@@ -69,8 +67,8 @@ def get_google_scopes_for_provider(provider: str) -> list[str]:
 
 def get_google_scopes_for_reconnect(provider: str | None) -> list[str]:
     """Return scopes to request during OAuth (incremental auth via include_granted_scopes)."""
-    normalized = normalize_oauth_provider(provider)
-    # Always request full supported scope set; Google incremental auth grants only new ones.
+    # Always request the full supported scope set; Google incremental auth grants
+    # only the ones not already held, so the provider argument is not needed here.
     return list(GOOGLE_OAUTH_SCOPES)
 
 

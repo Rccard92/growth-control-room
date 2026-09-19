@@ -3,10 +3,10 @@
 import asyncio
 import os
 from datetime import UTC, date, datetime, timedelta
-from zoneinfo import ZoneInfo
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
@@ -24,20 +24,20 @@ def _future_day(days: int = 30) -> date:
 def _iso_at_nine(day: date) -> str:
     return datetime.combine(day, datetime.min.time(), tzinfo=_ROME).replace(hour=9).isoformat()
 
-from app.schemas.content_seo_editorial import EditorialPublishShopifyRequest
+
 from app.schemas.content_seo_editorial import (
     ContentSeoEditorialItemRead,
-    EditorialArticlePayload,
     EditorialPublishingUpdateRequest,
+    EditorialPublishShopifyRequest,
     normalize_editorial_article_payload,
 )
+from app.services.content.editorial_publishing_service import update_editorial_publishing
 from app.services.content.editorial_publishing_utils import (
+    PUBLISHING_STALE_MESSAGE,
     attach_publishing_sync_metadata,
     build_publishing_payload_from_article,
     enrich_article_with_hash,
-    PUBLISHING_STALE_MESSAGE,
 )
-from app.services.content.editorial_publishing_service import update_editorial_publishing
 from app.services.content.editorial_shopify_publish_service import publish_editorial_to_shopify
 
 
@@ -119,7 +119,9 @@ def _sample_row(*, publishing_payload: dict | None = None) -> SimpleNamespace:
         title="Guida",
         planned_date=date(2026, 6, 15),
         article_payload=article_payload,
-        publishing_payload=publishing_payload if publishing_payload is not None else default_publishing,
+        publishing_payload=publishing_payload
+        if publishing_payload is not None
+        else default_publishing,
         shopify_blog_id=None,
         shopify_article_id=None,
         shopify_article_gid=None,
@@ -247,7 +249,9 @@ def test_publish_missing_seo_returns_422() -> None:
     _, publishing_payload = _synced_article_and_publishing()
     publishing_payload = {**publishing_payload, "seoTitle": "", "metaDescription": ""}
     row = _sample_row(publishing_payload=publishing_payload)
-    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    store = SimpleNamespace(
+        id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected"
+    )
 
     async def run() -> None:
         mock_session = AsyncMock()
@@ -288,7 +292,9 @@ def test_publish_missing_write_content_returns_403() -> None:
     blog_id = uuid4()
     _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
     row = _sample_row(publishing_payload=publishing_payload)
-    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    store = SimpleNamespace(
+        id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected"
+    )
     blog_row = SimpleNamespace(
         id=blog_id,
         shopify_gid="gid://shopify/Blog/10",
@@ -336,6 +342,7 @@ def test_publish_missing_write_content_returns_403() -> None:
                         new_callable=AsyncMock,
                         return_value=mock_client,
                     ):
+
                         async def fake_read(
                             session: AsyncMock,  # noqa: ARG001
                             pid: UUID,  # noqa: ARG001
@@ -353,9 +360,7 @@ def test_publish_missing_write_content_returns_403() -> None:
                                 item_id,
                                 EditorialPublishShopifyRequest(mode="draft"),
                             )
-                            mock_read.assert_awaited_once_with(
-                                mock_session, project_id, item_id
-                            )
+                            mock_read.assert_awaited_once_with(mock_session, project_id, item_id)
                         assert row.publish_status == "draft_created"
                         assert row.shopify_article_gid == "gid://shopify/Article/55"
                         assert row.shopify_article_id == "55"
@@ -454,7 +459,9 @@ def test_publish_user_errors_keeps_payload() -> None:
     blog_id = uuid4()
     _, original_payload = _synced_article_and_publishing(blog_id=blog_id)
     row = _sample_row(publishing_payload=original_payload)
-    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    store = SimpleNamespace(
+        id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected"
+    )
     blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
 
     async def run() -> None:
@@ -742,7 +749,9 @@ def test_publish_success_clears_last_publish_error() -> None:
     row = _sample_row(publishing_payload=publishing_payload)
     row.last_publish_error = "Errore precedente stale"
     row.publish_status = "publish_error"
-    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    store = SimpleNamespace(
+        id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected"
+    )
     blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
 
     async def run() -> None:
@@ -804,14 +813,15 @@ def test_publish_success_clears_last_publish_error() -> None:
 
 
 def test_publish_metafields_sync_fail_marks_publish_error() -> None:
-    from app.services.shopify.client import ShopifyAPIError
 
     project_id = uuid4()
     item_id = uuid4()
     blog_id = uuid4()
     _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
     row = _sample_row(publishing_payload=publishing_payload)
-    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    store = SimpleNamespace(
+        id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected"
+    )
     blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
 
     async def run() -> None:
@@ -845,12 +855,19 @@ def test_publish_metafields_sync_fail_marks_publish_error() -> None:
                     mock_client.find_article_by_handle = AsyncMock(return_value=None)
                     mock_client.create_article = AsyncMock(
                         return_value={
-                            "article": {"id": "gid://shopify/Article/55", "handle": "guida-olio-evo"},
+                            "article": {
+                                "id": "gid://shopify/Article/55",
+                                "handle": "guida-olio-evo",
+                            },
                             "userErrors": [],
                         }
                     )
                     mock_client.sync_article_seo_metafields = AsyncMock(
-                        return_value={"synced": False, "error": "metafieldsSet rejected", "userErrors": []}
+                        return_value={
+                            "synced": False,
+                            "error": "metafieldsSet rejected",
+                            "userErrors": [],
+                        }
                     )
                     mock_client.get_article_global_metafields = AsyncMock(
                         return_value={"title_tag": "", "description_tag": ""}
@@ -891,7 +908,9 @@ def test_publish_find_by_handle_seo_graphql_error_returns_structured_422() -> No
     _, publishing_payload = _synced_article_and_publishing(blog_id=blog_id)
     row = _sample_row(publishing_payload=publishing_payload)
     row.last_publish_error = "Errore precedente"
-    store = SimpleNamespace(id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected")
+    store = SimpleNamespace(
+        id=uuid4(), shop_domain="shop.myshopify.com", connection_status="connected"
+    )
     blog_row = SimpleNamespace(id=blog_id, shopify_gid="gid://shopify/Blog/10", handle="news")
 
     async def run() -> None:

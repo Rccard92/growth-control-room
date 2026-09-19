@@ -10,7 +10,6 @@ os.environ.setdefault(
 )
 
 import asyncio
-from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -105,15 +104,19 @@ def test_usage_log_items_count() -> None:
             "rawPreview": {"tasks": []},
         }
 
-        with patch(
-            "app.services.dataforseo.dataforseo_sandbox_service.safe_test_keyword_search_volume_batch",
-            new=AsyncMock(return_value=mock_result),
-        ), patch(
-            "app.services.dataforseo.dataforseo_sandbox_service.assert_dataforseo_budget_allows",
-            new=AsyncMock(),
-        ), patch(
-            "app.services.dataforseo.dataforseo_sandbox_service.estimate_search_volume_batch_cost",
-            new=AsyncMock(return_value=0.45),
+        with (
+            patch(
+                "app.services.dataforseo.dataforseo_sandbox_service.safe_test_keyword_search_volume_batch",
+                new=AsyncMock(return_value=mock_result),
+            ),
+            patch(
+                "app.services.dataforseo.dataforseo_sandbox_service.assert_dataforseo_budget_allows",
+                new=AsyncMock(),
+            ),
+            patch(
+                "app.services.dataforseo.dataforseo_sandbox_service.estimate_search_volume_batch_cost",
+                new=AsyncMock(return_value=0.45),
+            ),
         ):
             await run_dataforseo_sandbox_test(
                 session,

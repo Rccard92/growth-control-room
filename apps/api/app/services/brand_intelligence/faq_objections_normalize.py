@@ -93,12 +93,8 @@ def dict_item_to_string(item: dict[str, object]) -> str | None:
     text = _get_str_field(item, "text", "testo", "content")
     value = _get_str_field(item, "value", "valore")
 
-    has_objection_key = any(
-        key in item for key in ("objection", "obiezione")
-    )
-    has_question_key = any(
-        key in item for key in ("question", "domanda")
-    )
+    has_objection_key = any(key in item for key in ("objection", "obiezione"))
+    has_question_key = any(key in item for key in ("question", "domanda"))
 
     if has_objection_key or (objection and not has_question_key):
         block = format_objection_answer_block(objection, answer)
@@ -156,9 +152,7 @@ def item_to_string(item: object, warnings: list[str] | None = None) -> str | Non
         if isinstance(dumped, dict):
             return dict_item_to_string(dumped)
         if warnings is not None:
-            warnings.append(
-                f"Elemento ignorato (model_dump non è dict): {type(item).__name__}"
-            )
+            warnings.append(f"Elemento ignorato (model_dump non è dict): {type(item).__name__}")
         return None
 
     if warnings is not None:

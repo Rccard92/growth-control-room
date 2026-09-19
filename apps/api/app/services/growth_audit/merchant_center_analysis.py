@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage
 from app.models.project import Project
 from app.services.google.exceptions import (
     GoogleIntegrationNotConnectedError,
@@ -154,7 +154,9 @@ def _compute_run_merchant_center_summary(
 
 def _page_has_demand(page: GrowthAuditPage) -> bool:
     metadata = page.page_metadata or {}
-    shopify = metadata.get("shopifyCommerce") if isinstance(metadata.get("shopifyCommerce"), dict) else {}
+    shopify = (
+        metadata.get("shopifyCommerce") if isinstance(metadata.get("shopifyCommerce"), dict) else {}
+    )
     gsc = metadata.get("searchConsole") if isinstance(metadata.get("searchConsole"), dict) else {}
     analytics = metadata.get("analytics") if isinstance(metadata.get("analytics"), dict) else {}
     ga4 = metadata.get("ga4Ecommerce") if isinstance(metadata.get("ga4Ecommerce"), dict) else {}
@@ -177,7 +179,7 @@ def _build_merchant_center_findings(
             continue
 
         status = str(meta.get("status") or "unknown").lower()
-        issues = meta.get("issues") or []
+        meta.get("issues") or []
         issues_count = int(meta.get("issuesCount") or 0)
         critical_count = int(meta.get("criticalIssuesCount") or 0)
         has_demand = _page_has_demand(page)
@@ -284,9 +286,7 @@ async def analyze_growth_audit_merchant_center(
     pages = await list_growth_audit_pages(session, project_id, run_id)
     product_pages = _filter_product_pages(pages)
     if not product_pages:
-        raise GrowthAuditValidationError(
-            "Nessuna pagina prodotto disponibile in questa run."
-        )
+        raise GrowthAuditValidationError("Nessuna pagina prodotto disponibile in questa run.")
 
     synced_at = _utcnow().isoformat()
 

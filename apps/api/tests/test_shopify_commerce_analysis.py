@@ -14,7 +14,7 @@ from fastapi import HTTPException
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
 from app.api.routes.growth_audit import analyze_growth_audit_shopify_commerce_endpoint
-from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditPage, GrowthAuditRun
 from app.schemas.growth_audit import GrowthAuditShopifyCommerceAnalysisRequest
 from app.services.growth_audit.exceptions import GrowthAuditValidationError
 from app.services.growth_audit.shopify_commerce_analysis import (
@@ -28,7 +28,6 @@ from app.services.shopify.exceptions import (
     ShopifyIntegrationPermissionError,
 )
 from app.services.shopify.shopify_commerce_client import _aggregate_line_items
-
 from tests.support import TEST_USER
 
 
@@ -262,7 +261,12 @@ def test_build_shopify_commerce_findings_limited_to_ten() -> None:
         page.page_metadata = {
             "searchConsole": {"impressions": 500},
             "analytics": {"sessions": 80},
-            "shopifyCommerce": {"sales": 0, "quantitySold": 0, "stock": 0, "availableForSale": False},
+            "shopifyCommerce": {
+                "sales": 0,
+                "quantitySold": 0,
+                "stock": 0,
+                "availableForSale": False,
+            },
         }
 
     findings = _build_shopify_commerce_findings(pages, [])
@@ -406,7 +410,7 @@ def test_analyze_shopify_commerce_updates_page_metadata_and_summary() -> None:
         session.execute = AsyncMock(return_value=findings_result)
 
         today = date.today()
-        created_at = datetime.combine(today, datetime.min.time()).isoformat() + "Z"
+        datetime.combine(today, datetime.min.time()).isoformat() + "Z"
 
         with (
             patch(

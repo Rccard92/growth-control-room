@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -179,13 +179,15 @@ async def run_ai_extraction(
                     BrandExtractedFact.status.in_(("suggested", "needs_review")),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     for fact in existing:
         await session.delete(fact)
 
     created: list[BrandExtractedFact] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for item in raw_facts:
         if not isinstance(item, dict):
             continue

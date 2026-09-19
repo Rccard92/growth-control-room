@@ -9,7 +9,9 @@ import pytest
 from fastapi import HTTPException
 
 from app.schemas.brand_product_knowledge import BrandProductKnowledgeGeneralProposal
-from app.services.brand_intelligence.product_knowledge_general_import import import_general_from_file
+from app.services.brand_intelligence.product_knowledge_general_import import (
+    import_general_from_file,
+)
 from app.services.brand_intelligence.product_knowledge_general_service import apply_general_proposal
 
 

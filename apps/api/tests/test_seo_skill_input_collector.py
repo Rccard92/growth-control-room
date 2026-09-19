@@ -25,7 +25,6 @@ from app.services.seo_skills.input_collector import (
     validate_public_http_url,
 )
 
-
 # --- SSRF validation ---
 
 
@@ -124,8 +123,7 @@ def test_collect_domain_returns_full_crawl_warning() -> None:
         assert result["url"] == "https://example.com"
         assert result["metadata"]["domain"] == "example.com"
         assert any(
-            "Full domain crawl is not implemented yet" in warning
-            for warning in result["warnings"]
+            "Full domain crawl is not implemented yet" in warning for warning in result["warnings"]
         )
 
     asyncio.run(run())
@@ -185,9 +183,7 @@ def test_collect_shopify_product_collects_product_data() -> None:
         proposal_result = MagicMock()
         proposal_result.scalar_one_or_none.return_value = None
 
-        session.execute = AsyncMock(
-            side_effect=[product_result, analysis_result, proposal_result]
-        )
+        session.execute = AsyncMock(side_effect=[product_result, analysis_result, proposal_result])
 
         with (
             patch(
@@ -411,16 +407,18 @@ def test_collect_url_fetch_failure_raises_readable_error() -> None:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch(
-            "app.services.seo_skills.input_collector.httpx.AsyncClient",
-            return_value=mock_client,
+        with (
+            patch(
+                "app.services.seo_skills.input_collector.httpx.AsyncClient",
+                return_value=mock_client,
+            ),
+            pytest.raises(SkillInputCollectionError, match="Failed to fetch URL"),
         ):
-            with pytest.raises(SkillInputCollectionError, match="Failed to fetch URL"):
-                await collect_skill_input(
-                    session,
-                    uuid4(),
-                    "url",
-                    url="https://example.com",
-                )
+            await collect_skill_input(
+                session,
+                uuid4(),
+                "url",
+                url="https://example.com",
+            )
 
     asyncio.run(run())

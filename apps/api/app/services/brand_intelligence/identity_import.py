@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.brand_identity_visual import BrandIdentityImportResponse, BrandIdentityProposal
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -16,8 +17,10 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-from app.services.ai.context_profiles import brand_import_metadata
-from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
+from app.services.brand_intelligence.text_extraction import (
+    TextExtractionError,
+    extract_text_from_bytes,
+)
 
 logger = logging.getLogger(__name__)
 

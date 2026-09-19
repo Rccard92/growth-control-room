@@ -51,7 +51,9 @@ def _extract_handle_from_url(url: str | None) -> str | None:
     return match.group(1).lower() if match else None
 
 
-def build_merchant_page_match_profiles(pages: list[GrowthAuditPage]) -> list[MerchantPageMatchProfile]:
+def build_merchant_page_match_profiles(
+    pages: list[GrowthAuditPage],
+) -> list[MerchantPageMatchProfile]:
     profiles: list[MerchantPageMatchProfile] = []
     for page in pages:
         normalized_urls: set[str] = set()
@@ -150,10 +152,7 @@ def _match_by_offer_id(
             profile
             for profile in profiles
             if profile.product_legacy_id == product_legacy_id
-            and (
-                not profile.variant_legacy_ids
-                or variant_legacy_id in profile.variant_legacy_ids
-            )
+            and (not profile.variant_legacy_ids or variant_legacy_id in profile.variant_legacy_ids)
         ]
         if len(matches) == 1:
             return MerchantMatchResult(

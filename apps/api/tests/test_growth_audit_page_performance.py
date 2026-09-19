@@ -14,16 +14,22 @@ from fastapi import HTTPException
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
 from app.api.routes.growth_audit import analyze_growth_audit_page_performance_endpoint
-from app.models.growth_audit import GrowthAuditEvent, GrowthAuditPage, GrowthAuditPageResult, GrowthAuditRun
+from app.models.growth_audit import (
+    GrowthAuditEvent,
+    GrowthAuditPage,
+    GrowthAuditPageResult,
+    GrowthAuditRun,
+)
 from app.schemas.growth_audit import GrowthAuditPagePerformanceAnalysisRequest
-from app.services.google.exceptions import GoogleApiRequestError, GoogleIntegrationNotConfiguredError
-from app.services.growth_audit.exceptions import GrowthAuditValidationError
+from app.services.google.exceptions import (
+    GoogleApiRequestError,
+    GoogleIntegrationNotConfiguredError,
+)
 from app.services.growth_audit.page_performance_analysis import (
     PERFORMANCE_RESULT_TYPE,
     analyze_growth_audit_page_performance,
 )
 from app.services.growth_audit.performance_analysis import normalize_pagespeed_result
-
 from tests.support import TEST_USER
 
 
@@ -168,13 +174,17 @@ def test_analyze_performance_creates_completed_result() -> None:
                 new=AsyncMock(side_effect=track_event),
             ),
         ):
-            result_run, result_page, result, findings_count, tasks_count = (
-                await analyze_growth_audit_page_performance(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                )
+            (
+                result_run,
+                result_page,
+                result,
+                findings_count,
+                tasks_count,
+            ) = await analyze_growth_audit_page_performance(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
             )
 
         assert result.result_type == PERFORMANCE_RESULT_TYPE
@@ -235,7 +245,15 @@ def test_analyze_performance_crux_missing_does_not_fail() -> None:
             ),
             patch(
                 "app.services.growth_audit.page_performance_analysis.create_growth_audit_event",
-                new=AsyncMock(return_value=GrowthAuditEvent(id=uuid4(), run_id=run_id, project_id=project_id, event_type="x", message="m")),
+                new=AsyncMock(
+                    return_value=GrowthAuditEvent(
+                        id=uuid4(),
+                        run_id=run_id,
+                        project_id=project_id,
+                        event_type="x",
+                        message="m",
+                    )
+                ),
             ),
         ):
             _, _, result, _, _ = await analyze_growth_audit_page_performance(
@@ -284,11 +302,28 @@ def test_analyze_performance_pagespeed_error_raises() -> None:
             ),
             patch(
                 "app.services.growth_audit.page_performance_analysis._persist_failed_performance_result",
-                new=AsyncMock(return_value=GrowthAuditPageResult(id=uuid4(), run_id=run_id, page_id=page_id, project_id=project_id, result_type="performance", status="failed")),
+                new=AsyncMock(
+                    return_value=GrowthAuditPageResult(
+                        id=uuid4(),
+                        run_id=run_id,
+                        page_id=page_id,
+                        project_id=project_id,
+                        result_type="performance",
+                        status="failed",
+                    )
+                ),
             ),
             patch(
                 "app.services.growth_audit.page_performance_analysis.create_growth_audit_event",
-                new=AsyncMock(return_value=GrowthAuditEvent(id=uuid4(), run_id=run_id, project_id=project_id, event_type="x", message="m")),
+                new=AsyncMock(
+                    return_value=GrowthAuditEvent(
+                        id=uuid4(),
+                        run_id=run_id,
+                        project_id=project_id,
+                        event_type="x",
+                        message="m",
+                    )
+                ),
             ),
             pytest.raises(GoogleApiRequestError),
         ):

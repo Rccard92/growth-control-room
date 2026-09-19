@@ -14,6 +14,13 @@ from app.core.config import settings
 from app.core.datetime import utc_now_naive
 from app.models.ai_model_setting import AiModelSetting
 from app.models.ai_usage_log import AiUsageLog
+from app.services.ai.model_policy import AiModelTier, AiResolvedModel, infer_tier_from_model
+from app.services.ai.model_request_params import (
+    KNOWN_SUPPORTED_MODELS,
+    build_openai_request_params,
+    infer_model_family,
+    is_known_supported_model,
+)
 from app.services.ai.operation_registry import (
     AI_OPERATIONS,
     AiOperationDefinition,
@@ -23,18 +30,11 @@ from app.services.ai.operation_registry import (
     resolve_registry_model,
     tier_cost_profile_label,
 )
-from app.services.ai.model_policy import AiModelTier, AiResolvedModel, infer_tier_from_model
-from app.services.ai.model_request_params import (
-    KNOWN_SUPPORTED_MODELS,
-    build_openai_request_params,
-    infer_model_family,
-    is_known_supported_model,
-)
 from app.services.ai.pricing import OPENAI_MODEL_PRICING, estimate_usage_cost
 
 
 def _default_model_for_operation(op: AiOperationDefinition) -> str:
-    from app.services.ai.model_policy import AiModelTier, tier_to_model_name
+    from app.services.ai.model_policy import tier_to_model_name
 
     model = resolve_registry_model(op)
     if model:
@@ -157,9 +157,7 @@ def compute_guardrail_warnings(
     cheap_tiers = {"cheap"}
     premium_tiers = {"premium", "reasoning"}
     if op.quality_level == "critical" and model_tier in cheap_tiers:
-        warnings.append(
-            f"ATTENZIONE: operation critica '{op.operation_key}' usa tier cheap."
-        )
+        warnings.append(f"ATTENZIONE: operation critica '{op.operation_key}' usa tier cheap.")
     elif op.recommended_tier in cheap_tiers and model_tier in premium_tiers:
         warnings.append(
             f"Operation '{op.operation_key}' usa tier premium su task economico consigliato."
@@ -197,8 +195,8 @@ async def get_available_models(session: AsyncSession) -> dict[str, Any]:
     }
     pricing_models = list(OPENAI_MODEL_PRICING.keys())
     log_models = (
-        await session.execute(select(AiUsageLog.model).distinct().limit(50))
-    ).scalars().all()
+        (await session.execute(select(AiUsageLog.model).distinct().limit(50))).scalars().all()
+    )
     all_names: set[str] = set(KNOWN_SUPPORTED_MODELS)
     for op in list_operations(include_planned=True):
         if op.gcr_recommended_model:
@@ -221,7 +219,8 @@ async def get_available_models(session: AsyncSession) -> dict[str, Any]:
                     else "pricing"
                     if name in pricing_models
                     else "registry"
-                    if name in {op.gcr_recommended_model for op in list_operations(include_planned=True)}
+                    if name
+                    in {op.gcr_recommended_model for op in list_operations(include_planned=True)}
                     else "logs"
                 ),
             }
@@ -278,15 +277,17 @@ async def list_settings_for_project(
             await session.execute(
                 select(AiModelSetting).where(AiModelSetting.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     }
     global_rows = {
         r.operation_key: r
         for r in (
-            await session.execute(
-                select(AiModelSetting).where(AiModelSetting.project_id.is_(None))
-            )
-        ).scalars().all()
+            await session.execute(select(AiModelSetting).where(AiModelSetting.project_id.is_(None)))
+        )
+        .scalars()
+        .all()
     }
 
     items: list[dict[str, Any]] = []
@@ -319,9 +320,7 @@ async def list_settings_for_project(
             model_name=display_model,
         )
         recent_error = (
-            await _recent_error_for_operation(
-                session, project_id, op.operation_key, display_model
-            )
+            await _recent_error_for_operation(session, project_id, op.operation_key, display_model)
             if is_operational
             else None
         )
@@ -347,7 +346,9 @@ async def list_settings_for_project(
                 "model": display_model,
                 "model_tier": display_tier,
                 "max_output_tokens": effective.max_output_tokens if is_operational else None,
-                "temperature": float(effective.temperature) if is_operational and effective.temperature else None,
+                "temperature": float(effective.temperature)
+                if is_operational and effective.temperature
+                else None,
                 "fallback_model": effective.fallback_model if is_operational else None,
                 "allow_fallback": effective.allow_fallback if is_operational else True,
                 "reasoning_effort": effective.reasoning_effort if is_operational else None,
@@ -584,10 +585,14 @@ async def reset_all_to_railway(
     project_id: UUID,
 ) -> int:
     rows = (
-        await session.execute(
-            select(AiModelSetting).where(AiModelSetting.project_id == project_id)
+        (
+            await session.execute(
+                select(AiModelSetting).where(AiModelSetting.project_id == project_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for row in rows:
         await session.delete(row)
     if rows:

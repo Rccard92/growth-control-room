@@ -17,7 +17,11 @@ from app.services.content.seo_constants import (
     SEO_MIN_LENGTH,
     TITLE_MIN_PAGE,
 )
-from app.services.shopify.analytics import compute_best_sellers, compute_sold_product_gids, product_lookup
+from app.services.shopify.analytics import (
+    compute_best_sellers,
+    compute_sold_product_gids,
+    product_lookup,
+)
 
 IssueDraft = dict[str, Any]
 
@@ -347,9 +351,7 @@ async def generate_seo_audit_issues(
                 )
             )
 
-        if not _PRODUCT_LINK_PATTERN.search(
-            (article.body_html or "") + (article.body_text or "")
-        ):
+        if not _PRODUCT_LINK_PATTERN.search((article.body_html or "") + (article.body_text or "")):
             issues.append(
                 _issue(
                     entity_type="article",

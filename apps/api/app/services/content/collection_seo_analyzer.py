@@ -28,12 +28,14 @@ async def analyze_collections_for_store(
     session: AsyncSession,
 ) -> CollectionAnalyzeResult:
     collections = (
-        await session.execute(
-            select(ShopifyCollection).where(
-                ShopifyCollection.shopify_store_id == store.id
+        (
+            await session.execute(
+                select(ShopifyCollection).where(ShopifyCollection.shopify_store_id == store.id)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     if not collections:
         return CollectionAnalyzeResult(

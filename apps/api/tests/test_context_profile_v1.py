@@ -1,12 +1,12 @@
 """BrandContextBuilder profile v1 priority tests."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.schemas.brand_intelligence import BrandContextBundleResponse, BrandKnowledgeScoreResponse
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 _PID = uuid4()
 
 

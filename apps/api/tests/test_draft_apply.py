@@ -4,8 +4,8 @@ import asyncio
 from types import SimpleNamespace
 from uuid import uuid4
 
-from app.services.brand_intelligence.draft_apply import _apply_scalar_section
 from app.schemas.brand_intelligence import BrandProfileUpdate
+from app.services.brand_intelligence.draft_apply import _apply_scalar_section
 
 
 def test_scalar_enrich_empty_official() -> None:

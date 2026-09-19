@@ -1,19 +1,22 @@
 """BrandIntelligenceContextBuilder.format_for_prompt tests."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.schemas.brand_identity_visual import BrandIdentityRead, BrandVisualIdentityRead
-from app.schemas.brand_product_knowledge import BrandProductKnowledgeContext, BrandProductKnowledgeGeneralRulesContext
-from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.schemas.brand_intelligence import (
     BrandContextBundleResponse,
     BrandKnowledgeScoreResponse,
     BrandProfileRead,
 )
+from app.schemas.brand_product_knowledge import (
+    BrandProductKnowledgeContext,
+    BrandProductKnowledgeGeneralRulesContext,
+)
+from app.schemas.brand_safe_claims import BrandSafeClaimsRead
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 _PID = uuid4()
 
 
@@ -206,7 +209,10 @@ def test_build_prompt_context_includes_safe_claims_fallback() -> None:
     assert prompt_ctx is not None
     assert prompt_ctx.safe_claims is not None
     assert "SAFE CLAIMS" in prompt_ctx.safe_claims
-    assert "fallback prudenza" in prompt_ctx.safe_claims.lower() or "prudenza" in prompt_ctx.safe_claims.lower()
+    assert (
+        "fallback prudenza" in prompt_ctx.safe_claims.lower()
+        or "prudenza" in prompt_ctx.safe_claims.lower()
+    )
     assert "SAFE CLAIMS" in (prompt_ctx.full_text or "")
 
 
@@ -355,7 +361,9 @@ def test_build_prompt_context_includes_editorial_guidelines() -> None:
         reading_style="Morbido e concreto",
         default_article_length="medio",
         brand_people=[
-            BrandPersonEntry(name="Davide", role="coordinatore", whenToUse="produzione", tone="diretto")
+            BrandPersonEntry(
+                name="Davide", role="coordinatore", whenToUse="produzione", tone="diretto"
+            )
         ],
         community_cta_rules=["Invita a commentare"],
         article_dos=["Essere concreti"],

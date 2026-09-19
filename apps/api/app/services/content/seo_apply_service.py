@@ -8,10 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.seo_optimizer import SeoChangeLog, SeoOptimizationProposal
 from app.models.shopify import ShopifyStore
+from app.services.content.seo_apply_drift import assert_no_upstream_drift
 from app.services.content.seo_apply_local_update import apply_proposed_values_to_entity
-from app.services.content.seo_proposal_diff import (
-    compute_changed_proposed,
-    proposal_changed_fields,
+from app.services.content.seo_apply_shopify import (
+    apply_collection_image_alt,
+    apply_collection_scalar_update,
+    apply_product_media_alts,
+    apply_product_scalar_update,
 )
 from app.services.content.seo_entity_analyze_single import (
     analyze_single_collection,
@@ -21,11 +24,10 @@ from app.services.content.seo_entity_detail_service import (
     get_collection_seo_detail,
     get_product_seo_detail,
 )
-from app.services.content.seo_apply_shopify import (
-    apply_collection_image_alt,
-    apply_collection_scalar_update,
-    apply_product_media_alts,
-    apply_product_scalar_update,
+from app.services.content.seo_field_validation import validate_seo_values
+from app.services.content.seo_proposal_diff import (
+    compute_changed_proposed,
+    proposal_changed_fields,
 )
 from app.services.shopify.client import ShopifyAPIError, ShopifyGraphQLClient
 from app.services.shopify.metafield_apply import apply_product_metafields
@@ -44,9 +46,7 @@ def write_products_required_response(
         "requires_scope": "write_products",
         "requires_reconnect": requires_reconnect,
         "message": message
-        or (
-            "Il token Shopify corrente non include write_products. Riconnetti Shopify."
-        ),
+        or ("Il token Shopify corrente non include write_products. Riconnetti Shopify."),
     }
 
 
@@ -185,6 +185,17 @@ async def apply_proposal(
     )
     if not effective_proposed:
         raise ValueError("Nessun campo da applicare nella proposta")
+
+    validate_seo_values(effective_proposed)
+
+    await assert_no_upstream_drift(
+        client,
+        entity_type=proposal.entity_type,
+        entity_gid=proposal.entity_gid,
+        snapshot=proposal.current_values,
+        changed_fields=set(effective_proposed),
+    )
+
     applied_values: dict[str, Any] = {}
     shopify_response: dict[str, Any] = {}
 

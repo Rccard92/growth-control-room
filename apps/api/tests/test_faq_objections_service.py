@@ -80,9 +80,7 @@ def test_apply_faq_objections_proposal_merge_non_destructive() -> None:
         warnings=None,
     )
     mock_session = AsyncMock()
-    proposal = BrandFaqObjectionsProposal.model_validate(
-        {"notes": "Nuove note operative"}
-    )
+    proposal = BrandFaqObjectionsProposal.model_validate({"notes": "Nuove note operative"})
 
     async def run() -> None:
         with patch(
@@ -160,9 +158,7 @@ def test_upsert_faq_objections_with_dict_in_objections_does_not_crash() -> None:
         ):
             result = await upsert_faq_objections(mock_session, uuid4(), payload)
             assert result.general_faq == ["Domanda: Q?\nRisposta: A"]
-            assert result.objections == [
-                "Obiezione: Costa troppo\nRisposta consigliata: Valore"
-            ]
+            assert result.objections == ["Obiezione: Costa troppo\nRisposta consigliata: Valore"]
 
     asyncio.run(run())
 

@@ -46,30 +46,42 @@ async def list_product_seo_items(
     session: AsyncSession,
 ) -> list[dict[str, Any]]:
     products = (
-        await session.execute(
-            select(ShopifyProduct).where(ShopifyProduct.shopify_store_id == store.id)
-        )
-    ).scalars().all()
-
-    analyses = (
-        await session.execute(
-            select(SeoEntityAnalysis).where(
-                SeoEntityAnalysis.shopify_store_id == store.id,
-                SeoEntityAnalysis.entity_type == "product",
+        (
+            await session.execute(
+                select(ShopifyProduct).where(ShopifyProduct.shopify_store_id == store.id)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
+
+    analyses = (
+        (
+            await session.execute(
+                select(SeoEntityAnalysis).where(
+                    SeoEntityAnalysis.shopify_store_id == store.id,
+                    SeoEntityAnalysis.entity_type == "product",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
     analysis_by_entity = {a.entity_id: a for a in analyses}
 
     proposals = (
-        await session.execute(
-            select(SeoOptimizationProposal).where(
-                SeoOptimizationProposal.shopify_store_id == store.id,
-                SeoOptimizationProposal.entity_type == "product",
-                SeoOptimizationProposal.status.in_(("draft", "approved")),
+        (
+            await session.execute(
+                select(SeoOptimizationProposal).where(
+                    SeoOptimizationProposal.shopify_store_id == store.id,
+                    SeoOptimizationProposal.entity_type == "product",
+                    SeoOptimizationProposal.status.in_(("draft", "approved")),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     proposal_entities = {p.entity_id for p in proposals}
 
     products_by_gid = product_lookup(list(products))
@@ -108,32 +120,42 @@ async def list_collection_seo_items(
     session: AsyncSession,
 ) -> list[dict[str, Any]]:
     collections = (
-        await session.execute(
-            select(ShopifyCollection).where(
-                ShopifyCollection.shopify_store_id == store.id
+        (
+            await session.execute(
+                select(ShopifyCollection).where(ShopifyCollection.shopify_store_id == store.id)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     analyses = (
-        await session.execute(
-            select(SeoEntityAnalysis).where(
-                SeoEntityAnalysis.shopify_store_id == store.id,
-                SeoEntityAnalysis.entity_type == "collection",
+        (
+            await session.execute(
+                select(SeoEntityAnalysis).where(
+                    SeoEntityAnalysis.shopify_store_id == store.id,
+                    SeoEntityAnalysis.entity_type == "collection",
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     analysis_by_entity = {a.entity_id: a for a in analyses}
 
     proposals = (
-        await session.execute(
-            select(SeoOptimizationProposal).where(
-                SeoOptimizationProposal.shopify_store_id == store.id,
-                SeoOptimizationProposal.entity_type == "collection",
-                SeoOptimizationProposal.status.in_(("draft", "approved")),
+        (
+            await session.execute(
+                select(SeoOptimizationProposal).where(
+                    SeoOptimizationProposal.shopify_store_id == store.id,
+                    SeoOptimizationProposal.entity_type == "collection",
+                    SeoOptimizationProposal.status.in_(("draft", "approved")),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     proposal_entities = {p.entity_id for p in proposals}
 
     items: list[dict[str, Any]] = []

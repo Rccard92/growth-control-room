@@ -102,9 +102,7 @@ async def load_run_product_context(
             pages_with_gsc += 1
             query_counts.append(len(top_queries))
 
-    avg_queries = (
-        sum(query_counts) / len(query_counts) if query_counts else 0.0
-    )
+    avg_queries = sum(query_counts) / len(query_counts) if query_counts else 0.0
 
     return GrowthAuditProductContext(
         product_pages_count=len(product_pages),

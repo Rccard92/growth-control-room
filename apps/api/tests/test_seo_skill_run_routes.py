@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -21,9 +21,8 @@ from app.api.routes.seo_skills import (
     list_project_seo_skill_runs,
 )
 from app.models.seo_skills import SeoSkillRun, SeoSkillRunResult
-from app.schemas.seo_skills import SeoSkillRunCreateRequest, SeoSkillCatalogCounts
+from app.schemas.seo_skills import SeoSkillCatalogCounts, SeoSkillRunCreateRequest
 from app.services.seo_skills.exceptions import SeoSkillRunValidationError
-
 from tests.support import TEST_USER
 
 
@@ -133,14 +132,14 @@ def test_create_project_seo_skill_run_claude_not_configured_returns_503() -> Non
                 "app.api.routes.seo_skills.start_seo_skill_run",
                 new_callable=AsyncMock,
             ) as mock_start,
+            pytest.raises(HTTPException) as exc,
         ):
-            with pytest.raises(HTTPException) as exc:
-                await create_project_seo_skill_run(
-                    project_id,
-                    _request(provider="claude"),
-                    session=session,
-                    current_user=TEST_USER,
-                )
+            await create_project_seo_skill_run(
+                project_id,
+                _request(provider="claude"),
+                session=session,
+                current_user=TEST_USER,
+            )
 
         assert exc.value.status_code == 503
         assert exc.value.detail == "Claude provider is not configured"
@@ -166,18 +165,16 @@ def test_create_project_seo_skill_run_validation_error_returns_422() -> None:
             patch(
                 "app.api.routes.seo_skills.start_seo_skill_run",
                 new_callable=AsyncMock,
-                side_effect=SeoSkillRunValidationError(
-                    "At least one SEO skill must be selected"
-                ),
+                side_effect=SeoSkillRunValidationError("At least one SEO skill must be selected"),
             ),
+            pytest.raises(HTTPException) as exc,
         ):
-            with pytest.raises(HTTPException) as exc:
-                await create_project_seo_skill_run(
-                    project_id,
-                    _request(selectedSkills=[]),
-                    session=session,
-                    current_user=TEST_USER,
-                )
+            await create_project_seo_skill_run(
+                project_id,
+                _request(selectedSkills=[]),
+                session=session,
+                current_user=TEST_USER,
+            )
 
         assert exc.value.status_code == 422
 
@@ -265,14 +262,14 @@ def test_get_project_seo_skill_run_not_found_returns_404() -> None:
                 new_callable=AsyncMock,
                 return_value=None,
             ),
+            pytest.raises(HTTPException) as exc,
         ):
-            with pytest.raises(HTTPException) as exc:
-                await get_project_seo_skill_run(
-                    project_id,
-                    run_id,
-                    session=session,
-                    current_user=TEST_USER,
-                )
+            await get_project_seo_skill_run(
+                project_id,
+                run_id,
+                session=session,
+                current_user=TEST_USER,
+            )
 
         assert exc.value.status_code == 404
 
@@ -336,7 +333,9 @@ def test_get_seo_skill_catalog_still_works() -> None:
                 ),
             ),
         ):
-            response = await get_seo_skill_catalog(project_id, session=session, current_user=TEST_USER)
+            response = await get_seo_skill_catalog(
+                project_id, session=session, current_user=TEST_USER
+            )
 
         mock_project.assert_awaited_once_with(project_id, session, TEST_USER)
         assert response.skills == []

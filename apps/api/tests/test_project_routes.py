@@ -8,14 +8,11 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-import pytest
-
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
 from app.api.routes.projects import create_project, update_project
 from app.models.project import Project
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate, normalize_public_site_url
-
 from tests.support import TEST_USER
 
 

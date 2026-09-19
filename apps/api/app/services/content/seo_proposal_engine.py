@@ -8,6 +8,12 @@ from app.core.config import settings
 from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoEntityAnalysis, SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyStore
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
+    build_prompt_cache_key,
+    enrich_ai_metadata,
+)
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -17,12 +23,6 @@ from app.services.ai.openai_client import (
 )
 from app.services.content.seo_current_values import normalize_proposal_values
 from app.services.content.seo_proposal_diff import compute_changed_proposed
-from app.services.ai.context_profiles import (
-    AiContextProfile,
-    build_context_for_profile,
-    build_prompt_cache_key,
-    enrich_ai_metadata,
-)
 from app.services.content.seo_skill_loader import load_seo_skill_context
 
 
@@ -138,7 +138,9 @@ def _rules_product_proposal(product: ShopifyProduct, analysis: SeoEntityAnalysis
         "description_html": product.description_html,
         "media_images": _apply_image_alts_to_media(media, image_alts),
         "image_alts": image_alts,
-        "reasoning": ["Proposta rule-based: solo campi mancanti o deboli compilati con dati esistenti"],
+        "reasoning": [
+            "Proposta rule-based: solo campi mancanti o deboli compilati con dati esistenti"
+        ],
         "risk_level": "low",
     }
     if not product.seo_title and "seo_title" in weak:

@@ -16,13 +16,13 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from app.api.routes import dataforseo as dataforseo_routes
 from app.schemas.dataforseo import (
     DataForSeoEstimateRequest,
     DataForSeoTestRequest,
     DataForSeoTestResponse,
 )
 from app.services.dataforseo.exceptions import DataForSeoRealCallsDisabledError
-from app.api.routes import dataforseo as dataforseo_routes
 
 
 def test_test_request_accepts_camel_case() -> None:
@@ -108,21 +108,24 @@ def test_camel_case_request_hits_409_not_422() -> None:
                 "languageCode": "it",
             }
         )
-        with patch(
-            "app.api.routes.dataforseo.get_project_for_user",
-            new=AsyncMock(),
-        ), patch(
-            "app.api.routes.dataforseo.run_dataforseo_sandbox_test",
-            new=AsyncMock(
-                side_effect=DataForSeoRealCallsDisabledError("DataForSEO real calls disabled.")
+        with (
+            patch(
+                "app.api.routes.dataforseo.get_project_for_user",
+                new=AsyncMock(),
             ),
+            patch(
+                "app.api.routes.dataforseo.run_dataforseo_sandbox_test",
+                new=AsyncMock(
+                    side_effect=DataForSeoRealCallsDisabledError("DataForSEO real calls disabled.")
+                ),
+            ),
+            pytest.raises(HTTPException) as exc,
         ):
-            with pytest.raises(HTTPException) as exc:
-                await dataforseo_routes.run_dataforseo_test_endpoint(
-                    project_id,
-                    request,
-                    session,
-                )
+            await dataforseo_routes.run_dataforseo_test_endpoint(
+                project_id,
+                request,
+                session,
+            )
         assert exc.value.status_code == 409
         assert "real calls disabled" in str(exc.value.detail).lower()
 

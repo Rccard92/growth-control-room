@@ -289,9 +289,7 @@ async def estimate_dataforseo_cost(
     estimated_cost = _compute_estimated_cost(calls, unit_costs)
 
     if has_observed:
-        assumptions.append(
-            "Costi unitari basati su usage log osservato per questo progetto."
-        )
+        assumptions.append("Costi unitari basati su usage log osservato per questo progetto.")
     else:
         assumptions.append(
             "Costi unitari conservativi di default: search volume 0.05, "
@@ -319,8 +317,7 @@ async def estimate_dataforseo_cost(
         "params": resolved,
         "estimateSource": "observed" if has_observed else "assumed",
         "observedUnitCosts": {
-            "searchVolume": observed.get("search_volume_batch")
-            or observed.get("search_volume"),
+            "searchVolume": observed.get("search_volume_batch") or observed.get("search_volume"),
             "keywordIdeas": observed.get("keyword_ideas"),
             "serp": observed.get("serp"),
         },

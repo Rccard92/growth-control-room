@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
 if TYPE_CHECKING:
     from app.models.ai_model_setting import AiModelSetting
     from app.models.ai_run import AiRun
@@ -17,8 +18,8 @@ if TYPE_CHECKING:
         BrandAudienceInsight,
         BrandClaimRule,
         BrandContentPillar,
-        BrandExtractedFact,
         BrandExternalSource,
+        BrandExtractedFact,
         BrandFaqObjections,
         BrandIdentity,
         BrandImportBatch,
@@ -34,8 +35,8 @@ if TYPE_CHECKING:
         BrandVisualIdentity,
         BrandVoice,
     )
-    from app.models.content_seo_editorial import ContentSeoEditorialItem
     from app.models.content_seo_brief_job import ContentSeoBriefGenerationJob
+    from app.models.content_seo_editorial import ContentSeoEditorialItem
     from app.models.integration import Integration
     from app.models.shopify import ShopifyStore
     from app.models.workspace import Workspace
@@ -127,12 +128,10 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="project",
         cascade="all, delete-orphan",
     )
-    brand_product_knowledge_general: Mapped["BrandProductKnowledgeGeneral | None"] = (
-        relationship(
-            back_populates="project",
-            cascade="all, delete-orphan",
-            uselist=False,
-        )
+    brand_product_knowledge_general: Mapped["BrandProductKnowledgeGeneral | None"] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
     brand_product_knowledge_items: Mapped[list["BrandProductKnowledgeItem"]] = relationship(
         back_populates="project",

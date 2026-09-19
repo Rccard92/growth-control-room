@@ -14,7 +14,12 @@ from app.models.shopify import (
     ShopifyProductMetafield,
     ShopifyStore,
 )
-from app.services.content.seo_proposal_manual_service import _product_current_with_metafields
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
+    build_prompt_cache_key,
+    enrich_ai_metadata,
+)
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -22,6 +27,7 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
+from app.services.content.seo_image_utils import resolve_product_image
 from app.services.content.seo_proposal_engine import (
     _ai_system_prompt,
     _proposed_alt_for_product,
@@ -29,16 +35,9 @@ from app.services.content.seo_proposal_engine import (
     _rules_product_proposal,
     _truncate_alt,
     collection_current_values,
-    product_current_values,
 )
+from app.services.content.seo_proposal_manual_service import _product_current_with_metafields
 from app.services.content.seo_skill_loader import load_seo_skill_context
-from app.services.ai.context_profiles import (
-    AiContextProfile,
-    build_context_for_profile,
-    build_prompt_cache_key,
-    enrich_ai_metadata,
-)
-from app.services.content.seo_image_utils import resolve_product_image
 from app.services.shopify.metafield_merge import build_product_metafields_merged
 from app.services.shopify.metafield_utils import (
     is_ai_generatable_metafield_type,
@@ -280,7 +279,7 @@ def _ai_field_user_prompt(
     if field == "imageAlt" and entity_type == "product":
         extra = (
             f'\nimage_id target="{image_id}". '
-            'Rispondi con value come oggetto: '
+            "Rispondi con value come oggetto: "
             '{"image_id":"...","proposed_alt":"...","reason":"..."}'
         )
     if field == "metafield" and metafield is not None:
@@ -345,7 +344,6 @@ async def generate_seo_proposal_field(
     if analysis is None:
         raise ValueError("Esegui prima l'analisi SEO su questa entità")
 
-    metafield_row: ShopifyProductMetafield | None = None
     metafield_ctx: _MetafieldContext | None = None
     compiled_metafields: list[dict[str, Any]] = []
     if entity_type == "product":
@@ -443,12 +441,12 @@ async def generate_seo_proposal_field(
             operation="generate_field",
             operation_key=seo_operation_key,
             entity_type=(
-                "product_image"
-                if field == "imageAlt" and entity_type == "product"
-                else entity_type
+                "product_image" if field == "imageAlt" and entity_type == "product" else entity_type
             ),
             entity_id=str(entity_id),
-            job_id=str(image_id) if field == "imageAlt" and entity_type == "product" and image_id else None,
+            job_id=str(image_id)
+            if field == "imageAlt" and entity_type == "product" and image_id
+            else None,
         ),
         ctx,
     )

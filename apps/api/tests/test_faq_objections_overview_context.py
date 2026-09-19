@@ -1,9 +1,9 @@
 """Overview and AI Context resilience tests for legacy FAQ dict data."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
@@ -11,7 +11,7 @@ from app.services.brand_intelligence.context import BrandIntelligenceContextBuil
 from app.services.brand_intelligence.faq_objections_service import faq_objections_completion
 from app.services.brand_intelligence.score import compute_brand_knowledge_score
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 _PID = uuid4()
 
 

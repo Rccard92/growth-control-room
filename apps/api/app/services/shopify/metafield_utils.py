@@ -79,8 +79,10 @@ def metafield_snapshot_item(
     is_empty: bool | None = None,
 ) -> dict[str, Any]:
     raw = raw_value if raw_value is not None else (value or "")
-    display = display_value if display_value is not None else parse_metafield_display_value(
-        type_name, raw
+    display = (
+        display_value
+        if display_value is not None
+        else parse_metafield_display_value(type_name, raw)
     )
     empty = is_empty if is_empty is not None else not str(display).strip()
     def_id = definition_id or id

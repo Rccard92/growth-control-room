@@ -84,9 +84,7 @@ async def list_editorial_items(
     status: str | None = None,
     content_type: str | None = None,
 ) -> list[ContentSeoEditorialItem]:
-    stmt = select(ContentSeoEditorialItem).where(
-        ContentSeoEditorialItem.project_id == project_id
-    )
+    stmt = select(ContentSeoEditorialItem).where(ContentSeoEditorialItem.project_id == project_id)
     if month:
         start, end = _month_range(month)
         stmt = stmt.where(
@@ -205,12 +203,16 @@ async def _duplicate_planned_date_warning(
     project_id: UUID,
 ) -> str | None:
     rows = (
-        await session.execute(
-            select(ContentSeoEditorialItem.planned_date).where(
-                ContentSeoEditorialItem.project_id == project_id
+        (
+            await session.execute(
+                select(ContentSeoEditorialItem.planned_date).where(
+                    ContentSeoEditorialItem.project_id == project_id
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if len(rows) != len(set(rows)):
         return "Alcuni contenuti potrebbero cadere nello stesso giorno."
     return None
@@ -234,19 +236,23 @@ async def reschedule_editorial_item(
 
     if payload.cascade and delta != 0:
         following = (
-            await session.execute(
-                select(ContentSeoEditorialItem)
-                .where(
-                    ContentSeoEditorialItem.project_id == project_id,
-                    ContentSeoEditorialItem.planned_date > old_date,
-                    ContentSeoEditorialItem.id != item_id,
-                )
-                .order_by(
-                    ContentSeoEditorialItem.planned_date.asc(),
-                    ContentSeoEditorialItem.created_at.asc(),
+            (
+                await session.execute(
+                    select(ContentSeoEditorialItem)
+                    .where(
+                        ContentSeoEditorialItem.project_id == project_id,
+                        ContentSeoEditorialItem.planned_date > old_date,
+                        ContentSeoEditorialItem.id != item_id,
+                    )
+                    .order_by(
+                        ContentSeoEditorialItem.planned_date.asc(),
+                        ContentSeoEditorialItem.created_at.asc(),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for item in following:
             item.planned_date = item.planned_date + timedelta(days=delta)
             _apply_planned_date_schedule_sync(item, timezone_name=timezone_name)

@@ -139,11 +139,7 @@ async def _persist_discovery_events(
     for event in events:
         event_type = event.get("type", "discovery_info")
         message = event.get("message", "Discovery event")
-        payload = {
-            key: value
-            for key, value in event.items()
-            if key not in {"type", "message"}
-        }
+        payload = {key: value for key, value in event.items() if key not in {"type", "message"}}
         await create_growth_audit_event(
             session,
             run_id=run.id,
@@ -186,9 +182,7 @@ async def _upsert_inventory_pages(
     inventory_items: list[dict],
     now: datetime,
 ) -> int:
-    existing_by_url = {
-        page.normalized_url: page for page in run.pages
-    }
+    existing_by_url = {page.normalized_url: page for page in run.pages}
     classified_count = 0
 
     for item in inventory_items:
@@ -1173,15 +1167,19 @@ async def recompute_growth_audit_run_summary(
     ).scalar_one()
 
     scores = (
-        await session.execute(
-            select(GrowthAuditPage.score).where(
-                GrowthAuditPage.run_id == run.id,
-                GrowthAuditPage.project_id == run.project_id,
-                GrowthAuditPage.status == "analyzed",
-                GrowthAuditPage.score.is_not(None),
+        (
+            await session.execute(
+                select(GrowthAuditPage.score).where(
+                    GrowthAuditPage.run_id == run.id,
+                    GrowthAuditPage.project_id == run.project_id,
+                    GrowthAuditPage.status == "analyzed",
+                    GrowthAuditPage.score.is_not(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     average_score = round(sum(scores) / len(scores)) if scores else None
 
     critical_count = (
@@ -1279,13 +1277,9 @@ async def rescan_growth_audit_page(
         raise GrowthAuditRunNotFoundError(f"Growth Audit run {run_id} not found")
 
     if run.status in _ACTIVE_RUN_STATUSES:
-        raise GrowthAuditValidationError(
-            "Cannot rescan page while audit run is still active."
-        )
+        raise GrowthAuditValidationError("Cannot rescan page while audit run is still active.")
     if run.status not in _RESCAN_ALLOWED_RUN_STATUSES:
-        raise GrowthAuditValidationError(
-            f"Cannot rescan page for run status: {run.status}"
-        )
+        raise GrowthAuditValidationError(f"Cannot rescan page for run status: {run.status}")
 
     page = await _get_growth_audit_page(
         session,
@@ -1412,9 +1406,7 @@ async def rescan_growth_audit_page(
 
     event_type = "page_rescan_completed" if success else "page_rescan_failed"
     event_message = (
-        f"Riscansione completata: {page.url}"
-        if success
-        else f"Riscansione fallita: {page.url}"
+        f"Riscansione completata: {page.url}" if success else f"Riscansione fallita: {page.url}"
     )
     await create_growth_audit_event(
         session,

@@ -36,9 +36,7 @@ _PAGE_TYPE_METHODOLOGY: dict[str, str] = {
         "Metodologia landing: messaggio above the fold, coerenza ads, CTA, social proof, "
         "friction points, CRO euristico, SEO/GEO base. Performance solo se dati disponibili."
     ),
-    "page": (
-        "Metodologia landing/static: messaggio, CTA, trust, SEO/GEO base, CRO euristico."
-    ),
+    "page": ("Metodologia landing/static: messaggio, CTA, trust, SEO/GEO base, CRO euristico."),
     "static_page": (
         "Metodologia pagina statica: chiarezza contenuto, trust, schema appropriato, linking, GEO base."
     ),

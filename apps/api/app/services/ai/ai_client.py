@@ -21,7 +21,11 @@ from app.services.ai.exceptions import (
     OpenAINotConfiguredError,
     OpenAIRequestError,
 )
-from app.services.ai.model_policy import AiResolvedModel, resolve_ai_model, resolve_standard_fallback
+from app.services.ai.model_policy import (
+    AiResolvedModel,
+    resolve_ai_model,
+    resolve_standard_fallback,
+)
 from app.services.ai.model_request_params import build_openai_request_params
 from app.services.ai.pricing import estimate_image_cost, estimate_usage_cost
 from app.services.ai.usage_service import (
@@ -576,10 +580,10 @@ async def generate_structured_json(
                     json_schema_name=json_schema_name,
                 )
                 parsed, content = _parse_json_object_response(
-                response,
-                metadata=metadata,
-                resolved=active_resolved,
-            )
+                    response,
+                    metadata=metadata,
+                    resolved=active_resolved,
+                )
             elif (
                 settings.ai_enable_model_fallback_on_schema_error
                 and not parse_exc.empty_content
@@ -615,10 +619,10 @@ async def generate_structured_json(
                     json_schema_name=json_schema_name,
                 )
                 parsed, content = _parse_json_object_response(
-                response,
-                metadata=metadata,
-                resolved=active_resolved,
-            )
+                    response,
+                    metadata=metadata,
+                    resolved=active_resolved,
+                )
             else:
                 _raise_openai_parse_error(parse_exc)
     except OpenAINotConfiguredError:
@@ -644,7 +648,9 @@ async def generate_structured_json(
                 status=status,
                 duration_ms=duration_ms,
                 output_chars=len(content),
-                output_preview=truncate_preview(content) if settings.ai_log_prompt_preview else None,
+                output_preview=truncate_preview(content)
+                if settings.ai_log_prompt_preview
+                else None,
                 response_id=getattr(response, "id", None) if response else None,
                 error_type=error_type,
                 error_message=error_message,
@@ -653,7 +659,7 @@ async def generate_structured_json(
         raise OpenAIRequestError(
             _user_message_for_parse_error(parse_exc),
             code=_parse_error_code(parse_exc),
-        )
+        ) from parse_exc
     except OpenAIError as exc:
         status = "error"
         error_type = type(exc).__name__
@@ -711,7 +717,11 @@ async def generate_structured_json(
 
     if estimated_total is not None:
         warn_threshold = settings.ai_single_request_warn_usd
-        if warn_threshold and warn_threshold > 0 and estimated_total >= Decimal(str(warn_threshold)):
+        if (
+            warn_threshold
+            and warn_threshold > 0
+            and estimated_total >= Decimal(str(warn_threshold))
+        ):
             logger.warning(
                 "AI request cost %.4f USD exceeds warn threshold %.2f (project=%s module=%s)",
                 estimated_total,
@@ -928,7 +938,9 @@ async def generate_image(
                 requested_model=model,
                 prompt_hash=prompt_hash,
                 prompt_chars=len(prompt_text),
-                prompt_preview=truncate_preview(prompt_text) if settings.ai_log_prompt_preview else None,
+                prompt_preview=truncate_preview(prompt_text)
+                if settings.ai_log_prompt_preview
+                else None,
                 prompt_cache_key=None,
                 status=status,
                 duration_ms=duration_ms,

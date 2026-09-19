@@ -147,7 +147,4 @@ def test_get_seo_skill_output_json_schema_has_max_items_limits() -> None:
 def test_get_seo_skill_output_json_schema_has_max_length_limits() -> None:
     schema = get_seo_skill_output_json_schema()
     assert schema["properties"]["summary"]["maxLength"] == 900
-    assert (
-        schema["properties"]["artifacts"]["properties"]["markdownReport"]["maxLength"]
-        == 1200
-    )
+    assert schema["properties"]["artifacts"]["properties"]["markdownReport"]["maxLength"] == 1200

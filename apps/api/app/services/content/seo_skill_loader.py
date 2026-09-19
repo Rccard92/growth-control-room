@@ -147,7 +147,7 @@ def _parse_external_skill_frontmatter(skill_dir: Path) -> str | None:
         content = skill_path.read_text(encoding="utf-8")
     except OSError:
         return None
-    name_match = re.search(r'^name:\s*([^\n]+)', content, re.MULTILINE)
+    name_match = re.search(r"^name:\s*([^\n]+)", content, re.MULTILINE)
     version_match = re.search(r'^version:\s*["\']?([^"\'\n]+)["\']?', content, re.MULTILINE)
     name = name_match.group(1).strip() if name_match else skill_dir.name
     version = version_match.group(1).strip() if version_match else "unknown"

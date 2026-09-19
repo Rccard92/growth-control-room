@@ -111,7 +111,9 @@ def test_normalize_editorial_article_payload_new_metadata_fields() -> None:
 
 def test_postprocess_editorial_article_removes_duplicate_intro() -> None:
     from app.schemas.content_seo_editorial import EditorialBriefPayload
-    from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
+    from app.services.content.editorial_article_postprocess import (
+        postprocess_editorial_article_html,
+    )
 
     brief = EditorialBriefPayload(
         proposed_title="Titolo",
@@ -131,7 +133,9 @@ def test_postprocess_editorial_article_removes_duplicate_intro() -> None:
 
 def test_postprocess_editorial_article_reduces_repetitions() -> None:
     from app.schemas.content_seo_editorial import EditorialBriefPayload
-    from app.services.content.editorial_article_postprocess import postprocess_editorial_article_html
+    from app.services.content.editorial_article_postprocess import (
+        postprocess_editorial_article_html,
+    )
 
     brief = EditorialBriefPayload(
         proposed_title="Titolo",
@@ -216,18 +220,20 @@ def test_generate_editorial_article_brief_not_approved() -> None:
     mock_session = AsyncMock()
 
     async def run() -> None:
-        with patch(
-            "app.services.content.editorial_article_service.is_openai_configured",
-            return_value=True,
-        ):
-            with patch(
+        with (
+            patch(
+                "app.services.content.editorial_article_service.is_openai_configured",
+                return_value=True,
+            ),
+            patch(
                 "app.services.content.editorial_article_service.get_editorial_item",
                 new_callable=AsyncMock,
                 return_value=row,
-            ):
-                with pytest.raises(ArticleGenerationError) as exc:
-                    await generate_editorial_article_core(mock_session, project_id, item_id)
-                assert exc.value.brief_not_approved
+            ),
+        ):
+            with pytest.raises(ArticleGenerationError) as exc:
+                await generate_editorial_article_core(mock_session, project_id, item_id)
+            assert exc.value.brief_not_approved
 
     asyncio.run(run())
 
@@ -311,39 +317,34 @@ def test_generate_editorial_article_success() -> None:
                             return_value="BRAND CONTEXT",
                         ):
                             with patch(
-                                "app.services.content.editorial_article_service.get_product_knowledge_prompt_for_entity",
-                                new_callable=AsyncMock,
-                                return_value="PK",
+                                "app.services.content.editorial_article_service.load_seo_skill_context",
+                                return_value=SimpleNamespace(brand_guardrails="GUARDRAILS"),
                             ):
                                 with patch(
-                                    "app.services.content.editorial_article_service.load_seo_skill_context",
-                                    return_value=SimpleNamespace(brand_guardrails="GUARDRAILS"),
+                                    "app.services.content.editorial_article_service.load_editorial_skill_context",
+                                    return_value=SimpleNamespace(
+                                        as_article_prompt_context=lambda: "EDITORIAL SKILL",
+                                        version="v1.1",
+                                    ),
                                 ):
                                     with patch(
-                                        "app.services.content.editorial_article_service.load_editorial_skill_context",
-                                        return_value=SimpleNamespace(
-                                            as_article_prompt_context=lambda: "EDITORIAL SKILL",
-                                            version="v1.1",
-                                        ),
+                                        "app.services.content.editorial_article_service.fetch_latest_editorial_ai_log",
+                                        new_callable=AsyncMock,
+                                        return_value=None,
                                     ):
                                         with patch(
-                                            "app.services.content.editorial_article_service.fetch_latest_editorial_ai_log",
+                                            "app.services.content.editorial_article_service.build_editorial_link_context",
                                             new_callable=AsyncMock,
-                                            return_value=None,
+                                            return_value=[],
                                         ):
                                             with patch(
-                                                "app.services.content.editorial_article_service.build_editorial_link_context",
+                                                "app.services.content.editorial_article_service.generate_structured_json",
                                                 new_callable=AsyncMock,
-                                                return_value=[],
+                                                return_value=_sample_ai_article(),
                                             ):
-                                                with patch(
-                                                    "app.services.content.editorial_article_service.generate_structured_json",
-                                                    new_callable=AsyncMock,
-                                                    return_value=_sample_ai_article(),
-                                                ):
-                                                    result = await generate_editorial_article_core(
-                                                        mock_session, project_id, item_id
-                                                    )
+                                                result = await generate_editorial_article_core(
+                                                    mock_session, project_id, item_id
+                                                )
         assert result.status == "draft_review"
         assert result.article_payload is not None
         assert result.article_payload["title"] == "Guida olio EVO"
@@ -377,9 +378,7 @@ def test_update_editorial_article_ready_to_publish() -> None:
             new_callable=AsyncMock,
             return_value=row,
         ):
-            result = await update_editorial_article(
-                mock_session, project_id, item_id, request
-            )
+            result = await update_editorial_article(mock_session, project_id, item_id, request)
         assert result.status == "ready_to_publish"
         assert result.article_payload is not None
 

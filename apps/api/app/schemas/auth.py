@@ -31,9 +31,7 @@ class UserRead(BaseModel):
     id: str
     email: str
     name: str
-    last_login_at: datetime | None = Field(
-        default=None, serialization_alias="lastLoginAt"
-    )
+    last_login_at: datetime | None = Field(default=None, serialization_alias="lastLoginAt")
 
 
 class LoginResponse(BaseModel):

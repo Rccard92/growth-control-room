@@ -101,7 +101,9 @@ class BrandVisualIdentityUpdate(BaseModel):
     accent_color: str | None = Field(default=None, validation_alias="accentColor")
     background_color: str | None = Field(default=None, validation_alias="backgroundColor")
     text_color: str | None = Field(default=None, validation_alias="textColor")
-    color_palette: list[dict[str, Any]] | None = Field(default=None, validation_alias="colorPalette")
+    color_palette: list[dict[str, Any]] | None = Field(
+        default=None, validation_alias="colorPalette"
+    )
     fonts: list[dict[str, Any]] | None = None
     visual_style_notes: str | None = Field(default=None, validation_alias="visualStyleNotes")
     image_style_notes: str | None = Field(default=None, validation_alias="imageStyleNotes")
@@ -174,7 +176,9 @@ class VisualExtractProposal(BaseModel):
         validation_alias="imageStyleNotes",
         serialization_alias="imageStyleNotes",
     )
-    do_show: list[str] | None = Field(default=None, validation_alias="doShow", serialization_alias="doShow")
+    do_show: list[str] | None = Field(
+        default=None, validation_alias="doShow", serialization_alias="doShow"
+    )
     do_not_show: list[str] | None = Field(
         default=None, validation_alias="doNotShow", serialization_alias="doNotShow"
     )
@@ -245,7 +249,9 @@ class BrandIdentityProposal(BaseModel):
     )
     differentiators: list[str] | None = None
     production_principles: list[str] | None = Field(
-        default=None, validation_alias="productionPrinciples", serialization_alias="productionPrinciples"
+        default=None,
+        validation_alias="productionPrinciples",
+        serialization_alias="productionPrinciples",
     )
     quality_principles: list[str] | None = Field(
         default=None, validation_alias="qualityPrinciples", serialization_alias="qualityPrinciples"

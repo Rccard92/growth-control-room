@@ -12,6 +12,17 @@ from app.schemas.brand_brief import (
     BrandIntelligenceBriefUpdate,
     GenerateBriefResponse,
 )
+from app.schemas.brand_editorial_guidelines import (
+    BrandEditorialGuidelinesRead,
+    BrandEditorialGuidelinesUpdate,
+)
+from app.schemas.brand_faq_objections import (
+    BrandFaqObjectionsApplyProposalRequest,
+    BrandFaqObjectionsApplyProposalResponse,
+    BrandFaqObjectionsImportResponse,
+    BrandFaqObjectionsRead,
+    BrandFaqObjectionsUpdate,
+)
 from app.schemas.brand_identity_visual import (
     BrandIdentityApplyProposalRequest,
     BrandIdentityApplyProposalResponse,
@@ -24,44 +35,6 @@ from app.schemas.brand_identity_visual import (
     VisualApplyProposalResponse,
     VisualExtractRequest,
     VisualExtractResponse,
-)
-from app.schemas.brand_product_knowledge import (
-    BrandProductKnowledgeGeneralApplyProposalRequest,
-    BrandProductKnowledgeGeneralApplyProposalResponse,
-    BrandProductKnowledgeGeneralImportResponse,
-    BrandProductKnowledgeGeneralRead,
-    BrandProductKnowledgeGeneralUpdate,
-    BrandProductKnowledgeItemFromShopifyRequest,
-    BrandProductKnowledgeItemRead,
-    BrandProductKnowledgeItemUpdate,
-    BrandProductKnowledgeItemsApplyImportRequest,
-    BrandProductKnowledgeItemsApplyImportResponse,
-    BrandProductKnowledgeItemsImportResponse,
-    BrandProductKnowledgeShopifyProductOption,
-    BrandProductKnowledgeShopifyProductsResponse,
-)
-from app.schemas.brand_safe_claims import (
-    BrandSafeClaimsApplyProposalRequest,
-    BrandSafeClaimsApplyProposalResponse,
-    BrandSafeClaimsImportResponse,
-    BrandSafeClaimsRead,
-    BrandSafeClaimsUpdate,
-)
-from app.schemas.brand_faq_objections import (
-    BrandFaqObjectionsApplyProposalRequest,
-    BrandFaqObjectionsApplyProposalResponse,
-    BrandFaqObjectionsImportResponse,
-    BrandFaqObjectionsRead,
-    BrandFaqObjectionsUpdate,
-)
-from app.schemas.brand_editorial_guidelines import (
-    BrandEditorialGuidelinesRead,
-    BrandEditorialGuidelinesUpdate,
-)
-from app.schemas.brand_profile_v1 import (
-    BrandProfileApplyProposalRequest,
-    BrandProfileEnrichRequest,
-    BrandProfileEnrichResponse,
 )
 from app.schemas.brand_intelligence import (
     BrandAiGuardrailCreate,
@@ -82,12 +55,12 @@ from app.schemas.brand_intelligence import (
     BrandContentPillarRead,
     BrandContentPillarUpdate,
     BrandContextBundleResponse,
-    BrandExtractBatchRequest,
-    BrandExtractedFactRead,
-    BrandExtractedFactUpdate,
     BrandExternalSourceRead,
     BrandExternalSourcesAddRequest,
     BrandExternalSourcesFetchResponse,
+    BrandExtractBatchRequest,
+    BrandExtractedFactRead,
+    BrandExtractedFactUpdate,
     BrandImportBatchCreateRequest,
     BrandImportBatchCreateResponse,
     BrandImportBatchListItem,
@@ -118,8 +91,42 @@ from app.schemas.brand_intelligence import (
     BrandVoiceRead,
     BrandVoiceUpdate,
 )
+from app.schemas.brand_product_knowledge import (
+    BrandProductKnowledgeGeneralApplyProposalRequest,
+    BrandProductKnowledgeGeneralApplyProposalResponse,
+    BrandProductKnowledgeGeneralImportResponse,
+    BrandProductKnowledgeGeneralRead,
+    BrandProductKnowledgeGeneralUpdate,
+    BrandProductKnowledgeItemFromShopifyRequest,
+    BrandProductKnowledgeItemRead,
+    BrandProductKnowledgeItemsApplyImportRequest,
+    BrandProductKnowledgeItemsApplyImportResponse,
+    BrandProductKnowledgeItemsImportResponse,
+    BrandProductKnowledgeItemUpdate,
+    BrandProductKnowledgeShopifyProductOption,
+    BrandProductKnowledgeShopifyProductsResponse,
+)
+from app.schemas.brand_profile_v1 import (
+    BrandProfileApplyProposalRequest,
+    BrandProfileEnrichRequest,
+    BrandProfileEnrichResponse,
+)
+from app.schemas.brand_safe_claims import (
+    BrandSafeClaimsApplyProposalRequest,
+    BrandSafeClaimsApplyProposalResponse,
+    BrandSafeClaimsImportResponse,
+    BrandSafeClaimsRead,
+    BrandSafeClaimsUpdate,
+)
 from app.services.brand_intelligence import service as bi_service
 from app.services.brand_intelligence import sources_service
+from app.services.brand_intelligence.batch_processor import schedule_batch_processing
+from app.services.brand_intelligence.batch_service import (
+    create_import_batch_with_sources,
+    get_batch_status,
+    list_batches,
+    mark_batch_started,
+)
 from app.services.brand_intelligence.brief_service import (
     approve_brief,
     archive_brief,
@@ -129,12 +136,14 @@ from app.services.brand_intelligence.brief_service import (
     patch_brief,
 )
 from app.services.brand_intelligence.brief_synthesis import generate_brief_from_batch
-from app.services.brand_intelligence.batch_processor import schedule_batch_processing
-from app.services.brand_intelligence.batch_service import (
-    create_import_batch_with_sources,
-    get_batch_status,
-    list_batches,
-    mark_batch_started,
+from app.services.brand_intelligence.document_extraction import run_ai_extraction
+from app.services.brand_intelligence.draft_apply import (
+    apply_section_draft,
+    apply_section_drafts_batch,
+)
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    get_editorial_guidelines,
+    upsert_editorial_guidelines,
 )
 from app.services.brand_intelligence.external_sources_service import (
     add_external_sources_to_batch,
@@ -143,17 +152,11 @@ from app.services.brand_intelligence.external_sources_service import (
     parse_sources_json,
     upsert_batch_sources,
 )
-from app.services.brand_intelligence.refresh_context_service import schedule_refresh_context
-from app.services.brand_intelligence.document_extraction import run_ai_extraction
-from app.services.brand_intelligence.draft_apply import (
-    apply_section_draft,
-    apply_section_drafts_batch,
-)
-from app.services.brand_intelligence.section_drafts_service import (
-    get_section_draft,
-    list_section_drafts,
-    patch_section_draft,
-    regenerate_section_draft,
+from app.services.brand_intelligence.faq_objections_import import import_faq_objections_from_file
+from app.services.brand_intelligence.faq_objections_service import (
+    apply_faq_objections_proposal,
+    get_faq_objections,
+    upsert_faq_objections,
 )
 from app.services.brand_intelligence.identity_import import import_identity_from_file
 from app.services.brand_intelligence.identity_service import (
@@ -161,17 +164,14 @@ from app.services.brand_intelligence.identity_service import (
     get_identity,
     upsert_identity,
 )
-from app.services.brand_intelligence.profile_enrichment import (
-    apply_brand_profile_proposal,
-    enrich_brand_profile,
+from app.services.brand_intelligence.product_knowledge_general_import import (
+    import_general_from_file,
 )
-from app.services.brand_intelligence.product_knowledge_general_import import import_general_from_file
 from app.services.brand_intelligence.product_knowledge_general_service import (
     apply_general_proposal,
     get_general,
     upsert_general,
 )
-from app.services.brand_intelligence.product_knowledge_items_import import import_items_from_file
 from app.services.brand_intelligence.product_knowledge_item_service import (
     apply_items_import_proposal,
     create_item_from_shopify,
@@ -182,29 +182,31 @@ from app.services.brand_intelligence.product_knowledge_item_service import (
     list_shopify_products_for_picker,
     update_item,
 )
+from app.services.brand_intelligence.product_knowledge_items_import import import_items_from_file
+from app.services.brand_intelligence.profile_enrichment import (
+    apply_brand_profile_proposal,
+    enrich_brand_profile,
+)
+from app.services.brand_intelligence.refresh_context_service import schedule_refresh_context
 from app.services.brand_intelligence.safe_claims_import import import_safe_claims_from_file
 from app.services.brand_intelligence.safe_claims_service import (
     apply_safe_claims_proposal,
     get_safe_claims,
     upsert_safe_claims,
 )
-from app.services.brand_intelligence.faq_objections_import import import_faq_objections_from_file
-from app.services.brand_intelligence.faq_objections_service import (
-    apply_faq_objections_proposal,
-    get_faq_objections,
-    upsert_faq_objections,
+from app.services.brand_intelligence.section_drafts_service import (
+    get_section_draft,
+    list_section_drafts,
+    patch_section_draft,
+    regenerate_section_draft,
 )
-from app.services.brand_intelligence.editorial_guidelines_service import (
-    get_editorial_guidelines,
-    upsert_editorial_guidelines,
-)
+from app.services.brand_intelligence.synthesis import synthesize_batch
 from app.services.brand_intelligence.visual_extraction import extract_visual_from_website
 from app.services.brand_intelligence.visual_identity_service import (
     apply_visual_proposal,
     get_visual_identity,
     upsert_visual_identity,
 )
-from app.services.brand_intelligence.synthesis import synthesize_batch
 from app.services.projects import get_project_for_user
 
 router = APIRouter(prefix="/projects", tags=["brand-intelligence"])
@@ -1473,9 +1475,7 @@ async def add_batch_external_sources(
     current_user: User = Depends(get_current_user),
 ) -> list[BrandExternalSourceRead]:
     await get_project_for_user(project_id, session, current_user)
-    return await add_external_sources_to_batch(
-        session, project_id, batch_id, body.sources
-    )
+    return await add_external_sources_to_batch(session, project_id, batch_id, body.sources)
 
 
 @router.post(
@@ -1595,9 +1595,7 @@ async def extract_brand_source_batch(
 ) -> dict:
     """Deprecato: preferire import-batches/{id}/start + polling status."""
     await get_project_for_user(project_id, session, current_user)
-    return await sources_service.extract_document_batch(
-        session, project_id, payload.document_ids
-    )
+    return await sources_service.extract_document_batch(session, project_id, payload.document_ids)
 
 
 @router.get(
@@ -1903,4 +1901,3 @@ async def archive_brand_intelligence_brief(
     await get_project_for_user(project_id, session, current_user)
     row = await archive_brief(session, project_id, brief_id)
     return build_brand_intelligence_brief_read(row)
-

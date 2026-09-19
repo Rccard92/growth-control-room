@@ -20,7 +20,9 @@ class BrandPersonEntry(BaseModel):
 
     name: str = ""
     role: str = ""
-    when_to_use: str = Field(default="", validation_alias="whenToUse", serialization_alias="whenToUse")
+    when_to_use: str = Field(
+        default="", validation_alias="whenToUse", serialization_alias="whenToUse"
+    )
     tone: str = ""
 
 
@@ -43,9 +45,7 @@ class BrandEditorialGuidelinesRead(BaseModel):
 
     id: UUID
     project_id: UUID = Field(serialization_alias="projectId")
-    content_philosophy: str | None = Field(
-        default=None, serialization_alias="contentPhilosophy"
-    )
+    content_philosophy: str | None = Field(default=None, serialization_alias="contentPhilosophy")
     article_length_policy: str | None = Field(
         default=None, serialization_alias="articleLengthPolicy"
     )
@@ -91,22 +91,14 @@ class BrandEditorialGuidelinesRead(BaseModel):
 class BrandEditorialGuidelinesUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    content_philosophy: str | None = Field(
-        default=None, validation_alias="contentPhilosophy"
-    )
-    article_length_policy: str | None = Field(
-        default=None, validation_alias="articleLengthPolicy"
-    )
+    content_philosophy: str | None = Field(default=None, validation_alias="contentPhilosophy")
+    article_length_policy: str | None = Field(default=None, validation_alias="articleLengthPolicy")
     reading_style: str | None = Field(default=None, validation_alias="readingStyle")
-    storytelling_rules: list[str] | None = Field(
-        default=None, validation_alias="storytellingRules"
-    )
+    storytelling_rules: list[str] | None = Field(default=None, validation_alias="storytellingRules")
     brand_people: list[BrandPersonEntry] | None = Field(
         default=None, validation_alias="brandPeople"
     )
-    author_voice_rules: list[str] | None = Field(
-        default=None, validation_alias="authorVoiceRules"
-    )
+    author_voice_rules: list[str] | None = Field(default=None, validation_alias="authorVoiceRules")
     community_cta_rules: list[str] | None = Field(
         default=None, validation_alias="communityCtaRules"
     )

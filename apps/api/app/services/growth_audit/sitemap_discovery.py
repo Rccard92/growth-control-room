@@ -62,7 +62,9 @@ def _safe_limit_urls(urls: list[str], max_urls: int) -> list[str]:
     return urls[:max_urls]
 
 
-def _find_elements_by_local_name(root: ElementTree.Element, local_name: str) -> list[ElementTree.Element]:
+def _find_elements_by_local_name(
+    root: ElementTree.Element, local_name: str
+) -> list[ElementTree.Element]:
     return [element for element in root.iter() if element.tag.split("}")[-1] == local_name]
 
 

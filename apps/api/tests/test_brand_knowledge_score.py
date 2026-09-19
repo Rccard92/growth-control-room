@@ -6,6 +6,10 @@ from app.services.brand_intelligence.identity_service import (
     identity_completion,
     identity_has_minimum,
 )
+from app.services.brand_intelligence.safe_claims_service import (
+    safe_claims_completion,
+    safe_claims_has_minimum,
+)
 from app.services.brand_intelligence.score import (
     SECTION_LABELS,
     _overall_status,
@@ -14,10 +18,6 @@ from app.services.brand_intelligence.score import (
     profile_has_minimum,
     profile_is_complete,
     profile_missing_context,
-)
-from app.services.brand_intelligence.safe_claims_service import (
-    safe_claims_completion,
-    safe_claims_has_minimum,
 )
 from app.services.brand_intelligence.visual_identity_service import (
     visual_completion,

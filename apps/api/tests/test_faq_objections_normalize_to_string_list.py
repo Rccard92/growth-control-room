@@ -26,9 +26,7 @@ def test_normalize_list_str() -> None:
 
 
 def test_normalize_list_dict_question_answer() -> None:
-    result = normalize_to_string_list(
-        [{"question": "Spedite?", "answer": "Sì, in 48h"}]
-    )
+    result = normalize_to_string_list([{"question": "Spedite?", "answer": "Sì, in 48h"}])
     assert result == ["Domanda: Spedite?\nRisposta: Sì, in 48h"]
 
 

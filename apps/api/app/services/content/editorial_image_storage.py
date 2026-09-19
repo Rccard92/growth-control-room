@@ -22,9 +22,7 @@ SHOPIFY_SCOPE_MISSING_WARNING = (
     "Per caricare immagini su Shopify serve il permesso write_files o write_images. "
     "Aggiorna gli scope della Custom App Shopify."
 )
-SHOPIFY_UPLOAD_FAILED_WARNING = (
-    "Upload Shopify Files fallito. Usa «Riprova upload su Shopify»."
-)
+SHOPIFY_UPLOAD_FAILED_WARNING = "Upload Shopify Files fallito. Usa «Riprova upload su Shopify»."
 
 
 def _images_root() -> Path:
@@ -202,10 +200,7 @@ def resolve_preview_image_url(
 
 
 def resolve_authenticated_image_url(project_id: UUID, item_id: UUID) -> str:
-    return (
-        f"/projects/{project_id}/content/seo/editorial-items/"
-        f"{item_id}/image-media"
-    )
+    return f"/projects/{project_id}/content/seo/editorial-items/{item_id}/image-media"
 
 
 def is_public_storage_configured() -> bool:

@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from app.services.content.editorial_link_context_service import (
+    EditorialLinkTarget,
     build_editorial_link_context,
     format_editorial_link_context_for_prompt,
     split_link_targets_by_type,
-    EditorialLinkTarget,
 )
 
 

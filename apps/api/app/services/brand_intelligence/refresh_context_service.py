@@ -45,9 +45,7 @@ async def refresh_batch_context(
     session_factory = get_session_factory()
     async with session_factory() as session:
         batch = (
-            await session.execute(
-                select(BrandImportBatch).where(BrandImportBatch.id == batch_id)
-            )
+            await session.execute(select(BrandImportBatch).where(BrandImportBatch.id == batch_id))
         ).scalar_one_or_none()
         if not batch:
             logger.error("Batch %s non trovato per refresh context", batch_id)
@@ -73,9 +71,7 @@ async def refresh_batch_context(
                     current_step="Recupero sito web",
                     commit=True,
                 )
-                await fetch_batch_external_sources(
-                    session, batch_id, refetch_failed=True
-                )
+                await fetch_batch_external_sources(session, batch_id, refetch_failed=True)
                 batch = (
                     await session.execute(
                         select(BrandImportBatch).where(BrandImportBatch.id == batch_id)
@@ -105,7 +101,9 @@ async def refresh_batch_context(
                                 BrandSectionDraft.status.in_(tuple(ARCHIVE_DRAFT_STATUSES)),
                             )
                         )
-                    ).scalars().all()
+                    )
+                    .scalars()
+                    .all()
                 )
                 for draft in drafts:
                     draft.status = "rejected"
@@ -121,9 +119,7 @@ async def refresh_batch_context(
                 )
                 from app.services.brand_intelligence.synthesis import synthesize_batch
 
-                await synthesize_batch(
-                    session, project_id, batch_id, update_progress=False
-                )
+                await synthesize_batch(session, project_id, batch_id, update_progress=False)
 
             batch = (
                 await session.execute(

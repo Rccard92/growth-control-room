@@ -21,7 +21,12 @@ from app.services.content.seo_skill_loader import load_seo_skill_context
 PRODUCT_BREAKDOWN_KEYS = (
     ("title", "score_title", "title", PRODUCT_WEIGHTS["title"]),
     ("seoTitle", "score_seo_title", "seo_title", PRODUCT_WEIGHTS["seo_title"]),
-    ("metaDescription", "score_meta_description", "seo_description", PRODUCT_WEIGHTS["meta_description"]),
+    (
+        "metaDescription",
+        "score_meta_description",
+        "seo_description",
+        PRODUCT_WEIGHTS["meta_description"],
+    ),
     ("description", "score_description", "description", PRODUCT_WEIGHTS["description"]),
     ("handle", "score_handle", "handle", PRODUCT_WEIGHTS["handle"]),
     ("imageAlt", "score_image_alt", "media_images", PRODUCT_WEIGHTS["image_alt"]),
@@ -30,7 +35,12 @@ PRODUCT_BREAKDOWN_KEYS = (
 COLLECTION_BREAKDOWN_KEYS = (
     ("title", "score_title", "title", COLLECTION_WEIGHTS["title"]),
     ("seoTitle", "score_seo_title", "seo_title", COLLECTION_WEIGHTS["seo_title"]),
-    ("metaDescription", "score_meta_description", "seo_description", COLLECTION_WEIGHTS["meta_description"]),
+    (
+        "metaDescription",
+        "score_meta_description",
+        "seo_description",
+        COLLECTION_WEIGHTS["meta_description"],
+    ),
     ("description", "score_description", "description", COLLECTION_WEIGHTS["description"]),
     ("handle", "score_handle", "handle", COLLECTION_WEIGHTS["handle"]),
     ("imageAlt", "score_image_alt", "image_alt", COLLECTION_WEIGHTS["image_alt"]),

@@ -193,9 +193,7 @@ def compute_attribution_intelligence(orders: list[ShopifyOrder]) -> dict[str, An
         }
     )
     products_by_source: dict[str, set[str]] = defaultdict(set)
-    product_revenue_by_source: dict[tuple[str, str], Decimal] = defaultdict(
-        lambda: Decimal("0")
-    )
+    product_revenue_by_source: dict[tuple[str, str], Decimal] = defaultdict(lambda: Decimal("0"))
 
     tracking_signals = 0
     direct_count = 0
@@ -289,9 +287,7 @@ def compute_attribution_intelligence(orders: list[ShopifyOrder]) -> dict[str, An
             "unknown_count": data["unknown_count"],
             "revenue": data["revenue"],
         }
-        for src, data in sorted(
-            new_returning.items(), key=lambda x: x[1]["revenue"], reverse=True
-        )
+        for src, data in sorted(new_returning.items(), key=lambda x: x[1]["revenue"], reverse=True)
     ][:15]
 
     campaign_items = _breakdown_items(revenue_by_campaign, orders_by_campaign, "campaign")
@@ -299,16 +295,12 @@ def compute_attribution_intelligence(orders: list[ShopifyOrder]) -> dict[str, An
         campaign_items = []
 
     return {
-        "revenue_by_source": _breakdown_items(
-            revenue_by_source, orders_by_source, "source"
-        ),
+        "revenue_by_source": _breakdown_items(revenue_by_source, orders_by_source, "source"),
         "orders_by_source": [
             {"source": k, "orders_count": v, "revenue": revenue_by_source[k]}
             for k, v in orders_by_source.most_common(15)
         ],
-        "revenue_by_channel": _breakdown_items(
-            revenue_by_channel, orders_by_channel, "channel"
-        ),
+        "revenue_by_channel": _breakdown_items(revenue_by_channel, orders_by_channel, "channel"),
         "orders_by_channel": [
             {"channel": k, "orders_count": v, "revenue": revenue_by_channel[k]}
             for k, v in orders_by_channel.most_common(15)
@@ -424,8 +416,7 @@ def build_attribution_alerts(intelligence: dict[str, Any]) -> list[dict[str, Any
 
     products_by_source = intelligence.get("_products_by_source") or {}
     revenue_by_source = {
-        item["source"]: item["revenue"]
-        for item in intelligence.get("revenue_by_source", [])
+        item["source"]: item["revenue"] for item in intelligence.get("revenue_by_source", [])
     }
     for source, revenue in revenue_by_source.items():
         if source in (UNKNOWN_SOURCE, DIRECT_SOURCE):

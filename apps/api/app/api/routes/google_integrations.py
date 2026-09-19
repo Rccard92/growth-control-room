@@ -12,20 +12,20 @@ from app.schemas.google_integration import (
     GoogleAnalyticsPropertiesResponse,
     GoogleAnalyticsProperty,
     GoogleIntegrationStatusResponse,
+    GoogleMerchantAccount,
+    GoogleMerchantAccountsResponse,
     GoogleOAuthStartRequest,
     GoogleOAuthStartResponse,
     GoogleSearchConsoleSite,
     GoogleSearchConsoleSitesResponse,
-    GoogleMerchantAccount,
-    GoogleMerchantAccountsResponse,
-    SelectGoogleMerchantAccountRequest,
-    SelectGoogleMerchantAccountResponse,
     SelectGoogleAnalyticsPropertyRequest,
     SelectGoogleAnalyticsPropertyResponse,
+    SelectGoogleMerchantAccountRequest,
+    SelectGoogleMerchantAccountResponse,
     SelectSearchConsoleSiteRequest,
     SelectSearchConsoleSiteResponse,
 )
-from app.schemas.project import ProjectRead
+from app.services.google.analytics_client import fetch_ga4_account_summaries
 from app.services.google.exceptions import (
     GoogleAnalyticsPropertyError,
     GoogleApiRequestError,
@@ -55,7 +55,6 @@ from app.services.google.google_scope_utils import (
     resolve_oauth_prompt,
 )
 from app.services.google.google_tokens import get_valid_google_access_token
-from app.services.google.analytics_client import fetch_ga4_account_summaries
 from app.services.google.merchant_client import fetch_merchant_accounts
 from app.services.google.search_console_client import fetch_search_console_sites
 from app.services.projects import get_project_for_user
@@ -73,9 +72,7 @@ def _redirect_error(project_id: UUID | None, error_code: str) -> RedirectRespons
             status_code=302,
         )
     return RedirectResponse(
-        url=frontend_redirect_url(
-            f"/projects/{project_id}/integrations?google_error={error_code}"
-        ),
+        url=frontend_redirect_url(f"/projects/{project_id}/integrations?google_error={error_code}"),
         status_code=302,
     )
 

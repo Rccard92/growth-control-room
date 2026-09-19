@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import urlparse
 
@@ -11,6 +12,13 @@ logger = logging.getLogger(__name__)
 
 SHOPIFY_API_VERSION = "2026-04"
 DEFAULT_PAGE_SIZE = 100
+
+# Shopify's GraphQL bucket refills over time, so a throttled call succeeds on retry.
+# Without this a large catalogue sync dies halfway with no way to resume.
+THROTTLE_MAX_ATTEMPTS = 5
+THROTTLE_BASE_DELAY_SECONDS = 1.0
+THROTTLE_MAX_DELAY_SECONDS = 20.0
+HTTP_RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
 # Optional GraphQL field blocks for orders (removed on access/validation errors).
 ORDER_OPTIONAL_BLOCKS: dict[str, str] = {
@@ -216,14 +224,10 @@ def normalize_shop_domain(raw: str) -> str:
         if "." not in value:
             value = f"{value}.myshopify.com"
         elif not value.endswith(".myshopify.com"):
-            raise ShopifyAPIError(
-                "Dominio non valido. Usa il formato nomesito.myshopify.com"
-            )
+            raise ShopifyAPIError("Dominio non valido. Usa il formato nomesito.myshopify.com")
 
     if not re.match(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$", value):
-        raise ShopifyAPIError(
-            "Dominio non valido. Usa il formato nomesito.myshopify.com"
-        )
+        raise ShopifyAPIError("Dominio non valido. Usa il formato nomesito.myshopify.com")
 
     return value
 
@@ -275,16 +279,36 @@ def article_seo_metafields_match(
     return title_ok and desc_ok
 
 
+def _is_throttled_response(response: httpx.Response) -> bool:
+    """True when Shopify answered 200 but refused the query for cost reasons."""
+    if response.status_code != 200:
+        return False
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    if not isinstance(body, dict):
+        return False
+    for error in body.get("errors") or []:
+        if not isinstance(error, dict):
+            continue
+        code = (error.get("extensions") or {}).get("code") or ""
+        if str(code).upper() == "THROTTLED":
+            return True
+        if "throttled" in str(error.get("message", "")).lower():
+            return True
+    return False
+
+
 class ShopifyGraphQLClient:
     def __init__(self, shop_domain: str, access_token: str) -> None:
         self.shop_domain = normalize_shop_domain(shop_domain)
         self.access_token = access_token.strip()
         if not self.access_token:
             raise ShopifyAPIError("Il token di accesso Admin API è obbligatorio")
-        self._url = (
-            f"https://{self.shop_domain}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
-        )
+        self._url = f"https://{self.shop_domain}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
         self.degraded_order_blocks: list[str] = []
+        self.throttle_retries = 0
 
     async def execute(
         self,
@@ -297,10 +321,16 @@ class ShopifyGraphQLClient:
                 err.get("message", str(err)) if isinstance(err, dict) else str(err)
                 for err in raw["errors"]
             ]
-            raise ShopifyAPIError(
-                "Errore GraphQL Shopify: " + "; ".join(messages[:3])
-            )
+            raise ShopifyAPIError("Errore GraphQL Shopify: " + "; ".join(messages[:3]))
         return raw.get("data") or {}
+
+    def _retry_delay(self, attempt: int, retry_after: str | None) -> float:
+        if retry_after:
+            try:
+                return min(float(retry_after), THROTTLE_MAX_DELAY_SECONDS)
+            except ValueError:
+                pass
+        return min(THROTTLE_BASE_DELAY_SECONDS * (2**attempt), THROTTLE_MAX_DELAY_SECONDS)
 
     async def execute_raw(
         self,
@@ -315,14 +345,53 @@ class ShopifyGraphQLClient:
         if variables:
             payload["variables"] = variables
 
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(self._url, json=payload, headers=headers)
-        except httpx.RequestError as exc:
-            raise ShopifyAPIError(
-                "Impossibile contattare Shopify. Verifica il dominio dello shop."
-            ) from exc
+        response: httpx.Response | None = None
+        for attempt in range(THROTTLE_MAX_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(self._url, json=payload, headers=headers)
+            except httpx.RequestError as exc:
+                if attempt + 1 >= THROTTLE_MAX_ATTEMPTS:
+                    raise ShopifyAPIError(
+                        "Impossibile contattare Shopify. Verifica il dominio dello shop."
+                    ) from exc
+                await asyncio.sleep(self._retry_delay(attempt, None))
+                continue
 
+            if response.status_code in HTTP_RETRY_STATUS and attempt + 1 < THROTTLE_MAX_ATTEMPTS:
+                delay = self._retry_delay(attempt, response.headers.get("Retry-After"))
+                self.throttle_retries += 1
+                logger.warning(
+                    "Shopify HTTP %s, nuovo tentativo tra %.1fs (%s/%s)",
+                    response.status_code,
+                    delay,
+                    attempt + 1,
+                    THROTTLE_MAX_ATTEMPTS,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            if attempt + 1 < THROTTLE_MAX_ATTEMPTS and _is_throttled_response(response):
+                delay = self._retry_delay(attempt, response.headers.get("Retry-After"))
+                self.throttle_retries += 1
+                logger.warning(
+                    "Shopify THROTTLED, nuovo tentativo tra %.1fs (%s/%s)",
+                    delay,
+                    attempt + 1,
+                    THROTTLE_MAX_ATTEMPTS,
+                )
+                await asyncio.sleep(delay)
+                continue
+            break
+
+        if response is None:
+            raise ShopifyAPIError("Impossibile contattare Shopify.")
+
+        if response.status_code == 429:
+            raise ShopifyAPIError(
+                "Shopify sta limitando le richieste (rate limit). Riprova tra qualche minuto.",
+                status_code=429,
+            )
         if response.status_code == 401:
             raise ShopifyAPIError(
                 "Token non valido o permessi insufficienti. "
@@ -405,11 +474,7 @@ class ShopifyGraphQLClient:
             data = await self.execute(query)
             installation = data.get("currentAppInstallation") or {}
             scopes = installation.get("accessScopes") or []
-            handles = [
-                s.get("handle")
-                for s in scopes
-                if isinstance(s, dict) and s.get("handle")
-            ]
+            handles = [s.get("handle") for s in scopes if isinstance(s, dict) and s.get("handle")]
             if handles:
                 return sorted(handles)
         except ShopifyAPIError:
@@ -433,10 +498,70 @@ class ShopifyGraphQLClient:
             )
         payload = response.json()
         scopes = payload.get("access_scopes") or []
-        handles = [
-            s.get("handle") for s in scopes if isinstance(s, dict) and s.get("handle")
-        ]
+        handles = [s.get("handle") for s in scopes if isinstance(s, dict) and s.get("handle")]
         return sorted(handles)
+
+    async def iter_connection_pages(
+        self,
+        connection_name: str,
+        node_fields: str,
+        *,
+        page_size: int = DEFAULT_PAGE_SIZE,
+        sort_key: str | None = None,
+        reverse: bool | None = None,
+    ) -> AsyncIterator[list[dict[str, Any]]]:
+        """Yield one page of nodes at a time.
+
+        The list-returning variants below buffer the whole connection in memory,
+        which a large catalogue cannot afford. Callers that persist as they go
+        should iterate instead, so a failure halfway keeps the work already done.
+        """
+        sort_args = ""
+        if sort_key:
+            sort_args += f", sortKey: {sort_key}"
+        if reverse is not None:
+            sort_args += f", reverse: {'true' if reverse else 'false'}"
+
+        query_template = f"""
+        query Paginate($first: Int!, $after: String) {{
+          {connection_name}(first: $first, after: $after{sort_args}) {{
+            pageInfo {{
+              hasNextPage
+              endCursor
+            }}
+            edges {{
+              node {{
+                {node_fields}
+              }}
+            }}
+          }}
+        }}
+        """
+
+        cursor: str | None = None
+        while True:
+            variables: dict[str, Any] = {"first": page_size, "after": cursor}
+            data = await self.execute(query_template, variables)
+            connection = data.get(connection_name) or {}
+            nodes = [edge["node"] for edge in (connection.get("edges") or []) if edge.get("node")]
+            if nodes:
+                yield nodes
+
+            page_info = connection.get("pageInfo") or {}
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info.get("endCursor")
+            if not cursor:
+                break
+
+    async def iter_products(
+        self,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> AsyncIterator[list[dict[str, Any]]]:
+        async for page in self.iter_connection_pages(
+            "products", PRODUCT_FIELDS, page_size=page_size
+        ):
+            yield page
 
     async def _paginate_connection(
         self,
@@ -746,7 +871,11 @@ class ShopifyGraphQLClient:
             msg = "; ".join(
                 str(err.get("message", "")) for err in user_errors if isinstance(err, dict)
             )
-            return {"synced": False, "error": msg or "Errore metafieldsSet.", "userErrors": user_errors}
+            return {
+                "synced": False,
+                "error": msg or "Errore metafieldsSet.",
+                "userErrors": user_errors,
+            }
         return {"synced": True, "error": None, "userErrors": []}
 
     async def find_article_by_handle(
@@ -788,8 +917,7 @@ class ShopifyGraphQLClient:
     def _infer_failed_order_blocks(errors: list[Any]) -> set[str]:
         failed: set[str] = set()
         blob = " ".join(
-            err.get("message", str(err)) if isinstance(err, dict) else str(err)
-            for err in errors
+            err.get("message", str(err)) if isinstance(err, dict) else str(err) for err in errors
         ).lower()
 
         if "email" in blob:
@@ -838,14 +966,10 @@ class ShopifyGraphQLClient:
                         pagination_failed = True
                         break
                     messages = [
-                        err.get("message", str(err))
-                        if isinstance(err, dict)
-                        else str(err)
+                        err.get("message", str(err)) if isinstance(err, dict) else str(err)
                         for err in raw["errors"]
                     ]
-                    raise ShopifyAPIError(
-                        "Errore GraphQL Shopify: " + "; ".join(messages[:3])
-                    )
+                    raise ShopifyAPIError("Errore GraphQL Shopify: " + "; ".join(messages[:3]))
 
                 data = raw.get("data") or {}
                 connection = data.get("orders") or {}
@@ -990,13 +1114,9 @@ class ShopifyGraphQLClient:
             user_errors = result.get("userErrors") or []
         if user_errors:
             messages = [
-                err.get("message", str(err))
-                for err in user_errors
-                if isinstance(err, dict)
+                err.get("message", str(err)) for err in user_errors if isinstance(err, dict)
             ]
-            raise ShopifyAPIError(
-                "Upload Shopify Files non riuscito: " + "; ".join(messages[:3])
-            )
+            raise ShopifyAPIError("Upload Shopify Files non riuscito: " + "; ".join(messages[:3]))
         targets = result.get("stagedTargets") or []
         if not targets:
             raise ShopifyAPIError("Shopify non ha restituito un target di upload.")
@@ -1036,9 +1156,7 @@ class ShopifyGraphQLClient:
             ) from exc
 
         if response.status_code not in (200, 201, 204):
-            raise ShopifyAPIError(
-                f"Upload file su Shopify fallito (HTTP {response.status_code})."
-            )
+            raise ShopifyAPIError(f"Upload file su Shopify fallito (HTTP {response.status_code}).")
 
     async def file_create_from_staged_upload(
         self,
@@ -1077,13 +1195,9 @@ class ShopifyGraphQLClient:
         user_errors = result.get("userErrors") or []
         if user_errors:
             messages = [
-                err.get("message", str(err))
-                for err in user_errors
-                if isinstance(err, dict)
+                err.get("message", str(err)) for err in user_errors if isinstance(err, dict)
             ]
-            raise ShopifyAPIError(
-                "Creazione file Shopify non riuscita: " + "; ".join(messages[:3])
-            )
+            raise ShopifyAPIError("Creazione file Shopify non riuscita: " + "; ".join(messages[:3]))
         files = result.get("files") or []
         if not files or not isinstance(files[0], dict):
             raise ShopifyAPIError("Shopify non ha creato il file immagine.")
@@ -1124,9 +1238,7 @@ class ShopifyGraphQLClient:
             if status == "FAILED":
                 raise ShopifyAPIError("Elaborazione file Shopify fallita.")
             await asyncio.sleep(1.0)
-        raise ShopifyAPIError(
-            "Timeout in attesa del file Shopify. Riprova l'upload."
-        )
+        raise ShopifyAPIError("Timeout in attesa del file Shopify. Riprova l'upload.")
 
 
 def parse_product_metafields(node: dict[str, Any]) -> list[dict[str, Any]]:

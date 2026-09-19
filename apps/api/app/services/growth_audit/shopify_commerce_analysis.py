@@ -10,7 +10,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage
 from app.services.growth_audit.exceptions import (
     GrowthAuditRunNotFoundError,
     GrowthAuditValidationError,
@@ -54,9 +54,7 @@ def _is_product_page(page: GrowthAuditPage) -> bool:
 
 def _filter_product_pages(pages: list[GrowthAuditPage]) -> list[GrowthAuditPage]:
     return [
-        page
-        for page in pages
-        if _is_product_page(page) and (page.source_entity_gid or "").strip()
+        page for page in pages if _is_product_page(page) and (page.source_entity_gid or "").strip()
     ]
 
 
@@ -81,7 +79,9 @@ def _get_page_ga4_sessions(page: GrowthAuditPage) -> int:
     return int(meta.get("sessions") or 0)
 
 
-def _page_has_open_critical_findings(page: GrowthAuditPage, findings: list[GrowthAuditFinding]) -> bool:
+def _page_has_open_critical_findings(
+    page: GrowthAuditPage, findings: list[GrowthAuditFinding]
+) -> bool:
     for finding in findings:
         if finding.page_id != page.id or finding.status != "open":
             continue
@@ -163,9 +163,7 @@ def _compute_run_commerce_summary(
         else:
             products_without_sales += 1
 
-        if stock is not None and int(stock) <= 0:
-            products_out_of_stock += 1
-        elif available is False:
+        if stock is not None and int(stock) <= 0 or available is False:
             products_out_of_stock += 1
 
         if sales > 0 or quantity > 0:
@@ -241,7 +239,14 @@ def _build_shopify_commerce_findings(
                 )
             )
 
-        if (gsc_impressions >= HIGH_IMPRESSIONS_THRESHOLD or ga4_sessions >= HIGH_SESSIONS_THRESHOLD) and sales == 0 and quantity == 0:
+        if (
+            (
+                gsc_impressions >= HIGH_IMPRESSIONS_THRESHOLD
+                or ga4_sessions >= HIGH_SESSIONS_THRESHOLD
+            )
+            and sales == 0
+            and quantity == 0
+        ):
             candidates.append(
                 (
                     gsc_impressions + ga4_sessions,
@@ -290,7 +295,11 @@ def _build_shopify_commerce_findings(
                 )
             )
 
-        if sales >= float(HIGH_SALES_THRESHOLD) and stock_value is not None and 0 < stock_value <= LOW_STOCK_THRESHOLD:
+        if (
+            sales >= float(HIGH_SALES_THRESHOLD)
+            and stock_value is not None
+            and 0 < stock_value <= LOW_STOCK_THRESHOLD
+        ):
             candidates.append(
                 (
                     int(sales),

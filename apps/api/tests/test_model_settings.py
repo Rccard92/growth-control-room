@@ -28,7 +28,6 @@ from app.services.ai.model_settings_service import (
 )
 from app.services.ai.operation_registry import get_operation, tier_cost_profile_label
 from app.services.ai.pricing import estimate_usage_cost
-
 from tests.support import TEST_USER
 
 
@@ -264,7 +263,9 @@ def test_planned_operation_guardrail_message() -> None:
 def test_unknown_model_not_in_guardrail_warnings() -> None:
     op = get_operation("product_image_alt")
     assert op is not None
-    warnings = compute_guardrail_warnings(op, model_tier="cheap", model_name="unknown-model-xyz-999")
+    warnings = compute_guardrail_warnings(
+        op, model_tier="cheap", model_name="unknown-model-xyz-999"
+    )
     assert not any("pricing" in w.lower() for w in warnings)
 
 

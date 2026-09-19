@@ -81,7 +81,9 @@ def _money_amount(node: dict[str, Any] | None, key: str) -> tuple[Decimal, str |
     return _parse_decimal(money.get("amount")), money.get("currencyCode")
 
 
-def _variant_prices(variant_nodes: list[dict[str, Any]]) -> tuple[int | None, Decimal | None, Decimal | None]:
+def _variant_prices(
+    variant_nodes: list[dict[str, Any]],
+) -> tuple[int | None, Decimal | None, Decimal | None]:
     prices: list[Decimal] = []
     for node in variant_nodes:
         price = node.get("price")
@@ -445,9 +447,7 @@ async def _replace_refunds(
     order: ShopifyOrder,
     node: dict[str, Any],
 ) -> int:
-    await session.execute(
-        delete(ShopifyOrderRefund).where(ShopifyOrderRefund.order_id == order.id)
-    )
+    await session.execute(delete(ShopifyOrderRefund).where(ShopifyOrderRefund.order_id == order.id))
 
     refund_nodes = (node.get("refunds") or {}).get("nodes") or []
     count = 0
@@ -534,11 +534,17 @@ async def sync_shopify_store(
 ) -> dict[str, Any]:
     started = time.monotonic()
 
-    products = await client.fetch_all_products()
+    # Stream products page by page and commit as we go: buffering an entire
+    # catalogue (descriptionHtml, media, metafields) blew up memory, and a
+    # failure late in the sync used to throw away everything already fetched.
+    products_synced = 0
     variants_synced = 0
-    for node in products:
-        product = await _upsert_product(session, store.id, node)
-        variants_synced += await _upsert_variants(session, store.id, product, node)
+    async for page in client.iter_products():
+        for node in page:
+            product = await _upsert_product(session, store.id, node)
+            variants_synced += await _upsert_variants(session, store.id, product, node)
+        products_synced += len(page)
+        await session.commit()
 
     orders = await client.fetch_all_orders()
     line_items_synced = 0
@@ -558,20 +564,22 @@ async def sync_shopify_store(
 
     logger.info(
         "Shopify sync v2 completed store_id=%s products=%d variants=%d orders=%d "
-        "line_items=%d refunds=%d metrics_days=%d duration_s=%s degraded_blocks=%s",
+        "line_items=%d refunds=%d metrics_days=%d duration_s=%s throttle_retries=%d "
+        "degraded_blocks=%s",
         store.id,
-        len(products),
+        products_synced,
         variants_synced,
         len(orders),
         line_items_synced,
         refunds_synced,
         metrics_count,
         duration_seconds,
+        client.throttle_retries,
         ",".join(client.degraded_order_blocks) or "none",
     )
 
     return {
-        "products_synced": len(products),
+        "products_synced": products_synced,
         "variants_synced": variants_synced,
         "orders_synced": len(orders),
         "line_items_synced": line_items_synced,

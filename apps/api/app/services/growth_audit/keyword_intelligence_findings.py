@@ -32,9 +32,7 @@ def build_keyword_intelligence_findings(
     competitors: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
-    volume_by_query = {
-        str(item.get("keyword") or "").lower(): item for item in search_volume
-    }
+    volume_by_query = {str(item.get("keyword") or "").lower(): item for item in search_volume}
 
     for seed in seed_queries:
         query = str(seed.get("query") or "")
@@ -101,12 +99,8 @@ def build_keyword_intelligence_findings(
                     "description": (
                         f'Per "{keyword}" la SERP mostra refinement chips informativi.'
                     ),
-                    "recommendation": (
-                        "Aggiungere FAQ/sezioni coerenti con i refinement chips."
-                    ),
-                    "evidence": (
-                        f'SERP per "{keyword}" mostra refinement chips: {chip_labels}.'
-                    ),
+                    "recommendation": ("Aggiungere FAQ/sezioni coerenti con i refinement chips."),
+                    "evidence": (f'SERP per "{keyword}" mostra refinement chips: {chip_labels}.'),
                     "structuredEvidence": structured_evidence,
                 }
             )
@@ -123,18 +117,14 @@ def build_keyword_intelligence_findings(
                 "bestPosition": best_position,
                 "keywords": competitor.get("keywords", [])[:5],
             }
-            position_text = (
-                str(best_position) if best_position is not None else "—"
-            )
+            position_text = str(best_position) if best_position is not None else "—"
             findings.append(
                 {
                     "category": "seo",
                     "severity": "medium",
                     "priority": "medium",
                     "title": "Competitor ricorrente in SERP",
-                    "description": (
-                        f'Il dominio "{domain}" compare spesso nei risultati SERP.'
-                    ),
+                    "description": (f'Il dominio "{domain}" compare spesso nei risultati SERP.'),
                     "recommendation": (
                         "Analizzare struttura e contenuti dei competitor principali."
                     ),

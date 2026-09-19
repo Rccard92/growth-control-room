@@ -1,9 +1,7 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-LOCAL_DATABASE_URL = (
-    "postgresql+asyncpg://gcr:gcr_dev@localhost:5432/growth_control_room"
-)
+LOCAL_DATABASE_URL = "postgresql+asyncpg://gcr:gcr_dev@localhost:5432/growth_control_room"
 
 
 class Settings(BaseSettings):
@@ -75,7 +73,7 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SECRETS_ENCRYPTION_KEY environment variable is required: integration "
                 "tokens must not be stored unencrypted. Generate one with: python -c "
-                "\"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+                '"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
             )
         return self
 

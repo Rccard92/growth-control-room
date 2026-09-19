@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content_seo import ShopifyCollection
 from app.models.seo_optimizer import SeoChangeLog, SeoOptimizationProposal
 from app.models.shopify import ShopifyProduct, ShopifyStore
+from app.services.content.seo_apply_drift import assert_no_upstream_drift
 from app.services.content.seo_apply_local_update import apply_proposed_values_to_entity
 from app.services.content.seo_apply_service import (
     _build_apply_success_response,
@@ -33,6 +34,7 @@ from app.services.content.seo_field_keys import (
     normalize_api_fields_to_snake,
     whitelist_changed_fields,
 )
+from app.services.content.seo_field_validation import validate_seo_values
 from app.services.content.seo_proposal_diff import compute_changed_proposed
 from app.services.content.seo_proposal_engine import (
     collection_current_values,
@@ -110,6 +112,16 @@ async def apply_entity_fields(
     effective_delta, _ = compute_changed_proposed(current, proposed_snake)
     if not effective_delta:
         raise ValueError("Nessun campo da applicare")
+
+    validate_seo_values(effective_delta)
+
+    await assert_no_upstream_drift(
+        client,
+        entity_type=entity_type,
+        entity_gid=entity_gid,
+        snapshot=current,
+        changed_fields=set(effective_delta),
+    )
 
     applied_values: dict[str, Any] = {}
     shopify_response: dict[str, Any] = {}

@@ -76,7 +76,7 @@ def _has_brand_people(value: list | None) -> bool:
 
 
 def editorial_guidelines_has_content(
-    row: BrandEditorialGuidelines | "BrandEditorialGuidelinesRead" | None,
+    row: BrandEditorialGuidelines | BrandEditorialGuidelinesRead | None,
 ) -> bool:
     if not row:
         return False
@@ -90,7 +90,7 @@ def editorial_guidelines_has_content(
 
 
 def editorial_guidelines_missing_fields(
-    row: BrandEditorialGuidelines | "BrandEditorialGuidelinesRead" | None,
+    row: BrandEditorialGuidelines | BrandEditorialGuidelinesRead | None,
 ) -> list[str]:
     if not row:
         return ["content_philosophy", "reading_style", "default_article_length"]
@@ -107,7 +107,7 @@ def editorial_guidelines_missing_fields(
 
 
 def editorial_guidelines_completion(
-    row: BrandEditorialGuidelines | "BrandEditorialGuidelinesRead" | None,
+    row: BrandEditorialGuidelines | BrandEditorialGuidelinesRead | None,
 ) -> CompletionStatus:
     if not row:
         return "empty"
@@ -125,10 +125,12 @@ def editorial_guidelines_completion(
 
 
 def editorial_guidelines_missing_context(
-    row: BrandEditorialGuidelines | "BrandEditorialGuidelinesRead" | None,
+    row: BrandEditorialGuidelines | BrandEditorialGuidelinesRead | None,
 ) -> list[str]:
     if editorial_guidelines_completion(row) == "empty":
-        return ["Editorial Guidelines non compilate: articoli potrebbero essere troppo SEO-oriented."]
+        return [
+            "Editorial Guidelines non compilate: articoli potrebbero essere troppo SEO-oriented."
+        ]
     return []
 
 

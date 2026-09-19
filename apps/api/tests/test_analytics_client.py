@@ -6,7 +6,6 @@ import os
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")

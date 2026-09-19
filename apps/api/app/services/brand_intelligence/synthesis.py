@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -13,13 +13,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
-    BrandExtractedFact,
     BrandExternalSource,
+    BrandExtractedFact,
     BrandImportBatch,
     BrandSectionDraft,
     BrandSourceDocument,
 )
-from app.schemas.brand_intelligence import BrandSectionDraftSynthesizeResponse, BrandSectionDraftSynthesizeSectionItem
+from app.schemas.brand_intelligence import (
+    BrandSectionDraftSynthesizeResponse,
+    BrandSectionDraftSynthesizeSectionItem,
+)
 from app.schemas.section_drafts import (
     FACT_SECTION_TO_DRAFT,
     SECTION_DRAFT_KEYS,
@@ -136,13 +139,21 @@ def _serialize_official_snapshot(snapshot: OfficialSnapshot) -> dict[str, Any]:
     return {
         "brand_profile": _profile(),
         "voice_tone": _voice(),
-        "products": [{"id": str(x.id), "name": x.name, "description": x.description} for x in snapshot.products],
-        "categories": [{"id": str(x.id), "name": x.name, "description": x.description} for x in snapshot.categories],
+        "products": [
+            {"id": str(x.id), "name": x.name, "description": x.description}
+            for x in snapshot.products
+        ],
+        "categories": [
+            {"id": str(x.id), "name": x.name, "description": x.description}
+            for x in snapshot.categories
+        ],
         "audience": [
             {"id": str(x.id), "segment_name": x.segment_name, "description": x.description}
             for x in snapshot.audience
         ],
-        "claims": [{"id": str(x.id), "title": x.title, "rule_type": x.rule_type} for x in snapshot.claims],
+        "claims": [
+            {"id": str(x.id), "title": x.title, "rule_type": x.rule_type} for x in snapshot.claims
+        ],
         "seo_strategy": {
             "primary_keywords": snapshot.seo.primary_keywords if snapshot.seo else None,
             "secondary_keywords": snapshot.seo.secondary_keywords if snapshot.seo else None,
@@ -155,7 +166,9 @@ def _serialize_official_snapshot(snapshot: OfficialSnapshot) -> dict[str, Any]:
     }
 
 
-def _facts_for_section(facts: list[BrandExtractedFact], section_key: str) -> list[BrandExtractedFact]:
+def _facts_for_section(
+    facts: list[BrandExtractedFact], section_key: str
+) -> list[BrandExtractedFact]:
     if section_key == "products_categories":
         return [f for f in facts if f.target_section in ("product_knowledge", "category_knowledge")]
     reverse = {v: k for k, v in FACT_SECTION_TO_DRAFT.items()}
@@ -228,7 +241,7 @@ async def _persist_section_draft(
     ).scalar_one_or_none()
 
     payload = validate_draft_payload(section_key, draft_payload)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if existing:
         existing.draft_payload = payload
@@ -298,7 +311,9 @@ async def synthesize_section(
                     BrandExtractedFact.batch_id == batch_id,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     if include_fact_ids:
         id_set = {str(i) for i in include_fact_ids}
@@ -310,11 +325,11 @@ async def synthesize_section(
             await session.execute(
                 select(BrandExternalSource).where(BrandExternalSource.batch_id == batch_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
-    has_external_content = any(
-        s.status == "fetched" or s.url for s in external_sources
-    )
+    has_external_content = any(s.status == "fetched" or s.url for s in external_sources)
     if not section_facts and not extra_instructions and not has_external_content:
         return None
 
@@ -323,7 +338,9 @@ async def synthesize_section(
             await session.execute(
                 select(BrandSourceDocument).where(BrandSourceDocument.batch_id == batch_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     doc_ids = list({str(f.source_document_id) for f in section_facts if f.source_document_id})
     ext_ids_from_facts = list(
@@ -331,9 +348,10 @@ async def synthesize_section(
     )
     snapshot = await load_official_snapshot(session, project_id)
     official_json = _serialize_official_snapshot(snapshot)
-    external_block = "\n".join(
-        format_external_source_for_prompt(s) for s in external_sources
-    ) or "No external sources."
+    external_block = (
+        "\n".join(format_external_source_for_prompt(s) for s in external_sources)
+        or "No external sources."
+    )
 
     if update_progress:
         await update_batch_progress(

@@ -78,19 +78,21 @@ def test_create_brief_batch_job_no_candidates() -> None:
 
     async def run() -> None:
         session = AsyncMock()
-        with patch(
-            "app.services.content.editorial_brief_batch_service.is_openai_configured",
-            return_value=True,
-        ):
-            with patch(
+        with (
+            patch(
+                "app.services.content.editorial_brief_batch_service.is_openai_configured",
+                return_value=True,
+            ),
+            patch(
                 "app.services.content.editorial_brief_batch_service.find_batch_candidates",
                 new_callable=AsyncMock,
                 return_value=[],
-            ):
-                with pytest.raises(HTTPException) as exc:
-                    await create_brief_batch_job(session, project_id, request)
-                assert exc.value.status_code == 422
-                assert "Nessun contenuto" in str(exc.value.detail)
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await create_brief_batch_job(session, project_id, request)
+            assert exc.value.status_code == 422
+            assert "Nessun contenuto" in str(exc.value.detail)
 
     asyncio.run(run())
 
@@ -177,21 +179,23 @@ def test_process_brief_batch_job_partial_failed() -> None:
             SimpleNamespace(id=item_fail, title="Fail"),
         ]
 
-        with patch(
-            "app.services.content.editorial_brief_batch_service.get_session_factory",
-            return_value=factory,
-        ):
-            with patch(
+        with (
+            patch(
+                "app.services.content.editorial_brief_batch_service.get_session_factory",
+                return_value=factory,
+            ),
+            patch(
                 "app.services.content.editorial_brief_batch_service.find_batch_candidates",
                 new_callable=AsyncMock,
                 return_value=candidates,
-            ):
-                with patch(
-                    "app.services.content.editorial_brief_batch_service.generate_editorial_brief_core",
-                    new_callable=AsyncMock,
-                    side_effect=generate_side_effect,
-                ):
-                    await process_brief_batch_job(job_id)
+            ),
+            patch(
+                "app.services.content.editorial_brief_batch_service.generate_editorial_brief_core",
+                new_callable=AsyncMock,
+                side_effect=generate_side_effect,
+            ),
+        ):
+            await process_brief_batch_job(job_id)
 
         assert job.status == "partial_failed"
         assert job.completed_items == 1

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from html.parser import HTMLParser
-from typing import Any
 from urllib.parse import urljoin, urlparse
 
 from app.schemas.brand_identity_visual import (
@@ -16,9 +15,7 @@ from app.schemas.brand_identity_visual import (
 from app.services.brand_intelligence.source_fetcher import _http_get, _preclean_html
 
 _HEX_RE = re.compile(r"#([0-9a-fA-F]{3,8})\b")
-_RGB_RE = re.compile(
-    r"rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)", re.I
-)
+_RGB_RE = re.compile(r"rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)", re.I)
 _FONT_FAMILY_RE = re.compile(r"font-family\s*:\s*([^;}{]+)", re.I)
 
 
@@ -66,9 +63,7 @@ def _assign_roles(colors: list[tuple[str, int]]) -> list[VisualColorSwatch]:
         confidence = min(0.9, 0.5 + count * 0.05)
         if role:
             used_roles.add(role)
-        swatches.append(
-            VisualColorSwatch(hex=hex_val, role=role, confidence=round(confidence, 2))
-        )
+        swatches.append(VisualColorSwatch(hex=hex_val, role=role, confidence=round(confidence, 2)))
     return swatches
 
 
@@ -147,7 +142,11 @@ def _extract_fonts_from_css(css: str) -> list[VisualFontEntry]:
     for match in _FONT_FAMILY_RE.finditer(css):
         raw = match.group(1).strip().strip('"').strip("'")
         name = raw.split(",")[0].strip().strip('"').strip("'")
-        if name and name.lower() not in ("inherit", "initial", "sans-serif", "serif") and name not in seen:
+        if (
+            name
+            and name.lower() not in ("inherit", "initial", "sans-serif", "serif")
+            and name not in seen
+        ):
             seen.add(name)
             role = "primary" if len(fonts) == 0 else "secondary" if len(fonts) == 1 else None
             fonts.append(VisualFontEntry(name=name, role=role))

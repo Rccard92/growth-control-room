@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.brand_editorial_guidelines import BrandEditorialGuidelinesRead
+from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
 from app.schemas.brand_identity_visual import (
     BrandIdentityRead,
     BrandModuleStatus,
@@ -11,8 +13,6 @@ from app.schemas.brand_identity_visual import (
 )
 from app.schemas.brand_product_knowledge import BrandProductKnowledgeContext
 from app.schemas.brand_safe_claims import BrandSafeClaimsRead
-from app.schemas.brand_faq_objections import BrandFaqObjectionsRead
-from app.schemas.brand_editorial_guidelines import BrandEditorialGuidelinesRead
 
 
 class BrandProfileRead(BaseModel):
@@ -72,7 +72,9 @@ class BrandProfileUpdate(BaseModel):
     linkedin_url: str | None = Field(default=None, validation_alias="linkedinUrl")
     trustpilot_url: str | None = Field(default=None, validation_alias="trustpilotUrl")
     google_business_url: str | None = Field(default=None, validation_alias="googleBusinessUrl")
-    other_sources: list[dict[str, Any]] | None = Field(default=None, validation_alias="otherSources")
+    other_sources: list[dict[str, Any]] | None = Field(
+        default=None, validation_alias="otherSources"
+    )
     short_description: str | None = Field(default=None, validation_alias="shortDescription")
     story: str | None = None
     mission: str | None = None
@@ -232,12 +234,20 @@ class BrandSeoStrategyRead(BaseModel):
     id: UUID
     project_id: UUID = Field(serialization_alias="projectId")
     primary_keywords: list[str] | None = Field(default=None, serialization_alias="primaryKeywords")
-    secondary_keywords: list[str] | None = Field(default=None, serialization_alias="secondaryKeywords")
-    keyword_clusters: list[dict[str, Any]] | None = Field(default=None, serialization_alias="keywordClusters")
+    secondary_keywords: list[str] | None = Field(
+        default=None, serialization_alias="secondaryKeywords"
+    )
+    keyword_clusters: list[dict[str, Any]] | None = Field(
+        default=None, serialization_alias="keywordClusters"
+    )
     priority_pages: list[str] | None = Field(default=None, serialization_alias="priorityPages")
-    internal_linking_notes: str | None = Field(default=None, serialization_alias="internalLinkingNotes")
+    internal_linking_notes: str | None = Field(
+        default=None, serialization_alias="internalLinkingNotes"
+    )
     meta_title_pattern: str | None = Field(default=None, serialization_alias="metaTitlePattern")
-    meta_description_pattern: str | None = Field(default=None, serialization_alias="metaDescriptionPattern")
+    meta_description_pattern: str | None = Field(
+        default=None, serialization_alias="metaDescriptionPattern"
+    )
     url_handle_pattern: str | None = Field(default=None, serialization_alias="urlHandlePattern")
     competitors: list[str] | None = None
     created_at: datetime = Field(serialization_alias="createdAt")
@@ -249,11 +259,17 @@ class BrandSeoStrategyUpdate(BaseModel):
 
     primary_keywords: list[str] | None = Field(default=None, validation_alias="primaryKeywords")
     secondary_keywords: list[str] | None = Field(default=None, validation_alias="secondaryKeywords")
-    keyword_clusters: list[dict[str, Any]] | None = Field(default=None, validation_alias="keywordClusters")
+    keyword_clusters: list[dict[str, Any]] | None = Field(
+        default=None, validation_alias="keywordClusters"
+    )
     priority_pages: list[str] | None = Field(default=None, validation_alias="priorityPages")
-    internal_linking_notes: str | None = Field(default=None, validation_alias="internalLinkingNotes")
+    internal_linking_notes: str | None = Field(
+        default=None, validation_alias="internalLinkingNotes"
+    )
     meta_title_pattern: str | None = Field(default=None, validation_alias="metaTitlePattern")
-    meta_description_pattern: str | None = Field(default=None, validation_alias="metaDescriptionPattern")
+    meta_description_pattern: str | None = Field(
+        default=None, validation_alias="metaDescriptionPattern"
+    )
     url_handle_pattern: str | None = Field(default=None, validation_alias="urlHandlePattern")
     competitors: list[str] | None = None
 
@@ -647,7 +663,9 @@ class BrandImportBatchRefreshContextRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     refetch_external_sources: bool = Field(default=True, validation_alias="refetchExternalSources")
-    regenerate_section_drafts: bool = Field(default=False, validation_alias="regenerateSectionDrafts")
+    regenerate_section_drafts: bool = Field(
+        default=False, validation_alias="regenerateSectionDrafts"
+    )
     archive_previous_drafts: bool = Field(default=True, validation_alias="archivePreviousDrafts")
 
 
@@ -848,9 +866,7 @@ class BrandContextBundleResponse(BaseModel):
     visual_identity: BrandVisualIdentityRead | None = Field(
         default=None, serialization_alias="visualIdentity"
     )
-    safe_claims: BrandSafeClaimsRead | None = Field(
-        default=None, serialization_alias="safeClaims"
-    )
+    safe_claims: BrandSafeClaimsRead | None = Field(default=None, serialization_alias="safeClaims")
     faq_objections: BrandFaqObjectionsRead | None = Field(
         default=None, serialization_alias="faqObjections"
     )
@@ -865,7 +881,9 @@ class BrandContextBundleResponse(BaseModel):
     categories: list[BrandProductKnowledgeRead] = []
     audience: list[BrandAudienceInsightRead] = []
     claims: list[BrandClaimRuleRead] = []
-    seo_strategy: BrandSeoStrategyRead | None = Field(default=None, serialization_alias="seoStrategy")
+    seo_strategy: BrandSeoStrategyRead | None = Field(
+        default=None, serialization_alias="seoStrategy"
+    )
     content_pillars: list[BrandContentPillarRead] = Field(
         default_factory=list, serialization_alias="contentPillars"
     )

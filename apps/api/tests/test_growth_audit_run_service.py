@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.models.growth_audit import GrowthAuditEvent, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditPage, GrowthAuditRun
 from app.schemas.growth_audit import GrowthAuditRunCreateRequest
 from app.services.growth_audit.exceptions import (
     GrowthAuditRunNotFoundError,
@@ -212,9 +212,7 @@ def test_load_pages_to_scan_excludes_analyzed_and_failed_statuses() -> None:
         loaded = await _load_pages_to_scan(session, run=audit_run, max_pages=10)
 
         assert len(loaded) == 3
-        assert all(
-            page.status in ("classified", "discovered", "pending") for page in loaded
-        )
+        assert all(page.status in ("classified", "discovered", "pending") for page in loaded)
 
     asyncio.run(run())
 
@@ -419,7 +417,9 @@ def test_process_growth_audit_run_keeps_seed_when_sitemap_fails() -> None:
             ),
             patch(
                 "app.services.growth_audit.run_service.discover_shopify_urls",
-                new=AsyncMock(return_value=([], [{"type": "shopify_urls_missing", "message": "none"}])),
+                new=AsyncMock(
+                    return_value=([], [{"type": "shopify_urls_missing", "message": "none"}])
+                ),
             ),
         ):
             await process_growth_audit_run(run_id)
@@ -521,8 +521,6 @@ def test_process_growth_audit_run_creates_technical_results() -> None:
             ),
         ):
             await process_growth_audit_run(run_id)
-
-        from app.models.growth_audit import GrowthAuditPageResult
 
         result_types = [
             type(item).__name__

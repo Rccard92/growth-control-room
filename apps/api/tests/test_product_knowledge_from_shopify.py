@@ -1,7 +1,6 @@
 """Product Knowledge from Shopify unit tests."""
 
 import asyncio
-from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4

@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 class AiModelSetting(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "ai_model_settings"
     __table_args__ = (
-        UniqueConstraint("project_id", "operation_key", name="uq_ai_model_settings_project_operation"),
+        UniqueConstraint(
+            "project_id", "operation_key", name="uq_ai_model_settings_project_operation"
+        ),
     )
 
     project_id: Mapped[uuid.UUID | None] = mapped_column(

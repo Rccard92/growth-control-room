@@ -8,26 +8,22 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.growth_audit import (
+    GrowthAuditAnalyticsAnalysisRequest,
+    GrowthAuditAnalyticsAnalysisResponse,
     GrowthAuditEventRead,
     GrowthAuditEventsListResponse,
     GrowthAuditFindingRead,
     GrowthAuditFindingsListResponse,
+    GrowthAuditGa4EcommerceAnalysisRequest,
+    GrowthAuditGa4EcommerceAnalysisResponse,
+    GrowthAuditKeywordIntelligenceAnalysisRequest,
+    GrowthAuditKeywordIntelligenceAnalysisResponse,
+    GrowthAuditMerchantCenterAnalysisRequest,
+    GrowthAuditMerchantCenterAnalysisResponse,
     GrowthAuditPageAiAnalysisRequest,
     GrowthAuditPageAiAnalysisResponse,
     GrowthAuditPagePerformanceAnalysisRequest,
     GrowthAuditPagePerformanceAnalysisResponse,
-    GrowthAuditKeywordIntelligenceAnalysisRequest,
-    GrowthAuditKeywordIntelligenceAnalysisResponse,
-    GrowthAuditSearchConsoleAnalysisRequest,
-    GrowthAuditSearchConsoleAnalysisResponse,
-    GrowthAuditAnalyticsAnalysisRequest,
-    GrowthAuditAnalyticsAnalysisResponse,
-    GrowthAuditShopifyCommerceAnalysisRequest,
-    GrowthAuditShopifyCommerceAnalysisResponse,
-    GrowthAuditGa4EcommerceAnalysisRequest,
-    GrowthAuditGa4EcommerceAnalysisResponse,
-    GrowthAuditMerchantCenterAnalysisRequest,
-    GrowthAuditMerchantCenterAnalysisResponse,
     GrowthAuditPageRead,
     GrowthAuditPageRescanRequest,
     GrowthAuditPageRescanResponse,
@@ -38,9 +34,19 @@ from app.schemas.growth_audit import (
     GrowthAuditRunDetailResponse,
     GrowthAuditRunRead,
     GrowthAuditRunsListResponse,
+    GrowthAuditSearchConsoleAnalysisRequest,
+    GrowthAuditSearchConsoleAnalysisResponse,
+    GrowthAuditShopifyCommerceAnalysisRequest,
+    GrowthAuditShopifyCommerceAnalysisResponse,
     GrowthAuditStartResponse,
     GrowthAuditTaskRead,
     GrowthAuditTasksListResponse,
+)
+from app.services.dataforseo.exceptions import (
+    DataForSeoApiError,
+    DataForSeoBudgetExceededError,
+    DataForSeoNotConfiguredError,
+    DataForSeoRealCallsDisabledError,
 )
 from app.services.google.exceptions import (
     GoogleAnalyticsPropertyError,
@@ -51,19 +57,22 @@ from app.services.google.exceptions import (
     GoogleSearchConsolePropertyError,
     MerchantAccountError,
 )
-from app.services.dataforseo.exceptions import (
-    DataForSeoApiError,
-    DataForSeoBudgetExceededError,
-    DataForSeoNotConfiguredError,
-    DataForSeoRealCallsDisabledError,
+from app.services.growth_audit.analytics_analysis import (
+    analyze_growth_audit_analytics,
 )
-from app.services.growth_audit.keyword_intelligence_analysis import (
-    analyze_growth_audit_page_keyword_intelligence,
+from app.services.growth_audit.analytics_ecommerce_analysis import (
+    analyze_growth_audit_analytics_ecommerce,
 )
 from app.services.growth_audit.exceptions import (
     GrowthAuditError,
     GrowthAuditRunNotFoundError,
     GrowthAuditValidationError,
+)
+from app.services.growth_audit.keyword_intelligence_analysis import (
+    analyze_growth_audit_page_keyword_intelligence,
+)
+from app.services.growth_audit.merchant_center_analysis import (
+    analyze_growth_audit_merchant_center,
 )
 from app.services.growth_audit.page_ai_analysis import (
     analyze_growth_audit_page_with_ai,
@@ -71,26 +80,6 @@ from app.services.growth_audit.page_ai_analysis import (
 )
 from app.services.growth_audit.page_performance_analysis import (
     analyze_growth_audit_page_performance,
-)
-from app.services.growth_audit.search_console_analysis import (
-    analyze_growth_audit_search_console,
-)
-from app.services.growth_audit.analytics_analysis import (
-    analyze_growth_audit_analytics,
-)
-from app.services.growth_audit.shopify_commerce_analysis import (
-    analyze_growth_audit_shopify_commerce,
-)
-from app.services.growth_audit.analytics_ecommerce_analysis import (
-    analyze_growth_audit_analytics_ecommerce,
-)
-from app.services.growth_audit.merchant_center_analysis import (
-    analyze_growth_audit_merchant_center,
-)
-from app.services.shopify.exceptions import (
-    ShopifyCommerceApiError,
-    ShopifyIntegrationNotConnectedError,
-    ShopifyIntegrationPermissionError,
 )
 from app.services.growth_audit.run_service import (
     get_growth_audit_run_detail,
@@ -102,7 +91,18 @@ from app.services.growth_audit.run_service import (
     rescan_growth_audit_page,
     start_growth_audit_run,
 )
+from app.services.growth_audit.search_console_analysis import (
+    analyze_growth_audit_search_console,
+)
+from app.services.growth_audit.shopify_commerce_analysis import (
+    analyze_growth_audit_shopify_commerce,
+)
 from app.services.projects import get_project_for_user
+from app.services.shopify.exceptions import (
+    ShopifyCommerceApiError,
+    ShopifyIntegrationNotConnectedError,
+    ShopifyIntegrationPermissionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -498,7 +498,13 @@ async def analyze_growth_audit_page_performance_endpoint(
 ) -> GrowthAuditPagePerformanceAnalysisResponse:
     await get_project_for_user(project_id, session, current_user)
     try:
-        run, page, result, findings_count, tasks_count = await analyze_growth_audit_page_performance(
+        (
+            run,
+            page,
+            result,
+            findings_count,
+            tasks_count,
+        ) = await analyze_growth_audit_page_performance(
             session,
             project_id=project_id,
             run_id=run_id,
@@ -543,19 +549,24 @@ async def analyze_growth_audit_page_keyword_intelligence_endpoint(
 ) -> GrowthAuditKeywordIntelligenceAnalysisResponse:
     await get_project_for_user(project_id, session, current_user)
     try:
-        run, page, summary, cached, findings_count, tasks_count = (
-            await analyze_growth_audit_page_keyword_intelligence(
-                session,
-                project_id=project_id,
-                run_id=run_id,
-                page_id=page_id,
-                max_seed_queries=request.max_seed_queries,
-                keyword_ideas_seeds=request.keyword_ideas_seeds,
-                serp_keywords=request.serp_keywords,
-                location_code=request.location_code,
-                language_code=request.language_code,
-                force=request.force,
-            )
+        (
+            run,
+            page,
+            summary,
+            cached,
+            findings_count,
+            tasks_count,
+        ) = await analyze_growth_audit_page_keyword_intelligence(
+            session,
+            project_id=project_id,
+            run_id=run_id,
+            page_id=page_id,
+            max_seed_queries=request.max_seed_queries,
+            keyword_ideas_seeds=request.keyword_ideas_seeds,
+            serp_keywords=request.serp_keywords,
+            location_code=request.location_code,
+            language_code=request.language_code,
+            force=request.force,
         )
     except DataForSeoRealCallsDisabledError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message) from exc

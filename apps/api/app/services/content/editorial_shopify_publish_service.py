@@ -15,14 +15,15 @@ from app.models.content_seo import ShopifyBlog
 from app.models.content_seo_editorial import ContentSeoEditorialItem
 from app.schemas.content_seo_editorial import (
     EditorialImagePayload,
+    EditorialPublishingPayload,
     EditorialPublishShopifyRequest,
     EditorialPublishShopifyResponse,
-    EditorialPublishingPayload,
     normalize_editorial_article_payload,
 )
 from app.services.content.editorial_item_service import get_editorial_item, get_editorial_item_read
 from app.services.content.editorial_publishing_utils import (
     HANDLE_CONFLICT_MESSAGE,
+    PUBLISHING_STALE_MESSAGE,
     SEO_REQUIRED_MESSAGE,
     attach_publishing_sync_metadata,
     build_article_create_input,
@@ -35,7 +36,6 @@ from app.services.content.editorial_publishing_utils import (
     get_publishing_seo_warnings,
     is_publishing_stale,
     normalize_publishing_payload,
-    PUBLISHING_STALE_MESSAGE,
     resolve_publishing_author,
     shopify_gid_numeric_id,
     shopify_publish_http_status,
@@ -116,9 +116,7 @@ async def _ensure_shopify_seo_synced(
             parsed = await client.get_article_global_metafields(article_gid)
         else:
             error = str(sync_result.get("error") or "Errore sincronizzazione SEO Shopify.")
-            error_message = (
-                f"Articolo creato/aggiornato, ma SEO Shopify non sincronizzata: {error}"
-            )
+            error_message = f"Articolo creato/aggiornato, ma SEO Shopify non sincronizzata: {error}"
             warnings.append(error_message)
             return publishing.model_copy(
                 update={
@@ -452,7 +450,8 @@ async def publish_editorial_to_shopify(
 
     image_payload = normalize_image_payload(getattr(row, "image_payload", None))
     has_approved_image = image_payload.image_status == "approved" or (
-        image_payload.image_status == "generated" and image_payload.approved_image_backup is not None
+        image_payload.image_status == "generated"
+        and image_payload.approved_image_backup is not None
     )
     if has_approved_image:
         if is_image_stale(row.article_payload, image_payload):

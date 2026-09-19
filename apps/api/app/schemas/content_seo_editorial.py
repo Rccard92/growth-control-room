@@ -137,9 +137,7 @@ class ContentSeoEditorialItemCreate(BaseModel):
     status: ContentSeoEditorialStatus = "idea"
     objective: ContentSeoEditorialObjective | None = None
     primary_keyword: str | None = Field(default=None, validation_alias="primaryKeyword")
-    secondary_keywords: list[str] | None = Field(
-        default=None, validation_alias="secondaryKeywords"
-    )
+    secondary_keywords: list[str] | None = Field(default=None, validation_alias="secondaryKeywords")
     target_audience: str | None = Field(default=None, validation_alias="targetAudience")
     search_intent: str | None = Field(default=None, validation_alias="searchIntent")
     commercial_intensity: ContentSeoEditorialCommercialIntensity | None = Field(
@@ -157,9 +155,7 @@ class ContentSeoEditorialItemCreate(BaseModel):
     linked_shopify_product_handle: str | None = Field(
         default=None, validation_alias="linkedShopifyProductHandle"
     )
-    linked_collection_id: UUID | None = Field(
-        default=None, validation_alias="linkedCollectionId"
-    )
+    linked_collection_id: UUID | None = Field(default=None, validation_alias="linkedCollectionId")
     linked_collection_title: str | None = Field(
         default=None, validation_alias="linkedCollectionTitle"
     )
@@ -177,9 +173,7 @@ class ContentSeoEditorialItemUpdate(BaseModel):
     status: ContentSeoEditorialStatus | None = None
     objective: ContentSeoEditorialObjective | None = None
     primary_keyword: str | None = Field(default=None, validation_alias="primaryKeyword")
-    secondary_keywords: list[str] | None = Field(
-        default=None, validation_alias="secondaryKeywords"
-    )
+    secondary_keywords: list[str] | None = Field(default=None, validation_alias="secondaryKeywords")
     target_audience: str | None = Field(default=None, validation_alias="targetAudience")
     search_intent: str | None = Field(default=None, validation_alias="searchIntent")
     commercial_intensity: ContentSeoEditorialCommercialIntensity | None = Field(
@@ -197,9 +191,7 @@ class ContentSeoEditorialItemUpdate(BaseModel):
     linked_shopify_product_handle: str | None = Field(
         default=None, validation_alias="linkedShopifyProductHandle"
     )
-    linked_collection_id: UUID | None = Field(
-        default=None, validation_alias="linkedCollectionId"
-    )
+    linked_collection_id: UUID | None = Field(default=None, validation_alias="linkedCollectionId")
     linked_collection_title: str | None = Field(
         default=None, validation_alias="linkedCollectionTitle"
     )
@@ -222,9 +214,7 @@ class EditorialPlanGenerateRequest(BaseModel):
     preferred_weekdays: list[EditorialWeekday] | None = Field(
         default=None, validation_alias="preferredWeekdays"
     )
-    content_types: list[ContentSeoEditorialContentType] = Field(
-        validation_alias="contentTypes"
-    )
+    content_types: list[ContentSeoEditorialContentType] = Field(validation_alias="contentTypes")
     objectives: list[ContentSeoEditorialObjective] = Field(
         default_factory=list, validation_alias="objectives"
     )
@@ -235,12 +225,8 @@ class EditorialPlanGenerateRequest(BaseModel):
     linked_product_ids: list[UUID] = Field(
         default_factory=list, validation_alias="linkedProductIds"
     )
-    avoid_product_ids: list[UUID] = Field(
-        default_factory=list, validation_alias="avoidProductIds"
-    )
-    primary_keywords: list[str] = Field(
-        default_factory=list, validation_alias="primaryKeywords"
-    )
+    avoid_product_ids: list[UUID] = Field(default_factory=list, validation_alias="avoidProductIds")
+    primary_keywords: list[str] = Field(default_factory=list, validation_alias="primaryKeywords")
     notes: str = ""
 
     @model_validator(mode="after")
@@ -304,9 +290,7 @@ class EditorialBriefBatchJobResponse(BaseModel):
     total_items: int = Field(serialization_alias="totalItems")
     completed_items: int = Field(serialization_alias="completedItems")
     failed_items: int = Field(serialization_alias="failedItems")
-    current_item_title: str | None = Field(
-        default=None, serialization_alias="currentItemTitle"
-    )
+    current_item_title: str | None = Field(default=None, serialization_alias="currentItemTitle")
     progress_percent: int = Field(serialization_alias="progressPercent")
     errors: list[EditorialBriefBatchJobError] = Field(default_factory=list)
 
@@ -423,9 +407,7 @@ class EditorialBriefPayload(BaseModel):
     author_suggestion: str = Field(default="", serialization_alias="authorSuggestion")
     author_reason: str = Field(default="", serialization_alias="authorReason")
     content_length_profile: str = Field(default="", serialization_alias="contentLengthProfile")
-    community_cta_suggestion: str = Field(
-        default="", serialization_alias="communityCtaSuggestion"
-    )
+    community_cta_suggestion: str = Field(default="", serialization_alias="communityCtaSuggestion")
     editorial_tone_notes: list[str] = Field(
         default_factory=list, serialization_alias="editorialToneNotes"
     )
@@ -520,15 +502,11 @@ def normalize_editorial_brief_payload(raw: dict) -> EditorialBriefPayload:
     author = str(data.get("author_suggestion") or "").strip()
     data["author_suggestion"] = author if author in _VALID_AUTHOR_SUGGESTIONS else ""
     profile = str(data.get("content_length_profile") or "").strip()
-    data["content_length_profile"] = (
-        profile if profile in _VALID_CONTENT_LENGTH_PROFILES else ""
-    )
+    data["content_length_profile"] = profile if profile in _VALID_CONTENT_LENGTH_PROFILES else ""
     complexity = str(data.get("structure_complexity") or "").strip()
     if "structureComplexity" in data and "structure_complexity" not in data:
         complexity = str(data.pop("structureComplexity") or "").strip()
-    data["structure_complexity"] = (
-        complexity if complexity in _VALID_STRUCTURE_COMPLEXITY else ""
-    )
+    data["structure_complexity"] = complexity if complexity in _VALID_STRUCTURE_COMPLEXITY else ""
     for int_alias, int_field in (
         ("recommendedWordCountMin", "recommended_word_count_min"),
         ("recommendedWordCountMax", "recommended_word_count_max"),
@@ -598,9 +576,7 @@ class EditorialArticlePayload(BaseModel):
     seo_title: str = Field(default="", serialization_alias="seoTitle")
     meta_description: str = Field(default="", serialization_alias="metaDescription")
     tags: list[str] = Field(default_factory=list)
-    linked_products: list[str] = Field(
-        default_factory=list, serialization_alias="linkedProducts"
-    )
+    linked_products: list[str] = Field(default_factory=list, serialization_alias="linkedProducts")
     linked_collections: list[str] = Field(
         default_factory=list, serialization_alias="linkedCollections"
     )
@@ -608,9 +584,7 @@ class EditorialArticlePayload(BaseModel):
     author_name: str = Field(default="", serialization_alias="authorName")
     author_role: str = Field(default="", serialization_alias="authorRole")
     community_cta: str = Field(default="", serialization_alias="communityCta")
-    estimated_reading_time: str = Field(
-        default="", serialization_alias="estimatedReadingTime"
-    )
+    estimated_reading_time: str = Field(default="", serialization_alias="estimatedReadingTime")
     content_length_profile: Literal["breve", "medio", "approfondito"] | None = Field(
         default=None, serialization_alias="contentLengthProfile"
     )
@@ -631,9 +605,7 @@ class EditorialArticlePayload(BaseModel):
     internal_link_suggestions: list[str] = Field(
         default_factory=list, serialization_alias="internalLinkSuggestions"
     )
-    html_blocks_used: list[str] = Field(
-        default_factory=list, serialization_alias="htmlBlocksUsed"
-    )
+    html_blocks_used: list[str] = Field(default_factory=list, serialization_alias="htmlBlocksUsed")
     skill_pack_used: str = Field(default="", serialization_alias="skillPackUsed")
     skill_pack_version: str = Field(default="", serialization_alias="skillPackVersion")
     safe_claim_flags: list[EditorialSafeClaimFlag] = Field(
@@ -714,9 +686,7 @@ def normalize_editorial_article_payload(raw: dict) -> EditorialArticlePayload:
     payload = EditorialArticlePayload.model_validate(data)
     sanitized = sanitize_editorial_article_html_with_warnings(payload.body_html)
     warnings = list(dict.fromkeys([*payload.warnings, *sanitized.warnings]))
-    return payload.model_copy(
-        update={"body_html": sanitized.html, "warnings": warnings}
-    )
+    return payload.model_copy(update={"body_html": sanitized.html, "warnings": warnings})
 
 
 class EditorialArticleUpdateRequest(BaseModel):
@@ -765,9 +735,7 @@ class EditorialPublishingPayload(BaseModel):
     is_published: bool = Field(default=False, serialization_alias="isPublished")
     publish_date: str | None = Field(default=None, serialization_alias="publishDate")
     template_suffix: str | None = Field(default=None, serialization_alias="templateSuffix")
-    source_article_hash: str | None = Field(
-        default=None, serialization_alias="sourceArticleHash"
-    )
+    source_article_hash: str | None = Field(default=None, serialization_alias="sourceArticleHash")
     source_article_updated_at: str | None = Field(
         default=None, serialization_alias="sourceArticleUpdatedAt"
     )
@@ -779,18 +747,14 @@ class EditorialPublishingPayload(BaseModel):
         default=None, serialization_alias="shopifySeoSyncedAt"
     )
     shopify_seo_error: str | None = Field(default=None, serialization_alias="shopifySeoError")
-    scheduled_publish_at: str | None = Field(
-        default=None, serialization_alias="scheduledPublishAt"
-    )
+    scheduled_publish_at: str | None = Field(default=None, serialization_alias="scheduledPublishAt")
     scheduled_publish_timezone: str | None = Field(
         default=None, serialization_alias="scheduledPublishTimezone"
     )
     scheduled_publish_source: EditorialScheduledPublishSource | None = Field(
         default=None, serialization_alias="scheduledPublishSource"
     )
-    source_planned_date: str | None = Field(
-        default=None, serialization_alias="sourcePlannedDate"
-    )
+    source_planned_date: str | None = Field(default=None, serialization_alias="sourcePlannedDate")
     scheduled_publish_time: str | None = Field(
         default=None, serialization_alias="scheduledPublishTime"
     )
@@ -876,9 +840,7 @@ class EditorialImagePayload(BaseModel):
     )
     image_approved_at: str | None = Field(default=None, serialization_alias="imageApprovedAt")
     image_hash: str | None = Field(default=None, serialization_alias="imageHash")
-    source_article_hash: str | None = Field(
-        default=None, serialization_alias="sourceArticleHash"
-    )
+    source_article_hash: str | None = Field(default=None, serialization_alias="sourceArticleHash")
     access_token: str | None = Field(default=None, serialization_alias="accessToken")
     updated_at: str | None = Field(default=None, serialization_alias="updatedAt")
     skill_pack_used: str = Field(default="", serialization_alias="skillPackUsed")

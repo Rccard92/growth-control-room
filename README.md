@@ -88,8 +88,27 @@ Copia `.env.example` in `.env` e adatta i valori se necessario.
 |-----------|---------|-------------|
 | `VITE_API_URL` | *(vuoto)* | URL base API per il frontend (build-time su Railway) |
 | `DATABASE_URL` | *(obbligatoria)* | Connessione PostgreSQL; in locale con `APP_ENV=development` usa il default da `.env` |
-| `CORS_ORIGINS` | `*` | Origini CORS consentite (separate da virgola) |
+| `SECRETS_ENCRYPTION_KEY` | *(obbligatoria in produzione)* | Chiave Fernet per cifrare i token di integrazione |
+| `CORS_ORIGINS` | *(obbligatoria in produzione)* | Origini consentite, separate da virgola. `*` è rifiutato fuori da `development` |
 | `APP_ENV` | `production` | Ambiente applicazione (`development` in locale) |
+| `INITIAL_ADMIN_EMAIL` | *(vuoto)* | Email del primo account amministratore |
+| `INITIAL_ADMIN_PASSWORD` | *(vuoto)* | Password del primo account (min. 12 caratteri) |
+
+### Autenticazione
+
+L'API richiede un account per tutti gli endpoint tranne health, login e le callback OAuth
+dei provider. Al primo avvio, se `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD` sono
+impostate e non esiste ancora un utente con password, viene creato l'account amministratore
+e collegato al workspace. Agli avvii successivi non viene toccato nulla.
+
+Genera la chiave di cifratura con:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Per ruotarla: metti la nuova chiave **per prima** in `SECRETS_ENCRYPTION_KEY` (separata da
+virgola dalla vecchia), redeploy, poi riscrivi le credenziali e togli la vecchia chiave.
 
 ## Deploy su Railway
 
@@ -100,30 +119,45 @@ Due servizi separati: **API** (FastAPI) e **WEB** (Vite preview).
 | Variabile | Esempio |
 |-----------|---------|
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (**obbligatoria** sul servizio API) |
-| `CORS_ORIGINS` | `https://web-xxx.up.railway.app` |
+| `SECRETS_ENCRYPTION_KEY` | chiave Fernet (**obbligatoria**) |
+| `CORS_ORIGINS` | `https://web-xxx.up.railway.app` (**obbligatoria**, niente `*`) |
 | `APP_ENV` | `production` |
+| `INITIAL_ADMIN_EMAIL` | `tu@dominio.it` |
+| `INITIAL_ADMIN_PASSWORD` | password di almeno 12 caratteri |
 
 `DATABASE_URL` deve essere impostata sul servizio **API**, non solo sul database Postgres. Senza questa variabile il container fallisce all'avvio con un errore esplicito. Railway fornisce spesso `postgresql://` o `postgres://`; la config converte automaticamente per asyncpg (FastAPI) e psycopg (Alembic).
 
-Il container API esegue `alembic upgrade head` all'avvio, poi uvicorn.
+Anche `SECRETS_ENCRYPTION_KEY` e `CORS_ORIGINS` sono obbligatorie sul servizio API in
+produzione: senza, il container si rifiuta di partire con un messaggio esplicito.
+
+**Migration.** Il container non esegue più `alembic upgrade head` all'avvio: con più di
+una replica le migration si sovrapporrebbero sullo stesso database. Esegui `./scripts/migrate.sh`
+come release step (o una tantum da console) prima di promuovere la nuova versione.
 
 ### Servizio WEB
 
 | Variabile | Esempio |
 |-----------|---------|
 | `VITE_API_URL` | `https://api-xxx.up.railway.app` (senza `/api` finale) |
-| `WEB_ALLOWED_HOSTS` | *(opzionale)* Host aggiuntivi per `vite preview`, separati da virgola (es. dominio custom) |
+| `PORT` | *(impostata da Railway)* porta su cui ascolta nginx |
+
+Il servizio WEB serve la build statica con **nginx** (compressione, header di cache e di
+sicurezza). `vite preview` era un server di sviluppo e non è più usato in produzione.
 
 `VITE_API_URL` è una variabile di **build**: imposta l'URL base dell'API **senza** suffisso `/api` (es. `https://api-xxx.up.railway.app`, non `.../api`). Il frontend aggiunge automaticamente i path `/api/projects`, ecc. Rebuild obbligatorio dopo ogni modifica.
-
-Se Railway assegna un nuovo dominio o usi un custom domain, aggiungilo in `WEB_ALLOWED_HOSTS` sul servizio WEB (runtime). L'host Railway attuale è già incluso in config.
 
 Lascia vuoto lo Start Command su entrambi i servizi (usa il CMD del Dockerfile).
 
 ### Post-deploy
 
-1. Redeploy API (migration 003 + seed demo)
-2. Redeploy WEB con `VITE_API_URL` impostato all'URL pubblico dell'API
+1. Imposta `SECRETS_ENCRYPTION_KEY`, `CORS_ORIGINS` e le credenziali admin sul servizio API
+2. Esegui le migration (`./scripts/migrate.sh`): la `044` ricifra i token salvati in
+   precedenza, la `045` crea le tabelle di autenticazione
+3. Redeploy API, poi accedi con l'account amministratore
+4. Redeploy WEB con `VITE_API_URL` impostato all'URL pubblico dell'API
+5. **Riconnetti Shopify e Google**: i token erano salvati senza cifratura reale, quindi
+   vanno considerati compromessi e riemessi. La riconnessione serve anche per ottenere
+   `write_products`.
 
 ## Integrazione Shopify (OAuth)
 

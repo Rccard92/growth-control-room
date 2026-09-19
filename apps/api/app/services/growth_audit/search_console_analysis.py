@@ -9,7 +9,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun
+from app.models.growth_audit import GrowthAuditFinding, GrowthAuditPage
 from app.services.google.google_tokens import get_valid_google_access_token
 from app.services.google.search_console_client import fetch_search_console_search_analytics
 from app.services.growth_audit.exceptions import (
@@ -220,10 +220,7 @@ def _build_gsc_findings(
                 )
             )
 
-        if (
-            OPPORTUNITY_POSITION_MIN <= position <= OPPORTUNITY_POSITION_MAX
-            and impressions >= 20
-        ):
+        if OPPORTUNITY_POSITION_MIN <= position <= OPPORTUNITY_POSITION_MAX and impressions >= 20:
             candidates.append(
                 (
                     impressions,
@@ -318,9 +315,7 @@ async def analyze_growth_audit_search_console(
     project = await get_project_by_id(project_id, session)
     site_url = (project.search_console_site_url or "").strip()
     if not site_url:
-        raise GrowthAuditValidationError(
-            "Seleziona prima una proprietà Search Console."
-        )
+        raise GrowthAuditValidationError("Seleziona prima una proprietà Search Console.")
 
     normalized_days = max(1, min(days, 90))
     end_date = date.today() - timedelta(days=1)

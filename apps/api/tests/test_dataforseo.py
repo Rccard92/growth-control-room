@@ -19,6 +19,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from app.api.routes import dataforseo as dataforseo_routes
 from app.core.config import settings
 from app.services.dataforseo.dataforseo_budget import assert_dataforseo_budget_allows
 from app.services.dataforseo.dataforseo_client import post_dataforseo
@@ -32,7 +33,6 @@ from app.services.dataforseo.exceptions import (
     DataForSeoBudgetExceededError,
     DataForSeoRealCallsDisabledError,
 )
-from app.api.routes import dataforseo as dataforseo_routes
 
 
 @pytest.fixture(autouse=True)
@@ -49,15 +49,19 @@ def test_status_configured_false_without_env() -> None:
     async def run() -> None:
         project_id = uuid4()
         session = AsyncMock()
-        with patch(
-            "app.api.routes.dataforseo.get_project_for_user",
-            new=AsyncMock(),
-        ), patch(
-            "app.api.routes.dataforseo.get_dataforseo_usage_today",
-            new=AsyncMock(return_value=Decimal("0")),
-        ), patch(
-            "app.api.routes.dataforseo.get_dataforseo_usage_month",
-            new=AsyncMock(return_value=Decimal("0")),
+        with (
+            patch(
+                "app.api.routes.dataforseo.get_project_for_user",
+                new=AsyncMock(),
+            ),
+            patch(
+                "app.api.routes.dataforseo.get_dataforseo_usage_today",
+                new=AsyncMock(return_value=Decimal("0")),
+            ),
+            patch(
+                "app.api.routes.dataforseo.get_dataforseo_usage_month",
+                new=AsyncMock(return_value=Decimal("0")),
+            ),
         ):
             response = await dataforseo_routes.get_dataforseo_status(project_id, session)
         assert response.configured is False
@@ -81,12 +85,17 @@ def test_test_endpoint_blocks_when_real_calls_disabled() -> None:
             location_code=2380,
             language_code="it",
         )
-        with patch(
-            "app.api.routes.dataforseo.get_project_for_user",
-            new=AsyncMock(),
-        ), patch(
-            "app.api.routes.dataforseo.run_dataforseo_sandbox_test",
-            new=AsyncMock(side_effect=DataForSeoRealCallsDisabledError("DataForSEO real calls disabled.")),
+        with (
+            patch(
+                "app.api.routes.dataforseo.get_project_for_user",
+                new=AsyncMock(),
+            ),
+            patch(
+                "app.api.routes.dataforseo.run_dataforseo_sandbox_test",
+                new=AsyncMock(
+                    side_effect=DataForSeoRealCallsDisabledError("DataForSEO real calls disabled.")
+                ),
+            ),
         ):
             with pytest.raises(HTTPException) as exc:
                 await dataforseo_routes.run_dataforseo_test_endpoint(project_id, request, session)
@@ -135,9 +144,12 @@ def test_estimate_does_not_make_http_calls() -> None:
     async def run() -> None:
         project_id = uuid4()
         session = AsyncMock()
-        with patch("httpx.AsyncClient") as client_mock, patch(
-            "app.services.dataforseo.dataforseo_cost_estimator.observed_unit_costs",
-            new=AsyncMock(return_value={}),
+        with (
+            patch("httpx.AsyncClient") as client_mock,
+            patch(
+                "app.services.dataforseo.dataforseo_cost_estimator.observed_unit_costs",
+                new=AsyncMock(return_value={}),
+            ),
         ):
             result = await estimate_dataforseo_cost(
                 session,
@@ -198,12 +210,15 @@ def test_mock_response_cost_is_saved() -> None:
             "rawPreview": {"tasks": []},
         }
 
-        with patch(
-            "app.services.dataforseo.dataforseo_sandbox_service.safe_test_keyword_search_volume",
-            new=AsyncMock(return_value=mock_result),
-        ), patch(
-            "app.services.dataforseo.dataforseo_sandbox_service.assert_dataforseo_budget_allows",
-            new=AsyncMock(),
+        with (
+            patch(
+                "app.services.dataforseo.dataforseo_sandbox_service.safe_test_keyword_search_volume",
+                new=AsyncMock(return_value=mock_result),
+            ),
+            patch(
+                "app.services.dataforseo.dataforseo_sandbox_service.assert_dataforseo_budget_allows",
+                new=AsyncMock(),
+            ),
         ):
             result = await run_dataforseo_sandbox_test(
                 session,
@@ -238,7 +253,9 @@ def test_no_real_http_calls_in_tests() -> None:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch("httpx.AsyncClient", return_value=mock_client) as client_ctor:
-            await post_dataforseo("/keywords_data/google_ads/search_volume/live", [{"keywords": ["x"]}])
+            await post_dataforseo(
+                "/keywords_data/google_ads/search_volume/live", [{"keywords": ["x"]}]
+            )
             client_ctor.assert_called_once()
             mock_client.post.assert_awaited_once()
 

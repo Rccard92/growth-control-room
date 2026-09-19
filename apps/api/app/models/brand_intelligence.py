@@ -44,7 +44,9 @@ class BrandProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     customer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_status: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
-    last_enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_enriched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     enrichment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     enrichment_warnings: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
 
@@ -75,9 +77,7 @@ class BrandIdentity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 class BrandVisualIdentity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "brand_visual_identities"
-    __table_args__ = (
-        UniqueConstraint("project_id", name="uq_brand_visual_identities_project_id"),
-    )
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_visual_identities_project_id"),)
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -140,19 +140,13 @@ class BrandFaqObjections(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     general_faq: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
-    product_process_questions: Mapped[list[str] | None] = mapped_column(
-        JSONB, nullable=True
-    )
-    purchase_shipping_questions: Mapped[list[str] | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    product_process_questions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    purchase_shipping_questions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     objections: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     myths_misconceptions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     recommended_answers: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     content_opportunities: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
-    social_comment_insights: Mapped[list[str] | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    social_comment_insights: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_import_source: Mapped[str | None] = mapped_column(String(500), nullable=True)
     last_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -652,7 +646,9 @@ class BrandExtractedFact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     update_mode: Mapped[str] = mapped_column(String(50), default="create")
     previous_value: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
     conflict_status: Mapped[str] = mapped_column(String(50), default="none")
-    source_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     import_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

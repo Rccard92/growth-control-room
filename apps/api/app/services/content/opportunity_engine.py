@@ -17,7 +17,11 @@ from app.services.content.seo_constants import (
     BODY_MIN_COLLECTION,
     SEO_MIN_LENGTH,
 )
-from app.services.shopify.analytics import compute_best_sellers, compute_sold_product_gids, product_lookup
+from app.services.shopify.analytics import (
+    compute_best_sellers,
+    compute_sold_product_gids,
+    product_lookup,
+)
 
 OpportunityDraft = dict[str, Any]
 
@@ -134,7 +138,9 @@ async def generate_content_opportunities(
                 )
             )
 
-        seo_weak = not (product.seo_title or "").strip() or not (product.seo_description or "").strip()
+        seo_weak = (
+            not (product.seo_title or "").strip() or not (product.seo_description or "").strip()
+        )
         body = _product_body_text(product)
         body_weak = body is not None and _text_len(body) < SEO_MIN_LENGTH * 3
         if seo_weak or body_weak:
@@ -155,9 +161,10 @@ async def generate_content_opportunities(
 
     for collection in collections:
         desc_weak = _text_len(collection.description_text) < BODY_MIN_COLLECTION
-        meta_weak = not (collection.seo_title or "").strip() or not (
-            collection.seo_description or ""
-        ).strip()
+        meta_weak = (
+            not (collection.seo_title or "").strip()
+            or not (collection.seo_description or "").strip()
+        )
         if desc_weak or meta_weak:
             opportunities.append(
                 _opportunity(
@@ -198,13 +205,9 @@ async def generate_content_opportunities(
         missing_collections = "/collections/" not in body_blob.lower()
         if missing_products or missing_collections:
             related_products = [
-                _entity_ref("product", p)
-                for p in products[:3]
-                if _is_active(p.status)
+                _entity_ref("product", p) for p in products[:3] if _is_active(p.status)
             ]
-            related_collections = [
-                _entity_ref("collection", c) for c in collections[:2]
-            ]
+            related_collections = [_entity_ref("collection", c) for c in collections[:2]]
             opportunities.append(
                 _opportunity(
                     opportunity_type="internal_linking",

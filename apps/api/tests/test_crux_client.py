@@ -6,8 +6,6 @@ import asyncio
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 
 from app.services.google.crux_client import fetch_crux_record

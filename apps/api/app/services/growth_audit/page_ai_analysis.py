@@ -95,7 +95,8 @@ async def _load_shopify_entity(
             "missingAltCount": sum(
                 1
                 for img in images
-                if isinstance(img, dict) and not str(img.get("altText") or img.get("alt") or "").strip()
+                if isinstance(img, dict)
+                and not str(img.get("altText") or img.get("alt") or "").strip()
             )
             if isinstance(images, list)
             else 0,
@@ -129,35 +130,45 @@ async def _build_page_analysis_context(
     note: str | None,
 ) -> dict[str, Any]:
     metadata = page.page_metadata or {}
-    technical_meta = metadata.get("technical") if isinstance(metadata.get("technical"), dict) else {}
+    technical_meta = (
+        metadata.get("technical") if isinstance(metadata.get("technical"), dict) else {}
+    )
 
     open_findings = (
-        await session.execute(
-            select(GrowthAuditFinding)
-            .where(
-                GrowthAuditFinding.page_id == page.id,
-                GrowthAuditFinding.project_id == page.project_id,
-                GrowthAuditFinding.run_id == run.id,
-                GrowthAuditFinding.status == "open",
+        (
+            await session.execute(
+                select(GrowthAuditFinding)
+                .where(
+                    GrowthAuditFinding.page_id == page.id,
+                    GrowthAuditFinding.project_id == page.project_id,
+                    GrowthAuditFinding.run_id == run.id,
+                    GrowthAuditFinding.status == "open",
+                )
+                .order_by(GrowthAuditFinding.created_at.desc())
+                .limit(12)
             )
-            .order_by(GrowthAuditFinding.created_at.desc())
-            .limit(12)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     open_tasks = (
-        await session.execute(
-            select(GrowthAuditTask)
-            .where(
-                GrowthAuditTask.page_id == page.id,
-                GrowthAuditTask.project_id == page.project_id,
-                GrowthAuditTask.run_id == run.id,
-                GrowthAuditTask.status == "open",
+        (
+            await session.execute(
+                select(GrowthAuditTask)
+                .where(
+                    GrowthAuditTask.page_id == page.id,
+                    GrowthAuditTask.project_id == page.project_id,
+                    GrowthAuditTask.run_id == run.id,
+                    GrowthAuditTask.status == "open",
+                )
+                .order_by(GrowthAuditTask.created_at.desc())
+                .limit(12)
             )
-            .order_by(GrowthAuditTask.created_at.desc())
-            .limit(12)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     shopify_entity = await _load_shopify_entity(session, page)
 
@@ -315,10 +326,7 @@ def _readable_ai_failure_message(exc: Exception, *, provider: str) -> str:
     msg = str(exc)
     lowered = msg.lower()
     if "not configured" in lowered or "non configurato" in lowered:
-        return (
-            f"Provider {provider} non configurato. "
-            "Verifica le credenziali AI del progetto."
-        )
+        return f"Provider {provider} non configurato. Verifica le credenziali AI del progetto."
     if "invalid schema for response_format" in lowered:
         return (
             "Analisi AI non riuscita: configurazione output non valida. "
@@ -471,9 +479,7 @@ async def analyze_growth_audit_page_with_ai(
     )
 
     json_schema = (
-        get_growth_audit_page_ai_output_json_schema()
-        if normalized_provider == "openai"
-        else None
+        get_growth_audit_page_ai_output_json_schema() if normalized_provider == "openai" else None
     )
 
     try:

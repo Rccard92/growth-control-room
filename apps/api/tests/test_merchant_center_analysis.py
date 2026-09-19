@@ -136,7 +136,9 @@ def test_compute_run_merchant_center_summary_counts_statuses() -> None:
             "criticalIssuesCount": 1,
         }
     }
-    summary = _compute_run_merchant_center_summary([page], products_unmatched=2, synced_at="2026-01-01T00:00:00Z")
+    summary = _compute_run_merchant_center_summary(
+        [page], products_unmatched=2, synced_at="2026-01-01T00:00:00Z"
+    )
     assert summary["productsMatched"] == 1
     assert summary["productsUnmatched"] == 2
     assert summary["disapprovedProducts"] == 1
@@ -164,7 +166,9 @@ def test_build_merchant_center_findings_prioritizes_disapproved_with_demand() ->
 
 def test_analyze_merchant_center_requires_account() -> None:
     async def run() -> None:
-        from app.services.growth_audit.merchant_center_analysis import analyze_growth_audit_merchant_center
+        from app.services.growth_audit.merchant_center_analysis import (
+            analyze_growth_audit_merchant_center,
+        )
 
         project_id = uuid4()
         run_id = uuid4()
@@ -203,17 +207,19 @@ def test_analyze_merchant_center_requires_account() -> None:
         project_result.scalar_one_or_none.return_value = project
         session.execute = AsyncMock(return_value=project_result)
 
-        with patch(
-            "app.services.growth_audit.merchant_center_analysis.get_growth_audit_run",
-            new_callable=AsyncMock,
-            return_value=run,
+        with (
+            patch(
+                "app.services.growth_audit.merchant_center_analysis.get_growth_audit_run",
+                new_callable=AsyncMock,
+                return_value=run,
+            ),
+            pytest.raises(GrowthAuditValidationError) as exc,
         ):
-            with pytest.raises(GrowthAuditValidationError) as exc:
-                await analyze_growth_audit_merchant_center(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                )
+            await analyze_growth_audit_merchant_center(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+            )
 
         assert "Merchant Center" in str(exc.value)
 

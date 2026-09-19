@@ -16,7 +16,6 @@ from app.services.growth_audit.exceptions import (
     GrowthAuditValidationError,
 )
 from app.services.growth_audit.run_service import rescan_growth_audit_page
-
 from tests.support import TEST_USER
 
 
@@ -118,17 +117,19 @@ def test_rescan_rejects_active_run() -> None:
         audit_run.status = "analyzing"
 
         session = AsyncMock()
-        with patch(
-            "app.services.growth_audit.run_service.get_growth_audit_run",
-            new=AsyncMock(return_value=audit_run),
+        with (
+            patch(
+                "app.services.growth_audit.run_service.get_growth_audit_run",
+                new=AsyncMock(return_value=audit_run),
+            ),
+            pytest.raises(GrowthAuditValidationError, match="still active"),
         ):
-            with pytest.raises(GrowthAuditValidationError, match="still active"):
-                await rescan_growth_audit_page(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                )
+            await rescan_growth_audit_page(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+            )
 
     asyncio.run(run())
 
@@ -150,14 +151,14 @@ def test_rescan_page_not_found() -> None:
                 "app.services.growth_audit.run_service._get_growth_audit_page",
                 new=AsyncMock(return_value=None),
             ),
+            pytest.raises(GrowthAuditRunNotFoundError),
         ):
-            with pytest.raises(GrowthAuditRunNotFoundError):
-                await rescan_growth_audit_page(
-                    session,
-                    project_id=project_id,
-                    run_id=run_id,
-                    page_id=page_id,
-                )
+            await rescan_growth_audit_page(
+                session,
+                project_id=project_id,
+                run_id=run_id,
+                page_id=page_id,
+            )
 
     asyncio.run(run())
 

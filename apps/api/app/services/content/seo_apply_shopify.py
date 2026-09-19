@@ -74,7 +74,9 @@ def build_collection_update_input(entity_gid: str, delta: dict[str, Any]) -> dic
         _apply_handle(input_data, handle)
         has_scalar = True
 
-    desc_html = _get_delta(delta, "description_html", "proposed_description", "proposed_description_html")
+    desc_html = _get_delta(
+        delta, "description_html", "proposed_description", "proposed_description_html"
+    )
     if desc_html is not None:
         input_data["descriptionHtml"] = desc_html
         has_scalar = True

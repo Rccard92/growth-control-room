@@ -103,10 +103,7 @@ def _date_bounds_to_utc(
 
 
 def _format_custom_label(start_date: date, end_date: date) -> str:
-    return (
-        f"Personalizzato: {start_date.strftime('%d/%m/%Y')} – "
-        f"{end_date.strftime('%d/%m/%Y')}"
-    )
+    return f"Personalizzato: {start_date.strftime('%d/%m/%Y')} – {end_date.strftime('%d/%m/%Y')}"
 
 
 def resolve_shopify_period(

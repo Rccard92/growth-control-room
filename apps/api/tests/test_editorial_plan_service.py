@@ -195,7 +195,12 @@ def test_generate_editorial_calendar_mixed_content_types_rotation() -> None:
                 dry_run=True,
             )
             types = [row.content_type for row in rows]
-            assert types == ["educational_article", "product_guide", "recipe", "educational_article"]
+            assert types == [
+                "educational_article",
+                "product_guide",
+                "recipe",
+                "educational_article",
+            ]
 
     asyncio.run(run())
 

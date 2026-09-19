@@ -19,13 +19,11 @@ from app.schemas.growth_audit import GrowthAuditSearchConsoleAnalysisRequest
 from app.services.google.exceptions import GoogleIntegrationNotConnectedError
 from app.services.growth_audit.exceptions import GrowthAuditValidationError
 from app.services.growth_audit.search_console_analysis import (
-
     _build_gsc_findings,
     _build_page_metrics_lookup,
     _compute_run_gsc_summary,
     analyze_growth_audit_search_console,
 )
-
 from tests.support import TEST_USER
 
 
@@ -128,17 +126,16 @@ def test_compute_run_gsc_summary_aggregates_totals() -> None:
 
 
 def test_build_gsc_findings_limited_to_ten() -> None:
-    pages = [
-        _build_page(project_id=uuid4(), run_id=uuid4(), page_id=uuid4())
-        for _ in range(12)
-    ]
+    pages = [_build_page(project_id=uuid4(), run_id=uuid4(), page_id=uuid4()) for _ in range(12)]
     metrics = {
         page.normalized_url: {
             "clicks": 0,
             "impressions": 500,
             "ctr": 0.005,
             "position": 12.0,
-            "topQueries": [{"query": "test", "clicks": 0, "impressions": 100, "ctr": 0, "position": 12}],
+            "topQueries": [
+                {"query": "test", "clicks": 0, "impressions": 100, "ctr": 0, "position": 12}
+            ],
         }
         for page in pages
     }

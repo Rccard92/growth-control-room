@@ -24,7 +24,6 @@ from app.services.growth_audit.analytics_analysis import (
     analyze_growth_audit_analytics,
 )
 from app.services.growth_audit.exceptions import GrowthAuditValidationError
-
 from tests.support import TEST_USER
 
 

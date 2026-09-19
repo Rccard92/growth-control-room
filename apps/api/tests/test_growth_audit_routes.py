@@ -22,10 +22,15 @@ from app.api.routes.growth_audit import (
     list_growth_audit_runs_endpoint,
     list_growth_audit_tasks_endpoint,
 )
-from app.models.growth_audit import GrowthAuditEvent, GrowthAuditFinding, GrowthAuditPage, GrowthAuditRun, GrowthAuditTask
+from app.models.growth_audit import (
+    GrowthAuditEvent,
+    GrowthAuditFinding,
+    GrowthAuditPage,
+    GrowthAuditRun,
+    GrowthAuditTask,
+)
 from app.schemas.growth_audit import GrowthAuditRunCreateRequest
 from app.services.growth_audit.exceptions import GrowthAuditRunNotFoundError
-
 from tests.support import TEST_USER
 
 
@@ -102,9 +107,7 @@ def test_growth_audit_routes_registered() -> None:
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/events" in paths
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/findings" in paths
     assert "/projects/{project_id}/growth-audit/runs/{run_id}/tasks" in paths
-    assert (
-        "/projects/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/rescan" in paths
-    )
+    assert "/projects/{project_id}/growth-audit/runs/{run_id}/pages/{page_id}/rescan" in paths
 
 
 def test_create_growth_audit_run_returns_201_payload() -> None:
@@ -154,7 +157,9 @@ def test_list_growth_audit_runs_endpoint() -> None:
                 return_value=[created],
             ),
         ):
-            response = await list_growth_audit_runs_endpoint(project_id, 20, session, current_user=TEST_USER)
+            response = await list_growth_audit_runs_endpoint(
+                project_id, 20, session, current_user=TEST_USER
+            )
 
         assert len(response.runs) == 1
 
@@ -179,7 +184,9 @@ def test_get_growth_audit_run_detail_endpoint() -> None:
                 return_value=(created, 0, 0),
             ),
         ):
-            response = await get_growth_audit_run_endpoint(project_id, run_id, session, current_user=TEST_USER)
+            response = await get_growth_audit_run_endpoint(
+                project_id, run_id, session, current_user=TEST_USER
+            )
 
         assert response.run.id == run_id
         assert len(response.pages) == 1
@@ -246,9 +253,9 @@ def test_get_growth_audit_run_wrong_project_returns_404() -> None:
                 new_callable=AsyncMock,
                 side_effect=GrowthAuditRunNotFoundError("not found"),
             ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                await get_growth_audit_run_endpoint(project_id, run_id, session, current_user=TEST_USER)
+            await get_growth_audit_run_endpoint(project_id, run_id, session, current_user=TEST_USER)
 
         assert exc_info.value.status_code == 404
 

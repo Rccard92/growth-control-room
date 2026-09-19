@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,23 +17,25 @@ async def build_content_seo_debug(
 ) -> dict:
     products_count = (
         await session.execute(
-            select(func.count()).select_from(ShopifyProduct).where(
-                ShopifyProduct.shopify_store_id == store.id
-            )
+            select(func.count())
+            .select_from(ShopifyProduct)
+            .where(ShopifyProduct.shopify_store_id == store.id)
         )
     ).scalar_one()
 
     collections_count = (
         await session.execute(
-            select(func.count()).select_from(ShopifyCollection).where(
-                ShopifyCollection.shopify_store_id == store.id
-            )
+            select(func.count())
+            .select_from(ShopifyCollection)
+            .where(ShopifyCollection.shopify_store_id == store.id)
         )
     ).scalar_one()
 
     collection_analyses_count = (
         await session.execute(
-            select(func.count()).select_from(SeoEntityAnalysis).where(
+            select(func.count())
+            .select_from(SeoEntityAnalysis)
+            .where(
                 SeoEntityAnalysis.shopify_store_id == store.id,
                 SeoEntityAnalysis.entity_type == "collection",
             )

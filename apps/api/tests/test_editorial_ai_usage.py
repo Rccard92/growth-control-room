@@ -1,7 +1,7 @@
 """Tests for editorial item AI usage endpoint and helpers."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -23,7 +23,7 @@ def _make_log(**overrides):
         "estimated_total_cost": Decimal("0.012"),
         "input_tokens": 1200,
         "output_tokens": 800,
-        "created_at": datetime(2026, 6, 14, 18, 42, tzinfo=timezone.utc),
+        "created_at": datetime(2026, 6, 14, 18, 42, tzinfo=UTC),
         "status": "success",
         "error_message": None,
         "context_hash": "abc123",

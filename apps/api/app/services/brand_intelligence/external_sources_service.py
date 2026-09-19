@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -36,7 +36,17 @@ VALID_SOURCE_TYPES = frozenset(
     }
 )
 
-TERMINAL_BATCH_FOR_ADD = frozenset({"review_ready", "partially_failed", "completed", "pending", "uploading", "extracting", "ai_processing"})
+TERMINAL_BATCH_FOR_ADD = frozenset(
+    {
+        "review_ready",
+        "partially_failed",
+        "completed",
+        "pending",
+        "uploading",
+        "extracting",
+        "ai_processing",
+    }
+)
 
 SINGLE_INSTANCE_TYPES = frozenset(
     {
@@ -62,7 +72,9 @@ def normalize_url(url: str) -> str:
         url = f"https://{url}"
     parsed = urlparse(url)
     if not parsed.netloc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"URL non valido: {url}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"URL non valido: {url}"
+        )
     return url
 
 
@@ -148,7 +160,9 @@ async def upsert_batch_sources(
                     BrandExternalSource.project_id == project_id,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     saved = 0
@@ -260,7 +274,9 @@ async def list_external_sources_for_batch(
                 )
                 .order_by(BrandExternalSource.created_at.asc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -321,9 +337,7 @@ async def fetch_batch_external_sources(
 ) -> tuple[list[str], int]:
     """Fetch all pending (or failed/skipped if refetch) sources. Returns warnings, fetched count."""
     batch = (
-        await session.execute(
-            select(BrandImportBatch).where(BrandImportBatch.id == batch_id)
-        )
+        await session.execute(select(BrandImportBatch).where(BrandImportBatch.id == batch_id))
     ).scalar_one_or_none()
     if not batch:
         return [], 0
@@ -340,12 +354,14 @@ async def fetch_batch_external_sources(
                     BrandExternalSource.status.in_(statuses),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     warnings: list[str] = []
     fetched_count = 0
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     for idx, source in enumerate(sources):
         source.status = "fetching"
@@ -406,7 +422,9 @@ def parse_sources_json(raw: str | None) -> list[BrandExternalSourceInput]:
             detail=f"sources JSON non valido: {exc}",
         ) from exc
     if not isinstance(data, list):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="sources deve essere un array.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="sources deve essere un array."
+        )
     out: list[BrandExternalSourceInput] = []
     for item in data:
         if not isinstance(item, dict):

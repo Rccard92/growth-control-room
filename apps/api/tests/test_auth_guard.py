@@ -93,9 +93,7 @@ def test_unknown_bearer_token_is_rejected(client) -> None:
 
     app.dependency_overrides[get_db] = _fake_db
     try:
-        response = client.get(
-            "/api/auth/me", headers={"Authorization": "Bearer inesistente"}
-        )
+        response = client.get("/api/auth/me", headers={"Authorization": "Bearer inesistente"})
         assert response.status_code == 401
     finally:
         app.dependency_overrides.pop(get_db, None)
@@ -105,6 +103,5 @@ def test_public_allowlist_has_not_silently_grown() -> None:
     spec = app.openapi()
     auth_free = {p for p in spec["paths"] if p in PUBLIC_PATHS}
     assert auth_free == set(PUBLIC_PATHS), (
-        "La allowlist pubblica non corrisponde alle route esposte: "
-        f"{auth_free ^ set(PUBLIC_PATHS)}"
+        f"La allowlist pubblica non corrisponde alle route esposte: {auth_free ^ set(PUBLIC_PATHS)}"
     )

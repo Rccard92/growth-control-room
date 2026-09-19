@@ -175,9 +175,7 @@ def normalize_growth_audit_page_ai_output(
     data = raw if isinstance(raw, dict) else {}
     findings_in = data.get("findings") if isinstance(data.get("findings"), list) else []
     tasks_in = data.get("tasks") if isinstance(data.get("tasks"), list) else []
-    recs_in = (
-        data.get("recommendations") if isinstance(data.get("recommendations"), list) else []
-    )
+    recs_in = data.get("recommendations") if isinstance(data.get("recommendations"), list) else []
     artifacts_in = data.get("artifacts") if isinstance(data.get("artifacts"), dict) else {}
 
     findings: list[dict[str, Any]] = []

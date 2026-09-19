@@ -20,9 +20,7 @@ async def get_shopify_store_for_project(
     result = await session.execute(
         select(ShopifyStore)
         .where(ShopifyStore.project_id == project_id)
-        .options(
-            selectinload(ShopifyStore.integration).selectinload(Integration.credential)
-        )
+        .options(selectinload(ShopifyStore.integration).selectinload(Integration.credential))
     )
     return result.scalar_one_or_none()
 
@@ -56,8 +54,7 @@ async def persist_shopify_connection(
         shop_info = await client.fetch_shop()
 
     result = await session.execute(
-        select(Integration)
-        .where(
+        select(Integration).where(
             Integration.project_id == project_id,
             Integration.provider == "shopify",
         )
@@ -87,9 +84,7 @@ async def persist_shopify_connection(
     encrypted_payload = encrypt_secret(credential_payload)
 
     credential_result = await session.execute(
-        select(IntegrationCredential).where(
-            IntegrationCredential.integration_id == integration.id
-        )
+        select(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
     credential = credential_result.scalar_one_or_none()
 

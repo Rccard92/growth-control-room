@@ -20,6 +20,9 @@ class ProductAnalyzeResult:
     critical: int = 0
     warnings: int = 0
     opportunities: int = 0
+    #: Draft/archived products are not analysed; reported so the UI can say why
+    #: the analysed count is lower than the catalogue size.
+    products_skipped_not_active: int = 0
 
 
 async def analyze_products_for_store(
@@ -27,10 +30,14 @@ async def analyze_products_for_store(
     session: AsyncSession,
 ) -> ProductAnalyzeResult:
     products = (
-        await session.execute(
-            select(ShopifyProduct).where(ShopifyProduct.shopify_store_id == store.id)
+        (
+            await session.execute(
+                select(ShopifyProduct).where(ShopifyProduct.shopify_store_id == store.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     products_by_gid = product_lookup(list(products))
     best_sellers = await compute_best_sellers(
@@ -44,11 +51,27 @@ async def analyze_products_for_store(
     load_seo_skill_context()
     skill_meta = skill_recommendation_metadata()
 
+    # One query for every existing analysis instead of one per product: a
+    # 5.000-product catalogue used to issue 5.000 round trips here.
+    existing_by_entity = {
+        row.entity_id: row
+        for row in (
+            await session.execute(
+                select(SeoEntityAnalysis).where(
+                    SeoEntityAnalysis.project_id == store.project_id,
+                    SeoEntityAnalysis.shopify_store_id == store.id,
+                    SeoEntityAnalysis.entity_type == "product",
+                )
+            )
+        ).scalars()
+    }
+
     result = ProductAnalyzeResult()
     now = datetime.now(UTC)
 
     for product in products:
         if (product.status or "").upper() != "ACTIVE":
+            result.products_skipped_not_active += 1
             continue
 
         desc_text = product.description_text
@@ -61,23 +84,14 @@ async def analyze_products_for_store(
             seo_title=product.seo_title,
             seo_description=product.seo_description,
             description_text=desc_text,
-        handle=product.handle,
-        media_images=product.media_images,
+            handle=product.handle,
+            media_images=product.media_images,
             featured_image_url=product.featured_image_url,
             product_type=product.product_type,
             is_best_seller=product.title in best_titles,
         )
 
-        existing = (
-            await session.execute(
-                select(SeoEntityAnalysis).where(
-                    SeoEntityAnalysis.project_id == store.project_id,
-                    SeoEntityAnalysis.shopify_store_id == store.id,
-                    SeoEntityAnalysis.entity_type == "product",
-                    SeoEntityAnalysis.entity_id == product.id,
-                )
-            )
-        ).scalar_one_or_none()
+        existing = existing_by_entity.get(product.id)
 
         recommendations = list(analysis.get("recommendations") or [])
         recommendations.append(skill_meta)

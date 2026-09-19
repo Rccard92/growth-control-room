@@ -129,7 +129,7 @@ e **migrarci dentro Shopify e Google** che oggi vivono in `apps/api/app/services
 ```python
 class BaseConnector(ABC):
     provider: IntegrationProvider
-    capabilities: frozenset[Capability]     # ads | commerce | analytics | email | search
+    capabilities: frozenset[Capability]  # ads | commerce | analytics | email | search
 
     async def authorize_url(self, ctx) -> str: ...
     async def exchange_code(self, ctx, code: str) -> Credentials: ...

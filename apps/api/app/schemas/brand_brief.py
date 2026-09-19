@@ -99,7 +99,9 @@ def _as_str(value: Any, default: str = "") -> str:
     return str(value)
 
 
-def _merge_dict(default: dict[str, Any], raw: Any, warnings: list[str], path: str) -> dict[str, Any]:
+def _merge_dict(
+    default: dict[str, Any], raw: Any, warnings: list[str], path: str
+) -> dict[str, Any]:
     out = copy.deepcopy(default)
     if not isinstance(raw, dict):
         if raw is not None:
@@ -144,9 +146,7 @@ def _normalize_list_items(
 def _normalize_priority_pages(items: list[Any], warnings: list[str]) -> list[Any]:
     result: list[Any] = []
     for i, item in enumerate(items):
-        if isinstance(item, str):
-            result.append(item)
-        elif isinstance(item, dict):
+        if isinstance(item, str) or isinstance(item, dict):
             result.append(item)
         else:
             warnings.append(f"seo_guidelines.priority_pages[{i}]: oggetto convertito in stringa")
@@ -172,7 +172,9 @@ def sanitize_brief_payload(raw: dict[str, Any] | None) -> tuple[BriefPayload, li
     )
     for list_key in ("values", "differentiators"):
         payload["brand_identity"][list_key] = _normalize_list_items(
-            _as_list(payload["brand_identity"].get(list_key), warnings, f"brand_identity.{list_key}"),
+            _as_list(
+                payload["brand_identity"].get(list_key), warnings, f"brand_identity.{list_key}"
+            ),
             warnings,
             f"brand_identity.{list_key}",
         )
@@ -185,7 +187,9 @@ def sanitize_brief_payload(raw: dict[str, Any] | None) -> tuple[BriefPayload, li
     )
     for list_key in ("words_to_use", "words_to_avoid", "examples"):
         payload["voice_and_tone"][list_key] = _normalize_list_items(
-            _as_list(payload["voice_and_tone"].get(list_key), warnings, f"voice_and_tone.{list_key}"),
+            _as_list(
+                payload["voice_and_tone"].get(list_key), warnings, f"voice_and_tone.{list_key}"
+            ),
             warnings,
             f"voice_and_tone.{list_key}",
         )
@@ -304,7 +308,7 @@ def sanitize_brief_payload(raw: dict[str, Any] | None) -> tuple[BriefPayload, li
         "source_warnings",
     )
 
-    for top_key, top_val in raw.items():
+    for top_key, _top_val in raw.items():
         if top_key not in DEFAULT_BRIEF_PAYLOAD:
             warnings.append(f"Sezione top-level extra '{top_key}' aggiunta a source_warnings")
             payload["source_warnings"].append(f"Extra section: {top_key}")

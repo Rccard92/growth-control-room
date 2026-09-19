@@ -1,12 +1,12 @@
 """Tests for SEO skill user-facing error messages."""
 
+from app.services.ai.exceptions import OpenAIRequestError
 from app.services.seo_skills.error_messages import (
     OPENAI_EMPTY_RESPONSE_RUN_MESSAGE,
     OPENAI_INVALID_JSON_RUN_MESSAGE,
     OPENAI_OUTPUT_TRUNCATED_RUN_MESSAGE,
     humanize_skill_error,
 )
-from app.services.ai.exceptions import OpenAIRequestError
 
 
 def test_humanize_openai_empty_response_for_openai_provider() -> None:

@@ -1,8 +1,8 @@
 """Tests for SEO skill loader."""
 
 from app.services.content.seo_skill_loader import (
-    GCR_SKILL_DIR,
     EXTERNAL_SKILL_DIR,
+    GCR_SKILL_DIR,
     clear_seo_skill_cache,
     get_seo_skill_metadata,
     load_external_skill_references,

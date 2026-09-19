@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.brand_intelligence import (
@@ -12,7 +12,6 @@ from app.models.brand_intelligence import (
     BrandAudienceInsight,
     BrandClaimRule,
     BrandContentPillar,
-    BrandExtractedFact,
     BrandEditorialGuidelines,
     BrandFaqObjections,
     BrandIdentity,
@@ -22,7 +21,6 @@ from app.models.brand_intelligence import (
     BrandProfile,
     BrandSafeClaims,
     BrandSeoStrategy,
-    BrandSourceDocument,
     BrandVisualIdentity,
     BrandVoice,
 )
@@ -46,27 +44,23 @@ from app.schemas.brand_intelligence import (
     BrandSeoStrategyUpdate,
     BrandVoiceUpdate,
 )
-from app.services.brand_intelligence.identity_service import (
-    identity_completion,
-    identity_missing_fields,
-)
-from app.services.brand_intelligence.safe_claims_service import (
-    safe_claims_completion,
-    safe_claims_missing_fields,
-)
-from app.services.brand_intelligence.visual_identity_service import (
-    visual_completion,
-    visual_missing_fields,
-)
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
-from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
+from app.services.brand_intelligence.editorial_guidelines_service import (
+    editorial_guidelines_completion,
+    editorial_guidelines_missing_fields,
+)
 from app.services.brand_intelligence.faq_objections_service import (
     faq_objections_completion,
     faq_objections_missing_fields,
 )
-from app.services.brand_intelligence.editorial_guidelines_service import (
-    editorial_guidelines_completion,
-    editorial_guidelines_missing_fields,
+from app.services.brand_intelligence.identity_service import (
+    identity_completion,
+    identity_missing_fields,
+)
+from app.services.brand_intelligence.product_knowledge_general_service import general_has_content
+from app.services.brand_intelligence.safe_claims_service import (
+    safe_claims_completion,
+    safe_claims_missing_fields,
 )
 from app.services.brand_intelligence.score import (
     SECTION_LABELS,
@@ -75,9 +69,12 @@ from app.services.brand_intelligence.score import (
     product_knowledge_module_completion,
     profile_has_minimum,
     profile_is_complete,
-    profile_missing_context,
     profile_missing_fields,
     score_to_response,
+)
+from app.services.brand_intelligence.visual_identity_service import (
+    visual_completion,
+    visual_missing_fields,
 )
 
 
@@ -157,11 +154,11 @@ async def list_products(session: AsyncSession, project_id: UUID) -> list[BrandPr
     return list(
         (
             await session.execute(
-                select(BrandProductKnowledge).where(
-                    BrandProductKnowledge.project_id == project_id
-                )
+                select(BrandProductKnowledge).where(BrandProductKnowledge.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -198,11 +195,11 @@ async def list_audience(session: AsyncSession, project_id: UUID) -> list[BrandAu
     return list(
         (
             await session.execute(
-                select(BrandAudienceInsight).where(
-                    BrandAudienceInsight.project_id == project_id
-                )
+                select(BrandAudienceInsight).where(BrandAudienceInsight.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -241,7 +238,9 @@ async def list_claims(session: AsyncSession, project_id: UUID) -> list[BrandClai
             await session.execute(
                 select(BrandClaimRule).where(BrandClaimRule.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -292,11 +291,11 @@ async def list_pillars(session: AsyncSession, project_id: UUID) -> list[BrandCon
     return list(
         (
             await session.execute(
-                select(BrandContentPillar).where(
-                    BrandContentPillar.project_id == project_id
-                )
+                select(BrandContentPillar).where(BrandContentPillar.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -333,11 +332,11 @@ async def list_guardrails(session: AsyncSession, project_id: UUID) -> list[Brand
     return list(
         (
             await session.execute(
-                select(BrandAiGuardrail).where(
-                    BrandAiGuardrail.project_id == project_id
-                )
+                select(BrandAiGuardrail).where(BrandAiGuardrail.project_id == project_id)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -372,11 +371,9 @@ async def delete_guardrail(session: AsyncSession, project_id: UUID, item_id: UUI
 
 async def list_assets(session: AsyncSession, project_id: UUID) -> list[BrandAsset]:
     return list(
-        (
-            await session.execute(
-                select(BrandAsset).where(BrandAsset.project_id == project_id)
-            )
-        ).scalars().all()
+        (await session.execute(select(BrandAsset).where(BrandAsset.project_id == project_id)))
+        .scalars()
+        .all()
     )
 
 
@@ -466,7 +463,9 @@ async def build_overview(
                     BrandProductKnowledgeItem.project_id == project_id
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     faq_objections = (
         await session.execute(

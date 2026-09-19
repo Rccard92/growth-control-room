@@ -22,7 +22,6 @@ __all__ = [
 
 
 class AiTaskType(str, Enum):
-
     PRODUCT_SEO_FIELD = "product_seo_field"
     PRODUCT_SEO_ALT = "product_seo_alt"
     PRODUCT_SEO_PROPOSAL = "product_seo_proposal"

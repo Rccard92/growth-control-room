@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -23,6 +22,12 @@ from app.schemas.content_seo_editorial import (
     normalize_editorial_article_payload,
     normalize_editorial_brief_payload,
 )
+from app.services.ai.context_profiles import (
+    AiContextProfile,
+    build_context_for_profile,
+    build_prompt_cache_key,
+    enrich_ai_metadata,
+)
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -30,25 +35,7 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-from app.services.ai.context_profiles import (
-    AiContextProfile,
-    build_context_for_profile,
-    build_prompt_cache_key,
-    enrich_ai_metadata,
-)
 from app.services.brand_intelligence.context import BrandIntelligenceContextBuilder
-from app.services.brand_intelligence.product_knowledge_context import (
-    get_product_knowledge_prompt_for_entity,
-)
-from app.services.content.editorial_brief_batch_service import has_editorial_brief_payload
-from app.services.content.editorial_brief_service import (
-    _CONTENT_TYPE_INSTRUCTIONS,
-    _safe_claims_guardrail_suffix,
-    build_bi_warnings,
-    build_brand_context_used,
-)
-from app.services.content.editorial_item_service import get_editorial_item
-from app.services.content.editorial_publishing_utils import enrich_article_with_hash, normalize_publishing_payload
 from app.services.content.editorial_ai_usage_service import (
     ARTICLE_OPERATION_KEYS,
     build_ai_generation_snapshot_from_log,
@@ -62,10 +49,22 @@ from app.services.content.editorial_article_quality import (
     extract_readability_checklist,
     validate_editorial_article_quality,
 )
+from app.services.content.editorial_brief_batch_service import has_editorial_brief_payload
+from app.services.content.editorial_brief_service import (
+    _CONTENT_TYPE_INSTRUCTIONS,
+    _safe_claims_guardrail_suffix,
+    build_bi_warnings,
+    build_brand_context_used,
+)
+from app.services.content.editorial_item_service import get_editorial_item
 from app.services.content.editorial_link_context_service import (
     build_editorial_link_context,
     format_editorial_link_context_for_prompt,
     split_link_targets_by_type,
+)
+from app.services.content.editorial_publishing_utils import (
+    enrich_article_with_hash,
+    normalize_publishing_payload,
 )
 from app.services.content.editorial_skill_loader import (
     EDITORIAL_SKILL_NAME,
@@ -300,8 +299,7 @@ def _build_article_system_prompt(
         )
     elif default_article_length == "breve":
         length_note = (
-            "\nProfilo lunghezza predefinito: breve — punta a 500-800 parole, "
-            "massima chiarezza."
+            "\nProfilo lunghezza predefinito: breve — punta a 500-800 parole, massima chiarezza."
         )
 
     base = (
@@ -313,7 +311,7 @@ def _build_article_system_prompt(
         "Usa il tono del brand dal contesto. "
         "bodyHtml deve usare tag sicuri: h2, h3, p, ul, ol, li, strong, em, a, blockquote, "
         "div con classi gcr-article-body (wrapper obbligatorio), gcr-article-note, gcr-product-tip, gcr-article-cta. "
-        "Tutto il contenuto dentro un unico <div class=\"gcr-article-body\">. "
+        'Tutto il contenuto dentro un unico <div class="gcr-article-body">. '
         "Paragrafi brevi (2-4 righe), almeno 1 lista puntata, 6-9 grassetti strategici (max 1 per paragrafo, frasi brevi), "
         "almeno 1 box Da ricordare o Consiglio Solmielato, CTA finale in box gcr-article-cta. "
         "title e seoTitle: titoli editoriali naturali — NON freddi/documentali, no 'FAQ semplice'. "
@@ -362,7 +360,7 @@ def _build_article_user_prompt(
         "- Segui editorialSkillChecklist, suggestedHtmlBlocks, internalLinkingPlan, readabilityNotes.\n"
         "- Link interni nel bodyHtml SOLO path da LINK INTERNI VERIFICATI (max 1-3); altrimenti internalLinkSuggestions.\n"
         "- Non inserire la firma nel bodyHtml.\n\n"
-        "bodyHtml: wrappa tutto in <div class=\"gcr-article-body\">; CTA finale in <div class=\"gcr-article-cta\"> "
+        'bodyHtml: wrappa tutto in <div class="gcr-article-body">; CTA finale in <div class="gcr-article-cta"> '
         "con strong + p + a (se path verificato disponibile). "
         "handle: slug URL-friendly. excerpt: 1-2 frasi. "
         "title/seoTitle: editoriali e naturali, non documentali. "
@@ -434,9 +432,7 @@ async def generate_editorial_article_core(
     skill = load_seo_skill_context()
     editorial_skill = load_editorial_skill_context()
     brief_norm = normalize_editorial_brief_payload(item.brief_payload or {})
-    link_targets = await build_editorial_link_context(
-        session, project_id, item, brief_norm
-    )
+    link_targets = await build_editorial_link_context(session, project_id, item, brief_norm)
     link_context_block = format_editorial_link_context_for_prompt(link_targets)
     system_prompt = _build_article_system_prompt(
         brand_ctx,
@@ -482,9 +478,7 @@ async def generate_editorial_article_core(
                     "warnings": list(dict.fromkeys([*payload.warnings, *post_warnings])),
                 }
             )
-        payload = _apply_brief_author_to_payload(
-            payload, item.brief_payload, bundle
-        )
+        payload = _apply_brief_author_to_payload(payload, item.brief_payload, bundle)
         brief_profile = ""
         if item.brief_payload:
             brief_norm = normalize_editorial_brief_payload(item.brief_payload)

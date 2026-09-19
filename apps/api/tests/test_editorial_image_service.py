@@ -2,14 +2,16 @@
 
 import asyncio
 import io
-from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from PIL import Image
 
-from app.schemas.content_seo_editorial import EditorialArticlePayload, normalize_editorial_article_payload
+from app.schemas.content_seo_editorial import (
+    EditorialArticlePayload,
+    normalize_editorial_article_payload,
+)
 from app.services.ai.ai_client import AiRequestMetadata, GenerateImageResult, OpenAIRequestError
 from app.services.content.editorial_image_processing import (
     EDITORIAL_IMAGE_FINAL_SIZE,

@@ -14,6 +14,7 @@ from app.schemas.brand_product_knowledge import (
     BrandProductKnowledgeGeneralImportResponse,
     BrandProductKnowledgeGeneralProposal,
 )
+from app.services.ai.context_profiles import brand_import_metadata
 from app.services.ai.openai_client import (
     AiRequestMetadata,
     OpenAINotConfiguredError,
@@ -21,8 +22,10 @@ from app.services.ai.openai_client import (
     generate_structured_json,
     is_openai_configured,
 )
-from app.services.ai.context_profiles import brand_import_metadata
-from app.services.brand_intelligence.text_extraction import TextExtractionError, extract_text_from_bytes
+from app.services.brand_intelligence.text_extraction import (
+    TextExtractionError,
+    extract_text_from_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
