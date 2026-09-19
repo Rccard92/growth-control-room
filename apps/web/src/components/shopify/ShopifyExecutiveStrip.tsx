@@ -4,6 +4,7 @@ import type {
   ShopifyDashboardSummary,
   ShopifyMetricComparison,
   ShopifyOfficialAnalytics,
+  ShopifyOrderDataCoverage,
 } from "@gcr/shared";
 import {
   directionClass,
@@ -19,6 +20,7 @@ interface ShopifyExecutiveStripProps {
   formatMoney: (value: string) => string;
   periodLabel?: string;
   comparison?: ShopifyDashboardComparison;
+  orderDataCoverage?: ShopifyOrderDataCoverage;
 }
 
 interface KpiItem {
@@ -46,7 +48,12 @@ export function ShopifyExecutiveStrip({
   formatMoney,
   periodLabel,
   comparison,
+  orderDataCoverage,
 }: ShopifyExecutiveStripProps) {
+  // With no order data for the period, every order KPI computes to zero. Showing
+  // "0,00 EUR" would read as "no sales" instead of "we do not know".
+  const ordersUnavailable = orderDataCoverage?.orderMetricsReliable === false;
+  const unavailable = "n/d";
   const scoreClass =
     trackingQualityScore >= 70 ? "emerald" : trackingQualityScore >= 40 ? "amber" : "rose";
   const metrics = comparison?.metrics;
@@ -69,23 +76,30 @@ export function ShopifyExecutiveStrip({
   const items: KpiItem[] = [
     {
       label: "Revenue",
-      value: revenueValue,
-      meta: useOfficial ? "Total sales ShopifyQL" : "Total sales Shopify-like",
-      accent: "violet",
-      comparisonMetric: metrics?.revenue,
+      value: ordersUnavailable ? unavailable : revenueValue,
+      meta: ordersUnavailable
+        ? "Dati non sincronizzati"
+        : useOfficial
+          ? "Total sales ShopifyQL"
+          : "Total sales Shopify-like",
+      accent: ordersUnavailable ? "default" : "violet",
+      comparisonMetric: ordersUnavailable ? undefined : metrics?.revenue,
     },
     {
       label: "Ordini",
-      value: ordersValue,
-      meta: `${orders.paid} pagati · ${orders.pending} pending`,
-      accent: "cyan",
-      comparisonMetric: metrics?.orders,
+      value: ordersUnavailable ? unavailable : ordersValue,
+      meta: ordersUnavailable
+        ? "Dati non sincronizzati"
+        : `${orders.paid} pagati · ${orders.pending} pending`,
+      accent: ordersUnavailable ? "default" : "cyan",
+      comparisonMetric: ordersUnavailable ? undefined : metrics?.orders,
     },
     {
       label: "AOV",
-      value: aovValue,
+      value: ordersUnavailable ? unavailable : aovValue,
+      meta: ordersUnavailable ? "Dati non sincronizzati" : undefined,
       accent: "default",
-      comparisonMetric: metrics?.averageOrderValue,
+      comparisonMetric: ordersUnavailable ? undefined : metrics?.averageOrderValue,
     },
     {
       label: "Prodotti attivi",
@@ -101,10 +115,10 @@ export function ShopifyExecutiveStrip({
     },
     {
       label: "Tracking quality score",
-      value: `${trackingQualityScore}%`,
-      meta: "Attribution Shopify",
-      accent: scoreClass,
-      comparisonMetric: trackingDelta,
+      value: ordersUnavailable ? unavailable : `${trackingQualityScore}%`,
+      meta: ordersUnavailable ? "Dati non sincronizzati" : "Attribution Shopify",
+      accent: ordersUnavailable ? "default" : scoreClass,
+      comparisonMetric: ordersUnavailable ? undefined : trackingDelta,
     },
   ];
 
@@ -112,6 +126,16 @@ export function ShopifyExecutiveStrip({
     <div className="shopify-executive-strip-wrap">
       {periodLabel && (
         <p className="shopify-panel__context">Performance del periodo: {periodLabel}</p>
+      )}
+      {orderDataCoverage?.message && (
+        <div
+          className={`shopify-coverage-banner shopify-coverage-banner--${
+            ordersUnavailable ? "critical" : "warning"
+          }`}
+          role="status"
+        >
+          {orderDataCoverage.message}
+        </div>
       )}
       <div className="shopify-executive-strip">
         {items.map((item) => (

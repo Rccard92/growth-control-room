@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -32,6 +32,11 @@ from app.services.shopify.comparison import (
     compute_period_snapshot,
 )
 from app.services.shopify.connect import get_shopify_client_for_store
+from app.services.shopify.data_coverage import (
+    OrderDataCoverage,
+    coverage_alert,
+    evaluate_order_data_coverage,
+)
 from app.services.shopify.period import ResolvedPeriod, order_effective_at_column
 from app.services.shopify.reconciliation import (
     build_reconciliation_diagnosis,
@@ -139,6 +144,7 @@ def _build_alerts(
     attribution_alerts: list[dict[str, Any]] | None = None,
     *,
     period_label: str = "nel periodo selezionato",
+    coverage: OrderDataCoverage | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
 
@@ -188,7 +194,10 @@ def _build_alerts(
                 }
             )
 
-    for product in products:
+    # With no reliable order data every active product would be flagged as
+    # "no sales", which is dozens of alerts saying nothing.
+    sales_alerts_meaningful = coverage is None or coverage.order_metrics_reliable
+    for product in products if sales_alerts_meaningful else []:
         if not _is_active_status(product.status):
             continue
         if product.shopify_gid not in period_sold_product_gids:
@@ -220,37 +229,15 @@ def _build_alerts(
                 }
             )
 
-    sync_dt = last_sync_at
-    if sync_dt is not None and sync_dt.tzinfo is None:
-        sync_dt = sync_dt.replace(tzinfo=UTC)
-    if sync_dt is None:
-        alerts.append(
-            {
-                "id": "sync-never",
-                "severity": "warning",
-                "title": "Sync non eseguito",
-                "description": (
-                    "Nessuna sincronizzazione registrata. Esegui un sync per aggiornare i dati."
-                ),
-                "entity_type": "sync",
-                "entity_id": None,
-                "action_label": "Sincronizza",
-            }
+    if coverage is None:
+        coverage = evaluate_order_data_coverage(
+            last_sync_at=last_sync_at,
+            period_start=datetime.now(UTC),
+            period_end=datetime.now(UTC),
         )
-    elif datetime.now(UTC) - sync_dt > timedelta(hours=24):
-        alerts.append(
-            {
-                "id": "sync-stale",
-                "severity": "warning",
-                "title": "Dati non aggiornati",
-                "description": (
-                    "Ultimo sync oltre 24 ore fa. I dati potrebbero non essere aggiornati."
-                ),
-                "entity_type": "sync",
-                "entity_id": None,
-                "action_label": "Sincronizza",
-            }
-        )
+    sync_alert = coverage_alert(coverage)
+    if sync_alert is not None:
+        alerts.append(sync_alert)
 
     if period_orders and not has_line_items:
         alerts.append(
@@ -590,6 +577,12 @@ async def build_dashboard(
         k: v for k, v in raw_attribution_intelligence.items() if not k.startswith("_")
     }
 
+    coverage = evaluate_order_data_coverage(
+        last_sync_at=store.last_sync_at,
+        period_start=period.start_at,
+        period_end=period.end_at_exclusive,
+    )
+
     alerts = _build_alerts(
         products,
         period_orders,
@@ -598,6 +591,7 @@ async def build_dashboard(
         store.last_sync_at,
         attribution_alerts,
         period_label=period.label.lower(),
+        coverage=coverage,
     )
 
     summary["critical_alerts_count"] = sum(1 for a in alerts if a["severity"] == "critical")
@@ -623,6 +617,7 @@ async def build_dashboard(
 
     return {
         "period": period.to_dict(),
+        "order_data_coverage": coverage.to_dict(),
         "comparison": comparison,
         "reconciliation": reconciliation_raw,
         "official_analytics": official_analytics_raw,

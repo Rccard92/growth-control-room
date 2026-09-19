@@ -17,6 +17,7 @@ from app.services.dataforseo.exceptions import (
     DataForSeoBudgetExceededError,
     DataForSeoRealCallsDisabledError,
 )
+from app.services.shopify.auto_sync import start_auto_sync, stop_auto_sync
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(_app: FastAPI):
     await init_db()
     await _bootstrap_initial_admin()
+    start_auto_sync()
     yield
+    await stop_auto_sync()
     await close_db()
 
 

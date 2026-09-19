@@ -2,12 +2,14 @@ import { FormEvent, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { useProject } from "../hooks/useProjects";
 import { useShopifyConnect, useShopifyOAuthStart } from "../hooks/useShopify";
 import { APP_ROUTES } from "../routes/config";
 
 export function ShopifyConnectPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { data: project } = useProject(id);
   const oauthStart = useShopifyOAuthStart(id!);
   const manualConnect = useShopifyConnect(id!);
   const [shopDomain, setShopDomain] = useState("");
@@ -38,7 +40,7 @@ export function ShopifyConnectPage() {
         subtitle="Autorizza Growth Control Room sul tuo store"
         breadcrumb={[
           { label: "Progetti", href: APP_ROUTES.projects },
-          { label: id ?? "", href: id ? APP_ROUTES.project(id) : undefined },
+          { label: project?.name ?? id ?? "", href: id ? APP_ROUTES.project(id) : undefined },
           { label: "Integrazioni", href: id ? APP_ROUTES.projectIntegrations(id) : undefined },
           { label: "Connetti" },
         ]}

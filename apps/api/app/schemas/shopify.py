@@ -698,10 +698,27 @@ class ShopifyOfficialAnalyticsResponse(BaseModel):
     )
 
 
+class ShopifyOrderDataCoverage(BaseModel):
+    """Whether the synced orders actually cover the selected period."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    status: str = "covered"
+    order_metrics_reliable: bool = Field(default=True, serialization_alias="orderMetricsReliable")
+    is_stale: bool = Field(default=False, serialization_alias="isStale")
+    last_sync_at: str | None = Field(default=None, serialization_alias="lastSyncAt")
+    covered_until: str | None = Field(default=None, serialization_alias="coveredUntil")
+    message: str | None = None
+
+
 class ShopifyDashboardResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     period: ShopifyDashboardPeriod
+    order_data_coverage: ShopifyOrderDataCoverage = Field(
+        default_factory=ShopifyOrderDataCoverage,
+        serialization_alias="orderDataCoverage",
+    )
     comparison: ShopifyDashboardComparison
     reconciliation: ShopifyDashboardReconciliation
     official_analytics: ShopifyOfficialAnalytics = Field(

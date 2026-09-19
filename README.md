@@ -195,6 +195,32 @@ Dopo ogni modifica agli scope serve **riconnettere Shopify**: i token OAuth gia'
 emessi non ereditano i nuovi permessi. Verifica con
 `GET /api/projects/{id}/shopify/scopes`.
 
+### Sync automatico
+
+Il sync Shopify non è più solo manuale. L'API esegue un ciclo periodico che
+risincronizza gli store collegati i cui dati sono più vecchi della soglia configurata.
+Il ciclo prende un **advisory lock Postgres**, quindi con più repliche ne lavora una sola.
+
+| Variabile | Default | Descrizione |
+|-----------|---------|-------------|
+| `SHOPIFY_AUTO_SYNC_ENABLED` | `true` | Abilita il ciclo automatico |
+| `SHOPIFY_AUTO_SYNC_INTERVAL_MINUTES` | `180` | Ogni quanto controllare gli store |
+| `SHOPIFY_AUTO_SYNC_MAX_AGE_MINUTES` | `720` | Età oltre la quale uno store va risincronizzato |
+
+Con i default, ogni store viene aggiornato almeno due volte al giorno.
+
+**Limite Shopify da conoscere:** con lo scope `read_orders` (senza `read_all_orders`,
+che richiede approvazione Partner) l'API espone solo gli **ultimi 60 giorni** di ordini.
+Se il sync resta fermo più a lungo, gli ordini nel mezzo non sono più recuperabili.
+
+### Copertura dati nella dashboard
+
+Le metriche ordine sono calcolate su quello che il sync ha in locale. Se il periodo
+selezionato non è coperto dall'ultimo sync, la dashboard mostra `n/d` al posto di `0,00 €`
+e un banner che spiega il motivo, invece di far sembrare "nessuna vendita" quello che in
+realtà è "nessun dato". Il campo `orderDataCoverage` della risposta espone
+`status` (`covered` / `partial` / `uncovered` / `never_synced`) e `orderMetricsReliable`.
+
 ### Flusso utente
 
 1. Apri un progetto → **Integrazioni** → Shopify → **Connetti**

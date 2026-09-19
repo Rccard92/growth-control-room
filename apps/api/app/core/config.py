@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     secrets_encryption_key: str | None = None
     initial_admin_email: str | None = None
     initial_admin_password: str | None = None
+    shopify_auto_sync_enabled: bool = True
+    shopify_auto_sync_interval_minutes: int = 180
+    shopify_auto_sync_max_age_minutes: int = 720
+    shopify_auto_sync_startup_delay_seconds: int = 60
     cors_origins: str = "*"
     app_env: str = "production"
     shopify_client_id: str | None = None

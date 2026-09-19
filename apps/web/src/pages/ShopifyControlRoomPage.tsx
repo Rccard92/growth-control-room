@@ -224,6 +224,7 @@ export function ShopifyControlRoomPage() {
             formatMoney={(value) => formatShopifyMoney(value, "EUR")}
             periodLabel={periodLabel}
             comparison={blocks.comparison}
+            orderDataCoverage={dashboard.orderDataCoverage}
           />
 
           <MetricBreakdownPanel

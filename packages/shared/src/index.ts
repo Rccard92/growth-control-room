@@ -117,6 +117,8 @@ export type {
   ShopifyInsightSeverity,
   ShopifyProduct,
   ShopifyOrder,
+  ShopifyOrderDataCoverage,
+  ShopifyOrderDataCoverageStatus,
 } from "./types/shopify";
 export type {
   SeoAuditIssue,

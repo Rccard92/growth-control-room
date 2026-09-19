@@ -453,8 +453,25 @@ export interface ShopifyDailyDiagnosisItem {
   severity: ShopifyInsightSeverity;
 }
 
+export type ShopifyOrderDataCoverageStatus =
+  | "covered"
+  | "partial"
+  | "uncovered"
+  | "never_synced";
+
+/** Whether the synced orders actually cover the selected period. */
+export interface ShopifyOrderDataCoverage {
+  status: ShopifyOrderDataCoverageStatus;
+  orderMetricsReliable: boolean;
+  isStale: boolean;
+  lastSyncAt: string | null;
+  coveredUntil: string | null;
+  message: string | null;
+}
+
 export interface ShopifyDashboard {
   period: ShopifyDashboardPeriod;
+  orderDataCoverage?: ShopifyOrderDataCoverage;
   comparison: ShopifyDashboardComparison;
   reconciliation: ShopifyDashboardReconciliation;
   officialAnalytics: ShopifyOfficialAnalytics;
