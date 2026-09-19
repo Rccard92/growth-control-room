@@ -10,6 +10,81 @@ Qui si risponde a una sola domanda: **questa parte funziona e si può mettere on
 
 ---
 
+## Aggiornamento 2026-09-19 — correzioni applicate
+
+Tutto ciò che questo documento segnalava è stato corretto, tranne due voci elencate in
+fondo alla sezione. La suite è verde: **1052 test backend, 356 frontend, lint pulito**.
+
+### Blocchi al go-live
+
+| Blocco | Stato | Cosa è cambiato |
+|---|---|---|
+| Endpoint di scrittura pubblici | ✅ risolto | Login con password (scrypt) e sessioni bearer lato server. Tutti gli endpoint richiedono un utente tranne health, login e le callback OAuth. Un test percorre l'intera superficie OpenAPI e fallisce se una route resta raggiungibile in anonimo |
+| Token non cifrati | ✅ risolto | Fernet con rotazione multi-chiave, migration `044` che ricifra i payload esistenti, avvio rifiutato in produzione senza `SECRETS_ENCRYPTION_KEY` |
+| Multi-tenancy finta | ✅ risolto | I progetti sono filtrati sul workspace dell'utente: un id di un altro tenant restituisce 404 |
+| `write_products` mancante | ✅ risolto | Aggiunto agli scope di default, in `.env.example` e nel README |
+| Sync sincrono e senza throttling | ⚠️ mitigato | Retry con backoff su `THROTTLED`, 429 e 5xx; sync prodotti in streaming con commit progressivo. Resta dentro la richiesta HTTP: vedi sotto |
+
+### Bug
+
+| Bug | Stato |
+|---|---|
+| BUG 1 — il sanitizer chiude il wrapper a metà articolo | ✅ risolto, con stack che distingue i tag emessi dai soppressi |
+| BUG 2 — tabelle, `<br>`, `<img>` distrutti | ✅ risolto: aggiunti tabelle, `br`, `img`, `figure`, `h4`; `h1`/`h5`/`h6` e `b`/`i` rimappati invece che appiattiti |
+| BUG 3 — cambio handle senza redirect | ✅ risolto: `redirectNewHandle: true` sempre presente quando l'handle cambia |
+| BUG 4 — `/api/debug/routes` rotto | ✅ risolto: endpoint rimosso, `uv.lock` committato, dipendenze bloccate |
+| BUG 5 — 9 test stantii | ✅ risolti tutti, con date relative invece che hardcoded |
+
+### Rischi medi
+
+| # | Stato |
+|---|---|
+| 1 — nessuna guardia di concorrenza sull'apply | ✅ risolto: rilettura dei valori live prima di scrivere, 409 `upstream_drift` se un campo è cambiato |
+| 2 — apply non atomico | ⚠️ invariato: la scrittura scalare e quella degli alt restano due chiamate. Il change log registra entrambe e il retry è idempotente |
+| 3 — mutation deprecate | ⚠️ **non toccate di proposito** (vedi sotto) |
+| 4 — N+1 nell'analisi | ✅ risolto con una query unica |
+| 5 — prodotti non `ACTIVE` saltati in silenzio | ✅ risolto: contati e riportati in risposta |
+| 6 — nessuna validazione in scrittura | ✅ risolto: limiti di lunghezza, titoli non vuoti, formato handle |
+| 7 — costo immagini non tracciato | ✅ risolto per `gpt-image-2` e le versioni successive |
+| 8 — nessun connection pooling | ⚠️ invariato, impatto solo di latenza |
+| 9 — `target="_blank"` rimosso | ✅ risolto, con `noopener noreferrer` forzato |
+
+### Altro aggiunto
+
+- **CI GitHub Actions**: ruff lint e format, pytest, typecheck, build e test frontend.
+- **Ruff configurato** e tutte le segnalazioni risolte (ha trovato, fra l'altro, un
+  `assert` mancante in un test e un import morto che rendeva inutile un patch).
+- **`conftest.py` e configurazione pytest**: la suite parte con un semplice `pytest`.
+- **Dockerfile multi-stage**: API non-root con healthcheck, frontend servito da nginx con
+  compressione, cache header e header di sicurezza al posto di `vite preview`.
+- **Migration fuori dall'avvio del container** (`scripts/migrate.sh`).
+
+### Due cose deliberatamente non fatte
+
+1. **Le mutation deprecate non sono state migrate.** `productUpdate(input:)` e
+   `productUpdateMedia` funzionano ancora nelle versioni API 2026. Cambiarle in
+   `productUpdate(product: ProductUpdateInput!)` e `fileUpdate` senza poter provare su uno
+   store reale rischia di rompere la funzione principale proprio al go-live. Va fatto
+   subito dopo, con lo store di sviluppo davanti.
+
+2. **Il sync non è stato spostato su un job runner.** Serve un servizio Redis su Railway e
+   un worker separato: è una scelta di infrastruttura, non una correzione. Nel frattempo il
+   rischio è ridotto (retry sul throttling, streaming con commit progressivo), ma su un
+   catalogo molto grande il sync può ancora superare il timeout del gateway. È la Fase 1
+   della [roadmap](roadmap-control-room.md).
+
+### Da fare al deploy
+
+1. Generare `SECRETS_ENCRYPTION_KEY` e impostarla sul servizio API
+2. Impostare `CORS_ORIGINS` con il dominio WEB (il wildcard ora è rifiutato)
+3. Impostare `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD`
+4. Eseguire `./scripts/migrate.sh` come release step
+5. **Riconnettere Shopify e Google**: i token erano di fatto in chiaro, vanno riemessi;
+   la riconnessione serve anche per ottenere `write_products`
+6. Collaudo su store di sviluppo, in particolare il cambio handle con verifica del redirect
+
+---
+
 ## Verdetto
 
 **La pipeline è reale, completa e sostanzialmente corretta.** Non è una demo: la catena
