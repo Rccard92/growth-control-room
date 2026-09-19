@@ -16,7 +16,17 @@ async_session_factory: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global engine
     if engine is None:
-        engine = create_async_engine(settings.database_url_async, echo=False)
+        engine = create_async_engine(
+            settings.database_url_async,
+            echo=False,
+            # Railway's Postgres proxy drops idle connections. Without a liveness
+            # check the pool hands out a dead one and the request fails with
+            # "connection is closed" -- seen in production on 2026-09-15.
+            pool_pre_ping=True,
+            pool_recycle=settings.db_pool_recycle_seconds,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+        )
     return engine
 
 

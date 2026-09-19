@@ -13,6 +13,9 @@ class Settings(BaseSettings):
 
     database_url: str | None = None
     secrets_encryption_key: str | None = None
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_recycle_seconds: int = 1800
     initial_admin_email: str | None = None
     initial_admin_password: str | None = None
     shopify_auto_sync_enabled: bool = True
