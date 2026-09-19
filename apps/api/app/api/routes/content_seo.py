@@ -22,6 +22,7 @@ from app.schemas.content_seo_editorial import (
     EditorialBriefBatchJobResponse,
     EditorialBriefBatchStartRequest,
     EditorialBriefUpdateRequest,
+    EditorialCleanupRequest,
     EditorialImageActionResponse,
     EditorialImageEditRequest,
     EditorialItemAiUsageResponse,
@@ -73,6 +74,10 @@ from app.services.content.editorial_brief_batch_service import (
 from app.services.content.editorial_brief_service import (
     generate_editorial_brief,
     update_editorial_brief,
+)
+from app.services.content.editorial_cleanup_service import (
+    preview_editorial_cleanup,
+    run_editorial_cleanup,
 )
 from app.services.content.editorial_image_service import (
     approve_editorial_image,
@@ -219,8 +224,10 @@ async def content_seo_sync_shopify(
             await session.commit()
             if def_result.get("warnings"):
                 warnings.extend(def_result["warnings"][:3])
-        except Exception:
-            pass
+        except Exception as exc:
+            # Non-fatal for the content sync, but the user has to know it happened.
+            logger.warning("Sync definizioni metafield non riuscito: %s", exc)
+            warnings.append(f"Definizioni metafield non sincronizzate: {exc}")
         if collection_result.errors and collections_synced == 0:
             message = collection_result.errors[0]
         elif collection_result.warnings:
@@ -1020,6 +1027,46 @@ async def delete_content_seo_editorial_item(
 ) -> None:
     await get_project_for_user(project_id, session, current_user)
     await delete_editorial_item(session, project_id, item_id)
+
+
+@router.get("/{project_id}/content/seo/editorial-items/cleanup/preview")
+async def preview_content_seo_editorial_cleanup(
+    project_id: UUID,
+    include_drafts: bool = Query(default=True, alias="includeDrafts"),
+    abandoned_after_days: int = Query(default=30, ge=0, le=3650, alias="abandonedAfterDays"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """List the editorial items a cleanup would delete. Changes nothing."""
+    await get_project_for_user(project_id, session, current_user)
+    return await preview_editorial_cleanup(
+        session,
+        project_id,
+        include_drafts=include_drafts,
+        abandoned_after_days=abandoned_after_days,
+    )
+
+
+@router.post("/{project_id}/content/seo/editorial-items/cleanup")
+async def run_content_seo_editorial_cleanup(
+    project_id: UUID,
+    body: EditorialCleanupRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Delete unpublished editorial items. Requires an explicit confirm."""
+    await get_project_for_user(project_id, session, current_user)
+    try:
+        return await run_editorial_cleanup(
+            session,
+            project_id,
+            confirm=body.confirm,
+            item_ids=body.item_ids,
+            include_drafts=body.include_drafts,
+            abandoned_after_days=body.abandoned_after_days,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post(

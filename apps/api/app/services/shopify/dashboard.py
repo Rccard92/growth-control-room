@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -47,6 +48,8 @@ from app.services.shopify.shopifyql import (
     build_unavailable_official_analytics,
     fetch_official_analytics,
 )
+
+logger = logging.getLogger(__name__)
 
 SEO_MIN_LENGTH = 20
 PENDING_STATUSES = {"PENDING", "AUTHORIZED", "PARTIALLY_PAID"}
@@ -556,10 +559,18 @@ async def build_dashboard(
         }
     )
     try:
-        client = await get_shopify_client_for_store(store, session)
+        client = await get_shopify_client_for_store(store)
         official_analytics_raw = await fetch_official_analytics(client, period)
-    except Exception:
-        pass
+    except Exception as exc:
+        # Never swallow this silently: an exception here used to surface as a
+        # generic "ShopifyQL non disponibile" that blamed the OAuth scopes.
+        logger.warning("ShopifyQL non disponibile per store=%s: %s", store.shop_domain, exc)
+        official_analytics_raw = build_unavailable_official_analytics(
+            {
+                "message": f"ShopifyQL non raggiungibile: {exc}",
+                "error_code": "request_failed",
+            }
+        )
     official_analytics_raw.pop("_error", None)
 
     analytics_reconciliation_raw = build_analytics_reconciliation(

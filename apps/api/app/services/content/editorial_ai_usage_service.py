@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.version import APP_VERSION
 from app.models.ai_usage_log import AiUsageLog
 from app.schemas.content_seo_editorial import (
     EditorialAiGenerationInfo,
@@ -16,7 +17,7 @@ from app.schemas.content_seo_editorial import (
 BRIEF_OPERATION_KEYS = ("blog_brief_generation", "blog_brief_batch_item")
 ARTICLE_OPERATION_KEYS = ("article_draft_generation",)
 IMAGE_OPERATION_KEYS = ("editorial_image_generation", "editorial_image_edit")
-EDITORIAL_GENERATOR_VERSION = "0.5.14-alpha"
+EDITORIAL_GENERATOR_VERSION = APP_VERSION
 
 
 def build_ai_generation_snapshot_from_log(log: AiUsageLog) -> dict:

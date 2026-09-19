@@ -268,7 +268,7 @@ async def shopify_shopifyql_probe(
         )
 
     try:
-        client = await get_shopify_client_for_store(store, session)
+        client = await get_shopify_client_for_store(store)
         data = await probe_shopifyql(client)
     except ShopifyAPIError as exc:
         data = {
@@ -316,7 +316,7 @@ async def shopify_official_analytics(
 
     period = resolve_shopify_period(store, range, start_date, end_date)
     try:
-        client = await get_shopify_client_for_store(store, session)
+        client = await get_shopify_client_for_store(store)
         official = await fetch_official_analytics(client, period)
     except Exception:
         from app.services.shopify.shopifyql import build_unavailable_official_analytics

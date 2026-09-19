@@ -1017,3 +1017,16 @@ class ShopifyBlogsListResponse(BaseModel):
 
     blogs: list[ShopifyBlogListItem] = Field(default_factory=list)
     sync_required: bool = Field(default=False, serialization_alias="syncRequired")
+
+
+class EditorialCleanupRequest(BaseModel):
+    """Bulk delete of unpublished editorial items. Deliberately opt-in."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    confirm: bool = False
+    item_ids: list[UUID] | None = Field(default=None, validation_alias="itemIds")
+    include_drafts: bool = Field(default=True, validation_alias="includeDrafts")
+    abandoned_after_days: int = Field(
+        default=30, ge=0, le=3650, validation_alias="abandonedAfterDays"
+    )

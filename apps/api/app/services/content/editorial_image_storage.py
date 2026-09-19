@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from pathlib import Path
 from uuid import UUID
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.services.shopify.connect import get_shopify_store_for_project
+
+logger = logging.getLogger(__name__)
 
 PUBLIC_STORAGE_WARNING = (
     "Storage pubblico immagini non configurato: l'immagine non può essere inviata a Shopify."
@@ -147,8 +150,9 @@ def delete_editorial_image(storage_path: str | None) -> None:
                 client_kwargs["endpoint_url"] = endpoint
             client = boto3.client(**client_kwargs)
             client.delete_object(Bucket=settings.editorial_image_s3_bucket, Key=storage_path)
-        except Exception:
-            return
+        except Exception as exc:
+            # A failed delete leaves an orphaned object, which is worth knowing about.
+            logger.warning("Rimozione immagine da S3 non riuscita (%s): %s", storage_path, exc)
         return
 
     path = _images_root() / storage_path

@@ -221,6 +221,29 @@ e un banner che spiega il motivo, invece di far sembrare "nessuna vendita" quell
 realtà è "nessun dato". Il campo `orderDataCoverage` della risposta espone
 `status` (`covered` / `partial` / `uncovered` / `never_synced`) e `orderMetricsReliable`.
 
+### Pulizia item editoriali
+
+Gli articoli generati che non arrivano mai su Shopify (errori di pubblicazione,
+bozze abbandonate) si accumulano nel piano editoriale. La pulizia è in due passi,
+perché l'eliminazione è irreversibile:
+
+```bash
+# 1. anteprima: elenca cosa verrebbe eliminato, non tocca nulla
+curl -H "Authorization: Bearer $TOKEN" \
+  "$API/api/projects/$PROJECT_ID/content/seo/editorial-items/cleanup/preview"
+
+# 2. eliminazione: solo con confirm esplicito
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "content-type: application/json" \
+  -d '{"confirm": true}' \
+  "$API/api/projects/$PROJECT_ID/content/seo/editorial-items/cleanup"
+```
+
+Un item **non** viene mai eliminato se è pubblicato, programmato, o se ha un
+articolo su Shopify: cancellare la riga locale lascerebbe l'articolo orfano sul blog.
+Le bozze contano come abbandonate dopo 30 giorni senza modifiche
+(`abandonedAfterDays`); con `includeDrafts=false` si eliminano solo gli errori di
+pubblicazione. `itemIds` restringe la selezione, non la allarga mai.
+
 ### Flusso utente
 
 1. Apri un progetto → **Integrazioni** → Shopify → **Connetti**

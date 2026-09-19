@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+from app.core.version import APP_VERSION
 from app.services.content.editorial_ai_usage_service import (
     build_ai_generation_snapshot_from_log,
     get_editorial_item_ai_usage,
@@ -39,7 +40,8 @@ def test_build_ai_generation_snapshot_from_log() -> None:
     assert snap["model"] == "gpt-5.4"
     assert snap["operation_key"] == "blog_brief_generation"
     assert snap["estimated_total_cost"] == 0.012
-    assert snap["generator_version"] == "0.5.14-alpha"
+    # Pinned to the single app version constant, not a copy that drifts.
+    assert snap["generator_version"] == APP_VERSION
 
 
 def test_build_ai_generation_snapshot_null_cost() -> None:

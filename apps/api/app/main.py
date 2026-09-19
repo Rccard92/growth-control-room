@@ -11,6 +11,7 @@ from app.api.router import api_router, public_api_router
 from app.api.routes import google_integrations, projects
 from app.api.validation_helpers import is_json_string_body_validation_error
 from app.core.config import settings
+from app.core.version import APP_VERSION
 from app.db.session import close_db, init_db
 from app.services.ai.exceptions import AiBudgetExceededError, AiSingleRequestBlockedError
 from app.services.dataforseo.exceptions import (
@@ -49,7 +50,7 @@ async def _bootstrap_initial_admin() -> None:
 app = FastAPI(
     title="Growth Control Room API",
     description="API per la piattaforma multi-brand e-commerce/marketing",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
