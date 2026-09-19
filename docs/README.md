@@ -12,6 +12,7 @@ Indice della documentazione del progetto.
 - [Ottimizzazione costi AI](cost-optimization.md) — tier, context e riduzione spesa
 - [Audit tecnico 2026-09](audit-2026-09.md) — stato reale del progetto, punti forti e criticità
 - [Roadmap Control Room](roadmap-control-room.md) — piano completo verso la control room multi-canale
+- [Verifica SEO/Content pre-go-live](verifica-seo-content-2026-09.md) — stato del modulo SEO, editorial e publishing Shopify
 
 ## Convenzioni
 
